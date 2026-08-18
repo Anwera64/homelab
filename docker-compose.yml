@@ -1,0 +1,168 @@
+services:
+  # ==============================================================================
+  # 1. Network & VPN Gateway (Gluetun)
+  # ==============================================================================
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
+      - TZ=${TZ:-America/Mexico_City}
+    ports:
+      - 8080:8080       # qBittorrent Web UI
+      - 8191:8191       # FlareSolverr Web API
+      - 6881:6881       # qBittorrent Torrent Protocol (TCP)
+      - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 2. Download Clients & Solvers (Routed strictly through VPN)
+  # ==============================================================================
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Mexico_City}
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - ${CONFIG_PATH}/qbittorrent:/config
+      - ${DOWNLOADS_PATH}:/downloads
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Mexico_City}
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 3. Arr Automation Suite
+  # ==============================================================================
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/prowlarr:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/radarr:/config
+      - ${MOVIES_PATH}:/movies
+      - ${DOWNLOADS_PATH}:/downloads
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/sonarr:/config
+      - ${SHOWS_PATH}:/tv
+      - ${DOWNLOADS_PATH}:/downloads
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/bazarr:/config
+      - ${MOVIES_PATH}:/movies
+      - ${SHOWS_PATH}:/tv
+    ports:
+      - 6767:6767
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 4. Request UI & Discovery (Jellyseerr)
+  # ==============================================================================
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/jellyseerr:/app/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 5. Media Server (Jellyfin with RTX 5080 NVENC Transcoding)
+  # ==============================================================================
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/jellyfin/config:/config
+      - ${CONFIG_PATH}/jellyfin/cache:/cache
+      - ${MOVIES_PATH}:/media/movies:ro
+      - ${SHOWS_PATH}:/media/tv:ro
+    ports:
+      - 8096:8096
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 6. Dashboard & Unified Portal (Homepage)
+  # ==============================================================================
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/homepage:/app/config
+    ports:
+      - 3000:3000
+    restart: unless-stopped

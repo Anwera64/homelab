@@ -1,92 +1,82 @@
 # startup_homelab.ps1
-# Runs all Arr apps, download clients, and media servers on demand
+# Starts the entire Dockerized Homelab media stack and verifies health
 
-Write-Host "Initializing Media Stack..." -ForegroundColor Cyan
-
-# 1. Ensure NordVPN is connected and actively routing traffic
-$nordPath = "C:\Program Files\NordVPN\NordVPN.exe"
-
-function Test-NordVpnRouted {
-    $route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Where-Object { 
-        $_.InterfaceAlias -like "*Nord*" 
-    }
-    return ($null -ne $route)
+# Always ensure working directory is this repository folder
+if ($PSScriptRoot) {
+    Set-Location -Path $PSScriptRoot
 }
 
-if (Test-NordVpnRouted) {
-    Write-Host "NordVPN is already connected and routing traffic. Skipping connection wait." -ForegroundColor Green
-} elseif (Test-Path $nordPath) {
-    Write-Host "NordVPN is disconnected. Connecting to fastest server..." -ForegroundColor Yellow
-    # Trigger auto-connect via NordVPN CLI
-    & "$nordPath" -c
+Write-Host "=====================================================" -ForegroundColor Cyan
+Write-Host "         [+] Starting Homelab Media Stack            " -ForegroundColor Cyan
+Write-Host "=====================================================" -ForegroundColor Cyan
 
-    Write-Host "Waiting for VPN tunnel and routing to establish..." -ForegroundColor Cyan
-    $timeoutSeconds = 12
-    $elapsed = 0
-    $connected = $false
+# 1. Verify Docker CLI is available
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Host "[ERROR] Docker is not installed or not in PATH." -ForegroundColor Red
+    Write-Host "Please install Docker Desktop and start it before running this script." -ForegroundColor Yellow
+    exit 1
+}
 
-    while ($elapsed -lt $timeoutSeconds) {
-        Start-Sleep -Seconds 1
-        $elapsed++
-        if (Test-NordVpnRouted) {
-            Write-Host "VPN tunnel secured and routed in $elapsed second(s)!" -ForegroundColor Green
-            $connected = $true
-            break
+# 2. Check if Docker Daemon is running
+Write-Host "Checking Docker engine status..." -ForegroundColor DarkGray
+docker info >$null 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Docker daemon is not running. Attempting to start Docker Desktop..." -ForegroundColor Yellow
+    $possiblePaths = @(
+        "$env:LOCALAPPDATA\Programs\DockerDesktop\Docker Desktop.exe",
+        "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    )
+    $dockerDesktopPath = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($dockerDesktopPath) {
+        Start-Process $dockerDesktopPath
+        Write-Host "Waiting for Docker daemon to initialize..." -ForegroundColor Cyan
+        $retries = 30
+        while ($retries -gt 0) {
+            Start-Sleep -Seconds 2
+            docker info >$null 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Docker daemon is ready!" -ForegroundColor Green
+                break
+            }
+            $retries--
         }
-    }
-
-    if (-not $connected) {
-        Write-Host "Warning: VPN connection timed out after $timeoutSeconds seconds. Proceeding..." -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "NordVPN not found at $nordPath. Please verify the installation path." -ForegroundColor Red
-}
-
-# 2. Define exact paths for your main applications
-$apps = @(
-    "C:\ProgramData\Sonarr\bin\Sonarr.exe",
-    "C:\ProgramData\Radarr\bin\Radarr.exe",
-    "C:\ProgramData\Prowlarr\bin\Prowlarr.exe",
-    "C:\Program Files\qBittorrent\qbittorrent.exe",
-    "C:\Program Files\Jellyfin\Server\jellyfin-windows-tray\Jellyfin.Windows.Tray.exe"
-)
-
-# Launch each media application in the background
-foreach ($app in $apps) {
-    if (Test-Path $app) {
-        Write-Host "Launching $app..." -ForegroundColor DarkGray
-        Start-Process -FilePath $app -WindowStyle Minimized
+        if ($retries -eq 0) {
+            Write-Host "[ERROR] Timed out waiting for Docker engine." -ForegroundColor Red
+            exit 1
+        }
     } else {
-        Write-Host "File not found (Skipping): $app" -ForegroundColor Red
+        Write-Host "[ERROR] Could not find Docker Desktop executable." -ForegroundColor Red
+        Write-Host "Please start Docker Desktop manually from your Start Menu." -ForegroundColor Yellow
+        exit 1
     }
 }
 
-# 3. Launch FlareSolverr (Standalone Executable or Docker container)
-$flarePaths = @(
-    "$env:USERPROFILE\Downloads\flaresolverr_windows_x64\flaresolverr\flaresolverr.exe",
-    "C:\Program Files\FlareSolverr\flaresolverr.exe",
-    "C:\FlareSolverr\flaresolverr.exe"
-)
-$flareStarted = $false
-
-foreach ($fPath in $flarePaths) {
-    if (Test-Path $fPath) {
-        Write-Host "Launching FlareSolverr..." -ForegroundColor DarkGray
-        Start-Process -FilePath $fPath -WindowStyle Minimized
-        $flareStarted = $true
-        break
-    }
+# 3. Check for .env file
+if (-not (Test-Path "$PSScriptRoot\.env")) {
+    Write-Host "[WARNING] No .env file found. Copying from .env.example..." -ForegroundColor Yellow
+    Copy-Item "$PSScriptRoot\.env.example" "$PSScriptRoot\.env"
+    Write-Host "Please configure your .env file with your WIREGUARD_PRIVATE_KEY!" -ForegroundColor Red
 }
 
-if (-not $flareStarted -and (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Host "Starting FlareSolverr Docker container..." -ForegroundColor DarkGray
-    docker start flaresolverr 2>$null
-    $flareStarted = $true
-}
+# 4. Bring up the stack with Docker Compose
+Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
+docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
 
-if (-not $flareStarted) {
-    Write-Host "FlareSolverr not found. If you moved it, please update its path in this script." -ForegroundColor Yellow
+if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
+    Write-Host "=====================================================" -ForegroundColor Green
+    Write-Host "     [SUCCESS] All Homelab Services Are Up & Running " -ForegroundColor Green
+    Write-Host "=====================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  * Dashboard:    http://localhost:3000" -ForegroundColor White
+    Write-Host "  * Jellyfin:     http://localhost:8096" -ForegroundColor White
+    Write-Host "  * Jellyseerr:   http://localhost:5055" -ForegroundColor White
+    Write-Host "  * qBittorrent:  http://localhost:8080 (via Gluetun VPN)" -ForegroundColor White
+    Write-Host "  * Radarr:       http://localhost:7878" -ForegroundColor White
+    Write-Host "  * Sonarr:       http://localhost:8989" -ForegroundColor White
+    Write-Host "  * Prowlarr:     http://localhost:9696" -ForegroundColor White
+    Write-Host "  * Bazarr:       http://localhost:6767" -ForegroundColor White
+    Write-Host ""
+} else {
+    Write-Host "[ERROR] Failed to start one or more containers. Check logs with 'docker compose logs'." -ForegroundColor Red
 }
-
-Write-Host "Media Stack is up and running safely!" -ForegroundColor Green
-Start-Sleep -Seconds 3

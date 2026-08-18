@@ -1,0 +1,11 @@
+# Environment / Secrets
+.env
+*.env.local
+
+# Container configuration data (databases, local caches)
+config/
+data/
+
+# Logs
+*.log
+logs/

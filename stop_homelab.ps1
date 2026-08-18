@@ -1,29 +1,30 @@
-# Stop_Media_Stack.ps1
+# stop_homelab.ps1
+# Cleanly terminates all Docker containers in the Homelab stack
 
-# 1. Auto-elevate script to run as Administrator
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
-    exit
+# Always ensure working directory is this repository folder
+if ($PSScriptRoot) {
+    Set-Location -Path $PSScriptRoot
 }
 
-Write-Host "Stopping Media Stack..." -ForegroundColor Red
+Write-Host "=====================================================" -ForegroundColor Yellow
+Write-Host "         [-] Stopping Homelab Media Stack            " -ForegroundColor Yellow
+Write-Host "=====================================================" -ForegroundColor Yellow
 
-# 2. Stop Windows Services (if registered as services)
-$serviceNames = @("Sonarr", "Radarr", "Prowlarr", "JellyfinServer")
-foreach ($service in $serviceNames) {
-    Get-Service -Name $service -ErrorAction SilentlyContinue | Stop-Service -Force
+# 1. Stop Docker Compose Stack
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+    Write-Host "Stopping Docker containers..." -ForegroundColor DarkGray
+    docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" down
 }
 
-# 3. Force-kill processes (including Jellyfin Server and Tray apps)
+# 2. Cleanup any legacy standalone Windows processes if lingering
 $processNames = @("Sonarr", "Radarr", "Prowlarr", "qbittorrent", "jellyfin", "jellyfin-tray", "Jellyfin.Windows.Tray", "flaresolverr")
 foreach ($proc in $processNames) {
-    Stop-Process -Name $proc -ErrorAction SilentlyContinue -Force
+    $found = Get-Process -Name $proc -ErrorAction SilentlyContinue
+    if ($found) {
+        Write-Host "Terminating legacy host process: $proc" -ForegroundColor DarkGray
+        Stop-Process -Name $proc -ErrorAction SilentlyContinue -Force
+    }
 }
 
-# 4. Stop FlareSolverr if running via Docker
-if (Get-Command docker -ErrorAction SilentlyContinue) {
-    docker stop flaresolverr 2>$null
-}
-
-Write-Host "All media services, processes, and containers have been stopped!" -ForegroundColor Green
-Start-Sleep -Seconds 3
+Write-Host ""
+Write-Host "[SUCCESS] All Homelab services have been successfully stopped!" -ForegroundColor Green
