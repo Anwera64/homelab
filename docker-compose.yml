@@ -166,3 +166,19 @@ services:
     ports:
       - 3000:3000
     restart: unless-stopped
+
+  # ==============================================================================
+  # 7. TRaSH Guides Automation (Recyclarr)
+  # ==============================================================================
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8
+    container_name: recyclarr
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+      - CRON_SCHEDULE=0 3 * * * # Automatically sync daily at 3:00 AM
+    volumes:
+      - ${CONFIG_PATH}/recyclarr:/config
+    depends_on:
+      - sonarr
+      - radarr
+    restart: unless-stopped

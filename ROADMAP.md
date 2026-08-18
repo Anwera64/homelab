@@ -38,6 +38,7 @@ graph TD
         RAD & SON --> QBIT
         FLARE --> PROW
         BAZ[📝 Bazarr] --> RAD & SON
+        RECYC[♻️ Recyclarr - TRaSH Guides Auto-Sync] --> RAD & SON
     end
 
     subgraph MediaStorage [Local Media Libraries]
@@ -94,4 +95,5 @@ graph TD
 | **Sonarr** | [http://localhost:8989](http://localhost:8989) | TV series manager |
 | **Prowlarr** | [http://localhost:9696](http://localhost:9696) | Indexers manager |
 | **Bazarr** | [http://localhost:6767](http://localhost:6767) | Subtitles manager |
+| **Recyclarr** | Container (Cron `0 3 * * *`) | TRaSH Guides quality & format sync |
 | **FlareSolverr** | [http://localhost:8191](http://localhost:8191) | Solvers API |
