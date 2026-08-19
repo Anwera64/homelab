@@ -1,0 +1,46 @@
+# ==============================================================================
+# Caddyfile - Homelab Reverse Proxy Configuration
+# ==============================================================================
+
+{
+    admin off
+}
+
+# ------------------------------------------------------------------------------
+# 1. Main Dashboard Entrypoints (Homepage)
+# ------------------------------------------------------------------------------
+# Tailscale HTTPS/HTTP, Default Port 80, localhost, desktop-kujo8mp, and LAN IP
+homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
+    reverse_proxy homepage:3000
+}
+
+# ------------------------------------------------------------------------------
+# 2. Dedicated Service Hostnames
+# ------------------------------------------------------------------------------
+http://jellyfin.local, http://jellyfin.homelab.local {
+    reverse_proxy jellyfin:8096
+}
+
+http://jellyseerr.local, http://seerr.local, http://seerr.homelab.local {
+    reverse_proxy jellyseerr:5055
+}
+
+http://sonarr.local, http://sonarr.homelab.local {
+    reverse_proxy sonarr:8989
+}
+
+http://radarr.local, http://radarr.homelab.local {
+    reverse_proxy radarr:7878
+}
+
+http://prowlarr.local, http://prowlarr.homelab.local {
+    reverse_proxy prowlarr:9696
+}
+
+http://bazarr.local, http://bazarr.homelab.local {
+    reverse_proxy bazarr:6767
+}
+
+http://qbittorrent.local, http://qbit.local, http://qbit.homelab.local {
+    reverse_proxy gluetun:8080
+}

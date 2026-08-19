@@ -159,6 +159,7 @@ services:
     container_name: homepage
     environment:
       - TZ=${TZ:-America/Mexico_City}
+      - HOMEPAGE_ALLOWED_HOSTS=*
     volumes:
       - ${CONFIG_PATH}/homepage:/app/config
     ports:
@@ -180,3 +181,51 @@ services:
       - sonarr
       - radarr
     restart: unless-stopped
+
+  # ==============================================================================
+  # 8. Remote Mesh Gateway (Tailscale)
+  # ==============================================================================
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: ${TS_HOSTNAME:-homelab}
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+      - TS_HOSTNAME=${TS_HOSTNAME:-homelab}
+      - TS_USERSPACE=false
+    volumes:
+      - ${CONFIG_PATH}/tailscale:/var/lib/tailscale
+      - tailscale_sock:/var/run/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 9. Reverse Proxy & Hostname Routing (Caddy)
+  # ==============================================================================
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    network_mode: "service:tailscale"
+    volumes:
+      - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ${CONFIG_PATH}/caddy/data:/data
+      - ${CONFIG_PATH}/caddy/config:/config
+      - tailscale_sock:/var/run/tailscale
+    depends_on:
+      - tailscale
+      - homepage
+    restart: unless-stopped
+
+volumes:
+  tailscale_sock:
+
+
+

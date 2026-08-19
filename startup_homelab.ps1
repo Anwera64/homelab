@@ -68,14 +68,24 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "     [SUCCESS] All Homelab Services Are Up & Running " -ForegroundColor Green
     Write-Host "=====================================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  * Dashboard:    http://localhost:3000   (LAN: http://192.168.1.20:3000)" -ForegroundColor White
-    Write-Host "  * Jellyfin:     http://localhost:8096   (LAN / TV: http://192.168.1.20:8096)" -ForegroundColor White
-    Write-Host "  * Jellyseerr:   http://localhost:5055   (LAN / Mobile: http://192.168.1.20:5055)" -ForegroundColor White
-    Write-Host "  * qBittorrent:  http://localhost:8080   (via Gluetun VPN)" -ForegroundColor White
-    Write-Host "  * Radarr:       http://localhost:7878" -ForegroundColor White
-    Write-Host "  * Sonarr:       http://localhost:8989" -ForegroundColor White
-    Write-Host "  * Prowlarr:     http://localhost:9696" -ForegroundColor White
-    Write-Host "  * Bazarr:       http://localhost:6767" -ForegroundColor White
+    Write-Host "  --- Remote Access (Tailscale Mesh VPN) ---" -ForegroundColor Magenta
+    Write-Host "  * Secure Portal:  https://homelab.llama-porbeagle.ts.net" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  --- Local Hostname Access (Port 80 / Caddy) ---" -ForegroundColor Cyan
+    Write-Host "  * Central Portal: http://desktop-kujo8mp   (or http://192.168.1.20)" -ForegroundColor Yellow
+    Write-Host "  * Jellyfin:       http://desktop-kujo8mp:8096" -ForegroundColor White
+    Write-Host "  * Jellyseerr:     http://desktop-kujo8mp:5055" -ForegroundColor White
+    Write-Host "  * Sonarr:         http://desktop-kujo8mp:8989" -ForegroundColor White
+    Write-Host "  * Radarr:         http://desktop-kujo8mp:7878" -ForegroundColor White
+    Write-Host "  * Prowlarr:       http://desktop-kujo8mp:9696" -ForegroundColor White
+    Write-Host "  * Bazarr:         http://desktop-kujo8mp:6767" -ForegroundColor White
+    Write-Host "  * qBittorrent:    http://desktop-kujo8mp:8080" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  --- Legacy Direct Port Fallbacks ---" -ForegroundColor DarkGray
+    Write-Host "  * Dashboard:      http://localhost:3000   (LAN: http://192.168.1.20:3000)" -ForegroundColor DarkGray
+    Write-Host "  * Jellyfin:       http://localhost:8096   (LAN / TV: http://192.168.1.20:8096)" -ForegroundColor DarkGray
+    Write-Host "  * Jellyseerr:     http://localhost:5055   (LAN / Mobile: http://192.168.1.20:5055)" -ForegroundColor DarkGray
+    Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
     Write-Host ""
 } else {
     Write-Host "[ERROR] Failed to start one or more containers. Check logs with 'docker compose logs'." -ForegroundColor Red
