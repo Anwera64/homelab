@@ -21,30 +21,30 @@ homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.l
 # ------------------------------------------------------------------------------
 # 2. Service Port Reverse Proxies (Accessible locally & via Tailscale)
 # ------------------------------------------------------------------------------
-:8096 {
+homelab.llama-porbeagle.ts.net:8096, :8096 {
     reverse_proxy jellyfin:8096
 }
 
-:5055 {
+homelab.llama-porbeagle.ts.net:5055, :5055 {
     reverse_proxy jellyseerr:5055
 }
 
-:8080 {
+homelab.llama-porbeagle.ts.net:8080, :8080 {
     reverse_proxy gluetun:8080
 }
 
-:8989 {
+homelab.llama-porbeagle.ts.net:8989, :8989 {
     reverse_proxy sonarr:8989
 }
 
-:7878 {
+homelab.llama-porbeagle.ts.net:7878, :7878 {
     reverse_proxy radarr:7878
 }
 
-:9696 {
+homelab.llama-porbeagle.ts.net:9696, :9696 {
     reverse_proxy prowlarr:9696
 }
 
-:6767 {
+homelab.llama-porbeagle.ts.net:6767, :6767 {
     reverse_proxy bazarr:6767
 }

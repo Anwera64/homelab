@@ -16,6 +16,7 @@
       
       if (!isStandardPort && targetUrl.port) {
         targetUrl.hostname = currentUrl.hostname;
+        targetUrl.protocol = currentUrl.protocol;
         return targetUrl.toString();
       }
 
