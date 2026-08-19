@@ -68,10 +68,10 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "     [SUCCESS] All Homelab Services Are Up & Running " -ForegroundColor Green
     Write-Host "=====================================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  * Dashboard:    http://localhost:3000" -ForegroundColor White
-    Write-Host "  * Jellyfin:     http://localhost:8096" -ForegroundColor White
-    Write-Host "  * Jellyseerr:   http://localhost:5055" -ForegroundColor White
-    Write-Host "  * qBittorrent:  http://localhost:8080 (via Gluetun VPN)" -ForegroundColor White
+    Write-Host "  * Dashboard:    http://localhost:3000   (LAN: http://192.168.1.20:3000)" -ForegroundColor White
+    Write-Host "  * Jellyfin:     http://localhost:8096   (LAN / TV: http://192.168.1.20:8096)" -ForegroundColor White
+    Write-Host "  * Jellyseerr:   http://localhost:5055   (LAN / Mobile: http://192.168.1.20:5055)" -ForegroundColor White
+    Write-Host "  * qBittorrent:  http://localhost:8080   (via Gluetun VPN)" -ForegroundColor White
     Write-Host "  * Radarr:       http://localhost:7878" -ForegroundColor White
     Write-Host "  * Sonarr:       http://localhost:8989" -ForegroundColor White
     Write-Host "  * Prowlarr:     http://localhost:9696" -ForegroundColor White
