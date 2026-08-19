@@ -3,20 +3,41 @@
 // ==============================================================================
 
 (function() {
+  var PORT_TO_PATH = {
+    '8096': '/jellyfin/',
+    '5055': '/seerr/',
+    '8080': '/qbit/',
+    '8989': '/sonarr/',
+    '7878': '/radarr/',
+    '9696': '/prowlarr/',
+    '6767': '/bazarr/'
+  };
+
   function adaptServiceUrl(targetHref, currentOrigin) {
     if (!targetHref || typeof targetHref !== 'string') {
       return targetHref;
     }
 
     try {
-      const targetUrl = new URL(targetHref, currentOrigin);
-      const currentUrl = new URL(currentOrigin);
+      var targetUrl = new URL(targetHref, currentOrigin);
+      var currentUrl = new URL(currentOrigin);
 
-      const isStandardPort = targetUrl.port === '' || targetUrl.port === '80' || targetUrl.port === '443';
+      var isStandardPort = targetUrl.port === '' || targetUrl.port === '80' || targetUrl.port === '443';
       
       if (!isStandardPort && targetUrl.port) {
+        var port = targetUrl.port;
+
+        // Remote Tailscale Ingress (HTTPS / *.ts.net) ➡️ Map to Port 443 HTTPS Subpath
+        if (currentUrl.protocol === 'https:' || currentUrl.hostname.indexOf('.ts.net') !== -1) {
+          var subPath = PORT_TO_PATH[port];
+          if (subPath) {
+            return currentUrl.origin + subPath;
+          }
+        }
+
+        // Local Ingress (LAN IP / Hostname / localhost) ➡️ Pure HTTP direct port
         targetUrl.hostname = currentUrl.hostname;
-        targetUrl.protocol = currentUrl.protocol;
+        targetUrl.protocol = 'http:';
         return targetUrl.toString();
       }
 
@@ -27,10 +48,10 @@
   }
 
   function rewriteLinks() {
-    const origin = window.location.href;
+    var origin = window.location.href;
     document.querySelectorAll('a[href]').forEach(function(anchor) {
       var currentHref = anchor.getAttribute('href');
-      if (currentHref && (currentHref.includes(':') || currentHref.startsWith('http'))) {
+      if (currentHref && (currentHref.indexOf(':') !== -1 || currentHref.indexOf('http') === 0)) {
         var adapted = adaptServiceUrl(currentHref, origin);
         if (adapted !== currentHref) {
           anchor.setAttribute('href', adapted);

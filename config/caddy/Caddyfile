@@ -7,44 +7,82 @@
 }
 
 # ------------------------------------------------------------------------------
-# 1. Main Dashboard Entrypoints (Homepage)
+# 1. Main Dashboard & Subpath Ingress (Remote HTTPS 443 + Local Port 80)
 # ------------------------------------------------------------------------------
-# Tailscale HTTPS/HTTP, Default Port 80, localhost, desktop-kujo8mp, and LAN IP
 homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
-    reverse_proxy homepage:3000
-}
+    # Service Subpaths for Remote HTTPS Ingress
+    handle_path /jellyfin/* {
+        reverse_proxy jellyfin:8096
+    }
+    redir /jellyfin /jellyfin/
 
-:3000 {
-    reverse_proxy homepage:3000
+    handle_path /seerr/* {
+        reverse_proxy jellyseerr:5055
+    }
+    redir /seerr /seerr/
+
+    handle_path /sonarr/* {
+        reverse_proxy sonarr:8989
+    }
+    redir /sonarr /sonarr/
+
+    handle_path /radarr/* {
+        reverse_proxy radarr:7878
+    }
+    redir /radarr /radarr/
+
+    handle_path /prowlarr/* {
+        reverse_proxy prowlarr:9696
+    }
+    redir /prowlarr /prowlarr/
+
+    handle_path /bazarr/* {
+        reverse_proxy bazarr:6767
+    }
+    redir /bazarr /bazarr/
+
+    handle_path /qbit/* {
+        reverse_proxy gluetun:8080
+    }
+    redir /qbit /qbit/
+
+    # Default to Homepage Dashboard
+    handle {
+        reverse_proxy homepage:3000
+    }
 }
 
 # ------------------------------------------------------------------------------
-# 2. Service Port Reverse Proxies (Accessible locally & via Tailscale)
+# 2. Local Port Direct Ingress (Pure HTTP on custom ports)
 # ------------------------------------------------------------------------------
-homelab.llama-porbeagle.ts.net:8096, :8096 {
+http://:8096 {
     reverse_proxy jellyfin:8096
 }
 
-homelab.llama-porbeagle.ts.net:5055, :5055 {
+http://:5055 {
     reverse_proxy jellyseerr:5055
 }
 
-homelab.llama-porbeagle.ts.net:8080, :8080 {
+http://:8080 {
     reverse_proxy gluetun:8080
 }
 
-homelab.llama-porbeagle.ts.net:8989, :8989 {
+http://:8989 {
     reverse_proxy sonarr:8989
 }
 
-homelab.llama-porbeagle.ts.net:7878, :7878 {
+http://:7878 {
     reverse_proxy radarr:7878
 }
 
-homelab.llama-porbeagle.ts.net:9696, :9696 {
+http://:9696 {
     reverse_proxy prowlarr:9696
 }
 
-homelab.llama-porbeagle.ts.net:6767, :6767 {
+http://:6767 {
     reverse_proxy bazarr:6767
+}
+
+http://:3000 {
+    reverse_proxy homepage:3000
 }
