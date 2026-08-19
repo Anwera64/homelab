@@ -16,8 +16,6 @@ services:
       - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
       - TZ=${TZ:-America/Mexico_City}
     ports:
-      - 8080:8080       # qBittorrent Web UI
-      - 8191:8191       # FlareSolverr Web API
       - 6881:6881       # qBittorrent Torrent Protocol (TCP)
       - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
     restart: unless-stopped
@@ -65,8 +63,6 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/prowlarr:/config
-    ports:
-      - 9696:9696
     restart: unless-stopped
 
   radarr:
@@ -79,8 +75,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/radarr:/config
       - ${MEDIA_ROOT}:/data
-    ports:
-      - 7878:7878
     restart: unless-stopped
 
   sonarr:
@@ -93,8 +87,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/sonarr:/config
       - ${MEDIA_ROOT}:/data
-    ports:
-      - 8989:8989
     restart: unless-stopped
 
   bazarr:
@@ -107,8 +99,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/bazarr:/config
       - ${MEDIA_ROOT}:/data
-    ports:
-      - 6767:6767
     restart: unless-stopped
 
   # ==============================================================================
@@ -122,8 +112,6 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/jellyseerr:/app/config
-    ports:
-      - 5055:5055
     restart: unless-stopped
 
   # ==============================================================================
@@ -140,8 +128,6 @@ services:
       - ${MEDIA_ROOT}:/data:ro
       - ${MOVIES_PATH}:/media/movies:ro
       - ${SHOWS_PATH}:/media/tv:ro
-    ports:
-      - 8096:8096
     deploy:
       resources:
         reservations:
@@ -162,8 +148,6 @@ services:
       - HOMEPAGE_ALLOWED_HOSTS=*
     volumes:
       - ${CONFIG_PATH}/homepage:/app/config
-    ports:
-      - 3000:3000
     restart: unless-stopped
 
   # ==============================================================================
@@ -205,6 +189,14 @@ services:
     ports:
       - 80:80
       - 443:443
+      - 3000:3000
+      - 8096:8096
+      - 5055:5055
+      - 8080:8080
+      - 8989:8989
+      - 7878:7878
+      - 9696:9696
+      - 6767:6767
     restart: unless-stopped
 
   # ==============================================================================
@@ -226,6 +218,3 @@ services:
 
 volumes:
   tailscale_sock:
-
-
-

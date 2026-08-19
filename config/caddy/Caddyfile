@@ -14,33 +14,37 @@ homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.l
     reverse_proxy homepage:3000
 }
 
+:3000 {
+    reverse_proxy homepage:3000
+}
+
 # ------------------------------------------------------------------------------
-# 2. Dedicated Service Hostnames
+# 2. Service Port Reverse Proxies (Accessible locally & via Tailscale)
 # ------------------------------------------------------------------------------
-http://jellyfin.local, http://jellyfin.homelab.local {
+:8096 {
     reverse_proxy jellyfin:8096
 }
 
-http://jellyseerr.local, http://seerr.local, http://seerr.homelab.local {
+:5055 {
     reverse_proxy jellyseerr:5055
 }
 
-http://sonarr.local, http://sonarr.homelab.local {
+:8080 {
+    reverse_proxy gluetun:8080
+}
+
+:8989 {
     reverse_proxy sonarr:8989
 }
 
-http://radarr.local, http://radarr.homelab.local {
+:7878 {
     reverse_proxy radarr:7878
 }
 
-http://prowlarr.local, http://prowlarr.homelab.local {
+:9696 {
     reverse_proxy prowlarr:9696
 }
 
-http://bazarr.local, http://bazarr.homelab.local {
+:6767 {
     reverse_proxy bazarr:6767
-}
-
-http://qbittorrent.local, http://qbit.local, http://qbit.homelab.local {
-    reverse_proxy gluetun:8080
 }
