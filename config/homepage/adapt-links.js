@@ -1,18 +1,18 @@
 /**
  * Dynamic Ingress Link Adapter for Homepage
  * Rewrites homelab service URLs dynamically based on how the user accessed Homepage.
- * - Remote HTTPS (Tailscale *.ts.net / https): Maps to clean HTTPS subpaths on port 443.
- * - Local LAN (http / hostname / LAN IP): Maps to pure HTTP direct ports with zero SSL conflicts.
+ * - Remote HTTPS (Tailscale *.ts.net / https): Maps to dedicated Let's Encrypt HTTPS ports.
+ * - Local LAN (http / hostname / LAN IP): Keeps standard pure HTTP ports (0 SSL errors).
  */
 
-const PORT_TO_PATH = {
-  '8096': '/jellyfin/',
-  '5055': '/seerr/',
-  '8080': '/qbit/',
-  '8989': '/sonarr/',
-  '7878': '/radarr/',
-  '9696': '/prowlarr/',
-  '6767': '/bazarr/'
+const HTTP_TO_HTTPS_PORT = {
+  '8096': '8443',   // Jellyfin
+  '5055': '15055',  // Jellyseerr
+  '8080': '18080',  // qBittorrent
+  '8989': '18989',  // Sonarr
+  '7878': '17878',  // Radarr
+  '9696': '19696',  // Prowlarr
+  '6767': '16767'   // Bazarr
 };
 
 function adaptServiceUrl(targetHref, currentOrigin) {
@@ -24,22 +24,23 @@ function adaptServiceUrl(targetHref, currentOrigin) {
     const targetUrl = new URL(targetHref, currentOrigin);
     const currentUrl = new URL(currentOrigin);
 
-    // Only adapt internal homelab service links targeting specific ports
     const isStandardPort = targetUrl.port === '' || targetUrl.port === '80' || targetUrl.port === '443';
     
     if (!isStandardPort && targetUrl.port) {
       const port = targetUrl.port;
 
-      // Remote Tailscale Ingress (HTTPS / .ts.net): Map to clean HTTPS subpath on port 443
+      // Remote Tailscale Ingress (HTTPS / *.ts.net) ➡️ Dedicated HTTPS port + https protocol
       if (currentUrl.protocol === 'https:' || currentUrl.hostname.includes('.ts.net')) {
-        const subPath = PORT_TO_PATH[port];
-        if (subPath) {
-          return `${currentUrl.origin}${subPath}`;
-        }
+        const httpsPort = HTTP_TO_HTTPS_PORT[port] || port;
+        targetUrl.hostname = currentUrl.hostname;
+        targetUrl.port = httpsPort;
+        targetUrl.protocol = 'https:';
+        return targetUrl.toString();
       }
 
-      // Local Ingress (LAN IP / Hostname / localhost): Preserve active hostname + Pure HTTP port
+      // Local Ingress (LAN IP / Hostname / localhost) ➡️ Keep standard HTTP port + http protocol
       targetUrl.hostname = currentUrl.hostname;
+      targetUrl.port = port;
       targetUrl.protocol = 'http:';
       return targetUrl.toString();
     }
@@ -51,5 +52,5 @@ function adaptServiceUrl(targetHref, currentOrigin) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { adaptServiceUrl, PORT_TO_PATH };
+  module.exports = { adaptServiceUrl, HTTP_TO_HTTPS_PORT };
 }

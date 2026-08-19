@@ -7,53 +7,18 @@
 }
 
 # ------------------------------------------------------------------------------
-# 1. Main Dashboard & Subpath Ingress (Remote HTTPS 443 + Local Port 80)
+# 1. Main Dashboard Entrypoint (Homepage Port 80 & 443)
 # ------------------------------------------------------------------------------
 homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
-    # Service Subpaths for Remote HTTPS Ingress
-    handle_path /jellyfin/* {
-        reverse_proxy jellyfin:8096
-    }
-    redir /jellyfin /jellyfin/
+    reverse_proxy homepage:3000
+}
 
-    handle_path /seerr/* {
-        reverse_proxy jellyseerr:5055
-    }
-    redir /seerr /seerr/
-
-    handle_path /sonarr/* {
-        reverse_proxy sonarr:8989
-    }
-    redir /sonarr /sonarr/
-
-    handle_path /radarr/* {
-        reverse_proxy radarr:7878
-    }
-    redir /radarr /radarr/
-
-    handle_path /prowlarr/* {
-        reverse_proxy prowlarr:9696
-    }
-    redir /prowlarr /prowlarr/
-
-    handle_path /bazarr/* {
-        reverse_proxy bazarr:6767
-    }
-    redir /bazarr /bazarr/
-
-    handle_path /qbit/* {
-        reverse_proxy gluetun:8080
-    }
-    redir /qbit /qbit/
-
-    # Default to Homepage Dashboard
-    handle {
-        reverse_proxy homepage:3000
-    }
+http://:3000 {
+    reverse_proxy homepage:3000
 }
 
 # ------------------------------------------------------------------------------
-# 2. Local Port Direct Ingress (Pure HTTP on custom ports)
+# 2. Local LAN Direct Ports (Pure HTTP)
 # ------------------------------------------------------------------------------
 http://:8096 {
     reverse_proxy jellyfin:8096
@@ -83,6 +48,33 @@ http://:6767 {
     reverse_proxy bazarr:6767
 }
 
-http://:3000 {
-    reverse_proxy homepage:3000
+# ------------------------------------------------------------------------------
+# 3. Remote Tailscale Dedicated HTTPS Ports (Let's Encrypt TLS)
+# ------------------------------------------------------------------------------
+https://homelab.llama-porbeagle.ts.net:8443 {
+    reverse_proxy jellyfin:8096
+}
+
+https://homelab.llama-porbeagle.ts.net:15055 {
+    reverse_proxy jellyseerr:5055
+}
+
+https://homelab.llama-porbeagle.ts.net:18080 {
+    reverse_proxy gluetun:8080
+}
+
+https://homelab.llama-porbeagle.ts.net:18989 {
+    reverse_proxy sonarr:8989
+}
+
+https://homelab.llama-porbeagle.ts.net:17878 {
+    reverse_proxy radarr:7878
+}
+
+https://homelab.llama-porbeagle.ts.net:19696 {
+    reverse_proxy prowlarr:9696
+}
+
+https://homelab.llama-porbeagle.ts.net:16767 {
+    reverse_proxy bazarr:6767
 }

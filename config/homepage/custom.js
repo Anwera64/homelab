@@ -1,16 +1,16 @@
 // ==============================================================================
-// Homepage Custom JavaScript - Dynamic Ingress Link Adapter
+// Homepage Custom JavaScript - Dynamic Ingress Link Adapter (Split Ports)
 // ==============================================================================
 
 (function() {
-  var PORT_TO_PATH = {
-    '8096': '/jellyfin/',
-    '5055': '/seerr/',
-    '8080': '/qbit/',
-    '8989': '/sonarr/',
-    '7878': '/radarr/',
-    '9696': '/prowlarr/',
-    '6767': '/bazarr/'
+  var HTTP_TO_HTTPS_PORT = {
+    '8096': '8443',   // Jellyfin
+    '5055': '15055',  // Jellyseerr
+    '8080': '18080',  // qBittorrent
+    '8989': '18989',  // Sonarr
+    '7878': '17878',  // Radarr
+    '9696': '19696',  // Prowlarr
+    '6767': '16767'   // Bazarr
   };
 
   function adaptServiceUrl(targetHref, currentOrigin) {
@@ -27,16 +27,18 @@
       if (!isStandardPort && targetUrl.port) {
         var port = targetUrl.port;
 
-        // Remote Tailscale Ingress (HTTPS / *.ts.net) ➡️ Map to Port 443 HTTPS Subpath
+        // Remote Tailscale Ingress (HTTPS / *.ts.net) ➡️ Dedicated HTTPS port + https protocol
         if (currentUrl.protocol === 'https:' || currentUrl.hostname.indexOf('.ts.net') !== -1) {
-          var subPath = PORT_TO_PATH[port];
-          if (subPath) {
-            return currentUrl.origin + subPath;
-          }
+          var httpsPort = HTTP_TO_HTTPS_PORT[port] || port;
+          targetUrl.hostname = currentUrl.hostname;
+          targetUrl.port = httpsPort;
+          targetUrl.protocol = 'https:';
+          return targetUrl.toString();
         }
 
-        // Local Ingress (LAN IP / Hostname / localhost) ➡️ Pure HTTP direct port
+        // Local Ingress (LAN IP / Hostname / localhost) ➡️ Keep standard HTTP port + http protocol
         targetUrl.hostname = currentUrl.hostname;
+        targetUrl.port = port;
         targetUrl.protocol = 'http:';
         return targetUrl.toString();
       }

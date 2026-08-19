@@ -1,55 +1,55 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { adaptServiceUrl, PORT_TO_PATH } = require('../config/homepage/adapt-links.js');
+const { adaptServiceUrl, HTTP_TO_HTTPS_PORT } = require('../config/homepage/adapt-links.js');
 
-test('Dual-Mode Ingress Link Adapter Suite', async (t) => {
+test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
   const remoteOrigin = 'https://homelab.llama-porbeagle.ts.net/';
 
-  await t.test('Remote HTTPS: adapts Jellyfin (:8096) to https /jellyfin/ subpath', () => {
+  await t.test('Remote HTTPS: adapts Jellyfin (:8096) to https :8443 port', () => {
     const input = 'http://desktop-kujo8mp:8096';
     const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net/jellyfin/');
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:8443/');
   });
 
-  await t.test('Remote HTTPS: adapts Jellyseerr (:5055) to https /seerr/ subpath', () => {
+  await t.test('Remote HTTPS: adapts Jellyseerr (:5055) to https :15055 port', () => {
     const input = 'http://desktop-kujo8mp:5055';
     const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net/seerr/');
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:15055/');
   });
 
-  await t.test('Remote HTTPS: adapts Sonarr (:8989) to https /sonarr/ subpath', () => {
+  await t.test('Remote HTTPS: adapts Sonarr (:8989) to https :18989 port', () => {
     const input = 'http://desktop-kujo8mp:8989';
     const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net/sonarr/');
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18989/');
   });
 
-  await t.test('Remote HTTPS: adapts Radarr (:7878) to https /radarr/ subpath', () => {
+  await t.test('Remote HTTPS: adapts Radarr (:7878) to https :17878 port', () => {
     const input = 'http://desktop-kujo8mp:7878';
     const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net/radarr/');
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:17878/');
   });
 
-  await t.test('Remote HTTPS: adapts qBittorrent (:8080) to https /qbit/ subpath', () => {
+  await t.test('Remote HTTPS: adapts qBittorrent (:8080) to https :18080 port', () => {
     const input = 'http://desktop-kujo8mp:8080';
     const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net/qbit/');
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18080/');
   });
 
-  await t.test('Local LAN IP (HTTP): adapts hostname to 192.168.1.20 and retains pure HTTP port', () => {
+  await t.test('Local LAN IP (HTTP): retains local port 8096 in pure HTTP', () => {
     const lanOrigin = 'http://192.168.1.20/';
     const input = 'http://desktop-kujo8mp:8096';
     const result = adaptServiceUrl(input, lanOrigin);
     assert.equal(result, 'http://192.168.1.20:8096/');
   });
 
-  await t.test('Local Hostname (HTTP): preserves desktop-kujo8mp and retains pure HTTP port', () => {
+  await t.test('Local Hostname (HTTP): retains local port 5055 in pure HTTP', () => {
     const localHostOrigin = 'http://desktop-kujo8mp/';
     const input = 'http://192.168.1.20:5055';
     const result = adaptServiceUrl(input, localHostOrigin);
     assert.equal(result, 'http://desktop-kujo8mp:5055/');
   });
 
-  await t.test('Localhost (HTTP): adapts link to localhost with pure HTTP port', () => {
+  await t.test('Localhost (HTTP): retains local port 7878 in pure HTTP', () => {
     const localhostOrigin = 'http://localhost:3000/';
     const input = 'http://desktop-kujo8mp:7878';
     const result = adaptServiceUrl(input, localhostOrigin);

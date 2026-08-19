@@ -90,17 +90,16 @@ graph TD
 
 ## 🌐 Web UI Service Endpoints
 
-| Service | Primary Hostname (Port 80) | Direct / Network Endpoint | Notes |
+| Service | Remote Ingress (Tailscale HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Notes |
 | :--- | :--- | :--- | :--- |
-| **Homepage (Remote)** | [https://homelab.llama-porbeagle.ts.net](https://homelab.llama-porbeagle.ts.net) | Tailscale MagicDNS | Secure remote portal (Let's Encrypt HTTPS) |
-| **Homepage Portal** | [http://desktop-kujo8mp](http://desktop-kujo8mp) | [http://192.168.1.20](http://192.168.1.20) | Central dashboard & status |
-| **Jellyfin** | [http://desktop-kujo8mp:8096](http://desktop-kujo8mp:8096) | [http://localhost:8096](http://localhost:8096) | Media server (RTX 5080 NVENC) |
-| **Jellyseerr** | [http://desktop-kujo8mp:5055](http://desktop-kujo8mp:5055) | [http://localhost:5055](http://localhost:5055) | Media discovery & requests |
-| **qBittorrent** | [http://desktop-kujo8mp:8080](http://desktop-kujo8mp:8080) | [http://localhost:8080](http://localhost:8080) | Routed via Gluetun VPN |
-| **Radarr** | [http://desktop-kujo8mp:7878](http://desktop-kujo8mp:7878) | [http://localhost:7878](http://localhost:7878) | Movies manager |
-| **Sonarr** | [http://desktop-kujo8mp:8989](http://desktop-kujo8mp:8989) | [http://localhost:8989](http://localhost:8989) | TV series manager |
-| **Prowlarr** | [http://desktop-kujo8mp:9696](http://desktop-kujo8mp:9696) | [http://localhost:9696](http://localhost:9696) | Indexers manager |
-| **Bazarr** | [http://desktop-kujo8mp:6767](http://desktop-kujo8mp:6767) | [http://localhost:6767](http://localhost:6767) | Subtitles manager |
+| **Homepage Portal** | [https://homelab.llama-porbeagle.ts.net](https://homelab.llama-porbeagle.ts.net) | [http://desktop-kujo8mp](http://desktop-kujo8mp) / `:80` | Central dashboard & unified status |
+| **Jellyfin** | [https://homelab.llama-porbeagle.ts.net:8443](https://homelab.llama-porbeagle.ts.net:8443) | [http://desktop-kujo8mp:8096](http://desktop-kujo8mp:8096) | Media server (RTX 5080 NVENC Transcoding) |
+| **Jellyseerr** | [https://homelab.llama-porbeagle.ts.net:15055](https://homelab.llama-porbeagle.ts.net:15055) | [http://desktop-kujo8mp:5055](http://desktop-kujo8mp:5055) | Media discovery & request manager |
+| **qBittorrent** | [https://homelab.llama-porbeagle.ts.net:18080](https://homelab.llama-porbeagle.ts.net:18080) | [http://desktop-kujo8mp:8080](http://desktop-kujo8mp:8080) | Download client (Routed via Gluetun VPN) |
+| **Sonarr** | [https://homelab.llama-porbeagle.ts.net:18989](https://homelab.llama-porbeagle.ts.net:18989) | [http://desktop-kujo8mp:8989](http://desktop-kujo8mp:8989) | TV series manager |
+| **Radarr** | [https://homelab.llama-porbeagle.ts.net:17878](https://homelab.llama-porbeagle.ts.net:17878) | [http://desktop-kujo8mp:7878](http://desktop-kujo8mp:7878) | Movies manager |
+| **Prowlarr** | [https://homelab.llama-porbeagle.ts.net:19696](https://homelab.llama-porbeagle.ts.net:19696) | [http://desktop-kujo8mp:9696](http://desktop-kujo8mp:9696) | Trackers & Indexers proxy |
+| **Bazarr** | [https://homelab.llama-porbeagle.ts.net:16767](https://homelab.llama-porbeagle.ts.net:16767) | [http://desktop-kujo8mp:6767](http://desktop-kujo8mp:6767) | Subtitles sync |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality & format sync |
 | **FlareSolverr** | Container | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
 
