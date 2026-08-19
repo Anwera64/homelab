@@ -1,0 +1,33 @@
+#!/bin/sh
+# ==============================================================================
+# Homelab Git Pre-Commit Hook
+# Validates unit tests and docker-compose configuration prior to every commit.
+# ==============================================================================
+
+echo "🔍 [Pre-Commit] Running automated validation checks..."
+
+# 1. Run Node.js Unit Tests
+echo "  [+] Running unit tests (node --test tests/adapt-links.test.js)..."
+node --test tests/adapt-links.test.js
+TEST_EXIT_CODE=$?
+
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+  echo ""
+  echo "❌ [Pre-Commit FAILED] Unit tests failed! Commit aborted."
+  exit 1
+fi
+
+# 2. Validate Docker Compose Configuration
+echo "  [+] Validating docker-compose.yml configuration..."
+if command -v docker >/dev/null 2>&1; then
+  docker compose -f docker-compose.yml --env-file .env config -q
+  COMPOSE_EXIT_CODE=$?
+  if [ $COMPOSE_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ [Pre-Commit FAILED] docker-compose.yml validation failed! Commit aborted."
+    exit 1
+  fi
+fi
+
+echo "✅ [Pre-Commit PASSED] All tests and configuration validations passed!"
+exit 0
