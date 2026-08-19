@@ -37,7 +37,7 @@ services:
       - TORRENTING_PORT=6881
     volumes:
       - ${CONFIG_PATH}/qbittorrent:/config
-      - ${DOWNLOADS_PATH}:/downloads
+      - ${MEDIA_ROOT}:/data
     depends_on:
       - gluetun
     restart: unless-stopped
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 3. Arr Automation Suite
+  # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
   # ==============================================================================
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
@@ -78,8 +78,7 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/radarr:/config
-      - ${MOVIES_PATH}:/movies
-      - ${DOWNLOADS_PATH}:/downloads
+      - ${MEDIA_ROOT}:/data
     ports:
       - 7878:7878
     restart: unless-stopped
@@ -93,8 +92,7 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/sonarr:/config
-      - ${SHOWS_PATH}:/tv
-      - ${DOWNLOADS_PATH}:/downloads
+      - ${MEDIA_ROOT}:/data
     ports:
       - 8989:8989
     restart: unless-stopped
@@ -108,8 +106,7 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/bazarr:/config
-      - ${MOVIES_PATH}:/movies
-      - ${SHOWS_PATH}:/tv
+      - ${MEDIA_ROOT}:/data
     ports:
       - 6767:6767
     restart: unless-stopped
@@ -140,6 +137,7 @@ services:
     volumes:
       - ${CONFIG_PATH}/jellyfin/config:/config
       - ${CONFIG_PATH}/jellyfin/cache:/cache
+      - ${MEDIA_ROOT}:/data:ro
       - ${MOVIES_PATH}:/media/movies:ro
       - ${SHOWS_PATH}:/media/tv:ro
     ports:
