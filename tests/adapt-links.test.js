@@ -35,11 +35,24 @@ test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
     assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18080/');
   });
 
+  await t.test('Remote HTTPS: adapts FlareSolverr (:8191) to https :18191 port', () => {
+    const input = 'http://desktop-kujo8mp:8191';
+    const result = adaptServiceUrl(input, remoteOrigin);
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18191/');
+  });
+
   await t.test('Local LAN IP (HTTP): retains local port 8096 in pure HTTP', () => {
     const lanOrigin = 'http://192.168.1.20/';
     const input = 'http://desktop-kujo8mp:8096';
     const result = adaptServiceUrl(input, lanOrigin);
     assert.equal(result, 'http://192.168.1.20:8096/');
+  });
+
+  await t.test('Local LAN IP (HTTP): retains local FlareSolverr port 8191 in pure HTTP', () => {
+    const lanOrigin = 'http://192.168.1.20/';
+    const input = 'http://desktop-kujo8mp:8191';
+    const result = adaptServiceUrl(input, lanOrigin);
+    assert.equal(result, 'http://192.168.1.20:8191/');
   });
 
   await t.test('Local Hostname (HTTP): retains local port 5055 in pure HTTP', () => {

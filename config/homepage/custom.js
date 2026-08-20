@@ -10,7 +10,8 @@
     '8989': '18989',  // Sonarr
     '7878': '17878',  // Radarr
     '9696': '19696',  // Prowlarr
-    '6767': '16767'   // Bazarr
+    '6767': '16767',  // Bazarr
+    '8191': '18191'   // FlareSolverr
   };
 
   function adaptServiceUrl(targetHref, currentOrigin) {

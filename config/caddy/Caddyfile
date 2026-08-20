@@ -48,6 +48,10 @@ http://:6767 {
     reverse_proxy bazarr:6767
 }
 
+http://:8191 {
+    reverse_proxy flaresolverr:8191
+}
+
 # ------------------------------------------------------------------------------
 # 3. Remote Tailscale Dedicated HTTPS Ports (Let's Encrypt TLS)
 # ------------------------------------------------------------------------------
@@ -77,4 +81,8 @@ https://homelab.llama-porbeagle.ts.net:19696 {
 
 https://homelab.llama-porbeagle.ts.net:16767 {
     reverse_proxy bazarr:6767
+}
+
+https://homelab.llama-porbeagle.ts.net:18191 {
+    reverse_proxy flaresolverr:8191
 }
