@@ -18,7 +18,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server and automati
 * **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
 * **🤖 Complete *Arr Automation:** **Sonarr**, **Radarr**, **Prowlarr**, and **Bazarr** managing series, films, indexers, and automated subtitle synchronization.
 * **♻️ TRaSH Guides Sync:** **Recyclarr** automatically syncs TRaSH quality profiles and custom formats (including Latin American Spanish audio scoring) daily.
-* **🛡️ VPN Network Isolation:** **qBittorrent** and **FlareSolverr** are strictly routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch.
+* **🛡️ VPN Network Isolation:** **qBittorrent** is strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
 * **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
 * **🌐 Dual-Mode Ingress Routing:**
   * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** with zero port forwarding required.
@@ -41,14 +41,13 @@ graph TD
     subgraph VPNNet [Gluetun VPN Network Isolation]
         GLUETUN[🛡️ Gluetun VPN - NordVPN WireGuard]
         QBIT[📥 qBittorrent Web UI]
-        FLARE[⚡ FlareSolverr]
     end
 
     subgraph ArrSuite [Arr Automation & Quality Engine]
         PROW[🔍 Prowlarr Indexer Proxy] --> RAD[🎬 Radarr Movies] & SON[📺 Sonarr Series]
+        FLARE[⚡ FlareSolverr Challenge Solver] --> PROW
         SEERR[✨ Jellyseerr Request Portal] --> RAD & SON
         RAD & SON --> QBIT
-        FLARE --> PROW
         BAZ[📝 Bazarr Subtitles] --> RAD & SON
         RECYC[♻️ Recyclarr - TRaSH Guides Sync] --> RAD & SON
         MAINT[🧹 Maintainerr - Automated Cleanup] --> RAD & SON
