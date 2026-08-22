@@ -15,6 +15,7 @@ services:
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
       - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
       - TZ=${TZ:-America/Mexico_City}
+      - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
     ports:
       - 6881:6881       # qBittorrent Torrent Protocol (TCP)
       - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
@@ -155,7 +156,59 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 6. Dashboard & Unified Portal (Homepage)
+  # 6. Media Analytics & Telemetry (Jellystat)
+  # ==============================================================================
+  jellystat-db:
+    image: postgres:16-alpine
+    container_name: jellystat-db
+    environment:
+      - POSTGRES_USER=${JELLYSTAT_DB_USER:-jellystat}
+      - POSTGRES_PASSWORD=${JELLYSTAT_DB_PASSWORD:-jellystat}
+      - POSTGRES_DB=${JELLYSTAT_DB_NAME:-jellystat}
+    volumes:
+      - ${CONFIG_PATH}/jellystat/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JELLYSTAT_DB_USER:-jellystat} -d ${JELLYSTAT_DB_NAME:-jellystat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  jellystat:
+    image: cyfershepard/jellystat:latest
+    container_name: jellystat
+    environment:
+      - POSTGRES_IP=jellystat-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${JELLYSTAT_DB_USER:-jellystat}
+      - POSTGRES_PASSWORD=${JELLYSTAT_DB_PASSWORD:-jellystat}
+      - POSTGRES_DB=${JELLYSTAT_DB_NAME:-jellystat}
+      - JWT_SECRET=${JELLYSTAT_JWT_SECRET:-jellystat_secret_token_12345}
+      - TZ=${TZ:-America/Mexico_City}
+    depends_on:
+      jellystat-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 7. Automated Media Lifecycle & Cleanup (Maintainerr)
+  # ==============================================================================
+  maintainerr:
+    image: ghcr.io/maintainerr/maintainerr:latest
+    container_name: maintainerr
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+      - NODE_ENV=production
+    volumes:
+      - ${CONFIG_PATH}/maintainerr:/opt/data
+    depends_on:
+      - sonarr
+      - radarr
+      - jellyfin
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 8. Dashboard & Unified Portal (Homepage)
   # ==============================================================================
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
@@ -163,12 +216,20 @@ services:
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - HOMEPAGE_ALLOWED_HOSTS=*
+      - HOMEPAGE_VAR_GLUETUN_API_KEY=${GLUETUN_API_KEY}
+      - HOMEPAGE_VAR_JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+      - HOMEPAGE_VAR_JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
+      - HOMEPAGE_VAR_SONARR_API_KEY=${SONARR_API_KEY}
+      - HOMEPAGE_VAR_RADARR_API_KEY=${RADARR_API_KEY}
+      - HOMEPAGE_VAR_PROWLARR_API_KEY=${PROWLARR_API_KEY}
+      - HOMEPAGE_VAR_BAZARR_API_KEY=${BAZARR_API_KEY}
     volumes:
       - ${CONFIG_PATH}/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
 
   # ==============================================================================
-  # 7. TRaSH Guides Automation (Recyclarr)
+  # 9. TRaSH Guides Automation (Recyclarr)
   # ==============================================================================
   recyclarr:
     image: ghcr.io/recyclarr/recyclarr:8
@@ -184,7 +245,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 8. Remote Mesh Gateway (Tailscale)
+  # 10. Remote Mesh Gateway (Tailscale)
   # ==============================================================================
   tailscale:
     image: tailscale/tailscale:latest
@@ -214,6 +275,8 @@ services:
       # Local HTTP Service Ports
       - 8096:8096
       - 5055:5055
+      - 3005:3005
+      - 6246:6246
       - 8080:8080
       - 8989:8989
       - 7878:7878
@@ -223,6 +286,8 @@ services:
       # Remote Tailscale HTTPS Service Ports
       - 8443:8443
       - 15055:15055
+      - 13005:13005
+      - 16246:16246
       - 18080:18080
       - 18989:18989
       - 17878:17878
@@ -232,7 +297,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 9. Reverse Proxy & Hostname Routing (Caddy)
+  # 11. Reverse Proxy & Hostname Routing (Caddy)
   # ==============================================================================
   caddy:
     image: caddy:latest

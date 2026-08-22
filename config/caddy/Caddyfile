@@ -28,6 +28,14 @@ http://:5055 {
     reverse_proxy jellyseerr:5055
 }
 
+http://:3005 {
+    reverse_proxy jellystat:3000
+}
+
+http://:6246 {
+    reverse_proxy maintainerr:6246
+}
+
 http://:8080 {
     reverse_proxy gluetun:8080
 }
@@ -61,6 +69,14 @@ https://homelab.llama-porbeagle.ts.net:8443 {
 
 https://homelab.llama-porbeagle.ts.net:15055 {
     reverse_proxy jellyseerr:5055
+}
+
+https://homelab.llama-porbeagle.ts.net:13005 {
+    reverse_proxy jellystat:3000
+}
+
+https://homelab.llama-porbeagle.ts.net:16246 {
+    reverse_proxy maintainerr:6246
 }
 
 https://homelab.llama-porbeagle.ts.net:18080 {

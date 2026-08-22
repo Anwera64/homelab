@@ -75,10 +75,12 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  * Central Portal: http://desktop-kujo8mp   (or http://192.168.1.20)" -ForegroundColor Yellow
     Write-Host "  * Jellyfin:       http://desktop-kujo8mp:8096" -ForegroundColor White
     Write-Host "  * Jellyseerr:     http://desktop-kujo8mp:5055" -ForegroundColor White
+    Write-Host "  * Jellystat:      http://desktop-kujo8mp:3005" -ForegroundColor White
     Write-Host "  * Sonarr:         http://desktop-kujo8mp:8989" -ForegroundColor White
     Write-Host "  * Radarr:         http://desktop-kujo8mp:7878" -ForegroundColor White
     Write-Host "  * Prowlarr:       http://desktop-kujo8mp:9696" -ForegroundColor White
     Write-Host "  * Bazarr:         http://desktop-kujo8mp:6767" -ForegroundColor White
+    Write-Host "  * Maintainerr:    http://desktop-kujo8mp:6246" -ForegroundColor White
     Write-Host "  * qBittorrent:    http://desktop-kujo8mp:8080" -ForegroundColor White
     Write-Host ""
     Write-Host "  --- Legacy Direct Port Fallbacks ---" -ForegroundColor DarkGray
