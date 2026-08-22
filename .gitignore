@@ -3,7 +3,11 @@
 *.env.local
 
 # Container configuration data (databases, local caches)
-config/
+config/*/**
+!config/homepage/
+!config/homepage/**
+config/homepage/logs/
+!config/caddy/Caddyfile
 data/
 
 # Logs

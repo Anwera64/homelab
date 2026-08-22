@@ -25,4 +25,5 @@ jobs:
 
       - name: Validate Docker Compose Configuration
         run: |
-          docker compose -f docker-compose.yml --env-file .env.example config -q
+          MEDIA_ROOT=/tmp/media MOVIES_PATH=/tmp/movies SHOWS_PATH=/tmp/shows DOWNLOADS_PATH=/tmp/downloads docker compose -f docker-compose.yml --env-file .env.example config -q
+

@@ -1,0 +1,143 @@
+---
+# ==============================================================================
+# Homepage Services Configuration
+# ==============================================================================
+
+- Media & Streaming:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: http://desktop-kujo8mp:8096
+        description: Media Streaming (RTX 5080 NVENC)
+        server: my-docker
+        container: jellyfin
+        widget:
+          type: jellyfin
+          url: http://jellyfin:8096
+          key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
+          enableNowPlaying: true
+          enableBlocks: true
+
+    - Jellyseerr:
+        icon: jellyseerr.png
+        href: http://desktop-kujo8mp:5055
+        description: Netflix-style Request & Discovery UI
+        server: my-docker
+        container: jellyseerr
+        widget:
+          type: jellyseerr
+          url: http://jellyseerr:5055
+          key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
+
+    - Jellystat:
+        icon: jellystat.png
+        href: http://desktop-kujo8mp:3005
+        description: Playback Analytics & Viewer Statistics
+        server: my-docker
+        container: jellystat
+        ping: http://jellystat:3000/
+
+- Automation Suite:
+    - Sonarr:
+        icon: sonarr.png
+        href: http://desktop-kujo8mp:8989
+        description: TV Series Management
+        server: my-docker
+        container: sonarr
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
+
+    - Radarr:
+        icon: radarr.png
+        href: http://desktop-kujo8mp:7878
+        description: Movie Collection Management
+        server: my-docker
+        container: radarr
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: http://desktop-kujo8mp:9696
+        description: Trackers & Indexer Proxy
+        server: my-docker
+        container: prowlarr
+        widget:
+          type: prowlarr
+          url: http://prowlarr:9696
+          key: "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}"
+
+    - Bazarr:
+        icon: bazarr.png
+        href: http://desktop-kujo8mp:6767
+        description: Automated Subtitle Sync
+        server: my-docker
+        container: bazarr
+        widget:
+          type: bazarr
+          url: http://bazarr:6767
+          key: "{{HOMEPAGE_VAR_BAZARR_API_KEY}}"
+
+    - Recyclarr:
+        icon: recyclarr.png
+        description: TRaSH Guides Quality & Format Sync (Daily 3 AM)
+        server: my-docker
+        container: recyclarr
+
+    - Maintainerr:
+        icon: maintainerr.png
+        href: http://desktop-kujo8mp:6246
+        description: Automated Media Lifecycle & Cleanup
+        server: my-docker
+        container: maintainerr
+        ping: http://maintainerr:6246/
+
+- Downloads & VPN Network:
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: http://desktop-kujo8mp:8080
+        description: Download Client (Kill-Switch Isolated)
+        server: my-docker
+        container: qbittorrent
+        widget:
+          type: qbittorrent
+          url: http://gluetun:8080
+
+    - Gluetun VPN:
+        icon: gluetun.png
+        description: NordVPN WireGuard Gateway
+        server: my-docker
+        container: gluetun
+        widget:
+          type: gluetun
+          url: http://gluetun:8000
+          key: "{{HOMEPAGE_VAR_GLUETUN_API_KEY}}"
+          version: 2
+
+    - FlareSolverr:
+        icon: flaresolverr.png
+        href: http://desktop-kujo8mp:8191
+        description: Cloudflare Solver Proxy
+        server: my-docker
+        container: flaresolverr
+        ping: http://flaresolverr:8191/
+
+- Ingress & Security:
+    - Tailscale:
+        icon: tailscale.png
+        href: https://login.tailscale.com/admin/machines
+        description: Remote Mesh Encrypted Network
+        server: my-docker
+        container: tailscale
+
+    - Caddy:
+        icon: caddy.png
+        href: http://desktop-kujo8mp
+        description: Reverse Proxy & Hostname Routing
+        server: my-docker
+        container: caddy
+
+

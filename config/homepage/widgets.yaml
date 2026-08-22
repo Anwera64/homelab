@@ -1,0 +1,19 @@
+---
+# ==============================================================================
+# Homepage Widgets Configuration
+# ==============================================================================
+
+- greeting:
+    text_size: 2xl
+    text: "Homelab Media Empire"
+
+- datetime:
+    text_size: md
+    format:
+      timeStyle: short
+      dateStyle: medium
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /
