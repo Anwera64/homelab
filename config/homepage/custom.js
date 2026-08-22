@@ -6,6 +6,8 @@
   var HTTP_TO_HTTPS_PORT = {
     '8096': '8443',   // Jellyfin
     '5055': '15055',  // Jellyseerr
+    '3005': '13005',  // Jellystat
+    '6246': '16246',  // Maintainerr
     '8080': '18080',  // qBittorrent
     '8989': '18989',  // Sonarr
     '7878': '17878',  // Radarr

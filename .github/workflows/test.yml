@@ -1,0 +1,28 @@
+name: CI Test Suite & Configuration Validation
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    name: Run Unit & Integrity Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Node.js Test Suite
+        run: node --test
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.yml --env-file .env.example config -q

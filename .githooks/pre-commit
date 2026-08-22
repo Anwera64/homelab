@@ -7,8 +7,8 @@
 echo "🔍 [Pre-Commit] Running automated validation checks..."
 
 # 1. Run Node.js Unit Tests
-echo "  [+] Running unit tests (node --test tests/adapt-links.test.js)..."
-node --test tests/adapt-links.test.js
+echo "  [+] Running unit & integrity test suites (node --test)..."
+node --test
 TEST_EXIT_CODE=$?
 
 if [ $TEST_EXIT_CODE -ne 0 ]; then
@@ -20,7 +20,11 @@ fi
 # 2. Validate Docker Compose Configuration
 echo "  [+] Validating docker-compose.yml configuration..."
 if command -v docker >/dev/null 2>&1; then
-  docker compose -f docker-compose.yml --env-file .env config -q
+  ENV_FILE=".env"
+  if [ ! -f "$ENV_FILE" ]; then
+    ENV_FILE=".env.example"
+  fi
+  docker compose -f docker-compose.yml --env-file "$ENV_FILE" config -q
   COMPOSE_EXIT_CODE=$?
   if [ $COMPOSE_EXIT_CODE -ne 0 ]; then
     echo ""

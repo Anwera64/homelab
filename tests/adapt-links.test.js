@@ -117,10 +117,67 @@ test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
     );
   });
 
+  await t.test('Remote HTTPS: adapts Prowlarr (:9696) to https :19696 port', () => {
+    const input = 'http://desktop-kujo8mp:9696';
+    const result = adaptServiceUrl(input, remoteOrigin);
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:19696/');
+  });
+
+  await t.test('Remote HTTPS: adapts Bazarr (:6767) to https :16767 port', () => {
+    const input = 'http://desktop-kujo8mp:6767';
+    const result = adaptServiceUrl(input, remoteOrigin);
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:16767/');
+  });
+
+  await t.test('Local LAN IP (HTTP): retains local Prowlarr port 9696 in pure HTTP', () => {
+    const lanOrigin = 'http://192.168.1.20/';
+    const input = 'http://desktop-kujo8mp:9696';
+    const result = adaptServiceUrl(input, lanOrigin);
+    assert.equal(result, 'http://192.168.1.20:9696/');
+  });
+
+  await t.test('Local LAN IP (HTTP): retains local Bazarr port 6767 in pure HTTP', () => {
+    const lanOrigin = 'http://192.168.1.20/';
+    const input = 'http://desktop-kujo8mp:6767';
+    const result = adaptServiceUrl(input, lanOrigin);
+    assert.equal(result, 'http://192.168.1.20:6767/');
+  });
+
+  await t.test('URL Preservation: preserves subpaths, query parameters, and hashes during rewrite', () => {
+    const complexInput = 'http://desktop-kujo8mp:8096/web/index.html?token=xyz123&theme=dark#player-view';
+    const result = adaptServiceUrl(complexInput, remoteOrigin);
+    assert.equal(
+      result,
+      'https://homelab.llama-porbeagle.ts.net:8443/web/index.html?token=xyz123&theme=dark#player-view'
+    );
+  });
+
+  await t.test('Unmapped Custom Ports: adapts origin and protocol while preserving unmapped port', () => {
+    const customInput = 'http://desktop-kujo8mp:9999/status';
+    const result = adaptServiceUrl(customInput, remoteOrigin);
+    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:9999/status');
+  });
+
   await t.test('Relative and malformed links resilience', () => {
     assert.equal(adaptServiceUrl('/local-path', remoteOrigin), '/local-path');
     assert.equal(adaptServiceUrl('', remoteOrigin), '');
     assert.equal(adaptServiceUrl(null, remoteOrigin), null);
     assert.equal(adaptServiceUrl(undefined, remoteOrigin), undefined);
   });
+
+  await t.test('Code Parity: custom.js and adapt-links.js have identical HTTP_TO_HTTPS_PORT maps', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const customJsPath = path.resolve(__dirname, '../config/homepage/custom.js');
+    const customJsContent = fs.readFileSync(customJsPath, 'utf8');
+
+    // Extract HTTP_TO_HTTPS_PORT object from custom.js
+    const match = customJsContent.match(/var HTTP_TO_HTTPS_PORT\s*=\s*(\{[\s\S]*?\});/);
+    assert.ok(match, 'HTTP_TO_HTTPS_PORT should exist in custom.js');
+
+    // Safely parse the object literal
+    const customMap = Function(`return ${match[1]}`)();
+    assert.deepEqual(customMap, HTTP_TO_HTTPS_PORT);
+  });
 });
+
