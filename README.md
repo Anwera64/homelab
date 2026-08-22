@@ -1,5 +1,6 @@
 # 🛸 Automated Homelab Media & Streaming Stack
 
+[![CI](https://github.com/Anwera64/homelab/actions/workflows/test.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/test.yml)
 [![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Docker Compose](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-RTX_5080_NVENC-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
@@ -50,6 +51,7 @@ graph TD
         FLARE --> PROW
         BAZ[📝 Bazarr Subtitles] --> RAD & SON
         RECYC[♻️ Recyclarr - TRaSH Guides Sync] --> RAD & SON
+        MAINT[🧹 Maintainerr - Automated Cleanup] --> RAD & SON
     end
 
     subgraph MediaStorage [Unified Storage - Atomic Hardlinks]
@@ -58,9 +60,11 @@ graph TD
         SON -->|2. Instant Hardlink| SHOWS["/data/Videos/Shows"]
         MOVIES --> JELLY[🍿 Jellyfin Server - RTX 5080 NVENC]
         SHOWS --> JELLY
+        JELLY --> JSTAT[📊 Jellystat - Playback Analytics]
+        JELLY --> MAINT
     end
 
-    HOMEPAGE --> ArrSuite & JELLY & QBIT
+    HOMEPAGE --> ArrSuite & JELLY & QBIT & JSTAT
 ```
 
 ---
@@ -80,7 +84,7 @@ graph TD
 | **Bazarr** | `https://homelab.<tailnet>.ts.net:16767` | `http://desktop-kujo8mp:6767` | Automated subtitle downloader & sync |
 | **Maintainerr** | `https://homelab.<tailnet>.ts.net:16246` | `http://desktop-kujo8mp:6246` | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality profile sync |
-| **FlareSolverr** | Container | `http://localhost:8191` | Cloudflare challenge bypass API |
+| **FlareSolverr** | `https://homelab.<tailnet>.ts.net:18191` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
 
 ---
 
@@ -88,6 +92,9 @@ graph TD
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── test.yml            # Automated CI workflow (Node.js test suites & Compose validation)
 ├── docker-compose.yml          # Master multi-container service orchestration
 ├── .env.example                # Environment variables template
 ├── startup_homelab.ps1         # One-click healthcheck & startup script
@@ -103,9 +110,16 @@ graph TD
 │   └── homepage/
 │       ├── adapt-links.js      # Dynamic client-side ingress link adapter
 │       ├── custom.js           # Browser DOM link rewriter
-│       └── services.yaml       # Dashboard service definitions & API widgets
+│       ├── custom.css          # Homepage dashboard styling overrides
+│       ├── services.yaml       # Dashboard service definitions & API widgets
+│       ├── settings.yaml       # Homepage global settings & layout
+│       ├── widgets.yaml        # Dashboard system & search widgets
+│       ├── bookmarks.yaml      # Quick bookmark links
+│       └── docker.yaml         # Local Docker daemon socket provider
 └── tests/
-    └── adapt-links.test.js     # Automated unit test suite (Node.js test runner)
+    ├── adapt-links.test.js        # Link adapter unit test suite
+    ├── config-integrity.test.js   # Cross-configuration & port alignment test suite
+    └── scripts-validation.test.js # PowerShell automation scripts test suite
 ```
 
 ---
@@ -165,7 +179,7 @@ Run the automated startup script:
   ```
 * **Run Automated Unit Tests:**
   ```powershell
-  node --test tests/adapt-links.test.js
+  node --test
   ```
 
 ---
@@ -189,10 +203,22 @@ Jellyfin is configured with full **NVIDIA NVENC/NVDEC hardware acceleration** (R
 
 ## 🧪 Quality Gate & Automated Testing
 
-This repository enforces strict code quality and configuration integrity. The Git pre-commit hook (`.githooks/pre-commit`) automatically executes on every commit:
-1. Runs all Node.js unit tests in `tests/adapt-links.test.js`.
-2. Validates `docker-compose.yml` syntax and environment variables.
-3. Automatically aborts the commit if any test fails.
+This repository enforces strict code quality and configuration integrity across local and continuous integration environments:
+
+### 1. Automated Test Suites (`tests/`)
+Running `node --test` executes 35+ automated validation checks across three dedicated suites:
+* **Ingress Link Adaptation (`adapt-links.test.js`):** Verifies that Homepage dashboard links adapt dynamically between secure Tailscale HTTPS ports and pure local HTTP LAN ports.
+* **Cross-Config Integrity (`config-integrity.test.js`):** Validates that all ports, services, and tokens across `Caddyfile`, `docker-compose.yml`, `services.yaml`, and `.env.example` stay 100% synchronized.
+* **PowerShell Automation (`scripts-validation.test.js`):** Validates startup, shutdown, and Hyper-V/WSL2 setup scripts.
+
+### 2. Git Pre-Commit Hook (`.githooks/pre-commit`)
+Automatically executed prior to every local commit:
+1. Runs the full Node.js test suite (`node --test`).
+2. Validates `docker-compose.yml` syntax and variable bindings (`docker compose config -q`).
+3. Automatically aborts the commit if any validation fails.
+
+### 3. Continuous Integration (`.github/workflows/test.yml`)
+GitHub Actions executes the full test runner and Docker Compose validation across all pushes and pull requests to `main` and `master`.
 
 ---
 
