@@ -95,7 +95,7 @@ test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
     assert.equal(result, 'http://localhost:7878/');
   });
 
-  await t.test('External Links Safety: never modifies external websites', () => {
+  await t.test('External Links Safety: never modifies external websites even with custom ports', () => {
     assert.equal(
       adaptServiceUrl('https://github.com/linuxserver/docker-jellyfin', remoteOrigin),
       'https://github.com/linuxserver/docker-jellyfin'
@@ -103,6 +103,14 @@ test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
     assert.equal(
       adaptServiceUrl('https://trash-guides.info/Radarr/', remoteOrigin),
       'https://trash-guides.info/Radarr/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://example.com:8443/custom-api', remoteOrigin),
+      'https://example.com:8443/custom-api'
+    );
+    assert.equal(
+      adaptServiceUrl('http://remote-vps.net:8080/dashboard', remoteOrigin),
+      'http://remote-vps.net:8080/dashboard'
     );
   });
 

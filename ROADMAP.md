@@ -11,7 +11,7 @@ This document serves as the persistent architectural roadmap for your self-hoste
 | **Caddy** | Reverse Proxy | Port 80/443 ingress, routing `homelab.local` & subdomains |
 | **Gluetun** | VPN Gateway | NordVPN WireGuard (NordLynx) tunnel with automatic kill-switch |
 | **qBittorrent** | Download Client | Routed strictly through Gluetun container network |
-| **FlareSolverr** | Cloudflare Bypass | Routed strictly through Gluetun container network |
+| **FlareSolverr** | Cloudflare Bypass | Standalone challenge bypass with direct DNS (1.1.1.1) to avoid VPN blacklisting |
 | **Prowlarr** | Indexer Proxy | Public trackers (TorrentGalaxy, 1337x, BitSearch, Knaben, ShowRSS) |
 | **Sonarr** | TV Automation | Series monitoring, custom Latin American audio formatting |
 | **Radarr** | Movie Automation | Film monitoring, Extended/Special Edition scoring rules |
@@ -39,14 +39,13 @@ graph TD
     subgraph VPNNet [Gluetun VPN Network Isolation]
         GLUETUN[🛡️ Gluetun VPN - NordVPN WireGuard]
         QBIT[📥 qBittorrent]
-        FLARE[⚡ FlareSolverr]
     end
 
     subgraph ArrSuite [Arr Automation & Discovery]
         PROW[🔍 Prowlarr] --> RAD[🎬 Radarr] & SON[📺 Sonarr]
+        FLARE[⚡ FlareSolverr - Direct DNS] --> PROW
         SEERR[✨ Jellyseerr] --> RAD & SON
         RAD & SON --> QBIT
-        FLARE --> PROW
         BAZ[📝 Bazarr] --> RAD & SON
         RECYC[♻️ Recyclarr - TRaSH Guides Auto-Sync] --> RAD & SON
     end

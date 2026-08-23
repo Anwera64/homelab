@@ -19,10 +19,9 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
 # 2. Cleanup any legacy standalone Windows processes if lingering
 $processNames = @("Sonarr", "Radarr", "Prowlarr", "qbittorrent", "jellyfin", "jellyfin-tray", "Jellyfin.Windows.Tray", "flaresolverr")
 foreach ($proc in $processNames) {
-    $found = Get-Process -Name $proc -ErrorAction SilentlyContinue
-    if ($found) {
-        Write-Host "Terminating legacy host process: $proc" -ForegroundColor DarkGray
-        Stop-Process -Name $proc -ErrorAction SilentlyContinue -Force
+    Get-Process -Name $proc -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Host "Terminating legacy host process: $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor DarkGray
+        Stop-Process -InputObject $_ -Force -ErrorAction SilentlyContinue
     }
 }
 

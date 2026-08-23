@@ -6,14 +6,25 @@
     admin off
 }
 
+# Reusable security headers snippet
+(security_headers) {
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
 # ------------------------------------------------------------------------------
 # 1. Main Dashboard Entrypoint (Homepage Port 80 & 443)
 # ------------------------------------------------------------------------------
 homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
+    import security_headers
     reverse_proxy homepage:3000
 }
 
 http://:3000 {
+    import security_headers
     reverse_proxy homepage:3000
 }
 

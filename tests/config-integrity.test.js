@@ -117,4 +117,20 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       );
     }
   });
+
+  await t.test('Recyclarr service receives Sonarr and Radarr API keys in docker-compose.yml', () => {
+    const recyclarrMatch = dockerComposeContent.match(/container_name:\s*recyclarr[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*depends_on:|$)/);
+    assert.ok(recyclarrMatch, 'docker-compose.yml must contain a recyclarr service with environment section');
+    const recyclarrEnv = recyclarrMatch[1];
+    assert.ok(recyclarrEnv.includes('SONARR_API_KEY'), 'Recyclarr service must receive SONARR_API_KEY');
+    assert.ok(recyclarrEnv.includes('RADARR_API_KEY'), 'Recyclarr service must receive RADARR_API_KEY');
+  });
+
+  await t.test('qBittorrent service enforces healthy Gluetun dependency in docker-compose.yml', () => {
+    const qbitMatch = dockerComposeContent.match(/container_name:\s*qbittorrent[\s\S]*?depends_on:\s*\n([\s\S]*?)(?=\n\s{4}[a-z_]+:|\n\s{2}[a-z_]+:|\n\s*restart:|$)/);
+    assert.ok(qbitMatch, 'docker-compose.yml must contain a qbittorrent service with depends_on section');
+    const qbitDepends = qbitMatch[1];
+    assert.ok(qbitDepends.includes('gluetun'), 'qBittorrent must depend on gluetun');
+    assert.ok(qbitDepends.includes('condition: service_healthy'), 'qBittorrent must check gluetun service_healthy condition');
+  });
 });

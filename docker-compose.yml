@@ -39,7 +39,8 @@ services:
       - ${CONFIG_PATH}/qbittorrent:/config
       - ${MEDIA_ROOT}:/data
     depends_on:
-      - gluetun
+      gluetun:
+        condition: service_healthy
     restart: unless-stopped
 
   flaresolverr:
@@ -238,6 +239,8 @@ services:
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - CRON_SCHEDULE=0 3 * * * # Automatically sync daily at 3:00 AM
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
     volumes:
       - ${CONFIG_PATH}/recyclarr:/config
     depends_on:

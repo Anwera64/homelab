@@ -18,6 +18,18 @@ const HTTP_TO_HTTPS_PORT = {
   '8191': '18191'   // FlareSolverr
 };
 
+function isHomelabHost(hostname, currentHostname) {
+  if (!hostname) return false;
+  if (hostname === currentHostname) return true;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true;
+  if (hostname.endsWith('.local') || hostname.endsWith('.ts.net')) return true;
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  if (hostname === 'desktop-kujo8mp' || hostname === 'homelab') return true;
+  return false;
+}
+
 function adaptServiceUrl(targetHref, currentOrigin) {
   if (!targetHref || typeof targetHref !== 'string') {
     return targetHref;
@@ -26,6 +38,10 @@ function adaptServiceUrl(targetHref, currentOrigin) {
   try {
     const targetUrl = new URL(targetHref, currentOrigin);
     const currentUrl = new URL(currentOrigin);
+
+    if (!isHomelabHost(targetUrl.hostname, currentUrl.hostname)) {
+      return targetHref;
+    }
 
     const isStandardPort = targetUrl.port === '' || targetUrl.port === '80' || targetUrl.port === '443';
     

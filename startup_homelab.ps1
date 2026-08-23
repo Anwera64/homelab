@@ -24,9 +24,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Docker daemon is not running. Attempting to start Docker Desktop..." -ForegroundColor Yellow
     $possiblePaths = @(
         "$env:LOCALAPPDATA\Programs\DockerDesktop\Docker Desktop.exe",
+        "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+        "$env:ProgramW6432\Docker\Docker\Docker Desktop.exe",
         "C:\Program Files\Docker\Docker\Docker Desktop.exe"
     )
-    $dockerDesktopPath = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $dockerDesktopPath = $possiblePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
     if ($dockerDesktopPath) {
         Start-Process $dockerDesktopPath
         Write-Host "Waiting for Docker daemon to initialize..." -ForegroundColor Cyan
@@ -55,7 +57,15 @@ if ($LASTEXITCODE -ne 0) {
 if (-not (Test-Path "$PSScriptRoot\.env")) {
     Write-Host "[WARNING] No .env file found. Copying from .env.example..." -ForegroundColor Yellow
     Copy-Item "$PSScriptRoot\.env.example" "$PSScriptRoot\.env"
-    Write-Host "Please configure your .env file with your WIREGUARD_PRIVATE_KEY!" -ForegroundColor Red
+    Write-Host "[ACTION REQUIRED] Created .env template. Please configure your .env file with your WIREGUARD_PRIVATE_KEY!" -ForegroundColor Red
+}
+
+if (Test-Path "$PSScriptRoot\.env") {
+    $envContent = Get-Content "$PSScriptRoot\.env" -Raw
+    if ($envContent -match "your_nordvpn_wireguard_private_key_here") {
+        Write-Host "[WARNING] Placeholder WIREGUARD_PRIVATE_KEY detected in .env." -ForegroundColor Yellow
+        Write-Host "VPN gateway (Gluetun) requires a valid WireGuard key to establish the tunnel." -ForegroundColor DarkGray
+    }
 }
 
 # 4. Bring up the stack with Docker Compose

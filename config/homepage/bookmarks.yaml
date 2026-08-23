@@ -1,3 +1,23 @@
 ---
-# Bookmarks (Empty)
-[]
+# ==============================================================================
+# Homepage Bookmarks Configuration
+# ==============================================================================
+
+- Documentation & Guides:
+    - TRaSH Guides:
+        - icon: https://trash-guides.info/favicon.ico
+        - href: https://trash-guides.info/
+        - description: Quality Profiles & Custom Formats Reference
+    - Jellyfin Docs:
+        - icon: jellyfin.png
+        - href: https://jellyfin.org/docs/
+        - description: Official Media Server Documentation
+    - LinuxServer.io:
+        - icon: https://www.linuxserver.io/favicon.ico
+        - href: https://docs.linuxserver.io/
+        - description: Container Fleet Documentation
+    - GitHub Repo:
+        - icon: github.png
+        - href: https://github.com/Anwera64/homelab
+        - description: Homelab Media Stack Source Code
+
