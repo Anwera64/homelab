@@ -18,7 +18,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server and automati
 * **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
 * **🤖 Complete *Arr Automation:** **Sonarr**, **Radarr**, **Prowlarr**, and **Bazarr** managing series, films, indexers, and automated subtitle synchronization.
 * **♻️ TRaSH Guides Sync:** **Recyclarr** automatically syncs TRaSH quality profiles and custom formats (including Latin American Spanish audio scoring) daily.
-* **🛡️ VPN Network Isolation:** **qBittorrent** is strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
+* **🛡️ VPN Network Isolation & Modern UI:** **qBittorrent** with **VueTorrent** WebUI skin, strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
 * **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
 * **🌐 Dual-Mode Ingress Routing:**
   * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** with zero port forwarding required.
@@ -76,7 +76,7 @@ graph TD
 | **Jellyfin Media** | `https://homelab.<tailnet>.ts.net:8443` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
 | **Jellyseerr** | `https://homelab.<tailnet>.ts.net:15055` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
 | **Jellystat** | `https://homelab.<tailnet>.ts.net:13005` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |
-| **qBittorrent** | `https://homelab.<tailnet>.ts.net:18080` | `http://desktop-kujo8mp:8080` | Download client (Kill-switch protected) |
+| **qBittorrent** | `https://homelab.<tailnet>.ts.net:18080` | `http://desktop-kujo8mp:8080` | Download client (VueTorrent UI, Kill-switch protected) |
 | **Sonarr** | `https://homelab.<tailnet>.ts.net:18989` | `http://desktop-kujo8mp:8989` | TV Series management & monitoring |
 | **Radarr** | `https://homelab.<tailnet>.ts.net:17878` | `http://desktop-kujo8mp:7878` | Movie collection management |
 | **Prowlarr** | `https://homelab.<tailnet>.ts.net:19696` | `http://desktop-kujo8mp:9696` | Torrent indexer proxy & FlareSolverr |
@@ -224,6 +224,7 @@ GitHub Actions executes the full test runner and Docker Compose validation acros
 ## 📄 License & Acknowledgments
 
 * Media Management Suite: [LinuxServer.io](https://www.linuxserver.io/)
+* Torrent WebUI Skin: [VueTorrent](https://github.com/VueTorrent/VueTorrent)
 * Transcoding Engine: [Jellyfin](https://jellyfin.org/)
 * Quality Guides: [TRaSH Guides](https://trash-guides.info/)
 * Reverse Proxy: [Caddy](https://caddyserver.com/)

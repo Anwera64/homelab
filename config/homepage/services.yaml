@@ -99,7 +99,7 @@
     - qBittorrent:
         icon: qbittorrent.png
         href: http://desktop-kujo8mp:8080
-        description: Download Client (Kill-Switch Isolated)
+        description: Download Client (VueTorrent UI - Kill-Switch Isolated)
         server: my-docker
         container: qbittorrent
         widget:

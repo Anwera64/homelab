@@ -34,6 +34,7 @@ services:
       - TZ=${TZ:-America/Mexico_City}
       - WEBUI_PORT=8080
       - TORRENTING_PORT=6881
+      - DOCKER_MODS=ghcr.io/vuetorrent/vuetorrent-lsio-mod:latest
     volumes:
       - ${CONFIG_PATH}/qbittorrent:/config
       - ${MEDIA_ROOT}:/data
