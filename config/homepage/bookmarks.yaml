@@ -5,19 +5,19 @@
 
 - Documentation & Guides:
     - TRaSH Guides:
-        - icon: https://trash-guides.info/favicon.ico
         - href: https://trash-guides.info/
-        - description: Quality Profiles & Custom Formats Reference
+          icon: https://trash-guides.info/favicon.ico
+          description: Quality Profiles & Custom Formats Reference
     - Jellyfin Docs:
-        - icon: jellyfin.png
         - href: https://jellyfin.org/docs/
-        - description: Official Media Server Documentation
+          icon: jellyfin.png
+          description: Official Media Server Documentation
     - LinuxServer.io:
-        - icon: https://www.linuxserver.io/favicon.ico
         - href: https://docs.linuxserver.io/
-        - description: Container Fleet Documentation
+          icon: https://www.linuxserver.io/favicon.ico
+          description: Container Fleet Documentation
     - GitHub Repo:
-        - icon: github.png
         - href: https://github.com/Anwera64/homelab
-        - description: Homelab Media Stack Source Code
+        - icon: github.png
+          description: Homelab Media Stack Source Code
 

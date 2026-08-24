@@ -8,12 +8,14 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const CADDYFILE_PATH = path.join(ROOT_DIR, 'config/caddy/Caddyfile');
 const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
+const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
 const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
 
 test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const caddyfileContent = fs.readFileSync(CADDYFILE_PATH, 'utf8');
   const dockerComposeContent = fs.readFileSync(DOCKER_COMPOSE_PATH, 'utf8');
   const servicesYamlContent = fs.readFileSync(SERVICES_YAML_PATH, 'utf8');
+  const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
 
   await t.test('Caddyfile contains reverse proxy blocks for all HTTP_TO_HTTPS_PORT mappings', () => {
@@ -132,5 +134,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const qbitDepends = qbitMatch[1];
     assert.ok(qbitDepends.includes('gluetun'), 'qBittorrent must depend on gluetun');
     assert.ok(qbitDepends.includes('condition: service_healthy'), 'qBittorrent must check gluetun service_healthy condition');
+  });
+
+  await t.test('Homepage bookmarks.yaml contains valid bookmark entries with hrefs', () => {
+    // Check that bookmarks.yaml has bookmark entries and that each has a proper href
+    const hrefMatches = [...bookmarksYamlContent.matchAll(/-\s*href:\s*(https?:\/\/[^\s]+)/g)];
+    assert.ok(hrefMatches.length > 0, 'bookmarks.yaml must contain at least one bookmark with an href');
+
+    // Ensure no malformed multi-dash properties under bookmark items
+    // (e.g. - icon: followed by next-line - href: without dictionary mapping)
+    const malformedPattern = /-\s*icon:.*\n\s*-\s*href:/;
+    assert.ok(!malformedPattern.test(bookmarksYamlContent), 'bookmarks.yaml must not have separate array items for icon and href');
   });
 });
