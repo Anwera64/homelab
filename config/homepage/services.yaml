@@ -34,7 +34,6 @@
         description: Playback Analytics & Viewer Statistics
         server: my-docker
         container: jellystat
-        showStats: true
         widget:
           type: jellystat
           url: http://jellystat:3000
@@ -92,7 +91,6 @@
         description: TRaSH Guides Quality & Format Sync (Daily 3 AM)
         server: my-docker
         container: recyclarr
-        showStats: true
 
     - Maintainerr:
         icon: maintainerr.png
@@ -100,7 +98,6 @@
         description: Automated Media Lifecycle & Cleanup
         server: my-docker
         container: maintainerr
-        showStats: true
         ping: http://maintainerr:6246/
 
 - Downloads & VPN Network:
@@ -119,7 +116,6 @@
         description: NordVPN WireGuard Gateway
         server: my-docker
         container: gluetun
-        showStats: true
         widget:
           type: gluetun
           url: http://gluetun:8000
@@ -132,7 +128,6 @@
         description: Cloudflare Solver Proxy
         server: my-docker
         container: flaresolverr
-        showStats: true
         ping: http://flaresolverr:8191/
 
 - Ingress & Security:
@@ -142,7 +137,6 @@
         description: Remote Mesh Encrypted Network
         server: my-docker
         container: tailscale
-        showStats: true
 
     - Caddy:
         icon: caddy.png
@@ -150,4 +144,3 @@
         description: Reverse Proxy & DuckDNS Wildcard TLS
         server: my-docker
         container: caddy
-        showStats: true
