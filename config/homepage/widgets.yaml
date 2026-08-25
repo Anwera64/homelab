@@ -17,6 +17,3 @@
     cpu: true
     memory: true
     disk: /
-
-- docker:
-    server: my-docker
