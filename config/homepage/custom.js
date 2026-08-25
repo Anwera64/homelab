@@ -177,14 +177,27 @@
     if (!badge) {
       badge = document.createElement('div');
       badge.id = 'dynamic-gps-weather-badge';
-      badge.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 500; padding: 4px 10px; border-radius: 9999px; background: rgba(255,255,255,0.08); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; transition: transform 0.2s; margin-left: 8px;';
+      badge.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 500; padding: 4px 10px; border-radius: 9999px; background: rgba(255,255,255,0.08); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; transition: transform 0.2s; margin-right: 12px; margin-left: 6px; vertical-align: middle;';
       
-      var headerTarget = document.querySelector('.information-widgets') || document.querySelector('header') || document.querySelector('.widgets-container') || document.querySelector('.flex.items-center');
-      if (headerTarget) {
-        headerTarget.appendChild(badge);
+      // Locate the datetime widget in the header
+      var header = document.querySelector('header') || document.querySelector('.information-widgets') || document.querySelector('.widgets-container') || document.body;
+      var candidateNodes = header.querySelectorAll('div, span, p');
+      var timeContainer = null;
+      var datePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}:\d{2})/i;
+      
+      for (var i = candidateNodes.length - 1; i >= 0; i--) {
+        var node = candidateNodes[i];
+        if (datePattern.test(node.textContent) && node.children.length === 0) {
+          timeContainer = node.parentElement;
+          break;
+        }
+      }
+
+      if (timeContainer && timeContainer.parentElement) {
+        timeContainer.parentElement.insertBefore(badge, timeContainer);
       } else {
-        var topBar = document.body.firstElementChild;
-        if (topBar) topBar.appendChild(badge);
+        var headerTarget = document.querySelector('.information-widgets') || document.querySelector('header') || document.body.firstElementChild;
+        if (headerTarget) headerTarget.appendChild(badge);
       }
     }
     badge.innerHTML = '<span>' + weatherInfo.icon + '</span><span>' + Math.round(temp) + '°C</span>';
