@@ -35,10 +35,23 @@
         server: my-docker
         container: jellystat
         widget:
-          type: jellystat
-          url: http://jellystat:3000
-          key: "{{HOMEPAGE_VAR_JELLYSTAT_API_KEY}}"
-          fields: ["views", "duration"]
+          type: customapi
+          url: http://jellystat:3000/stats/getLibraryCardStats
+          headers:
+            x-api-token: "{{HOMEPAGE_VAR_JELLYSTAT_API_KEY}}"
+          mappings:
+            - field: 0.Plays
+              label: TV Plays
+              format: number
+            - field: 1.Plays
+              label: Movie Plays
+              format: number
+            - field: 0.total_playback_duration
+              label: TV Time
+              format: duration
+            - field: 1.total_playback_duration
+              label: Movie Time
+              format: duration
 
 - Automation Suite:
     - Sonarr:
