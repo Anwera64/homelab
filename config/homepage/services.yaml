@@ -1,12 +1,12 @@
 ---
 # ==============================================================================
-# Homepage Services Configuration
+# Homepage Services Configuration (DuckDNS Subdomain Architecture)
 # ==============================================================================
 
 - Media & Streaming:
     - Jellyfin:
         icon: jellyfin.png
-        href: http://desktop-kujo8mp:8096
+        href: https://jellyfin.spicy-llama.duckdns.org
         description: Media Streaming (RTX 5080 NVENC)
         server: my-docker
         container: jellyfin
@@ -19,7 +19,7 @@
 
     - Jellyseerr:
         icon: jellyseerr.png
-        href: http://desktop-kujo8mp:5055
+        href: https://seerr.spicy-llama.duckdns.org
         description: Netflix-style Request & Discovery UI
         server: my-docker
         container: jellyseerr
@@ -30,7 +30,7 @@
 
     - Jellystat:
         icon: jellystat.png
-        href: http://desktop-kujo8mp:3005
+        href: https://stat.spicy-llama.duckdns.org
         description: Playback Analytics & Viewer Statistics
         server: my-docker
         container: jellystat
@@ -39,7 +39,7 @@
 - Automation Suite:
     - Sonarr:
         icon: sonarr.png
-        href: http://desktop-kujo8mp:8989
+        href: https://sonarr.spicy-llama.duckdns.org
         description: TV Series Management
         server: my-docker
         container: sonarr
@@ -50,7 +50,7 @@
 
     - Radarr:
         icon: radarr.png
-        href: http://desktop-kujo8mp:7878
+        href: https://radarr.spicy-llama.duckdns.org
         description: Movie Collection Management
         server: my-docker
         container: radarr
@@ -61,7 +61,7 @@
 
     - Prowlarr:
         icon: prowlarr.png
-        href: http://desktop-kujo8mp:9696
+        href: https://prowlarr.spicy-llama.duckdns.org
         description: Trackers & Indexer Proxy
         server: my-docker
         container: prowlarr
@@ -72,7 +72,7 @@
 
     - Bazarr:
         icon: bazarr.png
-        href: http://desktop-kujo8mp:6767
+        href: https://bazarr.spicy-llama.duckdns.org
         description: Automated Subtitle Sync
         server: my-docker
         container: bazarr
@@ -89,7 +89,7 @@
 
     - Maintainerr:
         icon: maintainerr.png
-        href: http://desktop-kujo8mp:6246
+        href: https://maintainerr.spicy-llama.duckdns.org
         description: Automated Media Lifecycle & Cleanup
         server: my-docker
         container: maintainerr
@@ -98,7 +98,7 @@
 - Downloads & VPN Network:
     - qBittorrent:
         icon: qbittorrent.png
-        href: http://desktop-kujo8mp:8080
+        href: https://qbit.spicy-llama.duckdns.org
         description: Download Client (VueTorrent UI - Kill-Switch Isolated)
         server: my-docker
         container: qbittorrent
@@ -119,7 +119,7 @@
 
     - FlareSolverr:
         icon: flaresolverr.png
-        href: http://desktop-kujo8mp:8191
+        href: https://flaresolverr.spicy-llama.duckdns.org
         description: Cloudflare Solver Proxy
         server: my-docker
         container: flaresolverr
@@ -135,9 +135,7 @@
 
     - Caddy:
         icon: caddy.png
-        href: http://desktop-kujo8mp
-        description: Reverse Proxy & Hostname Routing
+        href: https://spicy-llama.duckdns.org
+        description: Reverse Proxy & DuckDNS Wildcard TLS
         server: my-docker
         container: caddy
-
-

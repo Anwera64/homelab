@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { HTTP_TO_HTTPS_PORT } = require('../config/homepage/adapt-links.js');
+const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CADDYFILE_PATH = path.join(ROOT_DIR, 'config/caddy/Caddyfile');
@@ -18,26 +18,39 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
 
-  await t.test('Caddyfile contains reverse proxy blocks for all HTTP_TO_HTTPS_PORT mappings', () => {
-    for (const [httpPort, httpsPort] of Object.entries(HTTP_TO_HTTPS_PORT)) {
-      // Check HTTP port block exists
-      const httpPattern = new RegExp(`http://:${httpPort}\\s*\\{`, 'm');
-      assert.ok(
-        httpPattern.test(caddyfileContent),
-        `Caddyfile must contain an HTTP reverse proxy block for port :${httpPort}`
-      );
+  await t.test('Caddyfile contains DuckDNS wildcard TLS block with dns duckdns plugin', () => {
+    assert.ok(
+      caddyfileContent.includes('*.spicy-llama.duckdns.org, spicy-llama.duckdns.org'),
+      'Caddyfile must contain wildcard entry for spicy-llama.duckdns.org'
+    );
+    assert.ok(
+      caddyfileContent.includes('dns duckdns {$DUCKDNS_TOKEN}'),
+      'Caddyfile must configure tls with dns duckdns {$DUCKDNS_TOKEN}'
+    );
+  });
 
-      // Check HTTPS port block exists
-      const httpsPattern = new RegExp(`:${httpsPort}\\s*\\{`, 'm');
+  await t.test('Caddyfile contains reverse proxy handlers for all core homelab services', () => {
+    const requiredServices = ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'bazarr', 'maintainerr', 'flaresolverr'];
+    for (const service of requiredServices) {
+      const handlerPattern = new RegExp(`@${service}\\s+host\\s+${service}\\.spicy-llama\\.duckdns\\.org`, 'm');
       assert.ok(
-        httpsPattern.test(caddyfileContent),
-        `Caddyfile must contain a dedicated HTTPS block for port :${httpsPort}`
+        handlerPattern.test(caddyfileContent),
+        `Caddyfile must contain a named host matcher for @${service}`
       );
     }
   });
 
-  await t.test('Tailscale container exposes all required HTTP and HTTPS ingress ports in docker-compose.yml', () => {
-    // Extract ports from tailscale service block in docker-compose.yml
+  await t.test('Caddyfile contains local direct HTTP port proxy blocks', () => {
+    for (const port of Object.keys(PORT_TO_SERVICE)) {
+      const httpPattern = new RegExp(`http://:${port}\\s*\\{`, 'm');
+      assert.ok(
+        httpPattern.test(caddyfileContent),
+        `Caddyfile must contain an HTTP reverse proxy block for local port :${port}`
+      );
+    }
+  });
+
+  await t.test('Tailscale container exposes standard ingress and local service ports in docker-compose.yml', () => {
     const tailscaleMatch = dockerComposeContent.match(/container_name:\s*tailscale[\s\S]*?ports:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*restart:|$)/);
     assert.ok(tailscaleMatch, 'docker-compose.yml must contain a tailscale service with a ports section');
 
@@ -49,16 +62,27 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       exposedPorts.add(match[1]);
     }
 
-    for (const [httpPort, httpsPort] of Object.entries(HTTP_TO_HTTPS_PORT)) {
+    assert.ok(exposedPorts.has('80'), 'Tailscale must expose port 80');
+    assert.ok(exposedPorts.has('443'), 'Tailscale must expose port 443');
+    assert.ok(exposedPorts.has('3000'), 'Tailscale must expose port 3000');
+
+    for (const port of Object.keys(PORT_TO_SERVICE)) {
       assert.ok(
-        exposedPorts.has(httpPort),
-        `Tailscale service in docker-compose.yml must expose HTTP port ${httpPort}`
-      );
-      assert.ok(
-        exposedPorts.has(httpsPort),
-        `Tailscale service in docker-compose.yml must expose HTTPS port ${httpsPort}`
+        exposedPorts.has(port),
+        `Tailscale service in docker-compose.yml must expose local port ${port}`
       );
     }
+  });
+
+  await t.test('Caddy service in docker-compose.yml builds custom image and injects DUCKDNS_TOKEN', () => {
+    assert.ok(
+      dockerComposeContent.includes('context: ./config/caddy'),
+      'Caddy service must configure build context as ./config/caddy'
+    );
+    assert.ok(
+      dockerComposeContent.includes('DUCKDNS_TOKEN=${DUCKDNS_TOKEN}'),
+      'Caddy service must receive DUCKDNS_TOKEN environment variable'
+    );
   });
 
   await t.test('Homepage service.yaml {{HOMEPAGE_VAR_*}} tokens are mapped in docker-compose.yml', () => {
@@ -81,7 +105,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('All environment variables in docker-compose.yml are documented in .env.example', () => {
-    // Match ${VAR_NAME} or ${VAR_NAME:-default}
     const envVarPattern = /\$\{([A-Z0-9_]+)(?::-.*?)?\}/g;
     const composeVars = new Set();
     let match;
@@ -101,7 +124,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('Homepage services.yaml internal container URLs point to valid services in docker-compose.yml', () => {
-    // Extract service names defined under services: in docker-compose.yml
     const serviceNameRegex = /^\s{2}([a-z0-9_-]+):\s*$/gm;
     const definedServices = new Set();
     let match;
@@ -109,7 +131,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       definedServices.add(match[1]);
     }
 
-    // Check URLs in services.yaml (e.g. url: http://sonarr:8989, ping: http://jellystat:3000/)
     const urlPattern = /(?:url|ping):\s*http:\/\/([a-z0-9_-]+):(\d+)/g;
     while ((match = urlPattern.exec(servicesYamlContent)) !== null) {
       const hostname = match[1];
@@ -137,12 +158,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('Homepage bookmarks.yaml contains valid bookmark entries with hrefs', () => {
-    // Check that bookmarks.yaml has bookmark entries and that each has a proper href
     const hrefMatches = [...bookmarksYamlContent.matchAll(/-\s*href:\s*(https?:\/\/[^\s]+)/g)];
     assert.ok(hrefMatches.length > 0, 'bookmarks.yaml must contain at least one bookmark with an href');
 
-    // Ensure no malformed multi-dash properties under bookmark items
-    // (e.g. - icon: followed by next-line - href: without dictionary mapping)
     const malformedPattern = /-\s*icon:.*\n\s*-\s*href:/;
     assert.ok(!malformedPattern.test(bookmarksYamlContent), 'bookmarks.yaml must not have separate array items for icon and href');
   });

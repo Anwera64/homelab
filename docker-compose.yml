@@ -263,6 +263,7 @@ services:
       - TS_USERSPACE=false
       - TS_PORT=41641
       - TS_TAILSCALED_EXTRA_ARGS=--port=41641
+      - TS_ROUTES=${TS_ROUTES:-192.168.1.0/24}
     volumes:
       - ${CONFIG_PATH}/tailscale:/var/lib/tailscale
       - tailscale_sock:/var/run/tailscale
@@ -287,26 +288,19 @@ services:
       - 9696:9696
       - 6767:6767
       - 8191:8191
-      # Remote Tailscale HTTPS Service Ports
-      - 8443:8443
-      - 15055:15055
-      - 13005:13005
-      - 16246:16246
-      - 18080:18080
-      - 18989:18989
-      - 17878:17878
-      - 19696:19696
-      - 16767:16767
-      - 18191:18191
     restart: unless-stopped
 
   # ==============================================================================
   # 11. Reverse Proxy & Hostname Routing (Caddy)
   # ==============================================================================
   caddy:
-    image: caddy:latest
+    build:
+      context: ./config/caddy
+      dockerfile: Dockerfile
     container_name: caddy
     network_mode: "service:tailscale"
+    environment:
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
     volumes:
       - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ${CONFIG_PATH}/caddy/data:/data

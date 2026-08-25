@@ -1,5 +1,5 @@
 # ==============================================================================
-# Caddyfile - Homelab Reverse Proxy Configuration
+# Caddyfile - Homelab Reverse Proxy Configuration (DuckDNS Wildcard + Local LAN)
 # ==============================================================================
 
 {
@@ -16,9 +16,79 @@
 }
 
 # ------------------------------------------------------------------------------
-# 1. Main Dashboard Entrypoint (Homepage Port 80 & 443)
+# 1. DuckDNS Wildcard HTTPS Subdomain Ingress (*.spicy-llama.duckdns.org)
 # ------------------------------------------------------------------------------
-homelab.llama-porbeagle.ts.net, http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
+*.spicy-llama.duckdns.org, spicy-llama.duckdns.org {
+    import security_headers
+
+    tls {
+        dns duckdns {$DUCKDNS_TOKEN}
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Media & Streaming
+    @jellyfin host jellyfin.spicy-llama.duckdns.org
+    handle @jellyfin {
+        reverse_proxy jellyfin:8096
+    }
+
+    @jellyseerr host seerr.spicy-llama.duckdns.org jellyseerr.spicy-llama.duckdns.org
+    handle @jellyseerr {
+        reverse_proxy jellyseerr:5055
+    }
+
+    @jellystat host stat.spicy-llama.duckdns.org jellystat.spicy-llama.duckdns.org
+    handle @jellystat {
+        reverse_proxy jellystat:3000
+    }
+
+    # Arr Automation Suite
+    @sonarr host sonarr.spicy-llama.duckdns.org
+    handle @sonarr {
+        reverse_proxy sonarr:8989
+    }
+
+    @radarr host radarr.spicy-llama.duckdns.org
+    handle @radarr {
+        reverse_proxy radarr:7878
+    }
+
+    @prowlarr host prowlarr.spicy-llama.duckdns.org
+    handle @prowlarr {
+        reverse_proxy prowlarr:9696
+    }
+
+    @bazarr host bazarr.spicy-llama.duckdns.org
+    handle @bazarr {
+        reverse_proxy bazarr:6767
+    }
+
+    @maintainerr host maintainerr.spicy-llama.duckdns.org
+    handle @maintainerr {
+        reverse_proxy maintainerr:6246
+    }
+
+    # Downloads & Solvers
+    @qbittorrent host qbit.spicy-llama.duckdns.org qbittorrent.spicy-llama.duckdns.org
+    handle @qbittorrent {
+        reverse_proxy gluetun:8080
+    }
+
+    @flaresolverr host flaresolverr.spicy-llama.duckdns.org
+    handle @flaresolverr {
+        reverse_proxy flaresolverr:8191
+    }
+
+    # Default / Dashboard (Homepage)
+    handle {
+        reverse_proxy homepage:3000
+    }
+}
+
+# ------------------------------------------------------------------------------
+# 2. Local LAN & Fallback Entrypoints (Pure HTTP :80)
+# ------------------------------------------------------------------------------
+http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
     import security_headers
     reverse_proxy homepage:3000
 }
@@ -29,7 +99,7 @@ http://:3000 {
 }
 
 # ------------------------------------------------------------------------------
-# 2. Local LAN Direct Ports (Pure HTTP)
+# 3. Direct Local LAN Ports (Pure HTTP)
 # ------------------------------------------------------------------------------
 http://:8096 {
     reverse_proxy jellyfin:8096
@@ -68,48 +138,5 @@ http://:6767 {
 }
 
 http://:8191 {
-    reverse_proxy flaresolverr:8191
-}
-
-# ------------------------------------------------------------------------------
-# 3. Remote Tailscale Dedicated HTTPS Ports (Let's Encrypt TLS)
-# ------------------------------------------------------------------------------
-https://homelab.llama-porbeagle.ts.net:8443 {
-    reverse_proxy jellyfin:8096
-}
-
-https://homelab.llama-porbeagle.ts.net:15055 {
-    reverse_proxy jellyseerr:5055
-}
-
-https://homelab.llama-porbeagle.ts.net:13005 {
-    reverse_proxy jellystat:3000
-}
-
-https://homelab.llama-porbeagle.ts.net:16246 {
-    reverse_proxy maintainerr:6246
-}
-
-https://homelab.llama-porbeagle.ts.net:18080 {
-    reverse_proxy gluetun:8080
-}
-
-https://homelab.llama-porbeagle.ts.net:18989 {
-    reverse_proxy sonarr:8989
-}
-
-https://homelab.llama-porbeagle.ts.net:17878 {
-    reverse_proxy radarr:7878
-}
-
-https://homelab.llama-porbeagle.ts.net:19696 {
-    reverse_proxy prowlarr:9696
-}
-
-https://homelab.llama-porbeagle.ts.net:16767 {
-    reverse_proxy bazarr:6767
-}
-
-https://homelab.llama-porbeagle.ts.net:18191 {
     reverse_proxy flaresolverr:8191
 }

@@ -1,191 +1,129 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { adaptServiceUrl, HTTP_TO_HTTPS_PORT } = require('../config/homepage/adapt-links.js');
+const { adaptServiceUrl, SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
 
-test('Option 2 Split-Port Ingress Link Adapter Suite', async (t) => {
-  const remoteOrigin = 'https://homelab.llama-porbeagle.ts.net/';
+test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
+  const duckdnsOrigin = 'https://spicy-llama.duckdns.org/';
+  const localHostOrigin = 'http://desktop-kujo8mp/';
+  const lanIpOrigin = 'http://192.168.1.20/';
 
-  await t.test('Remote HTTPS: adapts Jellyfin (:8096) to https :8443 port', () => {
-    const input = 'http://desktop-kujo8mp:8096';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:8443/');
-  });
-
-  await t.test('Remote HTTPS: adapts Jellyseerr (:5055) to https :15055 port', () => {
-    const input = 'http://desktop-kujo8mp:5055';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:15055/');
-  });
-
-  await t.test('Remote HTTPS: adapts Jellystat (:3005) to https :13005 port', () => {
-    const input = 'http://desktop-kujo8mp:3005';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:13005/');
-  });
-
-  await t.test('Remote HTTPS: adapts Maintainerr (:6246) to https :16246 port', () => {
-    const input = 'http://desktop-kujo8mp:6246';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:16246/');
-  });
-
-  await t.test('Remote HTTPS: adapts Sonarr (:8989) to https :18989 port', () => {
-    const input = 'http://desktop-kujo8mp:8989';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18989/');
-  });
-
-  await t.test('Remote HTTPS: adapts Radarr (:7878) to https :17878 port', () => {
-    const input = 'http://desktop-kujo8mp:7878';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:17878/');
-  });
-
-  await t.test('Remote HTTPS: adapts qBittorrent (:8080) to https :18080 port', () => {
-    const input = 'http://desktop-kujo8mp:8080';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18080/');
-  });
-
-  await t.test('Remote HTTPS: adapts FlareSolverr (:8191) to https :18191 port', () => {
-    const input = 'http://desktop-kujo8mp:8191';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:18191/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local port 8096 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:8096';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:8096/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local FlareSolverr port 8191 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:8191';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:8191/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local Jellystat port 3005 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:3005';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:3005/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local Maintainerr port 6246 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:6246';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:6246/');
-  });
-
-  await t.test('Local Hostname (HTTP): retains local port 5055 in pure HTTP', () => {
-    const localHostOrigin = 'http://desktop-kujo8mp/';
-    const input = 'http://192.168.1.20:5055';
-    const result = adaptServiceUrl(input, localHostOrigin);
-    assert.equal(result, 'http://desktop-kujo8mp:5055/');
-  });
-
-  await t.test('Localhost (HTTP): retains local port 7878 in pure HTTP', () => {
-    const localhostOrigin = 'http://localhost:3000/';
-    const input = 'http://desktop-kujo8mp:7878';
-    const result = adaptServiceUrl(input, localhostOrigin);
-    assert.equal(result, 'http://localhost:7878/');
-  });
-
-  await t.test('External Links Safety: never modifies external websites even with custom ports', () => {
+  await t.test('Subdomain Ingress: preserves clean HTTPS subdomains when accessed via DuckDNS', () => {
     assert.equal(
-      adaptServiceUrl('https://github.com/linuxserver/docker-jellyfin', remoteOrigin),
-      'https://github.com/linuxserver/docker-jellyfin'
+      adaptServiceUrl('https://jellyfin.spicy-llama.duckdns.org', duckdnsOrigin),
+      'https://jellyfin.spicy-llama.duckdns.org'
     );
     assert.equal(
-      adaptServiceUrl('https://trash-guides.info/Radarr/', remoteOrigin),
-      'https://trash-guides.info/Radarr/'
+      adaptServiceUrl('https://sonarr.spicy-llama.duckdns.org', duckdnsOrigin),
+      'https://sonarr.spicy-llama.duckdns.org'
     );
     assert.equal(
-      adaptServiceUrl('https://example.com:8443/custom-api', remoteOrigin),
-      'https://example.com:8443/custom-api'
-    );
-    assert.equal(
-      adaptServiceUrl('http://remote-vps.net:8080/dashboard', remoteOrigin),
-      'http://remote-vps.net:8080/dashboard'
+      adaptServiceUrl('https://radarr.spicy-llama.duckdns.org', duckdnsOrigin),
+      'https://radarr.spicy-llama.duckdns.org'
     );
   });
 
-  await t.test('Standard Web Port Safety: never modifies port 80/443 links', () => {
+  await t.test('Port-to-Subdomain Migration: converts legacy local port URLs to clean subdomains on HTTPS', () => {
     assert.equal(
-      adaptServiceUrl('http://desktop-kujo8mp:80', remoteOrigin),
-      'http://desktop-kujo8mp:80'
+      adaptServiceUrl('http://desktop-kujo8mp:8096', duckdnsOrigin),
+      'https://jellyfin.spicy-llama.duckdns.org/'
     );
     assert.equal(
-      adaptServiceUrl('https://desktop-kujo8mp:443', remoteOrigin),
-      'https://desktop-kujo8mp:443'
+      adaptServiceUrl('http://desktop-kujo8mp:8989', duckdnsOrigin),
+      'https://sonarr.spicy-llama.duckdns.org/'
     );
-  });
-
-  await t.test('Remote HTTPS: adapts Prowlarr (:9696) to https :19696 port', () => {
-    const input = 'http://desktop-kujo8mp:9696';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:19696/');
-  });
-
-  await t.test('Remote HTTPS: adapts Bazarr (:6767) to https :16767 port', () => {
-    const input = 'http://desktop-kujo8mp:6767';
-    const result = adaptServiceUrl(input, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:16767/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local Prowlarr port 9696 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:9696';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:9696/');
-  });
-
-  await t.test('Local LAN IP (HTTP): retains local Bazarr port 6767 in pure HTTP', () => {
-    const lanOrigin = 'http://192.168.1.20/';
-    const input = 'http://desktop-kujo8mp:6767';
-    const result = adaptServiceUrl(input, lanOrigin);
-    assert.equal(result, 'http://192.168.1.20:6767/');
-  });
-
-  await t.test('URL Preservation: preserves subpaths, query parameters, and hashes during rewrite', () => {
-    const complexInput = 'http://desktop-kujo8mp:8096/web/index.html?token=xyz123&theme=dark#player-view';
-    const result = adaptServiceUrl(complexInput, remoteOrigin);
     assert.equal(
-      result,
-      'https://homelab.llama-porbeagle.ts.net:8443/web/index.html?token=xyz123&theme=dark#player-view'
+      adaptServiceUrl('http://desktop-kujo8mp:7878', duckdnsOrigin),
+      'https://radarr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:9696', duckdnsOrigin),
+      'https://prowlarr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:6767', duckdnsOrigin),
+      'https://bazarr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:8080', duckdnsOrigin),
+      'https://qbit.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:5055', duckdnsOrigin),
+      'https://seerr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:3005', duckdnsOrigin),
+      'https://stat.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:6246', duckdnsOrigin),
+      'https://maintainerr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:8191', duckdnsOrigin),
+      'https://flaresolverr.spicy-llama.duckdns.org/'
     );
   });
 
-  await t.test('Unmapped Custom Ports: adapts origin and protocol while preserving unmapped port', () => {
-    const customInput = 'http://desktop-kujo8mp:9999/status';
-    const result = adaptServiceUrl(customInput, remoteOrigin);
-    assert.equal(result, 'https://homelab.llama-porbeagle.ts.net:9999/status');
+  await t.test('Local LAN Fallback: adapts DuckDNS subdomain URLs to local HTTP ports on desktop-kujo8mp', () => {
+    assert.equal(
+      adaptServiceUrl('https://jellyfin.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:8096/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://sonarr.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:8989/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://radarr.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:7878/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://seerr.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:5055/'
+    );
   });
 
-  await t.test('Relative and malformed links resilience', () => {
-    assert.equal(adaptServiceUrl('/local-path', remoteOrigin), '/local-path');
-    assert.equal(adaptServiceUrl('', remoteOrigin), '');
-    assert.equal(adaptServiceUrl(null, remoteOrigin), null);
-    assert.equal(adaptServiceUrl(undefined, remoteOrigin), undefined);
+  await t.test('Local LAN IP Fallback: adapts DuckDNS subdomain URLs to local HTTP ports on LAN IP', () => {
+    assert.equal(
+      adaptServiceUrl('https://jellyfin.spicy-llama.duckdns.org', lanIpOrigin),
+      'http://192.168.1.20:8096/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://qbit.spicy-llama.duckdns.org', lanIpOrigin),
+      'http://192.168.1.20:8080/'
+    );
   });
 
-  await t.test('Code Parity: custom.js and adapt-links.js have identical HTTP_TO_HTTPS_PORT maps', () => {
+  await t.test('External Links Safety: never modifies external websites', () => {
+    assert.equal(
+      adaptServiceUrl('https://github.com/Anwera64/homelab', duckdnsOrigin),
+      'https://github.com/Anwera64/homelab'
+    );
+    assert.equal(
+      adaptServiceUrl('https://trash-guides.info/', duckdnsOrigin),
+      'https://trash-guides.info/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://example.com:8443/api', duckdnsOrigin),
+      'https://example.com:8443/api'
+    );
+  });
+
+  await t.test('Code Parity: custom.js and adapt-links.js have identical SERVICE_PORTS and PORT_TO_SERVICE maps', () => {
     const fs = require('node:fs');
     const path = require('node:path');
     const customJsPath = path.resolve(__dirname, '../config/homepage/custom.js');
     const customJsContent = fs.readFileSync(customJsPath, 'utf8');
 
-    // Extract HTTP_TO_HTTPS_PORT object from custom.js
-    const match = customJsContent.match(/var HTTP_TO_HTTPS_PORT\s*=\s*(\{[\s\S]*?\});/);
-    assert.ok(match, 'HTTP_TO_HTTPS_PORT should exist in custom.js');
+    const servicePortsMatch = customJsContent.match(/var SERVICE_PORTS\s*=\s*(\{[\s\S]*?\});/);
+    assert.ok(servicePortsMatch, 'SERVICE_PORTS should exist in custom.js');
+    const customServicePorts = Function(`return ${servicePortsMatch[1]}`)();
+    assert.deepEqual(customServicePorts, SERVICE_PORTS);
 
-    // Safely parse the object literal
-    const customMap = Function(`return ${match[1]}`)();
-    assert.deepEqual(customMap, HTTP_TO_HTTPS_PORT);
+    const portToServiceMatch = customJsContent.match(/var PORT_TO_SERVICE\s*=\s*(\{[\s\S]*?\});/);
+    assert.ok(portToServiceMatch, 'PORT_TO_SERVICE should exist in custom.js');
+    const customPortToService = Function(`return ${portToServiceMatch[1]}`)();
+    assert.deepEqual(customPortToService, PORT_TO_SERVICE);
   });
 });
-

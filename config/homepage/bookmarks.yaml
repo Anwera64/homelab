@@ -18,6 +18,6 @@
           description: Container Fleet Documentation
     - GitHub Repo:
         - href: https://github.com/Anwera64/homelab
-        - icon: github.png
+          icon: github.png
           description: Homelab Media Stack Source Code
 

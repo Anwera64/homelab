@@ -70,20 +70,20 @@ graph TD
 
 ## 🌐 Web UI Service Endpoints
 
-| Service | Remote Ingress (Tailscale HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Features |
+| Service | Remote Ingress (DuckDNS HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Features |
 | :--- | :--- | :--- | :--- |
-| **Homepage Portal** | `https://homelab.<tailnet>.ts.net` | `http://desktop-kujo8mp` (Port 80) | Central dashboard & system telemetry |
-| **Jellyfin Media** | `https://homelab.<tailnet>.ts.net:8443` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
-| **Jellyseerr** | `https://homelab.<tailnet>.ts.net:15055` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
-| **Jellystat** | `https://homelab.<tailnet>.ts.net:13005` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |
-| **qBittorrent** | `https://homelab.<tailnet>.ts.net:18080` | `http://desktop-kujo8mp:8080` | Download client (VueTorrent UI, Kill-switch protected) |
-| **Sonarr** | `https://homelab.<tailnet>.ts.net:18989` | `http://desktop-kujo8mp:8989` | TV Series management & monitoring |
-| **Radarr** | `https://homelab.<tailnet>.ts.net:17878` | `http://desktop-kujo8mp:7878` | Movie collection management |
-| **Prowlarr** | `https://homelab.<tailnet>.ts.net:19696` | `http://desktop-kujo8mp:9696` | Torrent indexer proxy & FlareSolverr |
-| **Bazarr** | `https://homelab.<tailnet>.ts.net:16767` | `http://desktop-kujo8mp:6767` | Automated subtitle downloader & sync |
-| **Maintainerr** | `https://homelab.<tailnet>.ts.net:16246` | `http://desktop-kujo8mp:6246` | Automated media lifecycle & cleanup |
+| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://desktop-kujo8mp` (Port 80) | Central dashboard & system telemetry |
+| **Jellyfin Media** | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
+| **Jellyseerr** | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
+| **Jellystat** | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |
+| **qBittorrent** | `https://qbit.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8080` | Download client (VueTorrent UI, Kill-switch protected) |
+| **Sonarr** | `https://sonarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8989` | TV Series management & monitoring |
+| **Radarr** | `https://radarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:7878` | Movie collection management |
+| **Prowlarr** | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:9696` | Torrent indexer proxy & FlareSolverr |
+| **Bazarr** | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6767` | Automated subtitle downloader & sync |
+| **Maintainerr** | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6246` | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality profile sync |
-| **FlareSolverr** | `https://homelab.<tailnet>.ts.net:18191` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
+| **FlareSolverr** | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
 
 ---
 

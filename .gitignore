@@ -8,6 +8,7 @@ config/*/**
 !config/homepage/**
 config/homepage/logs/
 !config/caddy/Caddyfile
+!config/caddy/Dockerfile
 data/
 
 # Logs
