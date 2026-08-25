@@ -79,7 +79,18 @@
         reverse_proxy flaresolverr:8191
     }
 
-    # Default / Dashboard (Homepage)
+    # Dashboards (Side-by-Side)
+    @homarr host homarr.spicy-llama.duckdns.org
+    handle @homarr {
+        reverse_proxy homarr:7575
+    }
+
+    @homepage host homepage.spicy-llama.duckdns.org home.spicy-llama.duckdns.org
+    handle @homepage {
+        reverse_proxy homepage:3000
+    }
+
+    # Default / Dashboard Fallback
     handle {
         reverse_proxy homepage:3000
     }
@@ -101,6 +112,10 @@ http://:3000 {
 # ------------------------------------------------------------------------------
 # 3. Direct Local LAN Ports (Pure HTTP)
 # ------------------------------------------------------------------------------
+http://:7575 {
+    reverse_proxy homarr:7575
+}
+
 http://:8096 {
     reverse_proxy jellyfin:8096
 }

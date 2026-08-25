@@ -125,7 +125,15 @@
         container: flaresolverr
         ping: http://flaresolverr:8191/
 
-- Ingress & Security:
+- Ingress & Dashboards:
+    - Homarr:
+        icon: homarr.png
+        href: https://homarr.spicy-llama.duckdns.org
+        description: Visual Dashboard & Board Builder
+        server: my-docker
+        container: homarr
+        ping: http://homarr:7575/
+
     - Tailscale:
         icon: tailscale.png
         href: https://login.tailscale.com/admin/machines
