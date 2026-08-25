@@ -16,12 +16,10 @@
     'radarr': '7878',
     'prowlarr': '9696',
     'bazarr': '6767',
-    'flaresolverr': '8191',
-    'homarr': '7575'
+    'flaresolverr': '8191'
   };
 
   var PORT_TO_SERVICE = {
-    '7575': 'homarr',
     '8096': 'jellyfin',
     '5055': 'seerr',
     '3005': 'stat',
