@@ -3,19 +3,25 @@
 # Homepage Bookmarks Configuration
 # ==============================================================================
 
-- Documentation & Guides:
+- Network & Gateway:
+    - Tailscale Admin:
+        - href: https://login.tailscale.com/admin/machines
+          icon: tailscale.png
+          description: Remote Mesh Encrypted Network Dashboard
+    - DuckDNS:
+        - href: https://www.duckdns.org/
+          icon: https://www.duckdns.org/favicon.ico
+          description: Dynamic DNS Domain Manager
+    - Local Router:
+        - href: http://192.168.1.1/
+          icon: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/router.png
+          description: Home Gateway & DHCP Admin Portal
+
+- Guides & Source:
     - TRaSH Guides:
         - href: https://trash-guides.info/
           icon: https://trash-guides.info/favicon.ico
           description: Quality Profiles & Custom Formats Reference
-    - Jellyfin Docs:
-        - href: https://jellyfin.org/docs/
-          icon: jellyfin.png
-          description: Official Media Server Documentation
-    - LinuxServer.io:
-        - href: https://docs.linuxserver.io/
-          icon: https://www.linuxserver.io/favicon.ico
-          description: Container Fleet Documentation
     - GitHub Repo:
         - href: https://github.com/Anwera64/homelab
           icon: github.png

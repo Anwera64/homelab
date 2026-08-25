@@ -143,4 +143,89 @@
       }
     }
   }, true);
+
+  // ==============================================================================
+  // Dynamic Client-Side Browser GPS Weather Component
+  // ==============================================================================
+  var WEATHER_CODES = {
+    0: { text: 'Clear', icon: '☀️' },
+    1: { text: 'Mainly Clear', icon: '🌤️' },
+    2: { text: 'Partly Cloudy', icon: '⛅' },
+    3: { text: 'Overcast', icon: '☁️' },
+    45: { text: 'Fog', icon: '🌫️' },
+    48: { text: 'Depositing Rime Fog', icon: '🌫️' },
+    51: { text: 'Light Drizzle', icon: '🌦️' },
+    53: { text: 'Moderate Drizzle', icon: '🌧️' },
+    55: { text: 'Dense Drizzle', icon: '🌧️' },
+    61: { text: 'Slight Rain', icon: '🌦️' },
+    63: { text: 'Moderate Rain', icon: '🌧️' },
+    65: { text: 'Heavy Rain', icon: '🌧️' },
+    71: { text: 'Slight Snow', icon: '🌨️' },
+    73: { text: 'Moderate Snow', icon: '❄️' },
+    75: { text: 'Heavy Snow', icon: '❄️' },
+    80: { text: 'Rain Showers', icon: '🌦️' },
+    81: { text: 'Moderate Showers', icon: '🌧️' },
+    82: { text: 'Violent Showers', icon: '⛈️' },
+    95: { text: 'Thunderstorm', icon: '⛈️' },
+    96: { text: 'Thunderstorm with Hail', icon: '⛈️' },
+    99: { text: 'Severe Thunderstorm', icon: '⛈️' }
+  };
+
+  function updateWeatherBadge(temp, code, lat, lon) {
+    var weatherInfo = WEATHER_CODES[code] || { text: 'Weather', icon: '🌤️' };
+    var badge = document.getElementById('dynamic-gps-weather-badge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'dynamic-gps-weather-badge';
+      badge.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 500; padding: 4px 10px; border-radius: 9999px; background: rgba(255,255,255,0.08); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); color: inherit; cursor: pointer; transition: transform 0.2s; margin-left: 8px;';
+      
+      var headerTarget = document.querySelector('.information-widgets') || document.querySelector('header') || document.querySelector('.widgets-container') || document.querySelector('.flex.items-center');
+      if (headerTarget) {
+        headerTarget.appendChild(badge);
+      } else {
+        var topBar = document.body.firstElementChild;
+        if (topBar) topBar.appendChild(badge);
+      }
+    }
+    badge.innerHTML = '<span>' + weatherInfo.icon + '</span><span>' + Math.round(temp) + '°C</span>';
+    badge.title = weatherInfo.text + ' (' + Math.round(temp) + '°C) • GPS: ' + lat.toFixed(2) + ', ' + lon.toFixed(2);
+  }
+
+  function fetchGpsWeather(lat, lon) {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,weather_code&timezone=auto';
+    fetch(url)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.current) {
+          updateWeatherBadge(data.current.temperature_2m, data.current.weather_code, lat, lon);
+        }
+      })
+      .catch(function(err) {
+        console.warn('GPS weather fetch error:', err);
+      });
+  }
+
+  function initGpsWeather() {
+    if (navigator && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          if (pos && pos.coords) {
+            fetchGpsWeather(pos.coords.latitude, pos.coords.longitude);
+          }
+        },
+        function(err) {
+          fetchGpsWeather(19.4326, -99.1332);
+        },
+        { timeout: 8000, maximumAge: 600000 }
+      );
+    } else {
+      fetchGpsWeather(19.4326, -99.1332);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGpsWeather);
+  } else {
+    initGpsWeather();
+  }
 })();

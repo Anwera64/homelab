@@ -34,7 +34,12 @@
         description: Playback Analytics & Viewer Statistics
         server: my-docker
         container: jellystat
-        ping: http://jellystat:3000/
+        showStats: true
+        widget:
+          type: jellystat
+          url: http://jellystat:3000
+          key: "{{HOMEPAGE_VAR_JELLYSTAT_API_KEY}}"
+          fields: ["views", "duration"]
 
 - Automation Suite:
     - Sonarr:
