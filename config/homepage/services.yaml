@@ -111,7 +111,16 @@
         description: Automated Media Lifecycle & Cleanup
         server: my-docker
         container: maintainerr
-        ping: http://maintainerr:6246/
+        widget:
+          type: customapi
+          url: http://maintainerr:6246/api/collections
+          mappings:
+            - field: 0.mediaCount
+              label: Queued Movies
+              format: number
+            - field: 1.mediaCount
+              label: Queued Seasons
+              format: number
 
 - Downloads & VPN Network:
     - qBittorrent:
