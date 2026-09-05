@@ -31,6 +31,20 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       /docker\s+compose.*up\s+-d/i.test(startupContent),
       'startup_homelab.ps1 must invoke docker compose up -d'
     );
+
+    // Verifies update parameters, persistent timestamp gate, and image prune
+    assert.ok(
+      startupContent.includes('[switch]$SkipUpdate') && startupContent.includes('[switch]$ForceUpdate'),
+      'startup_homelab.ps1 must declare SkipUpdate and ForceUpdate switches'
+    );
+    assert.ok(
+      startupContent.includes('.last_update'),
+      'startup_homelab.ps1 must manage persistent .last_update state'
+    );
+    assert.ok(
+      startupContent.includes('docker image prune -f'),
+      'startup_homelab.ps1 must invoke docker image prune -f after update'
+    );
   });
 
   await t.test('stop_homelab.ps1 terminates Docker stack and legacy processes', () => {

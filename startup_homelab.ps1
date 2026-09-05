@@ -1,5 +1,9 @@
 # startup_homelab.ps1
 # Starts the entire Dockerized Homelab media stack and verifies health
+param(
+    [switch]$SkipUpdate,
+    [switch]$ForceUpdate
+)
 
 # Always ensure working directory is this repository folder
 if ($PSScriptRoot) {
@@ -68,11 +72,60 @@ if (Test-Path "$PSScriptRoot\.env") {
     }
 }
 
-# 4. Bring up the stack with Docker Compose
+# 4. Check for Automated Updates (24h Persistent Gate)
+$updateIntervalHours = 24
+$lastUpdateFile = "$PSScriptRoot\.last_update"
+$shouldUpdate = $false
+
+if ($ForceUpdate) {
+    Write-Host "Forced update flag (-ForceUpdate) specified. Checking for updates..." -ForegroundColor Cyan
+    $shouldUpdate = $true
+} elseif ($SkipUpdate) {
+    Write-Host "Skipping update check (-SkipUpdate specified)." -ForegroundColor DarkGray
+    $shouldUpdate = $false
+} else {
+    if (-not (Test-Path $lastUpdateFile)) {
+        Write-Host "No prior update record found. Checking for container updates..." -ForegroundColor Cyan
+        $shouldUpdate = $true
+    } else {
+        try {
+            $lastUpdateRaw = (Get-Content $lastUpdateFile -Raw).Trim()
+            $lastUpdateTime = [DateTime]$lastUpdateRaw
+            $hoursSince = ((Get-Date) - $lastUpdateTime).TotalHours
+            if ($hoursSince -ge $updateIntervalHours) {
+                Write-Host "Last update check was $([math]::Round($hoursSince, 1))h ago (> $updateIntervalHours h threshold). Checking for updates..." -ForegroundColor Cyan
+                $shouldUpdate = $true
+            } else {
+                $hoursLeft = [math]::Round($updateIntervalHours - $hoursSince, 1)
+                Write-Host "Last update check was $([math]::Round($hoursSince, 1))h ago. Skipping update check ($hoursLeft h remaining). Use -ForceUpdate to override." -ForegroundColor DarkGray
+            }
+        } catch {
+            Write-Host "[WARNING] Corrupted .last_update timestamp file. Scheduling update check..." -ForegroundColor Yellow
+            $shouldUpdate = $true
+        }
+    }
+}
+
+if ($shouldUpdate) {
+    Write-Host "Pulling latest container images..." -ForegroundColor Cyan
+    docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" pull
+    if ($LASTEXITCODE -eq 0) {
+        (Get-Date).ToString("o") | Set-Content "$PSScriptRoot\.last_update"
+        Write-Host "Container images updated. Recorded timestamp in .last_update." -ForegroundColor Green
+    } else {
+        Write-Host "[WARNING] Image pull encountered an error (offline or registry unreachable). Continuing with local images..." -ForegroundColor Yellow
+    }
+}
+
+# 5. Bring up the stack with Docker Compose
 Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
 docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
 
 if ($LASTEXITCODE -eq 0) {
+    if ($shouldUpdate) {
+        Write-Host "Cleaning up obsolete container images..." -ForegroundColor DarkGray
+        docker image prune -f >$null 2>&1
+    }
     Write-Host ""
     Write-Host "=====================================================" -ForegroundColor Green
     Write-Host "     [SUCCESS] All Homelab Services Are Up & Running " -ForegroundColor Green

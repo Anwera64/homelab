@@ -22,6 +22,7 @@ This document serves as the persistent architectural roadmap for your self-hoste
 | **Jellyfin** | Media Server | Hardware-accelerated (NVIDIA RTX 5080 NVENC/NVDEC) |
 | **Homepage** | Unified Dashboard | Single-pane-of-glass status and telemetry |
 | **Tailscale** | Remote Mesh VPN | Secure, encrypted zero-port-forwarding remote access |
+| **Watchtower** | Automated Updates | Daily 4 AM cron & 24h boot gate with image cleanup |
 | **Control Scripts** | Orchestration | [`startup_homelab.ps1`](./startup_homelab.ps1) & [`stop_homelab.ps1`](./stop_homelab.ps1) |
 
 ---
@@ -65,22 +66,32 @@ graph TD
 
 ## 🛠️ Management & Quick Reference
 
-* **Start Entire Stack:**
+* **Start Stack (Automated 24h Update Check & Pruning):**
   ```powershell
   .\startup_homelab.ps1
-  # or: docker compose up -d
+  ```
+
+* **Fast Start (Bypass Update Check for Instant Boot):**
+  ```powershell
+  .\startup_homelab.ps1 -SkipUpdate
+  ```
+
+* **Force Immediate Update Check on Boot:**
+  ```powershell
+  .\startup_homelab.ps1 -ForceUpdate
   ```
 
 * **Stop Entire Stack:**
   ```powershell
   .\stop_homelab.ps1
-  # or: docker compose down
   ```
 
-* **Update All Services:**
-  ```powershell
-  docker compose pull && docker compose up -d
-  ```
+* **Watchtower Automated Updates:**
+  * **Daily Cron:** Runs at `0 0 4 * * *` (4:00 AM) to update labeled automation tools while you sleep.
+  * **Manual Run-Once Check:**
+    ```powershell
+    docker compose run --rm watchtower --run-once
+    ```
 
 * **View Service Logs:**
   ```powershell
@@ -104,5 +115,6 @@ graph TD
 | **Bazarr** | [https://bazarr.spicy-llama.duckdns.org](https://bazarr.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:6767](http://desktop-kujo8mp:6767) | Subtitles sync |
 | **Maintainerr** | [https://maintainerr.spicy-llama.duckdns.org](https://maintainerr.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:6246](http://desktop-kujo8mp:6246) | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality & format sync |
+| **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | [https://flaresolverr.spicy-llama.duckdns.org](https://flaresolverr.spicy-llama.duckdns.org) | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
 

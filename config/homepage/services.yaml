@@ -166,3 +166,10 @@
         description: Reverse Proxy & DuckDNS Wildcard TLS
         server: my-docker
         container: caddy
+
+- Infrastructure & System:
+    - Watchtower:
+        icon: watchtower.png
+        description: Automated Image Updates (Daily 4 AM)
+        server: my-docker
+        container: watchtower

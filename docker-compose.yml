@@ -41,6 +41,7 @@ services:
     depends_on:
       gluetun:
         condition: service_healthy
+    stop_grace_period: 30s
     restart: unless-stopped
 
   flaresolverr:
@@ -53,6 +54,8 @@ services:
       - 1.1.1.1
       - 1.0.0.1
       - 8.8.8.8
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -71,6 +74,8 @@ services:
       - 8.8.8.8
     volumes:
       - ${CONFIG_PATH}/prowlarr:/config
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   radarr:
@@ -87,6 +92,8 @@ services:
     volumes:
       - ${CONFIG_PATH}/radarr:/config
       - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   sonarr:
@@ -103,6 +110,8 @@ services:
     volumes:
       - ${CONFIG_PATH}/sonarr:/config
       - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   bazarr:
@@ -119,6 +128,8 @@ services:
     volumes:
       - ${CONFIG_PATH}/bazarr:/config
       - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -132,6 +143,8 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/jellyseerr:/app/config
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -207,6 +220,8 @@ services:
       - sonarr
       - radarr
       - jellyfin
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -229,6 +244,8 @@ services:
     volumes:
       - ${CONFIG_PATH}/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -247,6 +264,8 @@ services:
     depends_on:
       - sonarr
       - radarr
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
@@ -310,6 +329,22 @@ services:
     depends_on:
       - tailscale
       - homepage
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 12. Automated Image Updates & Lifecycle (Watchtower)
+  # ==============================================================================
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
+      - WATCHTOWER_ROLLING_RESTART=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:

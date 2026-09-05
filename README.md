@@ -24,6 +24,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server and automati
   * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** with zero port forwarding required.
   * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
 * **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation.
+* **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
 * **🧪 Quality Gate & Testing:** Built-in Node.js unit test suite and Git pre-commit hooks to guarantee zero broken deployments.
 
 ---
@@ -83,6 +84,7 @@ graph TD
 | **Bazarr** | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6767` | Automated subtitle downloader & sync |
 | **Maintainerr** | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6246` | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality profile sync |
+| **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
 
 ---
@@ -170,8 +172,14 @@ Run the automated startup script:
 
 ## 🛠️ Management & Operations
 
-* **Start Stack:** `.\startup_homelab.ps1`
+* **Start Stack (with 24h Update Check & Pruning):** `.\startup_homelab.ps1`
+* **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
+* **Force Update on Boot:** `.\startup_homelab.ps1 -ForceUpdate`
 * **Stop Stack:** `.\stop_homelab.ps1`
+* **Watchtower Manual Update Check:**
+  ```powershell
+  docker compose run --rm watchtower --run-once
+  ```
 * **View Live Container Logs:**
   ```powershell
   docker compose logs -f <service-name>
