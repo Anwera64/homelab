@@ -314,6 +314,7 @@ services:
       - 9696:9696
       - 6767:6767
       - 8191:8191
+      - 3080:3080
     restart: unless-stopped
 
   # ==============================================================================
@@ -352,6 +353,54 @@ services:
       - WATCHTOWER_ROLLING_RESTART=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 13. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
+  # ==============================================================================
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:latest
+    container_name: ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-15m}
+      - OLLAMA_ORIGINS=*
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    restart: unless-stopped
+
+  open-webui:
+    profiles: ["ai"]
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_NAME=Homelab AI
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - ENABLE_RAG_WEB_SEARCH=True
+      - RAG_WEB_SEARCH_ENGINE=duckduckgo
+      - RAG_EMBEDDING_ENGINE=ollama
+      - RAG_EMBEDDING_MODEL=nomic-embed-text
+      - RAG_OLLAMA_BASE_URL=http://ollama:11434
+      - ENABLE_MEMORY_BACKGROUND_REVIEW=True
+      - MEMORIES_REVIEW_INTERVAL_TURNS=1
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/open-webui:/app/backend/data
+    depends_on:
+      - ollama
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
 volumes:

@@ -2,12 +2,46 @@
 # Starts the entire Dockerized Homelab media stack and verifies health
 param(
     [switch]$SkipUpdate,
-    [switch]$ForceUpdate
+    [switch]$ForceUpdate,
+    [switch]$NoAI,
+    [switch]$ArrOnly
 )
 
 # Always ensure working directory is this repository folder
 if ($PSScriptRoot) {
     Set-Location -Path $PSScriptRoot
+}
+
+# Handle selective profile switches (-NoAI / -ArrOnly)
+$aiEnabled = $true
+$profileArg = @()
+if ($NoAI -or $ArrOnly) {
+    Write-Host "Bypassing AI module (-NoAI / -ArrOnly specified). Starting media stack only..." -ForegroundColor DarkGray
+    $profileArg = @("--profile", "none")
+    $aiEnabled = $false
+    # Ensure any running AI containers are stopped when explicitly opting out
+    docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" --profile ai stop >$null 2>&1
+} else {
+    if (Test-Path "$PSScriptRoot\.env") {
+        $envLines = Get-Content "$PSScriptRoot\.env"
+        foreach ($line in $envLines) {
+            if ($line -match '^\s*COMPOSE_PROFILES\s*=\s*(.*)$') {
+                $val = $matches[1].Trim()
+                if ($val -notmatch "ai") {
+                    $aiEnabled = $false
+                }
+            }
+        }
+    }
+}
+
+if ($aiEnabled) {
+    if (-not (Test-Path "$PSScriptRoot\config\open-webui")) {
+        New-Item -ItemType Directory -Path "$PSScriptRoot\config\open-webui" -Force >$null
+    }
+    if (-not (Test-Path "$PSScriptRoot\config\ollama")) {
+        New-Item -ItemType Directory -Path "$PSScriptRoot\config\ollama" -Force >$null
+    }
 }
 
 Write-Host "=====================================================" -ForegroundColor Cyan
@@ -108,7 +142,7 @@ if ($ForceUpdate) {
 
 if ($shouldUpdate) {
     Write-Host "Pulling latest container images..." -ForegroundColor Cyan
-    docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" pull
+    docker compose @profileArg -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" pull
     if ($LASTEXITCODE -eq 0) {
         (Get-Date).ToString("o") | Set-Content "$PSScriptRoot\.last_update"
         Write-Host "Container images updated. Recorded timestamp in .last_update." -ForegroundColor Green
@@ -152,7 +186,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[3/3] Starting remaining Homelab services..." -ForegroundColor Cyan
-docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
+docker compose @profileArg -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[ERROR] Docker compose encountered an error during service startup." -ForegroundColor Red
     Write-Host "  -> Check logs with: docker compose logs" -ForegroundColor Yellow
@@ -163,7 +197,7 @@ Write-Host "Verifying container health statuses..." -ForegroundColor DarkGray
 Start-Sleep -Seconds 2
 
 $failedContainers = @()
-$containerIds = docker compose -f "$PSScriptRoot\docker-compose.yml" ps -a -q 2>$null
+$containerIds = docker compose @profileArg -f "$PSScriptRoot\docker-compose.yml" ps -a -q 2>$null
 if ($containerIds) {
     foreach ($cId in $containerIds) {
         $cName = (docker inspect $cId --format "{{.Name}}").TrimStart('/')
@@ -171,6 +205,10 @@ if ($containerIds) {
         $restarting = docker inspect $cId --format "{{.State.Restarting}}"
         $exitCode = docker inspect $cId --format "{{.State.ExitCode}}"
         $health = docker inspect $cId --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
+
+        if (-not $aiEnabled -and ($cName -eq "ollama" -or $cName -eq "open-webui")) {
+            continue
+        }
 
         if ($restarting -eq "true" -or $status -eq "exited" -or $health -eq "unhealthy") {
             $failedContainers += [PSCustomObject]@{
@@ -199,6 +237,29 @@ if ($failedContainers.Count -gt 0) {
         Write-Host "Cleaning up obsolete container images..." -ForegroundColor DarkGray
         docker image prune -f >$null 2>&1
     }
+
+    if ($aiEnabled) {
+        $ollamaRunning = (docker inspect ollama --format "{{.State.Status}}" 2>$null) -eq "running"
+        if ($ollamaRunning) {
+            Write-Host "Checking local AI starter models in Ollama..." -ForegroundColor Cyan
+            $requiredModels = @("qwen2.5:14b", "deepseek-r1:14b", "nomic-embed-text")
+            $installedModelsRaw = (docker exec ollama ollama list 2>$null) -join "`n"
+            foreach ($model in $requiredModels) {
+                if ($installedModelsRaw -notmatch [regex]::Escape($model)) {
+                    Write-Host "  [+] Pulling missing starter model '$model' into config/ollama..." -ForegroundColor Yellow
+                    docker exec ollama ollama pull $model
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "  [SUCCESS] Model '$model' is ready!" -ForegroundColor Green
+                    } else {
+                        Write-Host "  [WARNING] Failed to pull model '$model'. You can pull it later via Open WebUI or 'docker exec ollama ollama pull $model'." -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host "  * Model '$model' is ready." -ForegroundColor Green
+                }
+            }
+        }
+    }
+
     $domain = "spicy-llama.duckdns.org"
     if (Test-Path "$PSScriptRoot\.env") {
         $envLines = Get-Content "$PSScriptRoot\.env"
@@ -227,11 +288,17 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  * Maintainerr:    https://maintainerr.$domain" -ForegroundColor White
     Write-Host "  * qBittorrent:    https://qbit.$domain" -ForegroundColor White
     Write-Host "  * FlareSolverr:   https://flaresolverr.$domain" -ForegroundColor White
+    if ($aiEnabled) {
+        Write-Host "  * Open WebUI (AI):https://ai.$domain" -ForegroundColor White
+    }
     Write-Host ""
     Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray
     Write-Host "  * Dashboard:      http://localhost:3000" -ForegroundColor DarkGray
     Write-Host "  * Jellyfin:       http://localhost:8096" -ForegroundColor DarkGray
     Write-Host "  * Jellyseerr:     http://localhost:5055" -ForegroundColor DarkGray
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
+    if ($aiEnabled) {
+        Write-Host "  * Open WebUI:     http://localhost:3080" -ForegroundColor DarkGray
+    }
     Write-Host ""
 }

@@ -38,6 +38,10 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       'startup_homelab.ps1 must declare SkipUpdate and ForceUpdate switches'
     );
     assert.ok(
+      startupContent.includes('[switch]$NoAI') && startupContent.includes('[switch]$ArrOnly'),
+      'startup_homelab.ps1 must declare NoAI and ArrOnly switches'
+    );
+    assert.ok(
       startupContent.includes('.last_update'),
       'startup_homelab.ps1 must manage persistent .last_update state'
     );

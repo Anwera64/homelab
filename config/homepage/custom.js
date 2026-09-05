@@ -16,7 +16,9 @@
     'radarr': '7878',
     'prowlarr': '9696',
     'bazarr': '6767',
-    'flaresolverr': '8191'
+    'flaresolverr': '8191',
+    'ai': '3080',
+    'open-webui': '3080'
   };
 
   var PORT_TO_SERVICE = {
@@ -29,7 +31,8 @@
     '7878': 'radarr',
     '9696': 'prowlarr',
     '6767': 'bazarr',
-    '8191': 'flaresolverr'
+    '8191': 'flaresolverr',
+    '3080': 'ai'
   };
 
   function isHomelabHost(hostname, currentHostname) {

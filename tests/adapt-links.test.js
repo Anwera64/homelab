@@ -63,6 +63,10 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
       adaptServiceUrl('http://desktop-kujo8mp:8191', duckdnsOrigin),
       'https://flaresolverr.spicy-llama.duckdns.org/'
     );
+    assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:3080', duckdnsOrigin),
+      'https://ai.spicy-llama.duckdns.org/'
+    );
   });
 
   await t.test('Local LAN Fallback: adapts DuckDNS subdomain URLs to local HTTP ports on desktop-kujo8mp', () => {
@@ -81,6 +85,10 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
     assert.equal(
       adaptServiceUrl('https://seerr.spicy-llama.duckdns.org', localHostOrigin),
       'http://desktop-kujo8mp:5055/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://ai.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:3080/'
     );
   });
 

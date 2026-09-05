@@ -79,6 +79,12 @@
         reverse_proxy flaresolverr:8191
     }
 
+    # AI & Intelligence (Open WebUI)
+    @ai host ai.spicy-llama.duckdns.org
+    handle @ai {
+        reverse_proxy open-webui:8080
+    }
+
     # Default / Dashboard (Homepage)
     handle {
         reverse_proxy homepage:3000
@@ -139,4 +145,8 @@ http://:6767 {
 
 http://:8191 {
     reverse_proxy flaresolverr:8191
+}
+
+http://:3080 {
+    reverse_proxy open-webui:8080
 }

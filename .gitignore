@@ -9,6 +9,8 @@ config/*/**
 config/homepage/logs/
 !config/caddy/Caddyfile
 !config/caddy/Dockerfile
+config/ollama/
+config/open-webui/
 data/
 
 # Logs

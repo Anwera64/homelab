@@ -117,4 +117,5 @@ graph TD
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality & format sync |
 | **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | [https://flaresolverr.spicy-llama.duckdns.org](https://flaresolverr.spicy-llama.duckdns.org) | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
+| **Open WebUI (AI)** | [https://ai.spicy-llama.duckdns.org](https://ai.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3080](http://desktop-kujo8mp:3080) | Local LLM Assistant (RTX 5080 GPU accelerated) |
 
