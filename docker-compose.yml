@@ -16,6 +16,12 @@ services:
       - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
       - TZ=${TZ:-America/Mexico_City}
       - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
+    healthcheck:
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     ports:
       - 6881:6881       # qBittorrent Torrent Protocol (TCP)
       - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
@@ -338,6 +344,7 @@ services:
     image: containrrr/watchtower:latest
     container_name: watchtower
     environment:
+      - DOCKER_API_VERSION=1.44
       - TZ=${TZ:-America/Mexico_City}
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_LABEL_ENABLE=true

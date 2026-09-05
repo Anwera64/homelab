@@ -117,11 +117,84 @@ if ($shouldUpdate) {
     }
 }
 
-# 5. Bring up the stack with Docker Compose
-Write-Host "Starting Docker Compose services..." -ForegroundColor Cyan
-docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
+# 5. Staged Launch Sequence (Gluetun -> qBittorrent -> Full Media Stack)
+Write-Host "[1/3] Starting Gluetun VPN Gateway..." -ForegroundColor Cyan
+docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d gluetun
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Failed to start Gluetun VPN container." -ForegroundColor Red
+    Write-Host "  -> Check logs with: docker logs gluetun" -ForegroundColor Yellow
+}
 
-if ($LASTEXITCODE -eq 0) {
+Write-Host "Waiting for Gluetun VPN tunnel to become healthy..." -ForegroundColor DarkGray
+$gluetunTimeout = 45
+$gluetunHealthy = $false
+while ($gluetunTimeout -gt 0) {
+    $health = (docker inspect gluetun --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}" 2>$null)
+    if ($health -eq "healthy") {
+        $gluetunHealthy = $true
+        Write-Host "Gluetun VPN is healthy and tunnel is active!" -ForegroundColor Green
+        break
+    }
+    Start-Sleep -Seconds 2
+    $gluetunTimeout -= 2
+}
+
+if (-not $gluetunHealthy) {
+    Write-Host "[ERROR] Gluetun failed to reach healthy status within 45s. VPN connection or WireGuard key may need attention." -ForegroundColor Red
+    Write-Host "  -> Check logs with: docker logs gluetun" -ForegroundColor Yellow
+}
+
+Write-Host "[2/3] Starting qBittorrent client..." -ForegroundColor Cyan
+docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d qbittorrent
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Failed to start qBittorrent container." -ForegroundColor Red
+    Write-Host "  -> Check logs with: docker logs qbittorrent" -ForegroundColor Yellow
+}
+
+Write-Host "[3/3] Starting remaining Homelab services..." -ForegroundColor Cyan
+docker compose -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Docker compose encountered an error during service startup." -ForegroundColor Red
+    Write-Host "  -> Check logs with: docker compose logs" -ForegroundColor Yellow
+}
+
+# 6. Post-Startup Container Health Audit
+Write-Host "Verifying container health statuses..." -ForegroundColor DarkGray
+Start-Sleep -Seconds 2
+
+$failedContainers = @()
+$containerIds = docker compose -f "$PSScriptRoot\docker-compose.yml" ps -a -q 2>$null
+if ($containerIds) {
+    foreach ($cId in $containerIds) {
+        $cName = (docker inspect $cId --format "{{.Name}}").TrimStart('/')
+        $status = docker inspect $cId --format "{{.State.Status}}"
+        $restarting = docker inspect $cId --format "{{.State.Restarting}}"
+        $exitCode = docker inspect $cId --format "{{.State.ExitCode}}"
+        $health = docker inspect $cId --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
+
+        if ($restarting -eq "true" -or $status -eq "exited" -or $health -eq "unhealthy") {
+            $failedContainers += [PSCustomObject]@{
+                Name     = $cName
+                Status   = $status
+                Health   = $health
+                ExitCode = $exitCode
+            }
+        }
+    }
+}
+
+if ($failedContainers.Count -gt 0) {
+    Write-Host ""
+    Write-Host "=====================================================" -ForegroundColor Red
+    Write-Host "  [ERROR] The following container(s) failed to load: " -ForegroundColor Red
+    Write-Host "=====================================================" -ForegroundColor Red
+    foreach ($failed in $failedContainers) {
+        Write-Host "  * $($failed.Name) - Status: $($failed.Status), Health: $($failed.Health), ExitCode: $($failed.ExitCode)" -ForegroundColor Red
+        Write-Host "    -> Inspect logs with: docker logs $($failed.Name)" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "[ACTION REQUIRED] Check the logs for failing containers above." -ForegroundColor Yellow
+} else {
     if ($shouldUpdate) {
         Write-Host "Cleaning up obsolete container images..." -ForegroundColor DarkGray
         docker image prune -f >$null 2>&1
@@ -152,6 +225,4 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  * Jellyseerr:     http://localhost:5055   (LAN / Mobile: http://192.168.1.20:5055)" -ForegroundColor DarkGray
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
     Write-Host ""
-} else {
-    Write-Host "[ERROR] Failed to start one or more containers. Check logs with 'docker compose logs'." -ForegroundColor Red
 }
