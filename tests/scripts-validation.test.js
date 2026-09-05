@@ -45,6 +45,16 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       startupContent.includes('docker image prune -f'),
       'startup_homelab.ps1 must invoke docker image prune -f after update'
     );
+
+    // Verifies active DuckDNS HTTPS endpoint banner and absence of deprecated Tailscale URL
+    assert.ok(
+      !startupContent.includes('homelab.llama-porbeagle.ts.net'),
+      'startup_homelab.ps1 must not contain deprecated Tailscale URL homelab.llama-porbeagle.ts.net'
+    );
+    assert.ok(
+      startupContent.includes('DuckDNS HTTPS') && startupContent.includes('$domain'),
+      'startup_homelab.ps1 must display DuckDNS HTTPS endpoints'
+    );
   });
 
   await t.test('stop_homelab.ps1 terminates Docker stack and legacy processes', () => {

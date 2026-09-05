@@ -199,30 +199,39 @@ if ($failedContainers.Count -gt 0) {
         Write-Host "Cleaning up obsolete container images..." -ForegroundColor DarkGray
         docker image prune -f >$null 2>&1
     }
+    $domain = "spicy-llama.duckdns.org"
+    if (Test-Path "$PSScriptRoot\.env") {
+        $envLines = Get-Content "$PSScriptRoot\.env"
+        foreach ($line in $envLines) {
+            if ($line -match '^\s*DOMAIN_NAME\s*=\s*(.+)$') {
+                $val = $matches[1].Trim()
+                if ($val) { $domain = $val }
+            }
+        }
+    }
+
     Write-Host ""
     Write-Host "=====================================================" -ForegroundColor Green
     Write-Host "     [SUCCESS] All Homelab Services Are Up & Running " -ForegroundColor Green
     Write-Host "=====================================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  --- Remote Access (Tailscale Mesh VPN) ---" -ForegroundColor Magenta
-    Write-Host "  * Secure Portal:  https://homelab.llama-porbeagle.ts.net" -ForegroundColor Cyan
+    Write-Host "  --- Homelab Service Endpoints (DuckDNS HTTPS) ---" -ForegroundColor Cyan
+    Write-Host "  * Central Portal: https://$domain" -ForegroundColor Yellow
+    Write-Host "  * Jellyfin:       https://jellyfin.$domain" -ForegroundColor White
+    Write-Host "  * Jellyseerr:     https://seerr.$domain" -ForegroundColor White
+    Write-Host "  * Jellystat:      https://stat.$domain" -ForegroundColor White
+    Write-Host "  * Sonarr:         https://sonarr.$domain" -ForegroundColor White
+    Write-Host "  * Radarr:         https://radarr.$domain" -ForegroundColor White
+    Write-Host "  * Prowlarr:       https://prowlarr.$domain" -ForegroundColor White
+    Write-Host "  * Bazarr:         https://bazarr.$domain" -ForegroundColor White
+    Write-Host "  * Maintainerr:    https://maintainerr.$domain" -ForegroundColor White
+    Write-Host "  * qBittorrent:    https://qbit.$domain" -ForegroundColor White
+    Write-Host "  * FlareSolverr:   https://flaresolverr.$domain" -ForegroundColor White
     Write-Host ""
-    Write-Host "  --- Local Hostname Access (Port 80 / Caddy) ---" -ForegroundColor Cyan
-    Write-Host "  * Central Portal: http://desktop-kujo8mp   (or http://192.168.1.20)" -ForegroundColor Yellow
-    Write-Host "  * Jellyfin:       http://desktop-kujo8mp:8096" -ForegroundColor White
-    Write-Host "  * Jellyseerr:     http://desktop-kujo8mp:5055" -ForegroundColor White
-    Write-Host "  * Jellystat:      http://desktop-kujo8mp:3005" -ForegroundColor White
-    Write-Host "  * Sonarr:         http://desktop-kujo8mp:8989" -ForegroundColor White
-    Write-Host "  * Radarr:         http://desktop-kujo8mp:7878" -ForegroundColor White
-    Write-Host "  * Prowlarr:       http://desktop-kujo8mp:9696" -ForegroundColor White
-    Write-Host "  * Bazarr:         http://desktop-kujo8mp:6767" -ForegroundColor White
-    Write-Host "  * Maintainerr:    http://desktop-kujo8mp:6246" -ForegroundColor White
-    Write-Host "  * qBittorrent:    http://desktop-kujo8mp:8080" -ForegroundColor White
-    Write-Host ""
-    Write-Host "  --- Legacy Direct Port Fallbacks ---" -ForegroundColor DarkGray
-    Write-Host "  * Dashboard:      http://localhost:3000   (LAN: http://192.168.1.20:3000)" -ForegroundColor DarkGray
-    Write-Host "  * Jellyfin:       http://localhost:8096   (LAN / TV: http://192.168.1.20:8096)" -ForegroundColor DarkGray
-    Write-Host "  * Jellyseerr:     http://localhost:5055   (LAN / Mobile: http://192.168.1.20:5055)" -ForegroundColor DarkGray
+    Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray
+    Write-Host "  * Dashboard:      http://localhost:3000" -ForegroundColor DarkGray
+    Write-Host "  * Jellyfin:       http://localhost:8096" -ForegroundColor DarkGray
+    Write-Host "  * Jellyseerr:     http://localhost:5055" -ForegroundColor DarkGray
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
     Write-Host ""
 }
