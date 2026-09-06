@@ -42,6 +42,9 @@ if ($aiEnabled) {
     if (-not (Test-Path "$PSScriptRoot\config\ollama")) {
         New-Item -ItemType Directory -Path "$PSScriptRoot\config\ollama" -Force >$null
     }
+    if (-not (Test-Path "$PSScriptRoot\config\searxng")) {
+        New-Item -ItemType Directory -Path "$PSScriptRoot\config\searxng" -Force >$null
+    }
 }
 
 Write-Host "=====================================================" -ForegroundColor Cyan
@@ -242,7 +245,7 @@ if ($failedContainers.Count -gt 0) {
         $ollamaRunning = (docker inspect ollama --format "{{.State.Status}}" 2>$null) -eq "running"
         if ($ollamaRunning) {
             Write-Host "Checking local AI starter models in Ollama..." -ForegroundColor Cyan
-            $requiredModels = @("qwen2.5:14b", "deepseek-r1:14b", "nomic-embed-text")
+            $requiredModels = @("qwen2.5:14b", "deepseek-r1:14b", "nomic-embed-text", "mistral-small:22b-instruct-2409-q3_K_M")
             $installedModelsRaw = (docker exec ollama ollama list 2>$null) -join "`n"
             foreach ($model in $requiredModels) {
                 if ($installedModelsRaw -notmatch [regex]::Escape($model)) {
@@ -257,6 +260,16 @@ if ($failedContainers.Count -gt 0) {
                     Write-Host "  * Model '$model' is ready." -ForegroundColor Green
                 }
             }
+        }
+
+        $openwebuiRunning = (docker inspect open-webui --format "{{.State.Status}}" 2>$null) -eq "running"
+        if ($openwebuiRunning) {
+            Write-Host "Registering Open WebUI model memory loading indicator filter..." -ForegroundColor Cyan
+            $pythonCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { $null }
+            if ($pythonCmd) {
+                & $pythonCmd "$PSScriptRoot\config\open-webui\register_filter.py" >$null 2>&1
+            }
+            Write-Host "  * Open WebUI 'Loading model into memory...' UI indicator is active." -ForegroundColor Green
         }
     }
 
@@ -290,6 +303,7 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  * FlareSolverr:   https://flaresolverr.$domain" -ForegroundColor White
     if ($aiEnabled) {
         Write-Host "  * Open WebUI (AI):https://ai.$domain" -ForegroundColor White
+        Write-Host "  * Perplexica:     https://research.$domain (Tailscale/LAN only)" -ForegroundColor White
     }
     Write-Host ""
     Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray
@@ -299,6 +313,7 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
     if ($aiEnabled) {
         Write-Host "  * Open WebUI:     http://localhost:3080" -ForegroundColor DarkGray
+        Write-Host "  * Perplexica:     http://localhost:3001" -ForegroundColor DarkGray
     }
     Write-Host ""
 }

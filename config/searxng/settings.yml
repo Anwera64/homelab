@@ -1,0 +1,47 @@
+# ==============================================================================
+# SearXNG Configuration - Private Search Aggregator for Homelab
+# ==============================================================================
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "Homelab Search"
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "3575471c0360b753489e38d1b3f21a52db795ad1a3e386c50d96477934dd74cb"
+  limiter: false # Crucial: internal Docker queries from Perplexica & Open WebUI must not be rate limited
+  image_proxy: true
+
+search:
+  safe_search: 0
+  autocomplete: "duckduckgo"
+  formats:
+    - html
+    - json # Crucial: Perplexica and Open WebUI require JSON responses
+
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    enable_http: true
+    shortcut: ddg
+  - name: brave
+    engine: brave
+    shortcut: br
+  - name: bing
+    engine: bing
+    shortcut: b
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+  - name: wikidata
+    engine: wikidata
+    shortcut: wd
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+  - name: wolframalpha
+    engine: wolframalpha_noapi
+    shortcut: wa

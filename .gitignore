@@ -10,7 +10,12 @@ config/homepage/logs/
 !config/caddy/Caddyfile
 !config/caddy/Dockerfile
 config/ollama/
-config/open-webui/
+!config/searxng/
+!config/searxng/**
+config/open-webui/*
+!config/open-webui/filters/
+!config/open-webui/filters/**
+!config/open-webui/register_filter.py
 data/
 
 # Logs
@@ -19,3 +24,8 @@ logs/
 
 # State files
 .last_update
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class

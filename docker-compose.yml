@@ -315,6 +315,7 @@ services:
       - 6767:6767
       - 8191:8191
       - 3080:3080
+      - 3001:3001
     restart: unless-stopped
 
   # ==============================================================================
@@ -379,6 +380,33 @@ services:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
+  searxng:
+    profiles: ["ai"]
+    image: searxng/searxng:latest
+    container_name: searxng
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+    volumes:
+      - ${CONFIG_PATH}/searxng:/etc/searxng:ro
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    restart: unless-stopped
+
+  perplexica:
+    profiles: ["ai"]
+    image: itzcrazykns1337/vane:slim-latest
+    container_name: perplexica
+    environment:
+      - SEARXNG_API_URL=http://searxng:8080
+    volumes:
+      - perplexica_data:/home/vane/data
+    depends_on:
+      - searxng
+      - ollama
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    restart: unless-stopped
+
   open-webui:
     profiles: ["ai"]
     image: ghcr.io/open-webui/open-webui:main
@@ -387,8 +415,9 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - WEBUI_NAME=Homelab AI
       - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
-      - ENABLE_RAG_WEB_SEARCH=True
-      - RAG_WEB_SEARCH_ENGINE=duckduckgo
+      - ENABLE_WEB_SEARCH=True
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>&format=json
       - RAG_EMBEDDING_ENGINE=ollama
       - RAG_EMBEDDING_MODEL=nomic-embed-text
       - RAG_OLLAMA_BASE_URL=http://ollama:11434
@@ -396,12 +425,15 @@ services:
       - MEMORIES_REVIEW_INTERVAL_TURNS=1
       - TZ=${TZ:-America/Mexico_City}
     volumes:
-      - ${CONFIG_PATH}/open-webui:/app/backend/data
+      - openwebui_data:/app/backend/data
     depends_on:
       - ollama
+      - searxng
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
 volumes:
   tailscale_sock:
+  openwebui_data:
+  perplexica_data:

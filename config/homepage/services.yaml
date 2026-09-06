@@ -61,6 +61,13 @@
         server: my-docker
         container: open-webui
 
+    - Perplexica:
+        icon: si-perplexity-#20B8CD
+        href: https://research.spicy-llama.duckdns.org
+        description: AI Research & Answer Engine (SearXNG Powered)
+        server: my-docker
+        container: perplexica
+
 - Automation Suite:
     - Sonarr:
         icon: sonarr.png
