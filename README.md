@@ -3,17 +3,26 @@
 [![CI](https://github.com/Anwera64/homelab/actions/workflows/test.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/test.yml)
 [![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Docker Compose](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-RTX_5080_NVENC-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
+[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-RTX_5080_NVENC_%26_Compute-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Tailscale](https://img.shields.io/badge/Tailscale-Mesh_VPN-2F5CFF?logo=tailscale&logoColor=white)](https://tailscale.com/)
 [![Caddy](https://img.shields.io/badge/Caddy-Reverse_Proxy-1F88C0?logo=caddy&logoColor=white)](https://caddyserver.com/)
 [![WireGuard](https://img.shields.io/badge/WireGuard-NordVPN_Killswitch-88171A?logo=wireguard&logoColor=white)](https://www.wireguard.com/)
+[![Ollama](https://img.shields.io/badge/Ollama-Local_LLMs-black?logo=ollama&logoColor=white)](https://ollama.ai/)
+[![Open WebUI](https://img.shields.io/badge/Open_WebUI-AI_Workspace-blue?logo=openai&logoColor=white)](https://openwebui.com/)
+[![Perplexica](https://img.shields.io/badge/Perplexica-AI_Research_Engine-20B8CD?logo=searxng&logoColor=white)](https://github.com/ItzCrazyKns/Vane)
+[![SearXNG](https://img.shields.io/badge/SearXNG-Privacy_Search-3C4043?logo=google&logoColor=white)](https://searxng.org/)
 
-A modern, fully automated, GPU-accelerated self-hosted media server and automation pipeline running on Docker Compose on Windows / WSL2. Features zero-copy atomic hardlinks, VPN kill-switch isolation, TRaSH Guides quality sync, and dual-mode local/remote ingress with official Let's Encrypt HTTPS via Tailscale.
+A modern, fully automated, GPU-accelerated self-hosted media server, automation pipeline, and private AI intelligence & research stack running on Docker Compose on Windows / WSL2. Features zero-copy atomic hardlinks, VPN kill-switch isolation, TRaSH Guides quality sync, dual-mode local/remote ingress with official Let's Encrypt HTTPS via Tailscale, and a local privacy-first AI intelligence engine powered by Ollama (RTX 5080), Open WebUI, Perplexica/Vane, and SearXNG.
 
 ---
 
 ## 🌟 Key Features
 
+* **🧠 Local AI & Autonomous Research Engine:**
+  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen2.5:14b`, `mistral-small:22b-instruct-2409-q3_K_M`, `deepseek-r1:14b`, and `nomic-embed-text`.
+  * **Open WebUI:** Modern private AI workspace with persistent conversation memory, SearXNG-powered live web search RAG, and an automated "Loading model into memory..." status indicator filter.
+  * **Perplexica / Vane:** Privacy-first autonomous AI answering engine (Perplexity AI alternative) performing multi-round web research and source citation synthesis using local LLMs and embeddings.
+  * **SearXNG:** Self-hosted private search aggregator powering both Perplexica and Open WebUI with real-time JSON search results (Brave, Wikipedia, Wikidata, Arxiv, Bing, WolframAlpha) without tracking or rate limits.
 * **🍿 Hardware-Accelerated Streaming:** **Jellyfin** with full NVIDIA NVENC/NVDEC hardware transcoding for 4K HDR/Dolby Vision playback.
 * **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
 * **🤖 Complete *Arr Automation:** **Sonarr**, **Radarr**, **Prowlarr**, and **Bazarr** managing series, films, indexers, and automated subtitle synchronization.
@@ -37,6 +46,17 @@ graph TD
         CLIENTS[📱 Home Wi-Fi Devices] -->|http://desktop-kujo8mp| CADDY[🔒 Caddy Reverse Proxy :80]
         TAILSCALE[🔒 Tailscale Mesh Gateway] -->|https://homelab.ts.net| CADDY
         CADDY --> HOMEPAGE[📊 Homepage Dashboard]
+        CADDY -->|ai.spicy-llama.duckdns.org| WEBUI[🤖 Open WebUI :8080]
+        CADDY -->|research.spicy-llama.duckdns.org| PERPLEXICA[🧭 Perplexica / Vane :3000]
+    end
+
+    subgraph AIStack [Local AI & Autonomous Research Engine]
+        OLLAMA[🦙 Ollama Server - RTX 5080 GPU]
+        SEARX[🔍 SearXNG Search Aggregator :8080]
+        WEBUI -->|LLM Inference & RAG Embeddings| OLLAMA
+        WEBUI -->|RAG Web Search JSON| SEARX
+        PERPLEXICA -->|Agentic Search Tools| SEARX
+        PERPLEXICA -->|Tool Calling & Embeddings| OLLAMA
     end
 
     subgraph VPNNet [Gluetun VPN Network Isolation]
@@ -64,7 +84,7 @@ graph TD
         JELLY --> MAINT
     end
 
-    HOMEPAGE --> ArrSuite & JELLY & QBIT & JSTAT
+    HOMEPAGE --> ArrSuite & JELLY & QBIT & JSTAT & WEBUI & PERPLEXICA
 ```
 
 ---
@@ -86,7 +106,9 @@ graph TD
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality profile sync |
 | **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
-| **Open WebUI (AI)** | `https://ai.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3080` | Local LLM Assistant (RTX 5080 GPU accelerated) |
+| **Open WebUI (AI)** | `https://ai.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3080` | Local LLM workspace (RTX 5080 GPU, Memory Loading Filter, SearXNG RAG) |
+| **Perplexica (Vane)** | `https://research.spicy-llama.duckdns.org` *(Tailscale/LAN)* | `http://desktop-kujo8mp:3001` | Autonomous AI research & cited answer engine (SearXNG powered) |
+| **SearXNG Aggregator** | Internal Container (`http://searxng:8080`) | N/A | Private search backend (JSON API, Wolfram Alpha enabled) |
 
 ---
 
@@ -109,6 +131,12 @@ graph TD
 ├── config/
 │   ├── caddy/
 │   │   └── Caddyfile           # Reverse proxy routing & Tailscale TLS configuration
+│   ├── searxng/
+│   │   └── settings.yml        # SearXNG aggregator engine & JSON API configuration
+│   ├── open-webui/
+│   │   ├── filters/
+│   │   │   └── model_loading_indicator.py # Model memory loading status indicator filter
+│   │   └── register_filter.py  # Automation script to register filter in Open WebUI
 │   └── homepage/
 │       ├── adapt-links.js      # Dynamic client-side ingress link adapter
 │       ├── custom.js           # Browser DOM link rewriter
@@ -173,7 +201,11 @@ Run the automated startup script:
 
 ## 🛠️ Management & Operations
 
-* **Start Stack (with 24h Update Check & Pruning):** `.\startup_homelab.ps1`
+* **Start Stack (with 24h Update Check & Auto-Prune):** `.\startup_homelab.ps1`
+  * Fully initializes both the Media automation pipeline and the AI stack (`profiles: ["ai"]`).
+  * Automatically verifies and pulls required Ollama models (`qwen2.5:14b`, `mistral-small:22b-instruct-2409-q3_K_M`, `deepseek-r1:14b`, `nomic-embed-text`).
+  * Automatically registers and activates the Open WebUI memory loading indicator filter.
+* **Start Media Stack Only (Without AI Services):** `.\startup_homelab.ps1 -DisableAI`
 * **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
 * **Force Update on Boot:** `.\startup_homelab.ps1 -ForceUpdate`
 * **Stop Stack:** `.\stop_homelab.ps1`
@@ -238,3 +270,7 @@ GitHub Actions executes the full test runner and Docker Compose validation acros
 * Quality Guides: [TRaSH Guides](https://trash-guides.info/)
 * Reverse Proxy: [Caddy](https://caddyserver.com/)
 * Mesh Network: [Tailscale](https://tailscale.com/)
+* Local AI Inference Engine: [Ollama](https://ollama.ai/)
+* Private AI Workspace: [Open WebUI](https://openwebui.com/)
+* Autonomous Research Engine: [Perplexica / Vane](https://github.com/ItzCrazyKns/Vane)
+* Privacy Search Aggregator: [SearXNG](https://searxng.org/)
