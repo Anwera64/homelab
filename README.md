@@ -19,7 +19,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 ## 🌟 Key Features
 
 * **🧠 Local AI & Autonomous Research Engine:**
-  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen2.5:14b`, `mistral-small:22b-instruct-2409-q3_K_M`, `deepseek-r1:14b`, and `nomic-embed-text`.
+  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen3:14b`, `deepseek-v4-flash`, and `bge-m3`.
   * **Open WebUI:** Modern private AI workspace with persistent conversation memory, SearXNG-powered live web search RAG, and an automated "Loading model into memory..." status indicator filter.
   * **Perplexica / Vane:** Privacy-first autonomous AI answering engine (Perplexity AI alternative) performing multi-round web research and source citation synthesis using local LLMs and embeddings.
   * **SearXNG:** Self-hosted private search aggregator powering both Perplexica and Open WebUI with real-time JSON search results (Brave, Wikipedia, Wikidata, Arxiv, Bing, WolframAlpha) without tracking or rate limits.
@@ -203,7 +203,7 @@ Run the automated startup script:
 
 * **Start Stack (with 24h Update Check & Auto-Prune):** `.\startup_homelab.ps1`
   * Fully initializes both the Media automation pipeline and the AI stack (`profiles: ["ai"]`).
-  * Automatically verifies and pulls required Ollama models (`qwen2.5:14b`, `mistral-small:22b-instruct-2409-q3_K_M`, `deepseek-r1:14b`, `nomic-embed-text`).
+  * Automatically verifies and pulls required Ollama models (`qwen3:14b`, `deepseek-v4-flash`, `bge-m3`).
   * Automatically registers and activates the Open WebUI memory loading indicator filter.
 * **Start Media Stack Only (Without AI Services):** `.\startup_homelab.ps1 -DisableAI`
 * **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`

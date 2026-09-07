@@ -245,7 +245,7 @@ if ($failedContainers.Count -gt 0) {
         $ollamaRunning = (docker inspect ollama --format "{{.State.Status}}" 2>$null) -eq "running"
         if ($ollamaRunning) {
             Write-Host "Checking local AI starter models in Ollama..." -ForegroundColor Cyan
-            $requiredModels = @("qwen2.5:14b", "deepseek-r1:14b", "nomic-embed-text", "mistral-small:22b-instruct-2409-q3_K_M")
+            $requiredModels = @("qwen3:14b", "deepseek-v4-flash", "bge-m3")
             $installedModelsRaw = (docker exec ollama ollama list 2>$null) -join "`n"
             foreach ($model in $requiredModels) {
                 if ($installedModelsRaw -notmatch [regex]::Escape($model)) {
