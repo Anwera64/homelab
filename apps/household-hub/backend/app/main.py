@@ -1,0 +1,49 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.config import settings
+from app.core.database import init_db
+from app.api.v1.router import api_router
+from app import __version__
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB schemas on startup if needed
+    if settings.ENVIRONMENT != "testing":
+        await init_db()
+    yield
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=__version__,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
+)
+
+# Configure CORS
+origins = settings.CORS_ORIGINS
+if isinstance(origins, str):
+    origins = [origins]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins if origins != ["*"] else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    return {
+        "name": settings.PROJECT_NAME,
+        "version": __version__,
+        "docs_url": "/docs",
+        "api": settings.API_V1_STR,
+    }

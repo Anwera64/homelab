@@ -1,0 +1,140 @@
+import pytest
+import httpx
+
+
+async def create_user(client: httpx.AsyncClient, username: str, is_admin: bool = False, admin_token: str = None) -> tuple[str, str]:
+    """Helper to register initial admin or create member, returning (token, personal_space_id)."""
+    if admin_token is None:
+        # Register initial admin
+        resp = await client.post(
+            "/api/v1/auth/register-initial",
+            json={
+                "username": username,
+                "email": f"{username}@homelab.local",
+                "password": "SecretPassword123!",
+                "full_name": username.capitalize(),
+            },
+        )
+        data = resp.json()
+        return data["access_token"], data["user"]["personal_space_id"]
+    else:
+        # Admin creates member
+        resp = await client.post(
+            "/api/v1/users",
+            json={
+                "username": username,
+                "email": f"{username}@homelab.local",
+                "password": "SecretPassword123!",
+                "full_name": username.capitalize(),
+                "is_admin": is_admin,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        member_data = resp.json()
+        # Login member to get token
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": "SecretPassword123!"},
+        )
+        return login_resp.json()["access_token"], member_data["personal_space_id"]
+
+
+@pytest.mark.asyncio
+async def test_get_shared_space_and_default_bento_widgets(client: httpx.AsyncClient):
+    """Authenticated user can fetch the shared household hub with default Bento widgets."""
+    admin_token, _ = await create_user(client, "admin_user")
+
+    response = await client.get(
+        "/api/v1/spaces/shared",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "shared"
+    assert data["owner_id"] is None
+    settings = data["settings"]
+    assert "widgets" in settings
+    widget_types = [w["type"] for w in settings["widgets"]]
+    assert "calendar" in widget_types
+    assert "agent_launcher" in widget_types
+
+
+@pytest.mark.asyncio
+async def test_get_personal_space(client: httpx.AsyncClient):
+    """Authenticated user can fetch their own personal space."""
+    admin_token, admin_space_id = await create_user(client, "admin_user")
+
+    response = await client.get(
+        "/api/v1/spaces/personal",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == admin_space_id
+    assert data["type"] == "personal"
+    assert "widgets" in data["settings"]
+
+
+@pytest.mark.asyncio
+async def test_strict_zero_leak_personal_space_isolation(client: httpx.AsyncClient):
+    """
+    Strict Zero-Leak Rule:
+    1. Member B cannot access Member A's personal space.
+    2. Even Household Admin CANNOT access Member B's personal space.
+    """
+    admin_token, admin_space_id = await create_user(client, "admin_user")
+    member_token, member_space_id = await create_user(client, "member_b", admin_token=admin_token)
+
+    # 1. Member B attempts to read Admin's personal space by ID -> 403 Forbidden!
+    member_to_admin = await client.get(
+        f"/api/v1/spaces/{admin_space_id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert member_to_admin.status_code == 403
+    assert "zero-leak" in member_to_admin.json()["detail"].lower() or "forbidden" in member_to_admin.json()["detail"].lower()
+
+    # 2. Admin attempts to read Member B's personal space by ID -> 403 Forbidden!
+    admin_to_member = await client.get(
+        f"/api/v1/spaces/{member_space_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert admin_to_member.status_code == 403
+    assert "zero-leak" in admin_to_member.json()["detail"].lower() or "forbidden" in admin_to_member.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_update_personal_and_shared_settings(client: httpx.AsyncClient):
+    """Users can customize widget layout in personal space and shared space."""
+    admin_token, admin_space_id = await create_user(client, "admin_user")
+
+    # Update personal space settings
+    custom_personal_widgets = {
+        "layout_version": 2,
+        "columns": 3,
+        "widgets": [
+            {"id": "w-custom-1", "type": "custom_card", "title": "My Research", "size": "large", "position": 0}
+        ],
+    }
+    update_resp = await client.put(
+        "/api/v1/spaces/personal/settings",
+        json={"settings": custom_personal_widgets},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["settings"]["columns"] == 3
+
+    # Update shared space settings
+    custom_shared_widgets = {
+        "layout_version": 2,
+        "columns": 5,
+        "widgets": [
+            {"id": "w-shared-1", "type": "calendar", "title": "Family Cal", "size": "large", "position": 0}
+        ],
+    }
+    update_shared = await client.put(
+        "/api/v1/spaces/shared/settings",
+        json={"settings": custom_shared_widgets},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert update_shared.status_code == 200
+    assert update_shared.json()["settings"]["columns"] == 5

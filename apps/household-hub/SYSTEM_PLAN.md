@@ -23,6 +23,12 @@ A high-level architectural blueprint for the **Household Hub** platform. This do
   * **Session-Level Secret Mode:** A toggle in any conversation that completely severs the Gossip Bus. In Secret Mode, the agent is hard-blocked from emitting any shared milestones or facts.
   * **Natural Language Privacy Guard:** Saying *"Keep this between us"*, *"This is a secret"*, or *"Don't tell [User B]"* automatically enforces confidentiality.
   * **Audit & Revoke:** Users have an audit view of any milestones their conversations have published to the household bus, with one-click revocation/deletion.
+* **Persistent Agent Memory & Dynamic Relationship Building:**
+  * Agents build cumulative, long-term relationships with household members over time rather than treating interactions as amnesiac one-offs.
+  * **Dynamic Autonomous Extraction (Stage 3):** During conversations, agents autonomously extract user preferences, dietary habits, ongoing projects, and milestones into structured long-term memory.
+  * **Dynamic Context Injection (Stage 3):** At session start, relevant memories are dynamically retrieved and injected into the agent's prompt context, greeting users with immediate relational awareness.
+  * **Two-Tier Memory Scoping:** Personal memories (`scope="personal"`) are strictly isolated to the user under Zero-Leak rules; household facts (`scope="household"`) carry user attribution.
+  * **Human-in-the-Loop "Glass Box" Control:** Users maintain full control via an audit screen to inspect, refine, or delete/revoke any memory an agent has formed.
 * **Pluggable Integrations Engine:**
   * Extensible connectors for external services (Google Calendar, Apple iCloud CalDAV, SearXNG private search, PDF/document extractors).
   * Users attach whichever accounts or tools they personally use.
@@ -147,15 +153,16 @@ We will proceed through the build in modular, sequential stages. Before touching
 [Stage 6: Homelab Deployment & Tailscale Ingress]
 ```
 
-1. **Stage 1: Backend Foundation, Spaces & Dynamic Agent Catalog**
-   * Core FastAPI service, multi-user identity, personal & shared space data models, and the CRUD catalog for dynamically adding, editing, or removing agent personalities.
+1. **Stage 1: Backend Foundation, Spaces, Dynamic Agent Catalog & Memory Engine** `[COMPLETED ✅]`
+   * Core FastAPI service, multi-user identity (first-run onboarding & admin provisioning), strict zero-leak personal & shared space data models with Bento widgets, dynamic agent catalog with 2 baseline models (`researcher`, `assistant`), ownership permissions with 7-day undo grace period, and long-term memory engine with user audit/revoke.
+   * Documented baseline: [`docs/STAGE_1_BASELINE.md`](./docs/STAGE_1_BASELINE.md)
 2. **Stage 2: Pluggable Integrations Engine**
    * Connector interfaces for Google Calendar, Apple CalDAV, SearXNG search, and PDF extraction.
-3. **Stage 3: AI Inference, Tool Execution & Gossip Bus**
-   * Local Ollama streaming integration, agent tool-calling pipeline, and the shared milestone gossip bus.
+3. **Stage 3: AI Inference, Tool Execution, Autonomous Memory & Gossip Bus**
+   * Local Ollama streaming integration (`qwen3:14b`), agent tool-calling pipeline, autonomous memory reflection & dynamic context injection, and the shared milestone gossip bus.
 4. **Stage 4: KMP Shared Client Core**
    * Shared Kotlin Multiplatform module (`:shared`), Ktor client, data models, and state management.
 5. **Stage 5: Compose Multiplatform UI**
-   * Compose Multiplatform screens (`:composeApp`), theme, dashboard navigation, and streaming chat.
+   * Compose Multiplatform screens (`:composeApp`), theme, dashboard navigation, streaming chat, and agent memory audit & management UI ("What I Know About You").
 6. **Stage 6: Homelab Deployment & Tailscale Ingress**
    * Docker Compose integration, port bindings, and secure remote routing via Tailscale.
