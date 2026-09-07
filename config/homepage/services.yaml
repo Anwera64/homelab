@@ -53,20 +53,6 @@
               label: Movie Time
               format: duration
 
-- AI & Intelligence:
-    - Open WebUI:
-        icon: chatgpt.png
-        href: https://ai.spicy-llama.duckdns.org
-        description: Local AI Assistant (RTX 5080 Accelerated)
-        server: my-docker
-        container: open-webui
-
-    - Perplexica:
-        icon: si-perplexity-#20B8CD
-        href: https://research.spicy-llama.duckdns.org
-        description: AI Research & Answer Engine (SearXNG Powered)
-        server: my-docker
-        container: perplexica
 
 - Automation Suite:
     - Sonarr:

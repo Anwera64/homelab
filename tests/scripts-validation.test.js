@@ -96,26 +96,6 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       'enable_virtualization.ps1 must trigger wsl --update'
     );
   });
-
-  await t.test('Open WebUI model loading indicator filter and registration suite', () => {
-    const filterPath = path.join(ROOT_DIR, 'config/open-webui/filters/model_loading_indicator.py');
-    const registerPath = path.join(ROOT_DIR, 'config/open-webui/register_filter.py');
-
-    assert.ok(fs.existsSync(filterPath), 'model_loading_indicator.py filter must exist');
-    assert.ok(fs.existsSync(registerPath), 'register_filter.py script must exist');
-
-    const filterContent = fs.readFileSync(filterPath, 'utf8');
-    assert.ok(filterContent.includes('class Filter:'), 'Filter must declare class Filter');
-    assert.ok(filterContent.includes('class Valves('), 'Filter must declare Valves configuration');
-    assert.ok(filterContent.includes('async def inlet('), 'Filter must implement inlet hook');
-    assert.ok(filterContent.includes('async def stream('), 'Filter must implement stream hook');
-    assert.ok(filterContent.includes('async def outlet('), 'Filter must implement outlet hook');
-    assert.ok(filterContent.includes('Loading model into memory...'), 'Filter must default to Loading model into memory... status');
-
-    assert.ok(
-      startupContent.includes('register_filter.py'),
-      'startup_homelab.ps1 must invoke register_filter.py during AI initialization'
-    );
-  });
 });
+
 

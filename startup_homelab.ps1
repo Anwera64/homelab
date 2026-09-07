@@ -36,9 +36,6 @@ if ($NoAI -or $ArrOnly) {
 }
 
 if ($aiEnabled) {
-    if (-not (Test-Path "$PSScriptRoot\config\open-webui")) {
-        New-Item -ItemType Directory -Path "$PSScriptRoot\config\open-webui" -Force >$null
-    }
     if (-not (Test-Path "$PSScriptRoot\config\ollama")) {
         New-Item -ItemType Directory -Path "$PSScriptRoot\config\ollama" -Force >$null
     }
@@ -209,7 +206,7 @@ if ($containerIds) {
         $exitCode = docker inspect $cId --format "{{.State.ExitCode}}"
         $health = docker inspect $cId --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
 
-        if (-not $aiEnabled -and ($cName -eq "ollama" -or $cName -eq "open-webui")) {
+        if (-not $aiEnabled -and ($cName -eq "ollama" -or $cName -eq "searxng")) {
             continue
         }
 
@@ -254,22 +251,12 @@ if ($failedContainers.Count -gt 0) {
                     if ($LASTEXITCODE -eq 0) {
                         Write-Host "  [SUCCESS] Model '$model' is ready!" -ForegroundColor Green
                     } else {
-                        Write-Host "  [WARNING] Failed to pull model '$model'. You can pull it later via Open WebUI or 'docker exec ollama ollama pull $model'." -ForegroundColor Yellow
+                        Write-Host "  [WARNING] Failed to pull model '$model'. You can pull it later via 'docker exec ollama ollama pull $model'." -ForegroundColor Yellow
                     }
                 } else {
                     Write-Host "  * Model '$model' is ready." -ForegroundColor Green
                 }
             }
-        }
-
-        $openwebuiRunning = (docker inspect open-webui --format "{{.State.Status}}" 2>$null) -eq "running"
-        if ($openwebuiRunning) {
-            Write-Host "Registering Open WebUI model memory loading indicator filter..." -ForegroundColor Cyan
-            $pythonCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { $null }
-            if ($pythonCmd) {
-                & $pythonCmd "$PSScriptRoot\config\open-webui\register_filter.py" >$null 2>&1
-            }
-            Write-Host "  * Open WebUI 'Loading model into memory...' UI indicator is active." -ForegroundColor Green
         }
     }
 
@@ -301,19 +288,11 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  * Maintainerr:    https://maintainerr.$domain" -ForegroundColor White
     Write-Host "  * qBittorrent:    https://qbit.$domain" -ForegroundColor White
     Write-Host "  * FlareSolverr:   https://flaresolverr.$domain" -ForegroundColor White
-    if ($aiEnabled) {
-        Write-Host "  * Open WebUI (AI):https://ai.$domain" -ForegroundColor White
-        Write-Host "  * Perplexica:     https://research.$domain (Tailscale/LAN only)" -ForegroundColor White
-    }
     Write-Host ""
     Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray
     Write-Host "  * Dashboard:      http://localhost:3000" -ForegroundColor DarkGray
     Write-Host "  * Jellyfin:       http://localhost:8096" -ForegroundColor DarkGray
     Write-Host "  * Jellyseerr:     http://localhost:5055" -ForegroundColor DarkGray
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
-    if ($aiEnabled) {
-        Write-Host "  * Open WebUI:     http://localhost:3080" -ForegroundColor DarkGray
-        Write-Host "  * Perplexica:     http://localhost:3001" -ForegroundColor DarkGray
-    }
     Write-Host ""
 }

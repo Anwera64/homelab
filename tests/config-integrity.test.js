@@ -30,7 +30,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('Caddyfile contains reverse proxy handlers for all core homelab services', () => {
-    const requiredServices = ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'bazarr', 'maintainerr', 'flaresolverr', 'ai'];
+    const requiredServices = ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'bazarr', 'maintainerr', 'flaresolverr'];
     for (const service of requiredServices) {
       const handlerPattern = new RegExp(`@${service}\\s+host\\s+${service}\\.spicy-llama\\.duckdns\\.org`, 'm');
       assert.ok(
