@@ -33,6 +33,7 @@ import app.data.models.memory_model
 import app.data.models.system_setting_model
 import app.data.models.calendar_credential_model
 import app.data.models.document_model
+import app.data.models.gossip_model
 
 
 # Ensure SQLite enables foreign keys and WAL mode on synchronous driver connection

@@ -14,6 +14,7 @@ from app.data.datasources.memory_data_source import SqliteMemoryDataSource
 from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
+from app.data.datasources.gossip_data_source import SqliteGossipDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -24,6 +25,7 @@ from app.data.mappers.memory_data_mapper import MemoryDataMapper
 from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
+from app.data.mappers.gossip_data_mapper import GossipDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -34,11 +36,13 @@ from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
 from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
+from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
 
 # Connectors
 from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
 from app.data.connectors.pymupdf_document_reader import PyMuPDFDocumentReader
 from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+from app.data.connectors.ollama_llm_connector import OllamaLLMConnector
 
 # Security & Persistence
 from app.data.security.bcrypt_hasher import BcryptPasswordHasher
@@ -109,6 +113,16 @@ from app.domain.use_cases.integrations.manage_documents import (
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
 
+from app.domain.use_cases.gossip.publish_gossip_milestone import PublishGossipMilestoneUseCase
+from app.domain.use_cases.gossip.manage_gossip_milestones import (
+    ListHouseholdMilestonesUseCase,
+    ListUserMilestonesAuditUseCase,
+    RevokeGossipMilestoneUseCase,
+)
+from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
+from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+
 # Singletons for stateless services
 _password_hasher = BcryptPasswordHasher()
 _jwt_token_service = JwtTokenService(
@@ -126,6 +140,7 @@ _memory_mapper = MemoryDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
 _document_mapper = DocumentDataMapper()
+_gossip_mapper = GossipDataMapper()
 
 _secret_cipher = SecretCipherImpl(secret_key=settings.SECRET_KEY)
 _searxng_connector = SearXNGSearchConnector(
@@ -135,6 +150,11 @@ _searxng_connector = SearXNGSearchConnector(
 )
 _document_reader = PyMuPDFDocumentReader()
 _caldav_connector = CalDavCalendarConnector()
+_ollama_connector = OllamaLLMConnector(
+    base_url=settings.OLLAMA_BASE_URL,
+    timeout_seconds=settings.OLLAMA_TIMEOUT_SECONDS,
+)
+
 
 
 async def get_db_session():
@@ -152,6 +172,7 @@ def get_container(session: AsyncSession):
     system_setting_ds = SqliteSystemSettingDataSource(session)
     calendar_cred_ds = SqliteCalendarCredentialDataSource(session)
     document_ds = SqliteDocumentDataSource(session)
+    gossip_ds = SqliteGossipDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
@@ -161,8 +182,75 @@ def get_container(session: AsyncSession):
     system_setting_repo = SystemSettingRepositoryImpl(system_setting_ds, _system_setting_mapper)
     calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
+    gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
 
     uow = SqliteUnitOfWork(session)
+
+    context_assembler = AssembleAgentContextUseCase(
+        memory_repo=memory_repo,
+        gossip_repo=gossip_repo,
+        max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+    )
+
+    tool_lister = ListAvailableToolsUseCase()
+    tool_executor = ExecuteToolUseCase(
+        calendar_repo=calendar_cred_repo,
+        calendar_connector=_caldav_connector,
+        search_connector=_searxng_connector,
+        document_repo=document_repo,
+        document_reader=_document_reader,
+        cipher=_secret_cipher,
+        uow=uow,
+        allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
+    )
+
+    chat_turn_uc = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=agent_repo,
+        llm_client=_ollama_connector,
+        context_assembler=context_assembler,
+        tool_executor=tool_executor,
+        tool_lister=tool_lister,
+        uow=uow,
+    )
+
+    reflect_turn_uc = ReflectTurnUseCase(
+        llm_client=_ollama_connector,
+        memory_repo=memory_repo,
+        gossip_repo=gossip_repo,
+        session_repo=session_repo,
+        uow=uow,
+        confidence_threshold=settings.MEMORY_REFLECTION_CONFIDENCE_THRESHOLD,
+        model=settings.DEFAULT_LLM_MODEL,
+    )
+
+    async def _run_background_reflection(
+        session_id: str,
+        user_id: str,
+        username: str,
+        agent_id: str,
+        agent_name: str,
+        user_message: str,
+        assistant_message: str,
+        is_secret_session: bool,
+        is_turn_secret: bool,
+        is_first_turn: bool,
+    ):
+        async with AsyncSessionLocal() as bg_sess:
+            bg_container = get_container(bg_sess)
+            bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
+            await bg_reflect_uc.execute(
+                session_id=session_id,
+                user_id=user_id,
+                username=username,
+                agent_id=agent_id,
+                agent_name=agent_name,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                is_secret_session=is_secret_session,
+                is_turn_secret=is_turn_secret,
+                is_first_turn=is_first_turn,
+            )
 
     return {
         # Auth
@@ -176,7 +264,7 @@ def get_container(session: AsyncSession):
         pres_deps.get_member_use_case: GetMemberUseCase(user_repo),
         pres_deps.get_create_member_use_case: CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow),
         pres_deps.get_update_profile_use_case: UpdateProfileUseCase(user_repo, _password_hasher, uow),
-        pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow),
+        pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
 
         # Spaces
         pres_deps.get_shared_space_use_case: GetSharedSpaceUseCase(space_repo, uow),
@@ -237,6 +325,17 @@ def get_container(session: AsyncSession):
             uow=uow,
             allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
         ),
+
+        # Gossip Bus & Stage 3 Chat
+        pres_deps.get_publish_gossip_milestone_use_case: PublishGossipMilestoneUseCase(gossip_repo, uow),
+        pres_deps.get_list_household_milestones_use_case: ListHouseholdMilestonesUseCase(gossip_repo),
+        pres_deps.get_list_user_milestones_audit_use_case: ListUserMilestonesAuditUseCase(gossip_repo),
+        pres_deps.get_revoke_gossip_milestone_use_case: RevokeGossipMilestoneUseCase(gossip_repo, uow),
+        pres_deps.get_assemble_agent_context_use_case: context_assembler,
+        pres_deps.get_process_chat_turn_use_case: chat_turn_uc,
+        pres_deps.get_reflect_turn_use_case: reflect_turn_uc,
+        pres_deps.get_background_reflection_runner: _run_background_reflection,
+        pres_deps.get_llm_client: _ollama_connector,
 
         # Lifecycle & Background Maintenance
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
@@ -307,6 +406,15 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_delete_document_use_case,
         pres_deps.get_list_available_tools_use_case,
         pres_deps.get_execute_tool_use_case,
+        pres_deps.get_publish_gossip_milestone_use_case,
+        pres_deps.get_list_household_milestones_use_case,
+        pres_deps.get_list_user_milestones_audit_use_case,
+        pres_deps.get_revoke_gossip_milestone_use_case,
+        pres_deps.get_assemble_agent_context_use_case,
+        pres_deps.get_process_chat_turn_use_case,
+        pres_deps.get_reflect_turn_use_case,
+        pres_deps.get_background_reflection_runner,
+        pres_deps.get_llm_client,
     ]:
         def make_provider(target_stub):
             async def provider(container: dict = Depends(get_request_container)):
@@ -314,3 +422,4 @@ def setup_dependency_injection(app: FastAPI):
             return provider
 
         app.dependency_overrides[stub_fn] = make_provider(stub_fn)
+

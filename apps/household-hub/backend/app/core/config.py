@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     PDF_PARSER_TIMEOUT_SECONDS: float = 30.0
     MAX_PDF_SIZE_BYTES: int = 25 * 1024 * 1024
     MAX_PDF_PAGES: int = 150
+
+    # AI & LLM Inference Settings
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    OLLAMA_TIMEOUT_SECONDS: float = 60.0
+    DEFAULT_LLM_MODEL: str = "qwen3:14b"
+    MAX_TOOL_CALL_ITERATIONS: int = 5
+    MAX_CONTEXT_TOKENS: int = 8192
+    MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
+    MAX_GOSSIP_SUMMARY_LENGTH: int = 250
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["*"]

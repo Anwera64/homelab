@@ -95,3 +95,24 @@ class SecretDecryptionException(DomainException):
     """Raised when stored encrypted secrets cannot be decrypted (e.g. invalid token, key mismatch)."""
     pass
 
+
+# Stage 3 AI & Gossip Exceptions
+class LLMInferenceException(DomainException):
+    """Raised when LLM inference fails, times out, or returns an error."""
+    pass
+
+
+class GossipPublicationException(DomainException):
+    """Raised when publishing a milestone to the Gossip Bus fails."""
+    pass
+
+
+class PrivacyTriggerException(DomainException):
+    """Raised when natural language privacy triggers conflict with an action."""
+    pass
+
+
+class SessionBusyException(DomainException):
+    """Raised when a concurrent turn is already processing for a session."""
+    pass
+

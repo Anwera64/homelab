@@ -55,8 +55,10 @@ async def lifespan(app: FastAPI):
                 await bg_task
             except asyncio.CancelledError:
                 pass
-        from app.bootstrap.di import _searxng_connector
+        from app.bootstrap.di import _searxng_connector, _ollama_connector
         await _searxng_connector.close()
+        await _ollama_connector.close()
+
 
 
 def create_app() -> FastAPI:

@@ -1,5 +1,8 @@
+import asyncio
+import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 
 from app.domain.entities.user import User
 from app.presentation.schemas.session_schemas import (
@@ -10,6 +13,7 @@ from app.presentation.schemas.session_schemas import (
     SessionRead,
     SessionSecretToggle,
 )
+from app.presentation.schemas.chat_schemas import ChatTurnRequest, ChatTurnResponse
 from app.presentation.mappers.session_presentation_mapper import SessionPresentationMapper
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
@@ -17,6 +21,8 @@ from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
+from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.presentation.api.session_lock import SessionLockRegistry
 from app.presentation.api.deps import (
     get_current_user,
     get_list_user_sessions_use_case,
@@ -25,6 +31,9 @@ from app.presentation.api.deps import (
     get_toggle_secret_mode_use_case,
     get_add_chat_message_use_case,
     get_delete_session_use_case,
+    get_process_chat_turn_use_case,
+    get_session_lock_registry,
+    get_background_reflection_runner,
 )
 
 router = APIRouter(prefix="/sessions", tags=["Conversation Sessions & Secret Mode"])
@@ -121,3 +130,126 @@ async def delete_session(
     """Delete a conversation session and all its messages."""
     await use_case.execute(session_id=session_id, current_user=current_user)
     return {"message": "Session deleted successfully"}
+
+
+@router.post("/{session_id}/chat", response_model=ChatTurnResponse)
+async def chat_turn(
+    session_id: str,
+    payload: ChatTurnRequest,
+    process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
+    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
+    reflection_runner = Depends(get_background_reflection_runner),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Execute a full multi-turn conversational inference cycle with autonomous tool execution.
+    Guarded by SessionLockRegistry (409 Conflict on concurrent turns).
+    Schedules autonomous memory and gossip reflection in the background.
+    """
+    async with lock_registry.acquire(session_id):
+        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        is_first_turn = len(messages) == 0
+
+        result = await process_use_case.execute(
+            session_id=session_id,
+            current_user=current_user,
+            content=payload.content,
+            auto_approve_writes=payload.auto_approve_writes,
+        )
+
+        asyncio.create_task(
+            reflection_runner(
+                session_id=session_id,
+                user_id=current_user.id,
+                username=current_user.username,
+                agent_id=session_entity.agent_id or "",
+                agent_name="",
+                user_message=payload.content,
+                assistant_message=result.message.content,
+                is_secret_session=result.is_secret,
+                is_turn_secret=result.is_turn_secret,
+                is_first_turn=is_first_turn,
+            )
+        )
+
+        return ChatTurnResponse(
+            message=SessionPresentationMapper.to_message_response(result.message),
+            tool_calls=result.tools_executed,
+            memories_created_count=0,
+            milestones_created_count=0,
+            suggest_secret_mode=result.suggest_secret_mode,
+            session_title=session_entity.title,
+        )
+
+
+@router.post("/{session_id}/chat/stream")
+async def chat_turn_stream(
+    session_id: str,
+    payload: ChatTurnRequest,
+    process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
+    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
+    reflection_runner = Depends(get_background_reflection_runner),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Streaming chat endpoint via Server-Sent Events (SSE).
+    Uses an asyncio.Queue decoupling bridge: in-flight generation runs to completion
+    and saves to database even if the HTTP client disconnects early.
+    """
+    session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+    is_first_turn = len(messages) == 0
+
+    queue = asyncio.Queue()
+
+    async def worker():
+        try:
+            async with lock_registry.acquire(session_id):
+                final_event = None
+                async for event in process_use_case.execute_stream(
+                    session_id=session_id,
+                    current_user=current_user,
+                    content=payload.content,
+                    auto_approve_writes=payload.auto_approve_writes,
+                ):
+                    if event.get("type") == "done":
+                        final_event = event
+                    await queue.put(event)
+
+                if final_event:
+                    asyncio.create_task(
+                        reflection_runner(
+                            session_id=session_id,
+                            user_id=current_user.id,
+                            username=current_user.username,
+                            agent_id=final_event.get("agent_id", session_entity.agent_id or ""),
+                            agent_name=final_event.get("agent_name", ""),
+                            user_message=payload.content,
+                            assistant_message=final_event.get("assistant_content", ""),
+                            is_secret_session=session_entity.is_secret,
+                            is_turn_secret=final_event.get("is_turn_secret", False),
+                            is_first_turn=is_first_turn,
+                        )
+                    )
+        except Exception as exc:
+            await queue.put({"type": "error", "error": str(exc)})
+        finally:
+            await queue.put(None)
+
+    # Launch background worker
+    asyncio.create_task(worker())
+
+    async def sse_generator():
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+            yield "data: [DONE]\n\n"
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+

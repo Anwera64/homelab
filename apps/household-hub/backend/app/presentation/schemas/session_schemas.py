@@ -4,13 +4,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatMessageBase(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str = Field(..., min_length=1, max_length=65536)
+    role: Literal["user", "assistant", "system", "tool"]
+    content: str = Field(default="", min_length=0, max_length=65536)
     metadata_json: Optional[Dict[str, Any]] = {}
 
 
 class ChatMessageCreate(ChatMessageBase):
-    pass
+    content: str = Field(..., min_length=1, max_length=65536)
+
 
 
 class ChatMessageRead(ChatMessageBase):

@@ -64,6 +64,18 @@ from app.domain.use_cases.integrations.manage_documents import (
 )
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
+from app.domain.use_cases.gossip.publish_gossip_milestone import PublishGossipMilestoneUseCase
+from app.domain.use_cases.gossip.manage_gossip_milestones import (
+    ListHouseholdMilestonesUseCase,
+    ListUserMilestonesAuditUseCase,
+    RevokeGossipMilestoneUseCase,
+)
+from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
+from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+from app.domain.repositories.llm_client import ILLMClient
+from app.presentation.api.session_lock import SessionLockRegistry
+
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
@@ -223,6 +235,40 @@ def get_list_available_tools_use_case() -> ListAvailableToolsUseCase:
 
 def get_execute_tool_use_case() -> ExecuteToolUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
+
+_session_lock_registry = SessionLockRegistry()
+
+def get_session_lock_registry() -> SessionLockRegistry:
+    return _session_lock_registry
+
+def get_publish_gossip_milestone_use_case() -> PublishGossipMilestoneUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_household_milestones_use_case() -> ListHouseholdMilestonesUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_user_milestones_audit_use_case() -> ListUserMilestonesAuditUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_revoke_gossip_milestone_use_case() -> RevokeGossipMilestoneUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_assemble_agent_context_use_case() -> AssembleAgentContextUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_process_chat_turn_use_case() -> ProcessChatTurnUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_reflect_turn_use_case() -> ReflectTurnUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_background_reflection_runner():
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_llm_client() -> ILLMClient:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+
 
 
 # =========================================================================
