@@ -24,7 +24,12 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
-Base = declarative_base()
+from app.data.models.base import Base
+import app.data.models.user_model
+import app.data.models.space_model
+import app.data.models.agent_model
+import app.data.models.session_model
+import app.data.models.memory_model
 
 
 # Ensure SQLite enables foreign keys and WAL mode on synchronous driver connection

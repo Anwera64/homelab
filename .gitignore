@@ -16,7 +16,7 @@ config/open-webui/*
 !config/open-webui/filters/
 !config/open-webui/filters/**
 !config/open-webui/register_filter.py
-data/
+/data/
 
 # Logs
 *.log
@@ -25,7 +25,12 @@ logs/
 # State files
 .last_update
 
-# Python cache
+# Python cache & test artifacts
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+

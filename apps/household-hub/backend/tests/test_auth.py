@@ -253,7 +253,7 @@ async def test_login_timing_defense_invokes_password_verification_for_unknown_us
     Login endpoint must verify password against a dummy hash when username does not exist
     to guarantee constant-time execution and prevent user enumeration timing attacks.
     """
-    with patch("app.api.v1.auth.verify_password", wraps=verify_password) as verify_mock:
+    with patch("app.core.security.verify_password", wraps=verify_password) as verify_mock:
         resp = await client.post(
             "/api/v1/auth/login",
             json={"username": "non_existent_user_xyz", "password": "AnyPassword123!"},

@@ -33,5 +33,24 @@ if command -v docker >/dev/null 2>&1; then
   fi
 fi
 
+# 3. Validate Clean Architecture Module Boundaries
+if [ -d "apps/household-hub/backend" ]; then
+  echo "  [+] Validating Clean Architecture module boundaries..."
+  if [ -f "apps/household-hub/backend/.venv/Scripts/python.exe" ]; then
+    apps/household-hub/backend/.venv/Scripts/python.exe -m pytest apps/household-hub/backend/tests/architecture -q
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -m pytest apps/household-hub/backend/tests/architecture -q
+  elif command -v python >/dev/null 2>&1; then
+    python -m pytest apps/household-hub/backend/tests/architecture -q
+  fi
+  ARCH_EXIT_CODE=$?
+  if [ $ARCH_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ [Pre-Commit FAILED] Clean Architecture boundary violations detected! Commit aborted."
+    exit 1
+  fi
+fi
+
 echo "✅ [Pre-Commit PASSED] All tests and configuration validations passed!"
 exit 0
+
