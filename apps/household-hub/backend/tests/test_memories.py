@@ -264,3 +264,53 @@ async def test_household_memory_curation_by_admin(client: httpx.AsyncClient):
     )
     assert admin_del.status_code == 200
 
+
+@pytest.mark.asyncio
+async def test_create_memory_with_nonexistent_agent_returns_404(client: httpx.AsyncClient):
+    """Memory creation must validate agent existence and reject non-existent agents with 404."""
+    _, member_token, _, session_id = await setup_environment(client)
+
+    resp = await client.post(
+        "/api/v1/memories",
+        json={
+            "agent_id": "00000000-0000-0000-0000-000000000000",
+            "scope": "personal",
+            "content": "Fact with missing agent",
+            "source_session_id": session_id,
+        },
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert resp.status_code == 404
+    assert "agent" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_memory_confidence_and_content_validation(client: httpx.AsyncClient):
+    """Confidence must be within [0.0, 1.0] and content cannot be empty."""
+    _, member_token, agent_id, session_id = await setup_environment(client)
+
+    # 1. Confidence > 1.0
+    high_conf = await client.post(
+        "/api/v1/memories",
+        json={"agent_id": agent_id, "scope": "personal", "content": "Valid", "confidence": 1.5, "source_session_id": session_id},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert high_conf.status_code == 422
+
+    # 2. Confidence < 0.0
+    low_conf = await client.post(
+        "/api/v1/memories",
+        json={"agent_id": agent_id, "scope": "personal", "content": "Valid", "confidence": -0.5, "source_session_id": session_id},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert low_conf.status_code == 422
+
+    # 3. Empty content
+    empty_content = await client.post(
+        "/api/v1/memories",
+        json={"agent_id": agent_id, "scope": "personal", "content": "", "source_session_id": session_id},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert empty_content.status_code == 422
+
+

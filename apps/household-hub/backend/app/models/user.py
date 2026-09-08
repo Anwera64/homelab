@@ -26,6 +26,6 @@ class User(Base):
 
     # Relationships
     personal_space = relationship("Space", back_populates="owner", uselist=False, cascade="all, delete-orphan")
-    owned_agents = relationship("AgentPersonality", back_populates="owner", cascade="all, delete-orphan")
+    owned_agents = relationship("AgentPersonality", back_populates="owner")
     sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
     memories = relationship("AgentMemory", back_populates="user", cascade="all, delete-orphan")

@@ -307,3 +307,65 @@ async def test_trash_explicit_purge_and_slug_immediate_reuse(client: httpx.Async
     assert recreate_resp.status_code == 201
     assert recreate_resp.json()["slug"] == "disposable-bot"
 
+
+@pytest.mark.asyncio
+async def test_agent_slug_validation_and_character_rules(client: httpx.AsyncClient):
+    """Slugs support lowercase alphanumeric characters with hyphens and underscores; invalid characters return 422."""
+    _, member_token = await setup_users(client)
+
+    # 1. Valid slug with hyphens and underscores
+    valid1 = await client.post(
+        "/api/v1/agents",
+        json={"slug": "my_agent-v2", "name": "Valid 1", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert valid1.status_code == 201
+    assert valid1.json()["slug"] == "my_agent-v2"
+
+    # 2. Invalid slug with spaces
+    invalid_spaces = await client.post(
+        "/api/v1/agents",
+        json={"slug": "my agent", "name": "Invalid Spaces", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_spaces.status_code == 422
+
+    # 3. Invalid slug with slashes
+    invalid_slash = await client.post(
+        "/api/v1/agents",
+        json={"slug": "my/agent", "name": "Invalid Slash", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_slash.status_code == 422
+
+    # 4. Invalid slug with uppercase
+    invalid_upper = await client.post(
+        "/api/v1/agents",
+        json={"slug": "MyAgent", "name": "Invalid Upper", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_upper.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_agent_inference_parameter_ranges(client: httpx.AsyncClient):
+    """Temperature must be in [0.0, 2.0] and top_p in [0.0, 1.0]."""
+    _, member_token = await setup_users(client)
+
+    # 1. Temperature too high
+    bad_temp = await client.post(
+        "/api/v1/agents",
+        json={"slug": "bad-temp", "name": "Bad Temp", "system_prompt": "P", "temperature": 2.5},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert bad_temp.status_code == 422
+
+    # 2. Top_p negative
+    bad_top_p = await client.post(
+        "/api/v1/agents",
+        json={"slug": "bad-top-p", "name": "Bad Top P", "system_prompt": "P", "top_p": -0.1},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert bad_top_p.status_code == 422
+
+

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db, AsyncSessionLocal
 from app.services.catalog_seeder import seed_builtin_agents
+from app.services.spaces_service import get_or_create_shared_space
 from app.api.v1.router import api_router
 from app import __version__
 
@@ -16,7 +17,10 @@ async def lifespan(app: FastAPI):
         await init_db()
         async with AsyncSessionLocal() as session:
             await seed_builtin_agents(session)
+            await get_or_create_shared_space(session)
+            await session.commit()
     yield
+
 
 
 app = FastAPI(

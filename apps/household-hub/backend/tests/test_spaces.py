@@ -1,5 +1,7 @@
 import pytest
 import httpx
+from unittest.mock import patch
+
 
 
 async def create_user(client: httpx.AsyncClient, username: str, is_admin: bool = False, admin_token: str = None) -> tuple[str, str]:
@@ -138,3 +140,39 @@ async def test_update_personal_and_shared_settings(client: httpx.AsyncClient):
     )
     assert update_shared.status_code == 200
     assert update_shared.json()["settings"]["columns"] == 5
+
+
+@pytest.mark.asyncio
+async def test_shared_space_read_is_non_locking_and_collaborative(client: httpx.AsyncClient):
+    """
+    1. Verify GET /api/v1/spaces/shared does not trigger a database commit when space already exists.
+    2. Verify regular household members (non-admin) have collaborative access to update shared settings.
+    """
+    admin_token, _ = await create_user(client, "admin_user")
+    member_token, _ = await create_user(client, "regular_member", admin_token=admin_token)
+
+    # First ensure shared space exists
+    first_resp = await client.get(
+        "/api/v1/spaces/shared",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert first_resp.status_code == 200
+
+    # With space existing, GET /spaces/shared must NOT call commit
+    with patch("sqlalchemy.ext.asyncio.AsyncSession.commit") as mock_commit:
+        resp = await client.get(
+            "/api/v1/spaces/shared",
+            headers={"Authorization": f"Bearer {member_token}"},
+        )
+        assert resp.status_code == 200
+        mock_commit.assert_not_called()
+
+    # Collaborative access: member updates shared space settings
+    update_resp = await client.put(
+        "/api/v1/spaces/shared/settings",
+        json={"settings": {"columns": 6, "widgets": []}},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["settings"]["columns"] == 6
+

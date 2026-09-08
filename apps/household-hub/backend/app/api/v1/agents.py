@@ -2,12 +2,13 @@ from datetime import datetime, timezone, timedelta
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.config import settings
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.agent import AgentPersonality
+from app.models.session import ConversationSession
 from app.schemas.agent import AgentCreate, AgentRead, AgentTrashRead, AgentUpdate
 
 router = APIRouter(prefix="/agents", tags=["Dynamic Agent Catalog"])
@@ -82,6 +83,13 @@ async def purge_trash_agent(
             detail="Only the model owner or an Admin can permanently purge this model.",
         )
 
+    # Transition associated sessions to archived state rather than deleting them
+    await db.execute(
+        update(ConversationSession)
+        .where(ConversationSession.agent_id == agent.id)
+        .values(agent_id=None, is_archived=True)
+    )
+
     await db.delete(agent)
     await db.commit()
     return {"message": "Model permanently purged from trash. Slug is now available for reuse."}
@@ -120,6 +128,11 @@ async def create_agent(
     )
     expired_res = await db.execute(expired_stmt)
     for exp in expired_res.scalars().all():
+        await db.execute(
+            update(ConversationSession)
+            .where(ConversationSession.agent_id == exp.id)
+            .values(agent_id=None, is_archived=True)
+        )
         await db.delete(exp)
     await db.flush()
 

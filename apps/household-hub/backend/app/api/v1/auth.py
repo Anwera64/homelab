@@ -12,6 +12,10 @@ from app.services.spaces_service import create_personal_space, get_or_create_sha
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# Pre-computed dummy hash to mitigate user enumeration timing attacks on missing users
+DUMMY_PASSWORD_HASH = get_password_hash("dummy-constant-time-password-hash")
+
+
 
 def build_user_read(user: User) -> UserRead:
     return UserRead(
@@ -96,12 +100,21 @@ async def login(
     result = await db.execute(stmt)
     user = result.scalars().first()
 
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user:
+        verify_password(payload.password, DUMMY_PASSWORD_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 
     if not user.is_active:
         raise HTTPException(

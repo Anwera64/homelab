@@ -32,4 +32,4 @@ class AgentPersonality(Base):
 
     # Relationships
     owner = relationship("User", back_populates="owned_agents")
-    sessions = relationship("ConversationSession", back_populates="agent", cascade="all, delete-orphan")
+    sessions = relationship("ConversationSession", back_populates="agent")

@@ -203,3 +203,120 @@ async def test_session_updated_at_bump_and_message_ordering(client: httpx.AsyncC
     assert detail_messages[0]["content"] == "Message 1 in Session 1"
     assert detail_messages[1]["content"] == "Message 2 in Session 1"
 
+
+@pytest.mark.asyncio
+async def test_purged_agent_moves_sessions_to_archived_state(client: httpx.AsyncClient):
+    """
+    When an agent is permanently purged:
+    1. Associated sessions are retained rather than cascade-deleted.
+    2. Sessions transition to is_archived=True, agent_id=None.
+    3. User can view full message history of archived sessions.
+    """
+    admin_token, member_token, _ = await setup_environment(client)
+
+    # 1. Member creates custom agent
+    agent_resp = await client.post(
+        "/api/v1/agents",
+        json={"slug": "diy_coach", "name": "DIY Coach", "system_prompt": "Help DIY"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    custom_agent_id = agent_resp.json()["id"]
+
+    # 2. Create session with that agent and send messages
+    session_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": custom_agent_id, "title": "3D Printer Troubleshooting"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = session_resp.json()["id"]
+
+    await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": "The nozzle is clogged with PLA"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+
+    # 3. Delete and permanently purge agent
+    await client.delete(f"/api/v1/agents/{custom_agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+    purge_resp = await client.delete(f"/api/v1/agents/trash/{custom_agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+    assert purge_resp.status_code == 200
+
+    # 4. Fetch user's sessions: the session MUST still exist with is_archived=True
+    list_resp = await client.get("/api/v1/sessions", headers={"Authorization": f"Bearer {member_token}"})
+    assert list_resp.status_code == 200
+    sessions = list_resp.json()
+    archived_sess = next((s for s in sessions if s["id"] == session_id), None)
+    assert archived_sess is not None
+    assert archived_sess["is_archived"] is True
+    assert archived_sess["agent_id"] is None
+
+    # 5. Fetch session details: user can read history
+    detail_resp = await client.get(f"/api/v1/sessions/{session_id}", headers={"Authorization": f"Bearer {member_token}"})
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert detail["is_archived"] is True
+    assert len(detail["messages"]) == 1
+    assert detail["messages"][0]["content"] == "The nozzle is clogged with PLA"
+
+
+@pytest.mark.asyncio
+async def test_cannot_post_messages_to_archived_session(client: httpx.AsyncClient):
+    """Posting new messages to an archived session must return 400 Bad Request."""
+    _, member_token, _ = await setup_environment(client)
+
+    # Create agent, session, delete & purge agent
+    agent_resp = await client.post(
+        "/api/v1/agents",
+        json={"slug": "temp_bot", "name": "Temp Bot", "system_prompt": "Temp"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    agent_id = agent_resp.json()["id"]
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Temp Chat"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    await client.delete(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+    await client.delete(f"/api/v1/agents/trash/{agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+
+    # Attempt to post a new message to the archived session -> 400 Bad Request
+    post_resp = await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": "Hello into the void"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert post_resp.status_code == 400
+    assert "archived" in post_resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_chat_message_role_and_content_validation(client: httpx.AsyncClient):
+    """Message role must be user/assistant/system, and content must be non-empty."""
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Validation Chat"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    # 1. Invalid role
+    bad_role = await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "hacker_bot", "content": "Testing role"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert bad_role.status_code == 422
+
+    # 2. Empty content
+    empty_content = await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": ""},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert empty_content.status_code == 422
+
+

@@ -138,6 +138,12 @@ async def add_message(
             detail="Zero-Leak Privacy violation: You cannot post in another member's session.",
         )
 
+    if session.is_archived or session.agent_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot send messages to an archived conversation session.",
+        )
+
     message = ChatMessage(
         session_id=session.id,
         role=payload.role,

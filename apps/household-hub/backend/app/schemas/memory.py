@@ -1,13 +1,13 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MemoryBase(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1)
     category: Optional[str] = "fact"
     scope: Optional[str] = "personal"
-    confidence: Optional[float] = 1.0
+    confidence: Optional[float] = Field(1.0, ge=0.0, le=1.0)
     agent_id: Optional[str] = None
     source_session_id: Optional[str] = None
 

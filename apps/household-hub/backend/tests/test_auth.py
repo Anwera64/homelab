@@ -1,5 +1,8 @@
 import pytest
 import httpx
+from unittest.mock import patch
+from app.core.security import verify_password
+
 
 
 @pytest.mark.asyncio
@@ -242,4 +245,21 @@ def test_production_security_validation():
         SECRET_KEY="a-very-strong-production-secret-key-with-over-32-characters!",
     )
     assert valid_prod.ENVIRONMENT == "production"
+
+
+@pytest.mark.asyncio
+async def test_login_timing_defense_invokes_password_verification_for_unknown_user(client: httpx.AsyncClient):
+    """
+    Login endpoint must verify password against a dummy hash when username does not exist
+    to guarantee constant-time execution and prevent user enumeration timing attacks.
+    """
+    with patch("app.api.v1.auth.verify_password", wraps=verify_password) as verify_mock:
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={"username": "non_existent_user_xyz", "password": "AnyPassword123!"},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Invalid username or password"
+        verify_mock.assert_called_once()
+
 

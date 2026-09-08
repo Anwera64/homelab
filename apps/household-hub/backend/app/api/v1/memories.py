@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
+from app.models.agent import AgentPersonality
 from app.models.session import ConversationSession
 from app.models.memory import AgentMemory
 from app.schemas.memory import MemoryCreate, MemoryRead, MemoryUpdate
@@ -91,6 +92,18 @@ async def create_memory(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot publish household memory from a secret session. Zero-Leak confidentiality enforced.",
+            )
+
+    if payload.agent_id:
+        agent_res = await db.execute(
+            select(AgentPersonality).where(
+                (AgentPersonality.id == payload.agent_id) & AgentPersonality.deleted_at.is_(None)
+            )
+        )
+        if not agent_res.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent personality not found",
             )
 
     memory = AgentMemory(

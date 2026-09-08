@@ -17,9 +17,13 @@ async def get_shared_space(
     _: User = Depends(get_current_user),
 ):
     """Retrieve the shared household hub with shared Bento widgets."""
-    space = await get_or_create_shared_space(db)
-    await db.commit()
+    result = await db.execute(select(Space).where(Space.type == "shared"))
+    space = result.scalars().first()
+    if not space:
+        space = await get_or_create_shared_space(db)
+        await db.commit()
     return space
+
 
 
 @router.get("/personal", response_model=SpaceRead)

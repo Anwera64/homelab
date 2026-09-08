@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AgentBase(BaseModel):
@@ -9,13 +9,13 @@ class AgentBase(BaseModel):
     avatar: Optional[str] = "🤖"
     system_prompt: str
     model_alias: Optional[str] = "qwen3:14b"
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.9
+    temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0)
+    top_p: Optional[float] = Field(0.9, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = []
 
 
 class AgentCreate(AgentBase):
-    slug: str
+    slug: str = Field(..., pattern=r"^[a-z0-9]+(?:[-_][a-z0-9]+)*$", min_length=2, max_length=64)
 
 
 class AgentUpdate(BaseModel):
@@ -24,8 +24,8 @@ class AgentUpdate(BaseModel):
     avatar: Optional[str] = None
     system_prompt: Optional[str] = None
     model_alias: Optional[str] = None
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = None
     is_active: Optional[bool] = None
 

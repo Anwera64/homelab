@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, List, Dict, Any, Literal
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatMessageBase(BaseModel):
-    role: str
-    content: str
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(..., min_length=1, max_length=65536)
     metadata_json: Optional[Dict[str, Any]] = {}
 
 
@@ -22,13 +22,15 @@ class ChatMessageRead(ChatMessageBase):
 
 
 class SessionBase(BaseModel):
-    agent_id: str
+    agent_id: Optional[str] = None
     title: Optional[str] = "New Conversation"
     is_secret: Optional[bool] = False
 
 
-class SessionCreate(SessionBase):
-    pass
+class SessionCreate(BaseModel):
+    agent_id: str
+    title: Optional[str] = "New Conversation"
+    is_secret: Optional[bool] = False
 
 
 class SessionSecretToggle(BaseModel):
@@ -38,6 +40,7 @@ class SessionSecretToggle(BaseModel):
 class SessionRead(SessionBase):
     id: str
     user_id: str
+    is_archived: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -1,12 +1,13 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, get_current_user, get_current_admin_user
 from app.core.security import get_password_hash
 from app.models.user import User
+from app.models.agent import AgentPersonality
 from app.schemas.user import UserCreate, UserRead
 from app.services.spaces_service import create_personal_space
 
@@ -88,3 +89,51 @@ async def get_member(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     return build_user_read(user)
+
+
+@router.delete("/{user_id}")
+async def delete_member(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Household Admin can delete a member account.
+    - Member's personal space and personal memories are permanently purged (Strict Zero-Leak).
+    - Authored custom agents are reassigned to an active Household Admin.
+    - Cannot delete the only administrator account.
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    if user.is_admin:
+        admin_count_res = await db.execute(select(func.count(User.id)).where(User.is_admin.is_(True)))
+        admin_count = admin_count_res.scalar() or 0
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the only administrator account. Promote another member to admin first.",
+            )
+
+    # Determine inheriting admin
+    if current_admin.id != user.id:
+        inheriting_admin = current_admin
+    else:
+        other_admin_res = await db.execute(
+            select(User).where(User.is_admin.is_(True), User.id != user.id).limit(1)
+        )
+        inheriting_admin = other_admin_res.scalars().first()
+
+    # Reassign custom agents to inheriting admin
+    if inheriting_admin:
+        await db.execute(
+            update(AgentPersonality)
+            .where(AgentPersonality.owner_id == user.id)
+            .values(owner_id=inheriting_admin.id)
+        )
+
+    await db.delete(user)
+    await db.commit()
+    return {"message": "Member account deleted successfully"}
