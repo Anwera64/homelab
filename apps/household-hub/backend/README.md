@@ -33,14 +33,19 @@ The backend is structured into decoupled architectural layers strictly enforced 
   * **Cascading Trash Purge & Session Preservation:** When an agent is permanently purged (manually or upon expiration), all associated conversation sessions are automatically transitioned to an archived state (`is_archived=True`, `agent_id=None`) *before* agent deletion.
   * **Autonomous Background Purger:** An asynchronous background task runs in the application `lifespan` loop, automatically cleaning up expired trash models on an hourly interval.
   * **Inactive Agent Suspension:** Deactivating an agent (`is_active=False`) suspends it from accepting new sessions or chat messages while preserving full read access to past conversation history.
-* **Conversation Sessions & Secret Mode:**
-  * Multi-agent conversation session threads (`/api/v1/sessions`).
-  * **Secret Mode (`is_secret`):** Toggleable session confidentiality flag ensuring sensitive research or surprise planning never leaks to the shared gossip bus or shared memory.
-* **Agent Long-Term Memory & User Relationship Engine:**
-  * Persistent memory store (`/api/v1/memories`) enabling agents to accumulate personal preferences, dietary habits, and milestones over time.
-  * **Two-Tier Scoping:** Personal facts (`scope="personal"`) are strictly isolated to the user under Zero-Leak rules; household facts (`scope="household"`) carry user attribution.
-  * **Audit & Revoke:** Users maintain full visibility to view, edit, or delete any memory an agent has formed.
-  * **Secret Mode Hard Barrier:** Memories from Secret sessions cannot be published to the household scope.
+* **Pluggable Integrations Engine (Stage 2):**
+  * **Unified CalDAV Calendar Connector:** Compatible with Apple iCloud, Google Calendar, and self-hosted CalDAV instances. Passwords encrypted with AES-256 (Fernet) at rest. Enforces SSRF blocks and cloud metadata protections.
+  * **SearXNG Private Search Client:** Fast HTTP connection pooling (`httpx.AsyncClient`) with bounded LRU caching (max 500 entries) and 15-minute TTL. Role-based profiles (general vs. academic sources).
+  * **PyMuPDF Document Reader & Extractor:** Non-blocking PDF parsing with chunked streaming upload validation (64KB chunks), sectioning, citation extraction, and scanned 0-text rejection (`422 Unprocessable Entity`).
+  * **Relational Document Store:** SQLite persistence with auto-incrementing version tracking and raw `.md` download endpoint.
+* **AI Inference, Tool Execution & Attributed Gossip Bus (Stage 3):**
+  * **Local Ollama Inference (`qwen3:14b` on RTX 5080):** OpenAI-compatible chat completion and streaming pipelines with persistent connection pooling.
+  * **Progressive Token-by-Token SSE Streaming:** Real-time word-by-word streaming via `/sessions/{id}/stream`. Bypasses non-streaming calls for toolless agents and streams synthesized answers post-tool execution.
+  * **Prompt Injection Neutralization:** Strips control tokens (`System:`, `<|im_start|>`, `###`, `---`) from user memories and milestones prior to system prompt compilation.
+  * **Autonomous Memory Reflection & Deduplication:** Background extraction runs post-turn. Semantic in-place deduplication updates confidence and refreshes timestamps instead of inserting duplicate rows.
+  * **Attributed Gossip Bus:** Directional context stream (`/gossip/milestones`) where shared milestones carry explicit provenance (`source_user_id` $\rightarrow$ `reporting_agent_id`).
+  * **Durable Session Runners & Concurrency Governance:** Stream execution runs in isolated `AsyncSessionLocal` transactions resistant to client disconnects. `SessionLockRegistry` returns immediate `HTTP 409 Conflict` on concurrent turns with atomic lock pruning.
+  * **Security & Network Hardening:** Upstream LLM errors map to `502 Bad Gateway` (and `504 Gateway Timeout` on timeouts). Default CORS locked down to `https://spicy-llama.duckdns.org` with DuckDNS subdomain regex reflection and native mobile socket bypass compatibility.
 * **Storage & Reliability:**
   * SQLite database with **WAL (Write-Ahead Logging)** mode enabled and foreign keys strictly enforced (`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000`).
   * Asynchronous ORM via **SQLAlchemy 2.0** and **aiosqlite**.
@@ -75,17 +80,20 @@ cd apps\household-hub\backend
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-The 70 automated tests (100% passing) cover:
+The 157 automated tests (100% passing) cover:
 * `tests/architecture/test_architecture_boundaries.py`: AST static analysis verifying strict layer boundaries and coroutine DI providers.
 * `tests/test_auth.py`: First-run admin onboarding, atomic concurrent registration mutex, JWT verification, and member provisioning.
 * `tests/test_spaces.py`: Shared singleton space, Bento widgets layout, and strict Zero-Leak 403 enforcement.
 * `tests/test_agents.py`: Builtin models seeding, custom model creation, soft-delete, 7-day restore, slug reuse, cascading trash purge, and inactive suspension.
-* `tests/test_sessions.py`: Session thread management, secret mode toggle, private history isolation, and cursor pagination.
+* `tests/test_sessions.py`: Session thread management, secret mode toggle, private history isolation, cursor pagination, 409 stream lock, agent provenance, and LLM 502/504 mapping.
 * `tests/test_memories.py`: Agent memory personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, and secret mode block.
 * `tests/test_users.py`: User lifecycle, member deletion with knowledge inheritance, and profile updates.
-* `tests/domain/`: Pure entity logic and use case isolated unit tests.
-* `tests/data/`: Data source and mapping tests.
-* `tests/presentation/`: Presentation mapper and response DTO tests.
+* `tests/test_integrations.py`: CalDAV calendar integration, SearXNG search client with LRU caching, PDF reader with chunked validation, and document store CRUD.
+* `tests/test_cors.py`: DuckDNS origin whitelist, subdomain regex matching, and unauthorized origin rejection.
+* `tests/test_stage3_e2e.py`: Full SSE streaming chat turns, tool execution loops, memory reflection, and gossip bus milestone lifecycle.
+* `tests/domain/`: Pure entity logic and use case isolated unit tests (chat turn progressive streaming, context assembler prompt sanitization, memory reflection deduplication, gossip use cases).
+* `tests/data/`: Data source, connector, and repository mapping tests.
+* `tests/presentation/`: Presentation mapper, response DTO, session lock registry, and gossip router tests.
 
 ---
 

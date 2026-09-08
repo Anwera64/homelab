@@ -163,11 +163,12 @@ We will proceed through the build in modular, sequential stages. Before touching
 2. **Stage 2: Pluggable Integrations Engine** `[COMPLETED ✅]`
    * Pluggable CalDAV calendar integration (Apple iCloud, Google Calendar, self-hosted) with Fernet AES-256 encrypted credentials, atomic in-place updates, SSRF prevention, and graceful token recovery; SearXNG private search client with persistent connection pooling, bounded LRU caching (max 500 entries), and freshness bypass; PyMuPDF structured document reader with chunked streaming upload validation (64KB chunks) and scanned PDF rejection; SQLite document store with versioning and Markdown export; zero-trust mandatory session binding and server-authoritative Secret Mode external tool lock; uniform tool execution dispatcher. 107 automated tests (100% pass) with AST boundary enforcement.
    * Documented baseline: [`docs/STAGE_2_BASELINE.md`](./docs/STAGE_2_BASELINE.md)
-3. **Stage 3: AI Inference, Tool Execution, Autonomous Memory & Gossip Bus**
-   * Local Ollama streaming integration (`qwen3:14b`), agent tool-calling pipeline, autonomous memory reflection & dynamic context injection, and the shared milestone gossip bus.
-4. **Stage 4: KMP Shared Client Core**
-   * Shared Kotlin Multiplatform module (`:shared`), Ktor client, data models, and state management.
-5. **Stage 5: Compose Multiplatform UI**
+3. **Stage 3: AI Inference, Tool Execution, Autonomous Memory & Gossip Bus** `[COMPLETED ✅]`
+   * Local Ollama inference integration (`qwen3:14b` on RTX 5080) via OpenAI-compatible endpoints with progressive token-by-token SSE streaming (`execute_stream`); agent tool execution loop; context assembly with prompt injection delimiter stripping; autonomous memory reflection with in-place semantic deduplication; attributed gossip bus with milestone sanitization; durable background stream execution resilient to client disconnects; synchronous session lock registry (`HTTP 409 Conflict`) with atomic pruning; upstream LLM exception mapping (`HTTP 502 Bad Gateway` / `HTTP 504 Gateway Timeout`); strict CORS origin lockdown (`https://spicy-llama.duckdns.org`) with DuckDNS subdomain regex. 157 automated tests (100% pass) with AST boundary enforcement.
+   * Documented baseline: [`docs/STAGE_3_BASELINE.md`](./docs/STAGE_3_BASELINE.md)
+4. **Stage 4: KMP Shared Client Core (`:shared`)** `[NEXT UP ⏳]`
+   * Shared Kotlin Multiplatform module (`:shared`), multiplatform Ktor HTTP client (configured for Android, iOS Darwin, and Web Wasm), shared domain models, SSE stream ingestion, session state management (StateFlow), and authentication token management.
+5. **Stage 5: Compose Multiplatform UI (`:composeApp`)**
    * Compose Multiplatform screens (`:composeApp`), theme, dashboard navigation, streaming chat, and agent memory audit & management UI ("What I Know About You").
 6. **Stage 6: Homelab Deployment & Tailscale Ingress**
    * Docker Compose integration, port bindings, and secure remote routing via Tailscale.

@@ -118,4 +118,5 @@ graph TD
 | **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | [https://flaresolverr.spicy-llama.duckdns.org](https://flaresolverr.spicy-llama.duckdns.org) | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
 | **Open WebUI (AI)** | [https://ai.spicy-llama.duckdns.org](https://ai.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3080](http://desktop-kujo8mp:3080) | Local LLM Assistant (RTX 5080 GPU accelerated) |
+| **Household Hub** | [https://hub.spicy-llama.duckdns.org](https://hub.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3050](http://desktop-kujo8mp:3050) | Household Hub Backend (Stages 1-3 complete; Stage 4 KMP next) |
 
