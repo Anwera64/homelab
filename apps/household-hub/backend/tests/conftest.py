@@ -13,9 +13,12 @@ os.environ["SECRET_KEY"] = "test-secret-key-for-household-hub-testing-only-32cha
 os.environ["SQLITE_DB_PATH"] = ":memory:"
 
 from app.core.database import Base
+from app.bootstrap import di as di_module
+from app.core import database as db_module
 from app.bootstrap.di import get_db_session, setup_dependency_injection
 from app.api.deps import get_db
 from app.main import app
+
 
 # Create in-memory test engine with StaticPool so all async connections share the same memory DB
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -63,7 +66,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def client(db_session: AsyncSession) -> AsyncGenerator[httpx.AsyncClient, None]:
+async def client(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[httpx.AsyncClient, None]:
     """HTTP async test client with database dependency override."""
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         async with TestingSessionLocal() as session:
@@ -71,6 +74,11 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[httpx.AsyncClient, 
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_session] = override_get_db
+
+    monkeypatch.setattr(di_module, "AsyncSessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(db_module, "AsyncSessionLocal", TestingSessionLocal)
+
+
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:

@@ -50,7 +50,9 @@ Guidelines:
 class ReflectTurnResult:
     session_title: Optional[str] = None
     memories_created: List[AgentMemory] = field(default_factory=list)
+    memories_updated: List[AgentMemory] = field(default_factory=list)
     milestones_created: List[GossipMilestone] = field(default_factory=list)
+
 
 
 class ReflectTurnUseCase:
@@ -106,6 +108,7 @@ class ReflectTurnUseCase:
         parsed = self._parse_json(content)
 
         memories_to_create: List[AgentMemory] = []
+        memories_to_update: List[AgentMemory] = []
         milestones_to_create: List[GossipMilestone] = []
         updated_title: Optional[str] = None
 
@@ -119,9 +122,12 @@ class ReflectTurnUseCase:
                 session.title = updated_title
                 await self.session_repo.update(session)
 
-        # 2. Extract memories
+        # 2. Extract memories with deduplication
         raw_memories = parsed.get("memories", [])
         if isinstance(raw_memories, list):
+            existing_memories = await self.memory_repo.list_user_memories(
+                user_id=user_id, active_only=True
+            )
             for item in raw_memories:
                 if not isinstance(item, dict):
                     continue
@@ -143,27 +149,46 @@ class ReflectTurnUseCase:
 
                 category = str(item.get("category", "fact")).lower()
 
-                mem = AgentMemory(
-                    user_id=user_id,
-                    agent_id=agent_id,
-                    scope=scope,
-                    category=category,
-                    content=mem_content,
-                    confidence=conf,
-                    source_session_id=session_id,
+                # Check if identical memory already exists for this user and scope
+                normalized_content = mem_content.lower()
+                duplicate = next(
+                    (
+                        m for m in existing_memories
+                        if m.scope == scope and m.content.strip().lower() == normalized_content
+                    ),
+                    None,
                 )
-                created_mem = await self.memory_repo.create(mem)
-                memories_to_create.append(created_mem)
+
+                if duplicate:
+                    # Update confidence and timestamp instead of inserting duplicate row
+                    duplicate.confidence = max(duplicate.confidence, conf)
+                    duplicate.updated_at = datetime.now(timezone.utc)
+                    updated_mem = await self.memory_repo.update(duplicate)
+                    memories_to_update.append(updated_mem)
+                else:
+                    mem = AgentMemory(
+                        user_id=user_id,
+                        agent_id=agent_id,
+                        scope=scope,
+                        category=category,
+                        content=mem_content,
+                        confidence=conf,
+                        source_session_id=session_id,
+                    )
+                    created_mem = await self.memory_repo.create(mem)
+                    memories_to_create.append(created_mem)
+                    existing_memories.append(created_mem)
 
         # 3. Extract milestones (strictly dropped if secret)
         if not is_secret:
             raw_milestones = parsed.get("milestones", [])
             if isinstance(raw_milestones, list):
+                active_milestones = await self.gossip_repo.get_active_household_milestones()
                 for item in raw_milestones:
                     if not isinstance(item, dict):
                         continue
-                    summary = str(item.get("summary", "")).strip()
-                    if not summary:
+                    raw_summary = str(item.get("summary", "")).strip()
+                    if not raw_summary:
                         continue
 
                     category = str(item.get("category", "milestone")).lower()
@@ -182,12 +207,29 @@ class ReflectTurnUseCase:
                         reporting_agent_id=agent_id,
                         reporting_agent_name=agent_name,
                         category=category,
-                        summary=summary,
+                        summary=raw_summary,
                         expires_at=exp_dt,
                         source_session_id=session_id,
                     )
+
+                    # Sanitize summary to strip prompt injection delimiters
+                    sanitized_summary = milestone.sanitize()
+                    if not sanitized_summary:
+                        continue
+                    milestone.summary = sanitized_summary
+
+                    # Check for duplicates among active milestones
+                    normalized_summary = sanitized_summary.lower()
+                    is_duplicate = any(
+                        m.summary.strip().lower() == normalized_summary
+                        for m in active_milestones
+                    )
+                    if is_duplicate:
+                        continue
+
                     published = await self.gossip_repo.publish(milestone)
                     milestones_to_create.append(published)
+                    active_milestones.append(published)
 
         async with self.uow:
             await self.uow.commit()
@@ -195,8 +237,10 @@ class ReflectTurnUseCase:
         return ReflectTurnResult(
             session_title=updated_title,
             memories_created=memories_to_create,
+            memories_updated=memories_to_update,
             milestones_created=milestones_to_create,
         )
+
 
     def _parse_json(self, raw: str) -> dict:
         text = raw.strip()

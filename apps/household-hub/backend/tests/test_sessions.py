@@ -433,5 +433,89 @@ async def test_session_message_pagination_and_bounds(client: httpx.AsyncClient):
     assert invalid_high.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_chat_turn_stream_concurrent_lock_rejection(client: httpx.AsyncClient, monkeypatch):
+    from app.presentation.api.deps import get_session_lock_registry
+    from app.bootstrap.di import _ollama_connector
+    from app.domain.entities.llm_message import LLMResponseChunk
+
+    async def fake_stream(messages, model, temperature=0.7, top_p=0.9, tools=None):
+        yield LLMResponseChunk(delta_content="Hello stream")
+
+    monkeypatch.setattr(_ollama_connector, "stream_chat_completion", fake_stream)
+
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Lock Stream Test"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    registry = get_session_lock_registry()
+    acquired = await registry.try_acquire(session_id)
+    assert acquired is True
+
+    # Attempt to start streaming while lock is held -> must return 409 Conflict immediately (not 200)
+    stream_resp = await client.post(
+        f"/api/v1/sessions/{session_id}/chat/stream",
+        json={"content": "Streaming turn"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert stream_resp.status_code == 409
+
+    # Release lock and verify key is pruned
+    await registry.release(session_id)
+    assert session_id not in registry._locks
+
+
+@pytest.mark.asyncio
+async def test_chat_turn_agent_provenance(client: httpx.AsyncClient, monkeypatch):
+    import asyncio
+    from app.bootstrap.di import _ollama_connector
+    from app.domain.entities.llm_message import LLMResponse
+    from app.presentation.api import deps as pres_deps
+    from app.main import app
+
+    captured_reflection = {}
+
+    async def fake_chat(messages, model, temperature=0.7, top_p=0.9, tools=None):
+        return LLMResponse(content="Hello, I am Assistant!")
+
+    monkeypatch.setattr(_ollama_connector, "chat_completion", fake_chat)
+
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Provenance Test"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    def mock_reflection_runner():
+        async def _runner(**kwargs):
+            captured_reflection.update(kwargs)
+        return _runner
+
+    app.dependency_overrides[pres_deps.get_background_reflection_runner] = mock_reflection_runner
+
+    try:
+        turn_resp = await client.post(
+            f"/api/v1/sessions/{session_id}/chat",
+            json={"content": "Hello!"},
+            headers={"Authorization": f"Bearer {member_token}"},
+        )
+        assert turn_resp.status_code == 200
+        await asyncio.sleep(0.05)
+
+        assert captured_reflection.get("agent_name") != ""
+        assert captured_reflection.get("agent_id") == agent_id
+    finally:
+        app.dependency_overrides.pop(pres_deps.get_background_reflection_runner, None)
+
+
+
 
 

@@ -1,7 +1,7 @@
 import asyncio
 import json
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.domain.entities.user import User
@@ -21,6 +21,7 @@ from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
+from app.domain.use_cases.agents.get_agent import GetAgentUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.presentation.api.session_lock import SessionLockRegistry
 from app.presentation.api.deps import (
@@ -31,10 +32,13 @@ from app.presentation.api.deps import (
     get_toggle_secret_mode_use_case,
     get_add_chat_message_use_case,
     get_delete_session_use_case,
+    get_agent_use_case,
     get_process_chat_turn_use_case,
     get_session_lock_registry,
     get_background_reflection_runner,
+    get_background_chat_stream_runner,
 )
+
 
 router = APIRouter(prefix="/sessions", tags=["Conversation Sessions & Secret Mode"])
 
@@ -138,6 +142,7 @@ async def chat_turn(
     payload: ChatTurnRequest,
     process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
     get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     reflection_runner = Depends(get_background_reflection_runner),
     current_user: User = Depends(get_current_user),
@@ -150,6 +155,9 @@ async def chat_turn(
     async with lock_registry.acquire(session_id):
         session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
         is_first_turn = len(messages) == 0
+        agent_id = session_entity.agent_id or ""
+        agent = await agent_uc.execute(agent_id) if agent_id else None
+        agent_name = agent.name if agent else ""
 
         result = await process_use_case.execute(
             session_id=session_id,
@@ -163,8 +171,8 @@ async def chat_turn(
                 session_id=session_id,
                 user_id=current_user.id,
                 username=current_user.username,
-                agent_id=session_entity.agent_id or "",
-                agent_name="",
+                agent_id=agent_id,
+                agent_name=agent_name,
                 user_message=payload.content,
                 assistant_message=result.message.content,
                 is_secret_session=result.is_secret,
@@ -187,55 +195,50 @@ async def chat_turn(
 async def chat_turn_stream(
     session_id: str,
     payload: ChatTurnRequest,
-    process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
     get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
-    reflection_runner = Depends(get_background_reflection_runner),
+    stream_runner = Depends(get_background_chat_stream_runner),
     current_user: User = Depends(get_current_user),
 ):
     """
     Streaming chat endpoint via Server-Sent Events (SSE).
-    Uses an asyncio.Queue decoupling bridge: in-flight generation runs to completion
-    and saves to database even if the HTTP client disconnects early.
+    Uses an asyncio.Queue decoupling bridge and independent AsyncSessionLocal worker:
+    in-flight generation runs to completion and saves to database even if the HTTP
+    client disconnects early, with immediate 409 Conflict rejection if locked.
     """
-    session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
-    is_first_turn = len(messages) == 0
+    if not await lock_registry.try_acquire(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session {session_id} is currently processing another message.",
+        )
+
+    try:
+        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        is_first_turn = len(messages) == 0
+        agent_id = session_entity.agent_id or ""
+        agent = await agent_uc.execute(agent_id) if agent_id else None
+        agent_name = agent.name if agent else ""
+    except Exception:
+        await lock_registry.release(session_id)
+        raise
 
     queue = asyncio.Queue()
 
     async def worker():
         try:
-            async with lock_registry.acquire(session_id):
-                final_event = None
-                async for event in process_use_case.execute_stream(
-                    session_id=session_id,
-                    current_user=current_user,
-                    content=payload.content,
-                    auto_approve_writes=payload.auto_approve_writes,
-                ):
-                    if event.get("type") == "done":
-                        final_event = event
-                    await queue.put(event)
-
-                if final_event:
-                    asyncio.create_task(
-                        reflection_runner(
-                            session_id=session_id,
-                            user_id=current_user.id,
-                            username=current_user.username,
-                            agent_id=final_event.get("agent_id", session_entity.agent_id or ""),
-                            agent_name=final_event.get("agent_name", ""),
-                            user_message=payload.content,
-                            assistant_message=final_event.get("assistant_content", ""),
-                            is_secret_session=session_entity.is_secret,
-                            is_turn_secret=final_event.get("is_turn_secret", False),
-                            is_first_turn=is_first_turn,
-                        )
-                    )
-        except Exception as exc:
-            await queue.put({"type": "error", "error": str(exc)})
+            await stream_runner(
+                session_id=session_id,
+                current_user=current_user,
+                content=payload.content,
+                auto_approve_writes=payload.auto_approve_writes,
+                queue=queue,
+                agent_id=agent_id,
+                agent_name=agent_name,
+                is_first_turn=is_first_turn,
+            )
         finally:
-            await queue.put(None)
+            await lock_registry.release(session_id)
 
     # Launch background worker
     asyncio.create_task(worker())
@@ -252,4 +255,5 @@ async def chat_turn_stream(
             pass
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
 

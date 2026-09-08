@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -7,6 +8,26 @@ from app.domain.entities.session import ChatMessage
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.gossip_repository import IGossipRepository
+
+
+def _sanitize_prompt_snippet(text: str, max_length: int = 500) -> str:
+    if not text:
+        return ""
+    patterns = [
+        r"(?i)\bsystem\s*:",
+        r"(?i)\bhuman\s*:",
+        r"(?i)\bassistant\s*:",
+        r"(?i)<\|.*?\|>",
+        r"###",
+        r"---",
+    ]
+    cleaned = text
+    for pattern in patterns:
+        cleaned = re.sub(pattern, " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > max_length:
+        cleaned = cleaned[:max_length]
+    return cleaned
 
 
 class AssembleAgentContextUseCase:
@@ -67,21 +88,24 @@ class AssembleAgentContextUseCase:
             recency_lines.append("[What I Know About You]:")
             for m in personal_memories[:20]:
                 created_str = m.created_at.strftime("%b %Y") if hasattr(m, "created_at") and m.created_at else "Recent"
-                recency_lines.append(f"- [Added {created_str}] {m.content} (confidence: {m.confidence:.2f})")
+                safe_content = _sanitize_prompt_snippet(m.content)
+                recency_lines.append(f"- [Added {created_str}] {safe_content} (confidence: {m.confidence:.2f})")
 
         # Household memories
         if household_memories:
             recency_lines.append("[Household Shared Knowledge]:")
             for hm in household_memories[:10]:
-                recency_lines.append(f"- {hm.content}")
+                safe_content = _sanitize_prompt_snippet(hm.content)
+                recency_lines.append(f"- {safe_content}")
 
         # Household milestones with provenance attribution and anti-echo tags
         if household_milestones:
             recency_lines.append("[Injected Household Context - Do Not Re-Extract]:")
             for gm in household_milestones:
-                reporting = gm.reporting_agent_name or "an agent"
-                source = gm.source_username or "A member"
-                recency_lines.append(f"- {source} mentioned to the {reporting}: {gm.summary}")
+                reporting = _sanitize_prompt_snippet(gm.reporting_agent_name, max_length=50) or "an agent"
+                source = _sanitize_prompt_snippet(gm.source_username, max_length=50) or "A member"
+                safe_summary = _sanitize_prompt_snippet(gm.summary)
+                recency_lines.append(f"- {source} mentioned to the {reporting}: {safe_summary}")
 
         # Sandwich reminder for secret mode
         if is_secret:

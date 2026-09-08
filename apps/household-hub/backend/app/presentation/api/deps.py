@@ -265,8 +265,12 @@ def get_reflect_turn_use_case() -> ReflectTurnUseCase:
 def get_background_reflection_runner():
     raise NotImplementedError("Wired by bootstrap coordinator")
 
+def get_background_chat_stream_runner():
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
 def get_llm_client() -> ILLMClient:
     raise NotImplementedError("Wired by bootstrap coordinator")
+
 
 
 

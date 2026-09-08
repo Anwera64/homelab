@@ -1,9 +1,15 @@
+import asyncio
+import logging
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from app.domain.entities.user import User
 from app.presentation.api import deps as pres_deps
+
+logger = logging.getLogger(__name__)
+
 
 # Data Sources
 from app.data.datasources.user_data_source import SqliteUserDataSource
@@ -236,21 +242,73 @@ def get_container(session: AsyncSession):
         is_turn_secret: bool,
         is_first_turn: bool,
     ):
-        async with AsyncSessionLocal() as bg_sess:
-            bg_container = get_container(bg_sess)
-            bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
-            await bg_reflect_uc.execute(
-                session_id=session_id,
-                user_id=user_id,
-                username=username,
-                agent_id=agent_id,
-                agent_name=agent_name,
-                user_message=user_message,
-                assistant_message=assistant_message,
-                is_secret_session=is_secret_session,
-                is_turn_secret=is_turn_secret,
-                is_first_turn=is_first_turn,
-            )
+        try:
+            async with AsyncSessionLocal() as bg_sess:
+                bg_container = get_container(bg_sess)
+                bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
+                await bg_reflect_uc.execute(
+                    session_id=session_id,
+                    user_id=user_id,
+                    username=username,
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    user_message=user_message,
+                    assistant_message=assistant_message,
+                    is_secret_session=is_secret_session,
+                    is_turn_secret=is_turn_secret,
+                    is_first_turn=is_first_turn,
+                )
+        except Exception as exc:
+            logger.error("Background reflection failed for session %s: %s", session_id, exc, exc_info=True)
+
+    async def _run_background_chat_stream(
+        session_id: str,
+        current_user: User,
+        content: str,
+        auto_approve_writes: bool,
+        queue: asyncio.Queue,
+        agent_id: str = "",
+        agent_name: str = "",
+        is_first_turn: bool = False,
+    ):
+        try:
+            async with AsyncSessionLocal() as bg_sess:
+                bg_container = get_container(bg_sess)
+                bg_stream_uc = bg_container[pres_deps.get_process_chat_turn_use_case]
+                final_event = None
+                async for event in bg_stream_uc.execute_stream(
+                    session_id=session_id,
+                    current_user=current_user,
+                    content=content,
+                    auto_approve_writes=auto_approve_writes,
+                ):
+                    if event.get("type") == "done":
+                        final_event = event
+                    await queue.put(event)
+
+                if final_event:
+                    bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
+                    try:
+                        await bg_reflect_uc.execute(
+                            session_id=session_id,
+                            user_id=current_user.id,
+                            username=current_user.username,
+                            agent_id=agent_id or final_event.get("agent_id", ""),
+                            agent_name=agent_name or final_event.get("agent_name", ""),
+                            user_message=content,
+                            assistant_message=final_event.get("assistant_content", ""),
+                            is_secret_session=final_event.get("is_secret", False),
+                            is_turn_secret=final_event.get("is_turn_secret", False),
+                            is_first_turn=is_first_turn,
+                        )
+                    except Exception as ref_exc:
+                        logger.error("Background reflection in stream failed for session %s: %s", session_id, ref_exc, exc_info=True)
+        except Exception as exc:
+            logger.error("Background chat stream failed for session %s: %s", session_id, exc, exc_info=True)
+            await queue.put({"type": "error", "error": str(exc)})
+        finally:
+            await queue.put(None)
+
 
     return {
         # Auth
@@ -335,7 +393,9 @@ def get_container(session: AsyncSession):
         pres_deps.get_process_chat_turn_use_case: chat_turn_uc,
         pres_deps.get_reflect_turn_use_case: reflect_turn_uc,
         pres_deps.get_background_reflection_runner: _run_background_reflection,
+        pres_deps.get_background_chat_stream_runner: _run_background_chat_stream,
         pres_deps.get_llm_client: _ollama_connector,
+
 
         # Lifecycle & Background Maintenance
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
@@ -414,8 +474,10 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_process_chat_turn_use_case,
         pres_deps.get_reflect_turn_use_case,
         pres_deps.get_background_reflection_runner,
+        pres_deps.get_background_chat_stream_runner,
         pres_deps.get_llm_client,
     ]:
+
         def make_provider(target_stub):
             async def provider(container: dict = Depends(get_request_container)):
                 return container[target_stub]
