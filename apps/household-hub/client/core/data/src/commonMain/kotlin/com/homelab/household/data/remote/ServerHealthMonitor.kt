@@ -23,8 +23,13 @@ class ServerHealthMonitor(
         return try {
             val response = client.get("$baseUrl/api/v1/health")
             if (response.status.isSuccess()) {
-                val latency = mark.elapsedNow().inWholeMilliseconds
-                ServerStatus.Online(latencyMs = latency)
+                val dto = response.body<HealthCheckDto>()
+                if (dto.status.equals("ok", ignoreCase = true)) {
+                    val latency = mark.elapsedNow().inWholeMilliseconds
+                    ServerStatus.Online(latencyMs = latency)
+                } else {
+                    ServerStatus.Offline(reason = "Degraded status: ${dto.status}")
+                }
             } else {
                 ServerStatus.Offline(reason = "HTTP ${response.status.value}")
             }

@@ -61,4 +61,24 @@ class ServerHealthMonitorTest {
         val offline = status as ServerStatus.Offline
         assertTrue(offline.reason.contains("Connection refused") || offline.reason.isNotEmpty())
     }
+
+    @Test
+    fun check_health_when_captive_portal_html_or_degraded_status_emits_offline() = runTest {
+        val mockEngine = MockEngine {
+            respond(
+                content = "<html>Captive Portal Login</html>",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "text/html")
+            )
+        }
+
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) { json(json) }
+        }
+
+        val monitor = ServerHealthMonitor(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val status = monitor.checkHealth()
+
+        assertTrue(status is ServerStatus.Offline)
+    }
 }
