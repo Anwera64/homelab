@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     
     # Business Logic Rules
     AGENT_DELETE_GRACE_DAYS: int = 7
+
+    # Integration Settings
+    SEARXNG_BASE_URL: str = "http://searxng:8080"
+    SEARCH_TIMEOUT_SECONDS: float = 8.0
+    SEARCH_CACHE_TTL_SECONDS: int = 900
+    SEARXNG_CACHE_MAX_ENTRIES: int = 500
+    CALENDAR_TIMEOUT_SECONDS: float = 10.0
+    CALENDAR_ALLOW_AGENT_DELETE: bool = True
+    PDF_PARSER_TIMEOUT_SECONDS: float = 30.0
+    MAX_PDF_SIZE_BYTES: int = 25 * 1024 * 1024
+    MAX_PDF_PAGES: int = 150
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["*"]

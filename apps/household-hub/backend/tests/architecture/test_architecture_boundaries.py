@@ -59,6 +59,12 @@ def test_domain_has_zero_external_dependencies():
         "sqlalchemy",
         "pydantic",
         "aiosqlite",
+        "caldav",
+        "icalendar",
+        "fitz",
+        "pymupdf",
+        "cryptography",
+        "httpx",
     )
 
     violations = []

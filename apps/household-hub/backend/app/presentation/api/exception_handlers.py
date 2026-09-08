@@ -11,6 +11,13 @@ from app.domain.exceptions import (
     TrashGracePeriodException,
     SecretModeViolationException,
     InvalidOperationException,
+    CalendarIntegrationException,
+    CalendarAuthException,
+    SearchServiceException,
+    DocumentParsingException,
+    ToolNotFoundException,
+    ToolPermissionDeniedException,
+    SecretDecryptionException,
 )
 
 
@@ -70,6 +77,55 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(CalendarAuthException)
+    async def calendar_auth_handler(request: Request, exc: CalendarAuthException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(CalendarIntegrationException)
+    async def calendar_integration_handler(request: Request, exc: CalendarIntegrationException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ToolPermissionDeniedException)
+    async def tool_permission_handler(request: Request, exc: ToolPermissionDeniedException):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ToolNotFoundException)
+    async def tool_not_found_handler(request: Request, exc: ToolNotFoundException):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(DocumentParsingException)
+    async def document_parsing_handler(request: Request, exc: DocumentParsingException):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(SearchServiceException)
+    async def search_service_handler(request: Request, exc: SearchServiceException):
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(SecretDecryptionException)
+    async def secret_decryption_handler(request: Request, exc: SecretDecryptionException):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Stored credentials could not be decrypted. Please reconfigure your calendar."},
         )
 
     @app.exception_handler(DomainException)

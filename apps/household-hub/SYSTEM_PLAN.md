@@ -160,8 +160,9 @@ We will proceed through the build in modular, sequential stages. Before touching
 1. **Stage 1: Backend Foundation, Spaces, Dynamic Agent Catalog & Memory Engine** `[COMPLETED ✅]`
    * Core FastAPI service following Clean Architecture (`presentation -> domain <- data`, `bootstrap` DI), multi-user identity (first-run onboarding with distributed mutex & admin provisioning), strict zero-leak personal & shared space data models with Bento widgets, dynamic agent catalog with 2 baseline models (`researcher`, `assistant`), ownership permissions with 7-day undo grace period, autonomous background purger, inactive agent suspension, cascading session archival, and long-term memory engine with user audit/revoke. 70 automated tests (100% pass) with AST boundary enforcement.
    * Documented baseline: [`docs/STAGE_1_BASELINE.md`](./docs/STAGE_1_BASELINE.md)
-2. **Stage 2: Pluggable Integrations Engine**
-   * Connector interfaces for Google Calendar, Apple CalDAV, SearXNG search, and PDF extraction.
+2. **Stage 2: Pluggable Integrations Engine** `[COMPLETED ✅]`
+   * Pluggable CalDAV calendar integration (Apple iCloud, Google Calendar, self-hosted) with Fernet AES-256 encrypted credentials, atomic in-place updates, SSRF prevention, and graceful token recovery; SearXNG private search client with persistent connection pooling, bounded LRU caching (max 500 entries), and freshness bypass; PyMuPDF structured document reader with chunked streaming upload validation (64KB chunks) and scanned PDF rejection; SQLite document store with versioning and Markdown export; zero-trust mandatory session binding and server-authoritative Secret Mode external tool lock; uniform tool execution dispatcher. 107 automated tests (100% pass) with AST boundary enforcement.
+   * Documented baseline: [`docs/STAGE_2_BASELINE.md`](./docs/STAGE_2_BASELINE.md)
 3. **Stage 3: AI Inference, Tool Execution, Autonomous Memory & Gossip Bus**
    * Local Ollama streaming integration (`qwen3:14b`), agent tool-calling pipeline, autonomous memory reflection & dynamic context injection, and the shared milestone gossip bus.
 4. **Stage 4: KMP Shared Client Core**

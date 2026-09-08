@@ -47,6 +47,24 @@ from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
 
+from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
+from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
+from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
+from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
+from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
+from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
+from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
+from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
+from app.domain.use_cases.integrations.manage_documents import (
+    SaveDocumentUseCase,
+    GetDocumentUseCase,
+    ListDocumentsUseCase,
+    DeleteDocumentUseCase,
+)
+from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
+
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
     auto_error=False,
@@ -159,6 +177,51 @@ def get_update_memory_use_case() -> UpdateMemoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_delete_memory_use_case() -> DeleteMemoryUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_configure_calendar_use_case() -> ConfigureCalendarUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_user_calendar_use_case() -> GetUserCalendarUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_delete_calendar_use_case() -> DeleteCalendarUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_calendar_events_use_case() -> GetCalendarEventsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_create_calendar_event_use_case() -> CreateCalendarEventUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_update_calendar_event_use_case() -> UpdateCalendarEventUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_delete_calendar_event_use_case() -> DeleteCalendarEventUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_execute_search_use_case() -> ExecuteSearchUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_parse_pdf_document_use_case() -> ParsePdfDocumentUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_save_document_use_case() -> SaveDocumentUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_document_use_case() -> GetDocumentUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_documents_use_case() -> ListDocumentsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_delete_document_use_case() -> DeleteDocumentUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_available_tools_use_case() -> ListAvailableToolsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_execute_tool_use_case() -> ExecuteToolUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 

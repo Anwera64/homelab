@@ -43,3 +43,55 @@ class SecretModeViolationException(DomainException):
 class InvalidOperationException(DomainException):
     """Raised when a domain operation is invalid under current state."""
     pass
+
+
+# Integration Exceptions
+class CalendarIntegrationException(DomainException):
+    """Base exception for calendar operations."""
+    pass
+
+
+class CalendarAuthException(CalendarIntegrationException):
+    """Raised when CalDAV authentication fails."""
+    pass
+
+
+class SearchServiceException(DomainException):
+    """Raised when SearXNG query fails or times out."""
+    pass
+
+
+class DocumentParsingException(DomainException):
+    """Raised when a document cannot be parsed."""
+    pass
+
+
+class ScannedPdfException(DocumentParsingException):
+    """Raised when a PDF has zero text characters (pure raster scan)."""
+    pass
+
+
+class DocumentNotFoundException(EntityNotFoundException):
+    """Raised when a stored document is not found."""
+    pass
+
+
+class ToolNotFoundException(DomainException):
+    """Raised when an unknown tool is requested."""
+    pass
+
+
+class ToolPermissionDeniedException(DomainException):
+    """Raised when an agent or session lacks permission for a tool."""
+    pass
+
+
+class SecretModeLockException(ToolPermissionDeniedException):
+    """Raised when external write tools are invoked inside a Secret Mode session."""
+    pass
+
+
+class SecretDecryptionException(DomainException):
+    """Raised when stored encrypted secrets cannot be decrypted (e.g. invalid token, key mismatch)."""
+    pass
+

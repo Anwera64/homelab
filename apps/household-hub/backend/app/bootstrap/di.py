@@ -12,6 +12,8 @@ from app.data.datasources.agent_data_source import SqliteAgentDataSource
 from app.data.datasources.session_data_source import SqliteSessionDataSource
 from app.data.datasources.memory_data_source import SqliteMemoryDataSource
 from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
+from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
+from app.data.datasources.document_data_source import SqliteDocumentDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -20,6 +22,8 @@ from app.data.mappers.agent_data_mapper import AgentDataMapper
 from app.data.mappers.session_data_mapper import SessionDataMapper
 from app.data.mappers.memory_data_mapper import MemoryDataMapper
 from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
+from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
+from app.data.mappers.document_data_mapper import DocumentDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -28,10 +32,18 @@ from app.data.repositories.agent_repository_impl import AgentRepositoryImpl
 from app.data.repositories.session_repository_impl import SessionRepositoryImpl
 from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
 from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
+from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
+from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
+
+# Connectors
+from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
+from app.data.connectors.pymupdf_document_reader import PyMuPDFDocumentReader
+from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
 
 # Security & Persistence
 from app.data.security.bcrypt_hasher import BcryptPasswordHasher
 from app.data.security.jwt_token_service import JwtTokenService
+from app.data.security.secret_cipher_impl import SecretCipherImpl
 from app.data.persistence.unit_of_work import SqliteUnitOfWork
 
 # Domain Use Cases
@@ -78,6 +90,25 @@ from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
 
+# Integration Use Cases
+from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
+from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
+from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
+from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
+from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
+from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
+from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
+from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
+from app.domain.use_cases.integrations.manage_documents import (
+    SaveDocumentUseCase,
+    GetDocumentUseCase,
+    ListDocumentsUseCase,
+    DeleteDocumentUseCase,
+)
+from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
+
 # Singletons for stateless services
 _password_hasher = BcryptPasswordHasher()
 _jwt_token_service = JwtTokenService(
@@ -93,6 +124,17 @@ _agent_mapper = AgentDataMapper()
 _session_mapper = SessionDataMapper()
 _memory_mapper = MemoryDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
+_calendar_cred_mapper = CalendarCredentialDataMapper()
+_document_mapper = DocumentDataMapper()
+
+_secret_cipher = SecretCipherImpl(secret_key=settings.SECRET_KEY)
+_searxng_connector = SearXNGSearchConnector(
+    base_url=settings.SEARXNG_BASE_URL,
+    cache_ttl_seconds=settings.SEARCH_CACHE_TTL_SECONDS,
+    max_cache_entries=settings.SEARXNG_CACHE_MAX_ENTRIES,
+)
+_document_reader = PyMuPDFDocumentReader()
+_caldav_connector = CalDavCalendarConnector()
 
 
 async def get_db_session():
@@ -108,6 +150,8 @@ def get_container(session: AsyncSession):
     session_ds = SqliteSessionDataSource(session)
     memory_ds = SqliteMemoryDataSource(session)
     system_setting_ds = SqliteSystemSettingDataSource(session)
+    calendar_cred_ds = SqliteCalendarCredentialDataSource(session)
+    document_ds = SqliteDocumentDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
@@ -115,6 +159,8 @@ def get_container(session: AsyncSession):
     session_repo = SessionRepositoryImpl(session_ds, _session_mapper)
     memory_repo = MemoryRepositoryImpl(memory_ds, _memory_mapper)
     system_setting_repo = SystemSettingRepositoryImpl(system_setting_ds, _system_setting_mapper)
+    calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
+    document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
 
     uow = SqliteUnitOfWork(session)
 
@@ -165,6 +211,32 @@ def get_container(session: AsyncSession):
         pres_deps.get_create_memory_use_case: CreateMemoryUseCase(memory_repo, session_repo, agent_repo, uow),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow),
         pres_deps.get_delete_memory_use_case: DeleteMemoryUseCase(memory_repo, uow),
+
+        # Integrations
+        pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, uow),
+        pres_deps.get_user_calendar_use_case: GetUserCalendarUseCase(calendar_cred_repo),
+        pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
+        pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
+        pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
+        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
+        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
+        pres_deps.get_execute_search_use_case: ExecuteSearchUseCase(_searxng_connector),
+        pres_deps.get_parse_pdf_document_use_case: ParsePdfDocumentUseCase(_document_reader, max_size_bytes=settings.MAX_PDF_SIZE_BYTES),
+        pres_deps.get_save_document_use_case: SaveDocumentUseCase(document_repo, uow),
+        pres_deps.get_document_use_case: GetDocumentUseCase(document_repo),
+        pres_deps.get_list_documents_use_case: ListDocumentsUseCase(document_repo),
+        pres_deps.get_delete_document_use_case: DeleteDocumentUseCase(document_repo, uow),
+        pres_deps.get_list_available_tools_use_case: ListAvailableToolsUseCase(),
+        pres_deps.get_execute_tool_use_case: ExecuteToolUseCase(
+            calendar_repo=calendar_cred_repo,
+            calendar_connector=_caldav_connector,
+            search_connector=_searxng_connector,
+            document_repo=document_repo,
+            document_reader=_document_reader,
+            cipher=_secret_cipher,
+            uow=uow,
+            allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
+        ),
 
         # Lifecycle & Background Maintenance
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
@@ -220,6 +292,21 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_create_memory_use_case,
         pres_deps.get_update_memory_use_case,
         pres_deps.get_delete_memory_use_case,
+        pres_deps.get_configure_calendar_use_case,
+        pres_deps.get_user_calendar_use_case,
+        pres_deps.get_delete_calendar_use_case,
+        pres_deps.get_calendar_events_use_case,
+        pres_deps.get_create_calendar_event_use_case,
+        pres_deps.get_update_calendar_event_use_case,
+        pres_deps.get_delete_calendar_event_use_case,
+        pres_deps.get_execute_search_use_case,
+        pres_deps.get_parse_pdf_document_use_case,
+        pres_deps.get_save_document_use_case,
+        pres_deps.get_document_use_case,
+        pres_deps.get_list_documents_use_case,
+        pres_deps.get_delete_document_use_case,
+        pres_deps.get_list_available_tools_use_case,
+        pres_deps.get_execute_tool_use_case,
     ]:
         def make_provider(target_stub):
             async def provider(container: dict = Depends(get_request_container)):
