@@ -76,7 +76,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins if origins != ["*"] else ["*"],
+        allow_origins=origins,
+        allow_origin_regex=r"^https://([a-zA-Z0-9-]+\.)?spicy-llama\.duckdns\.org$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

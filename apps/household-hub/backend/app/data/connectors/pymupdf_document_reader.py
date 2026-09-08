@@ -2,7 +2,7 @@ import asyncio
 import io
 import re
 from typing import List, Tuple
-import fitz  # PyMuPDF
+import pymupdf as fitz
 
 from app.domain.entities.document import DocumentMetadata, DocumentSection, ParsedDocument
 from app.domain.exceptions import DocumentParsingException, ScannedPdfException

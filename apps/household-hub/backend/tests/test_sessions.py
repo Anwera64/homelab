@@ -516,6 +516,49 @@ async def test_chat_turn_agent_provenance(client: httpx.AsyncClient, monkeypatch
         app.dependency_overrides.pop(pres_deps.get_background_reflection_runner, None)
 
 
+@pytest.mark.asyncio
+async def test_chat_turn_llm_inference_exception_returns_502_or_504(client: httpx.AsyncClient, monkeypatch):
+    from app.bootstrap.di import _ollama_connector
+    from app.domain.exceptions import LLMInferenceException
+
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "LLM Error Mapping Test"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    # 1. Connection error / generic LLM failure -> 502 Bad Gateway
+    async def fake_chat_502(*args, **kwargs):
+        raise LLMInferenceException("Failed to connect to LLM at http://127.0.0.1:11434: Connection refused")
+
+    monkeypatch.setattr(_ollama_connector, "chat_completion", fake_chat_502)
+
+    resp_502 = await client.post(
+        f"/api/v1/sessions/{session_id}/chat",
+        json={"content": "Hello!"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert resp_502.status_code == 502
+    assert "Failed to connect to LLM" in resp_502.json()["detail"]
+
+    # 2. Timeout error -> 504 Gateway Timeout
+    async def fake_chat_504(*args, **kwargs):
+        raise LLMInferenceException("LLM inference timed out: ReadTimeout")
+
+    monkeypatch.setattr(_ollama_connector, "chat_completion", fake_chat_504)
+
+    resp_504 = await client.post(
+        f"/api/v1/sessions/{session_id}/chat",
+        json={"content": "Hello again!"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert resp_504.status_code == 504
+    assert "timed out" in resp_504.json()["detail"]
+
+
 
 
 

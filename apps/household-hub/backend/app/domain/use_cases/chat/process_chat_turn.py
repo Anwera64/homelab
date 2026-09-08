@@ -346,16 +346,107 @@ class ProcessChatTurnUseCase:
         final_content_parts: List[str] = []
         iterations = 0
 
-        while iterations < self.max_iterations:
-            iterations += 1
+        if not agent_tools:
+            async for chunk in self.llm_client.stream_chat_completion(
+                messages=llm_messages,
+                model=agent.model_alias or "qwen3:14b",
+                temperature=agent.temperature,
+                top_p=agent.top_p,
+                tools=None,
+            ):
+                if chunk.delta_content:
+                    final_content_parts.append(chunk.delta_content)
+                    yield {"type": "delta", "content": chunk.delta_content}
+        else:
+            while iterations < self.max_iterations:
+                iterations += 1
 
-            if iterations == self.max_iterations:
-                llm_messages.append(
-                    LLMMessage(
-                        role="system",
-                        content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
+                if iterations == self.max_iterations:
+                    llm_messages.append(
+                        LLMMessage(
+                            role="system",
+                            content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
+                        )
                     )
+                    async for chunk in self.llm_client.stream_chat_completion(
+                        messages=llm_messages,
+                        model=agent.model_alias or "qwen3:14b",
+                        temperature=agent.temperature,
+                        top_p=agent.top_p,
+                        tools=None,
+                    ):
+                        if chunk.delta_content:
+                            final_content_parts.append(chunk.delta_content)
+                            yield {"type": "delta", "content": chunk.delta_content}
+                    break
+
+                resp = await self.llm_client.chat_completion(
+                    messages=llm_messages,
+                    model=agent.model_alias or "qwen3:14b",
+                    temperature=agent.temperature,
+                    top_p=agent.top_p,
+                    tools=agent_tools if agent_tools else None,
                 )
+
+                if not resp.tool_calls:
+                    if resp.content:
+                        final_content_parts.append(resp.content)
+                        yield {"type": "delta", "content": resp.content}
+                    break
+
+                llm_messages.append(
+                    LLMMessage(role="assistant", content=resp.content, tool_calls=resp.tool_calls)
+                )
+
+                for tc in resp.tool_calls:
+                    if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
+                        proposal_info = {
+                            "tool": tc.name,
+                            "status": "proposal_pending",
+                            "arguments": tc.arguments,
+                            "message": f"Action '{tc.name}' requires member confirmation.",
+                        }
+                        tools_executed.append(proposal_info)
+                        yield {"type": "tool_call", "data": proposal_info}
+                        llm_messages.append(
+                            LLMMessage(
+                                role="tool",
+                                tool_call_id=tc.id,
+                                name=tc.name,
+                                content=json.dumps(proposal_info),
+                            )
+                        )
+                    else:
+                        yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
+                        tool_result = await self.tool_executor.execute(
+                            tool_name=tc.name,
+                            arguments=tc.arguments,
+                            user_id=current_user.id,
+                            agent_tool_permissions=agent.tool_permissions,
+                            is_secret_mode=is_turn_secret,
+                            role="assistant",
+                        )
+                        exec_info = {
+                            "tool": tc.name,
+                            "success": tool_result.success,
+                            "arguments": tc.arguments,
+                            "data": tool_result.data,
+                            "error": tool_result.error,
+                        }
+                        tools_executed.append(exec_info)
+                        yield {"type": "tool_result", "data": exec_info}
+                        llm_messages.append(
+                            LLMMessage(
+                                role="tool",
+                                tool_call_id=tc.id,
+                                name=tc.name,
+                                content=json.dumps(
+                                    tool_result.data if tool_result.success else {"error": tool_result.error}
+                                ),
+                            )
+                        )
+
+                # After executing tools, stream final synthesis to the user
                 async for chunk in self.llm_client.stream_chat_completion(
                     messages=llm_messages,
                     model=agent.model_alias or "qwen3:14b",
@@ -367,72 +458,6 @@ class ProcessChatTurnUseCase:
                         final_content_parts.append(chunk.delta_content)
                         yield {"type": "delta", "content": chunk.delta_content}
                 break
-
-            resp = await self.llm_client.chat_completion(
-                messages=llm_messages,
-                model=agent.model_alias or "qwen3:14b",
-                temperature=agent.temperature,
-                top_p=agent.top_p,
-                tools=agent_tools if agent_tools else None,
-            )
-
-            if not resp.tool_calls:
-                if resp.content:
-                    final_content_parts.append(resp.content)
-                    yield {"type": "delta", "content": resp.content}
-                break
-
-            llm_messages.append(
-                LLMMessage(role="assistant", content=resp.content, tool_calls=resp.tool_calls)
-            )
-
-            for tc in resp.tool_calls:
-                if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
-                    proposal_info = {
-                        "tool": tc.name,
-                        "status": "proposal_pending",
-                        "arguments": tc.arguments,
-                        "message": f"Action '{tc.name}' requires member confirmation.",
-                    }
-                    tools_executed.append(proposal_info)
-                    yield {"type": "tool_call", "data": proposal_info}
-                    llm_messages.append(
-                        LLMMessage(
-                            role="tool",
-                            tool_call_id=tc.id,
-                            name=tc.name,
-                            content=json.dumps(proposal_info),
-                        )
-                    )
-                else:
-                    yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
-                    tool_result = await self.tool_executor.execute(
-                        tool_name=tc.name,
-                        arguments=tc.arguments,
-                        user_id=current_user.id,
-                        agent_tool_permissions=agent.tool_permissions,
-                        is_secret_mode=is_turn_secret,
-                        role="assistant",
-                    )
-                    exec_info = {
-                        "tool": tc.name,
-                        "success": tool_result.success,
-                        "arguments": tc.arguments,
-                        "data": tool_result.data,
-                        "error": tool_result.error,
-                    }
-                    tools_executed.append(exec_info)
-                    yield {"type": "tool_result", "data": exec_info}
-                    llm_messages.append(
-                        LLMMessage(
-                            role="tool",
-                            tool_call_id=tc.id,
-                            name=tc.name,
-                            content=json.dumps(
-                                tool_result.data if tool_result.success else {"error": tool_result.error}
-                            ),
-                        )
-                    )
 
         final_content = "".join(final_content_parts)
 

@@ -18,6 +18,7 @@ from app.domain.exceptions import (
     ToolNotFoundException,
     ToolPermissionDeniedException,
     SecretDecryptionException,
+    LLMInferenceException,
 )
 
 
@@ -126,6 +127,19 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": "Stored credentials could not be decrypted. Please reconfigure your calendar."},
+        )
+
+    @app.exception_handler(LLMInferenceException)
+    async def llm_inference_handler(request: Request, exc: LLMInferenceException):
+        error_msg = str(exc)
+        if "timed out" in error_msg.lower():
+            return JSONResponse(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                content={"detail": error_msg},
+            )
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"detail": error_msg},
         )
 
     @app.exception_handler(DomainException)

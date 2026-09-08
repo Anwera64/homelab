@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     MAX_GOSSIP_SUMMARY_LENGTH: int = 250
     
     # CORS
-    CORS_ORIGINS: Union[List[str], str] = ["*"]
+    CORS_ORIGINS: Union[List[str], str] = ["https://spicy-llama.duckdns.org"]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

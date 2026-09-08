@@ -52,18 +52,28 @@ class FakeAgentRepository:
 
 
 class FakeLLMClient:
-    def __init__(self, responses=None):
+    def __init__(self, responses=None, stream_chunks_list=None):
         # responses is a list of LLMResponse objects to return sequentially
         self.responses = list(responses or [])
+        self.stream_chunks_list = list(stream_chunks_list or [])
+        self.chat_calls = []
+        self.stream_calls = []
 
     async def chat_completion(self, messages, model, temperature=0.7, top_p=0.9, tools=None):
+        self.chat_calls.append({"messages": messages, "model": model, "tools": tools})
         if self.responses:
             return self.responses.pop(0)
         return LLMResponse(content="Default response")
 
     async def stream_chat_completion(self, messages, model, temperature=0.7, top_p=0.9, tools=None):
-        resp = await self.chat_completion(messages, model, temperature, top_p, tools)
-        yield LLMResponseChunk(delta_content=resp.content, tool_calls=resp.tool_calls)
+        self.stream_calls.append({"messages": messages, "model": model, "tools": tools})
+        if self.stream_chunks_list:
+            chunks = self.stream_chunks_list.pop(0)
+            for chunk in chunks:
+                yield chunk
+        else:
+            resp = await self.chat_completion(messages, model, temperature, top_p, tools)
+            yield LLMResponseChunk(delta_content=resp.content, tool_calls=resp.tool_calls)
 
 
 class FakeContextAssembler:
@@ -231,3 +241,106 @@ async def test_process_chat_turn_write_tool_confirmation():
     assert len(tool_executor.executed_calls) == 0  # Not executed directly
     assert len(result.tools_executed) == 1
     assert result.tools_executed[0]["status"] == "proposal_pending"
+
+
+@pytest.mark.asyncio
+async def test_execute_stream_progressive_token_streaming_no_tools():
+    user = User(id="u1", username="alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    agent_repo = FakeAgentRepository(agents=[agent])
+    stream_chunks = [
+        LLMResponseChunk(delta_content="Hello "),
+        LLMResponseChunk(delta_content="there, "),
+        LLMResponseChunk(delta_content="friend!"),
+    ]
+    llm_client = FakeLLMClient(stream_chunks_list=[stream_chunks])
+    tool_executor = FakeToolExecutor()
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=agent_repo,
+        llm_client=llm_client,
+        context_assembler=FakeContextAssembler(),
+        tool_executor=tool_executor,
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev
+        async for ev in use_case.execute_stream(
+            session_id="s1", current_user=user, content="Hello"
+        )
+    ]
+
+    # Verify no blocking chat_completion was called when agent has no tools
+    assert len(llm_client.chat_calls) == 0
+    assert len(llm_client.stream_calls) == 1
+
+    # Verify progressive deltas were emitted
+    delta_contents = [ev["content"] for ev in events if ev["type"] == "delta"]
+    assert delta_contents == ["Hello ", "there, ", "friend!"]
+
+    # Verify done event and persistence
+    done_ev = [ev for ev in events if ev["type"] == "done"][0]
+    assert done_ev["assistant_content"] == "Hello there, friend!"
+    assert session_repo.messages[-1].content == "Hello there, friend!"
+
+
+@pytest.mark.asyncio
+async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
+    user = User(id="u1", username="alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    agent_repo = FakeAgentRepository(agents=[agent])
+
+    # Turn 1: chat_completion triggers tool call
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "today"})
+    resp1 = LLMResponse(content="", tool_calls=[tc])
+
+    # Synthesis: streamed chunks after tool result
+    stream_chunks = [
+        LLMResponseChunk(delta_content="You "),
+        LLMResponseChunk(delta_content="have "),
+        LLMResponseChunk(delta_content="2 meetings."),
+    ]
+    llm_client = FakeLLMClient(responses=[resp1], stream_chunks_list=[stream_chunks])
+    tool_executor = FakeToolExecutor()
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=agent_repo,
+        llm_client=llm_client,
+        context_assembler=FakeContextAssembler(),
+        tool_executor=tool_executor,
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev
+        async for ev in use_case.execute_stream(
+            session_id="s1", current_user=user, content="Check my calendar"
+        )
+    ]
+
+    # Tool call detection used chat_completion
+    assert len(llm_client.chat_calls) == 1
+    # Synthesis used stream_chat_completion with tools=None
+    assert len(llm_client.stream_calls) == 1
+    assert llm_client.stream_calls[0]["tools"] is None
+
+    # Events sequence: tool_executing, tool_result, deltas, done
+    types = [ev["type"] for ev in events]
+    assert "tool_executing" in types
+    assert "tool_result" in types
+    deltas = [ev["content"] for ev in events if ev["type"] == "delta"]
+    assert deltas == ["You ", "have ", "2 meetings."]
+    done_ev = [ev for ev in events if ev["type"] == "done"][0]
+    assert done_ev["assistant_content"] == "You have 2 meetings."
+
