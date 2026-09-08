@@ -1,8 +1,9 @@
 # Household Hub: Stage 1 Architecture Baseline
 
 **Status:** ✅ Hardened & Fully Tested (TDD)  
-**Test Suite:** 41 passing tests, 91% code coverage  
+**Test Suite:** 47 passing tests, 92% code coverage  
 **Date:** September 2026
+
 
 
 ---
@@ -116,11 +117,16 @@ erDiagram
 * **Status Check:** `GET /api/v1/auth/status` indicates whether the hub has been initialized (`member_count == 0`).
 * **Admin Onboarding:** `POST /api/v1/auth/register-initial` provisions the first registered user as `is_admin=True`, creates their personal space, and initializes the shared hub. Once created, all future calls to `register-initial` are rejected (`400 Bad Request`).
 * **Member Provisioning:** `POST /api/v1/users` is restricted to the Admin (`is_admin=True`). Regular members attempting to add users receive `403 Forbidden`.
-* **Member Deletion & Agent Inheritance (`DELETE /api/v1/users/{id}`):**
+* **Member Deletion & Knowledge Inheritance (`DELETE /api/v1/users/{id}`):**
   * Protected by admin permissions (`get_current_admin_user`).
   * Sole administrator accounts cannot be deleted (`400 Bad Request`).
   * When a member is deleted, their private personal space and personal memories are permanently removed (strict Zero-Leak).
-  * Custom AI agent personalities authored by the deleted user are cleanly reassigned to the household admin instead of being orphaned or cascade-deleted.
+  * Custom AI agent personalities and shared household memories (`scope == "household"`) authored by the deleted user are cleanly reassigned to the household admin instead of being orphaned or cascade-deleted.
+* **Self-Service Profile & Password Updates (`PATCH /api/v1/users/me`):** Authenticated users can update their `full_name`, `avatar_color`, and securely change their `password`.
+* **Input Validation & Sanitization:**
+  * Usernames enforce regex `^[a-zA-Z0-9_.-]+$` with 3-64 character length.
+  * Emails enforce standard RFC-compliant email regex with 5-255 character length.
+  * Full names enforce 1-128 character bounds.
 * **Login & Timing Attack Defense:** `POST /api/v1/auth/login` accepts direct JSON credentials and verifies password hashes using `bcrypt` (12 rounds). If a username does not exist in the database, the endpoint verifies the submitted password against a pre-computed dummy hash to guarantee constant-time execution and prevent user enumeration timing attacks.
 * **Password Guardrails:** Passwords enforce 8-72 character limits, preventing weak passwords and bcrypt buffer overflow/truncation.
 * **Production Security Validator:** In `ENVIRONMENT == "production"`, `Settings` refuses to start with default insecure keys or keys under 32 characters.
@@ -142,6 +148,7 @@ erDiagram
 * **Catalog Guardrails:**
   * Slugs enforce lowercase alphanumeric characters with hyphens and underscores (`^[a-z0-9]+(?:[-_][a-z0-9]+)*$`).
   * Model inference parameters enforce strict boundaries: `temperature` $\in [0.0, 2.0]$, `top_p` $\in [0.0, 1.0]$.
+  * Tool permissions enforce strict validation against the defined homelab capabilities set (`calendar_read`, `calendar_write`, `searxng_search`, `pdf_reader`, `document_writer`). Unrecognized tools are rejected (`422 Unprocessable Entity`).
 * **Ownership Enforcement:** Custom models record `owner_id`. Only the creator can edit or delete their model.
 * **7-Day Soft-Delete, Purge & Slug Reuse:**
   * Calling `DELETE /api/v1/agents/{id}` marks `deleted_at = now()` and hides the model from active listings.
@@ -154,6 +161,8 @@ erDiagram
 ### 3.4 Conversation Sessions, Secret Mode & Archived State
 * **Session Threads (`/api/v1/sessions`):** Private conversation threads linked to specific agent personalities.
 * **Archived Non-Interactive Sessions:** When an agent is permanently purged, user sessions are preserved with `is_archived: true` and `agent_id: null`. Users can review their complete conversation history, but posting new messages to an archived session is rejected (`400 Bad Request`).
+* **Trash Grace Period Chat Guard:** If an agent is in the 7-day trash grace period, posting messages to existing sessions is rejected (`400 Bad Request`) until the agent is restored.
+* **Bounded Message Retrieval & Pagination:** `GET /api/v1/sessions/{session_id}` supports `limit` (default 50, bounded 1 to 100) and `before_id` cursor pagination, protecting the application against memory exhaustion on long-running conversation threads.
 * **Chat Message Schema Validation:** Enforces valid roles (`role: Literal["user", "assistant", "system"]`) and non-empty content (`min_length=1`).
 * **Session Timestamp Bumping:** Appending any `ChatMessage` immediately touches and refreshes `ConversationSession.updated_at`, keeping active threads at the top of the user's conversation list.
 * **Deterministic Message Ordering:** `ConversationSession.messages` explicitly orders records by `ChatMessage.created_at.asc()`.
@@ -179,12 +188,13 @@ Tests are implemented with `pytest`, `pytest-asyncio`, and an isolated in-memory
 | :--- | :--- | :--- | :--- |
 | `test_health.py` | Health & Engine | DB connectivity, app version | ✅ 1 passed |
 | `test_auth.py` | Identity & Roles | First-run wizard, JWT, admin member provisioning, 403 checks, password limits, production security, constant-time login timing attack defense | ✅ 9 passed |
-| `test_users.py` | User Deletion & Lifecycle | Admin deletes member, reassigns custom agents to admin, purges personal space, sole admin protection, multi-admin deletion | ✅ 3 passed |
+| `test_users.py` | User Deletion & Lifecycle | Admin deletes member, reassigns custom agents & household memories to admin, purges personal space & personal memories, sole admin protection, multi-admin deletion, self-service profile/password update, input validation bounds | ✅ 6 passed |
 | `test_spaces.py` | Spaces & Concurrency | Shared hub, Bento widgets, strict Zero-Leak 403 isolation, non-locking read optimization, collaborative member updates | ✅ 5 passed |
-| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration, slug reuse, trash purge, slug regex validation, inference parameter bounds | ✅ 9 passed |
-| `test_sessions.py` | Sessions & Archival | Session lifecycle, messages, Secret Mode toggle, owner isolation, updated_at bumping, message ordering, purged agent session archival, non-interactive archived sessions, message role/content validation | ✅ 6 passed |
+| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration, slug reuse, trash purge, slug regex validation, inference parameter bounds, tool permissions allowlist | ✅ 10 passed |
+| `test_sessions.py` | Sessions & Archival | Session lifecycle, messages, Secret Mode toggle, owner isolation, updated_at bumping, message ordering, purged agent session archival, non-interactive archived sessions, trashed agent message guard, message pagination & bounds, message role/content validation | ✅ 8 passed |
 | `test_memories.py` | Agent Memory & Privacy | Personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, secret mode block, admin household curation, agent_id 404 validation, confidence range bounds | ✅ 8 passed |
-| **Total** | **41 tests** | **End-to-End API contracts across 5 TDD cycles** | **✅ 100% Pass (91% coverage)** |
+| **Total** | **47 tests** | **End-to-End API contracts across 10 TDD cycles** | **✅ 100% Pass (92% coverage)** |
+
 
 
 ---

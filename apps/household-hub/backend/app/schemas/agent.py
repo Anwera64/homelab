@@ -1,6 +1,15 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+ALLOWED_TOOL_PERMISSIONS = {
+    "calendar_read",
+    "calendar_write",
+    "searxng_search",
+    "pdf_reader",
+    "document_writer",
+}
 
 
 class AgentBase(BaseModel):
@@ -12,6 +21,15 @@ class AgentBase(BaseModel):
     temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(0.9, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = []
+
+    @field_validator("tool_permissions")
+    @classmethod
+    def validate_tools(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is not None:
+            for tool in v:
+                if tool not in ALLOWED_TOOL_PERMISSIONS:
+                    raise ValueError(f"Invalid tool permission '{tool}'. Allowed: {sorted(ALLOWED_TOOL_PERMISSIONS)}")
+        return v
 
 
 class AgentCreate(AgentBase):
@@ -28,6 +46,16 @@ class AgentUpdate(BaseModel):
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = None
     is_active: Optional[bool] = None
+
+    @field_validator("tool_permissions")
+    @classmethod
+    def validate_tools(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is not None:
+            for tool in v:
+                if tool not in ALLOWED_TOOL_PERMISSIONS:
+                    raise ValueError(f"Invalid tool permission '{tool}'. Allowed: {sorted(ALLOWED_TOOL_PERMISSIONS)}")
+        return v
+
 
 
 class AgentRead(AgentBase):

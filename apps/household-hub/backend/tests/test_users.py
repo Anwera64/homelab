@@ -121,3 +121,142 @@ async def test_delete_admin_when_secondary_admin_exists(client: httpx.AsyncClien
     get_agent = await client.get(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {admin1_token}"})
     assert get_agent.status_code == 200
     assert get_agent.json()["owner_id"] == admin1_id
+
+
+@pytest.mark.asyncio
+async def test_delete_member_preserves_household_memories_and_purges_personal_memories(client: httpx.AsyncClient):
+    """
+    When an admin deletes a member:
+    1. Member's personal memories are permanently purged (Strict Zero-Leak).
+    2. Shared household memories are preserved and reassigned to the Admin.
+    """
+    # 1. Admin registers
+    admin_reg = await client.post(
+        "/api/v1/auth/register-initial",
+        json={"username": "admin", "email": "admin@homelab.local", "password": "Password123!", "full_name": "Admin"},
+    )
+    admin_token = admin_reg.json()["access_token"]
+    admin_id = admin_reg.json()["user"]["id"]
+
+    # 2. Admin creates member
+    await client.post(
+        "/api/v1/users",
+        json={"username": "member1", "email": "member1@homelab.local", "password": "Password123!", "full_name": "Member 1"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "member1", "password": "Password123!"},
+    )
+    member_token = login_resp.json()["access_token"]
+    member_id = login_resp.json()["user"]["id"]
+
+    # 3. Member creates a personal memory
+    p_resp = await client.post(
+        "/api/v1/memories",
+        json={"scope": "personal", "content": "My private secret note", "category": "preference"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert p_resp.status_code == 201
+    personal_mem_id = p_resp.json()["id"]
+
+    # 4. Member creates a household memory
+    h_resp = await client.post(
+        "/api/v1/memories",
+        json={"scope": "household", "content": "Household Wi-Fi is Homelab-5G", "category": "fact"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert h_resp.status_code == 201
+    household_mem_id = h_resp.json()["id"]
+
+    # 5. Admin deletes member
+    del_resp = await client.delete(f"/api/v1/users/{member_id}", headers={"Authorization": f"Bearer {admin_token}"})
+    assert del_resp.status_code == 200
+
+    # 6. Personal memory must be purged (Zero-Leak)
+    get_p = await client.get(f"/api/v1/memories/{personal_mem_id}", headers={"Authorization": f"Bearer {admin_token}"})
+    assert get_p.status_code == 404
+
+    # 7. Household memory must be preserved and reassigned to Admin
+    get_h = await client.get(f"/api/v1/memories/{household_mem_id}", headers={"Authorization": f"Bearer {admin_token}"})
+    assert get_h.status_code == 200
+    assert get_h.json()["user_id"] == admin_id
+    assert get_h.json()["content"] == "Household Wi-Fi is Homelab-5G"
+
+
+@pytest.mark.asyncio
+async def test_user_self_service_profile_and_password_update(client: httpx.AsyncClient):
+    """Authenticated user can update profile details and password via PATCH /api/v1/users/me."""
+    admin_reg = await client.post(
+        "/api/v1/auth/register-initial",
+        json={"username": "admin", "email": "admin@homelab.local", "password": "Password123!", "full_name": "Admin"},
+    )
+    admin_token = admin_reg.json()["access_token"]
+
+    await client.post(
+        "/api/v1/users",
+        json={"username": "member1", "email": "member1@homelab.local", "password": "Password123!", "full_name": "Member 1"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "member1", "password": "Password123!"},
+    )
+    member_token = login_resp.json()["access_token"]
+
+    # 1. Member updates their profile and password
+    patch_resp = await client.patch(
+        "/api/v1/users/me",
+        json={
+            "full_name": "Updated Member Name",
+            "avatar_color": "#10B981",
+            "password": "NewSecretPassword456!",
+        },
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert patch_resp.status_code == 200
+    updated_data = patch_resp.json()
+    assert updated_data["full_name"] == "Updated Member Name"
+    assert updated_data["avatar_color"] == "#10B981"
+
+    # 2. Login with old password fails
+    old_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "member1", "password": "Password123!"},
+    )
+    assert old_login.status_code == 401
+
+    # 3. Login with new password succeeds
+    new_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "member1", "password": "NewSecretPassword456!"},
+    )
+    assert new_login.status_code == 200
+    assert "access_token" in new_login.json()
+
+
+@pytest.mark.asyncio
+async def test_user_registration_input_validation_bounds(client: httpx.AsyncClient):
+    """User registration enforces email formatting, username pattern, and non-empty full_name."""
+    # 1. Invalid email (missing domain/at)
+    bad_email = await client.post(
+        "/api/v1/auth/register-initial",
+        json={"username": "admin", "email": "not-an-email", "password": "Password123!", "full_name": "Admin"},
+    )
+    assert bad_email.status_code == 422
+
+    # 2. Invalid username (spaces/symbols)
+    bad_user = await client.post(
+        "/api/v1/auth/register-initial",
+        json={"username": "admin user", "email": "admin@homelab.local", "password": "Password123!", "full_name": "Admin"},
+    )
+    assert bad_user.status_code == 422
+
+    # 3. Empty full_name
+    bad_name = await client.post(
+        "/api/v1/auth/register-initial",
+        json={"username": "admin", "email": "admin@homelab.local", "password": "Password123!", "full_name": ""},
+    )
+    assert bad_name.status_code == 422
+
+

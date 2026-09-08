@@ -369,3 +369,45 @@ async def test_agent_inference_parameter_ranges(client: httpx.AsyncClient):
     assert bad_top_p.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_agent_tool_permissions_validation(client: httpx.AsyncClient):
+    """Tool permissions must strictly come from the defined homelab capabilities set."""
+    _, member_token = await setup_users(client)
+
+    # 1. Valid tool permissions -> 201 Created
+    valid_resp = await client.post(
+        "/api/v1/agents",
+        json={
+            "slug": "valid-tools-agent",
+            "name": "Valid Agent",
+            "system_prompt": "Prompt",
+            "tool_permissions": ["searxng_search", "pdf_reader"],
+        },
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert valid_resp.status_code == 201
+    agent_id = valid_resp.json()["id"]
+
+    # 2. Invalid tool permission on create -> 422 Unprocessable Entity
+    invalid_create = await client.post(
+        "/api/v1/agents",
+        json={
+            "slug": "bad-tools-agent",
+            "name": "Bad Tools Agent",
+            "system_prompt": "Prompt",
+            "tool_permissions": ["arbitrary_unvetted_tool"],
+        },
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_create.status_code == 422
+
+    # 3. Invalid tool permission on update -> 422 Unprocessable Entity
+    invalid_update = await client.put(
+        f"/api/v1/agents/{agent_id}",
+        json={"tool_permissions": ["drop_database"]},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_update.status_code == 422
+
+
+

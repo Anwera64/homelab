@@ -320,3 +320,118 @@ async def test_chat_message_role_and_content_validation(client: httpx.AsyncClien
     assert empty_content.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_cannot_send_messages_when_agent_is_in_trash_grace_period(client: httpx.AsyncClient):
+    """Cannot post messages to a session while its agent is soft-deleted in trash."""
+    _, member_token, _ = await setup_environment(client)
+
+    # 1. Create agent and session
+    agent_resp = await client.post(
+        "/api/v1/agents",
+        json={"slug": "trashed_agent", "name": "Trashed Agent", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    agent_id = agent_resp.json()["id"]
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Chat with soon-to-be trashed agent"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    # 2. Soft-delete agent into 7-day trash
+    del_agent = await client.delete(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+    assert del_agent.status_code == 200
+
+    # 3. Posting message while agent is in trash must be rejected with 400 Bad Request
+    post_trash = await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": "Are you still there?"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert post_trash.status_code == 400
+    assert "trash" in post_trash.json()["detail"].lower()
+
+    # 4. Restore agent
+    restore_resp = await client.post(f"/api/v1/agents/{agent_id}/restore", headers={"Authorization": f"Bearer {member_token}"})
+    assert restore_resp.status_code == 200
+
+    # 5. Posting message now succeeds
+    post_restored = await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": "Welcome back!"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert post_restored.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_session_message_pagination_and_bounds(client: httpx.AsyncClient):
+    """
+    Session detail endpoint must support pagination bounds:
+    - Default limit of 50.
+    - Custom limit (1 to 100).
+    - 'before_id' cursor pagination to traverse message history backwards.
+    - Limits outside 1-100 return 422.
+    """
+    _, member_token, agent_id = await setup_environment(client)
+
+    # 1. Create session
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Pagination Chat"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    # 2. Post 12 messages
+    msg_ids = []
+    for i in range(12):
+        r = await client.post(
+            f"/api/v1/sessions/{session_id}/messages",
+            json={"role": "user", "content": f"Message {i}"},
+            headers={"Authorization": f"Bearer {member_token}"},
+        )
+        assert r.status_code == 201
+        msg_ids.append(r.json()["id"])
+
+    # 3. Query with limit=5 -> returns latest 5 messages (Message 7 to 11)
+    page1 = await client.get(
+        f"/api/v1/sessions/{session_id}?limit=5",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert page1.status_code == 200
+    p1_messages = page1.json()["messages"]
+    assert len(p1_messages) == 5
+    assert p1_messages[0]["content"] == "Message 7"
+    assert p1_messages[-1]["content"] == "Message 11"
+
+    # 4. Query with limit=5 and before_id=first message of page 1 (Message 7)
+    earliest_p1_id = p1_messages[0]["id"]
+    page2 = await client.get(
+        f"/api/v1/sessions/{session_id}?limit=5&before_id={earliest_p1_id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert page2.status_code == 200
+    p2_messages = page2.json()["messages"]
+    assert len(p2_messages) == 5
+    assert p2_messages[0]["content"] == "Message 2"
+    assert p2_messages[-1]["content"] == "Message 6"
+
+    # 5. Out of bounds limit (0 or > 100) -> 422
+    invalid_low = await client.get(
+        f"/api/v1/sessions/{session_id}?limit=0",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_low.status_code == 422
+
+    invalid_high = await client.get(
+        f"/api/v1/sessions/{session_id}?limit=101",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert invalid_high.status_code == 422
+
+
+
+

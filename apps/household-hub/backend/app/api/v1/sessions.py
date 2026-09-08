@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -67,18 +68,17 @@ async def create_session(
 @router.get("/{session_id}", response_model=SessionDetailRead)
 async def get_session(
     session_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    before_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get session details and message history.
     Strict Zero-Leak Privacy: Only the session owner can view this session.
+    Supports cursor pagination via 'limit' (1-100) and 'before_id'.
     """
-    stmt = (
-        select(ConversationSession)
-        .where(ConversationSession.id == session_id)
-        .options(selectinload(ConversationSession.messages))
-    )
+    stmt = select(ConversationSession).where(ConversationSession.id == session_id)
     result = await db.execute(stmt)
     session = result.scalars().first()
     if not session:
@@ -90,7 +90,34 @@ async def get_session(
             detail="Zero-Leak Privacy violation: You cannot access another member's conversation session.",
         )
 
-    return session
+    # Message query with cursor pagination
+    msg_stmt = select(ChatMessage).where(ChatMessage.session_id == session_id)
+    if before_id:
+        cursor_res = await db.execute(
+            select(ChatMessage.created_at).where(
+                (ChatMessage.id == before_id) & (ChatMessage.session_id == session_id)
+            )
+        )
+        cursor_created_at = cursor_res.scalar()
+        if cursor_created_at:
+            msg_stmt = msg_stmt.where(ChatMessage.created_at < cursor_created_at)
+
+    msg_stmt = msg_stmt.order_by(ChatMessage.created_at.desc()).limit(limit)
+    msg_res = await db.execute(msg_stmt)
+    messages = list(reversed(msg_res.scalars().all()))
+
+    return SessionDetailRead(
+        id=session.id,
+        user_id=session.user_id,
+        agent_id=session.agent_id,
+        title=session.title,
+        is_secret=session.is_secret,
+        is_archived=session.is_archived,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        messages=messages,
+    )
+
 
 
 @router.patch("/{session_id}/secret", response_model=SessionRead)
@@ -143,6 +170,17 @@ async def add_message(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot send messages to an archived conversation session.",
         )
+
+    agent_res = await db.execute(
+        select(AgentPersonality.deleted_at).where(AgentPersonality.id == session.agent_id)
+    )
+    agent_deleted_at = agent_res.scalar()
+    if agent_deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot send messages while the agent is in trash. Restore the agent to continue chatting.",
+        )
+
 
     message = ChatMessage(
         session_id=session.id,

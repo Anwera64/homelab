@@ -1,15 +1,18 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, delete
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, get_current_user, get_current_admin_user
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.agent import AgentPersonality
-from app.schemas.user import UserCreate, UserRead
+from app.models.memory import AgentMemory
+
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services.spaces_service import create_personal_space
+
 
 router = APIRouter(prefix="/users", tags=["Household Members"])
 
@@ -76,7 +79,28 @@ async def create_member(
     return build_user_read(user)
 
 
+@router.patch("/me", response_model=UserRead)
+async def update_my_profile(
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authenticated user updates their own profile details or password."""
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.avatar_color is not None:
+        current_user.avatar_color = payload.avatar_color
+    if payload.password is not None:
+        current_user.hashed_password = get_password_hash(payload.password)
+
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user, attribute_names=["personal_space"])
+    return build_user_read(current_user)
+
+
 @router.get("/{user_id}", response_model=UserRead)
+
 async def get_member(
     user_id: str,
     db: AsyncSession = Depends(get_db),
@@ -126,14 +150,25 @@ async def delete_member(
         )
         inheriting_admin = other_admin_res.scalars().first()
 
-    # Reassign custom agents to inheriting admin
+    # Reassign custom agents and household memories to inheriting admin
     if inheriting_admin:
         await db.execute(
             update(AgentPersonality)
             .where(AgentPersonality.owner_id == user.id)
             .values(owner_id=inheriting_admin.id)
         )
+        await db.execute(
+            update(AgentMemory)
+            .where((AgentMemory.user_id == user.id) & (AgentMemory.scope == "household"))
+            .values(user_id=inheriting_admin.id)
+        )
+
+    # Purge member's private personal memories (Strict Zero-Leak)
+    await db.execute(
+        delete(AgentMemory).where((AgentMemory.user_id == user.id) & (AgentMemory.scope == "personal"))
+    )
 
     await db.delete(user)
     await db.commit()
     return {"message": "Member account deleted successfully"}
+

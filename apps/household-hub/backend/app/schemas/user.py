@@ -3,11 +3,15 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+USERNAME_REGEX = r"^[a-zA-Z0-9_.-]+$"
+EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+
+
 class UserBase(BaseModel):
-    username: str
-    email: str
-    full_name: str
-    avatar_color: Optional[str] = "#4F46E5"
+    username: str = Field(..., min_length=3, max_length=64, pattern=USERNAME_REGEX)
+    email: str = Field(..., min_length=5, max_length=255, pattern=EMAIL_REGEX)
+    full_name: str = Field(..., min_length=1, max_length=128)
+    avatar_color: Optional[str] = Field("#4F46E5", min_length=4, max_length=32)
 
 
 class UserCreate(UserBase):
@@ -26,6 +30,7 @@ class UserRead(UserBase):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    avatar_color: Optional[str] = None
+    full_name: Optional[str] = Field(None, min_length=1, max_length=128)
+    avatar_color: Optional[str] = Field(None, min_length=4, max_length=32)
     password: Optional[str] = Field(None, min_length=8, max_length=72)
+
