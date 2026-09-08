@@ -111,11 +111,13 @@ erDiagram
 
 ## 3. Core Operational Contracts
 
-### 3.1 First-Run Wizard & Authentication
+### 3.1 First-Run Wizard, Authentication & Security Hardening
 * **Status Check:** `GET /api/v1/auth/status` indicates whether the hub has been initialized (`member_count == 0`).
 * **Admin Onboarding:** `POST /api/v1/auth/register-initial` provisions the first registered user as `is_admin=True`, creates their personal space, and initializes the shared hub. Once created, all future calls to `register-initial` are rejected (`400 Bad Request`).
 * **Member Provisioning:** `POST /api/v1/users` is restricted to the Admin (`is_admin=True`). Regular members attempting to add users receive `403 Forbidden`.
 * **Login & JWT:** `POST /api/v1/auth/login` accepts direct JSON credentials, verifies password hashes using `bcrypt` (12 rounds), and issues signed JWT bearer tokens (`HS256`, 30-day default lifetime).
+* **Password Guardrails:** Passwords enforce 8-72 character limits, preventing weak passwords and bcrypt buffer overflow/truncation.
+* **Production Security Validator:** In `ENVIRONMENT == "production"`, `Settings` refuses to start with default insecure keys or keys under 32 characters.
 
 ### 3.2 Spaces Engine & Bento Widgets
 * **Shared Hub (`GET /api/v1/spaces/shared`):** Singleton collaborative space accessible to all household members. Holds shared widgets (household calendar, AI launchers).
@@ -123,20 +125,25 @@ erDiagram
 * **Strict Zero-Leak Rule:** `GET /api/v1/spaces/{space_id}` enforces that personal spaces can **only** be accessed by their owner (`owner_id == current_user.id`). Even the Household Admin is hard-blocked with `403 Forbidden`.
 * **Widget Settings Schema:** Stored in `Space.settings` as flexible JSON, enabling seamless widget additions without database migrations.
 
-### 3.3 Dynamic Agent Catalog & 7-Day Undo Grace Period
+### 3.3 Dynamic Agent Catalog, Seeding & Lifecycle
+* **Startup Lifespan Seeding:** Baseline models (`researcher` and `assistant`) are seeded cleanly during the FastAPI `lifespan` startup hook with an explicit commit. Read-only `GET` endpoints perform zero transaction side-effects.
 * **Built-in System Models:**
   1. **Researcher** (`researcher`): `qwen3:14b`, Temp: 0.3, tools: `["pdf_reader", "searxng_search", "document_writer"]`.
   2. **Assistant** (`assistant`): `qwen3:14b`, Temp: 0.7, tools: `["calendar_read", "calendar_write", "searxng_search"]`.
   * Built-in models cannot be deleted (`400 Bad Request`).
 * **Custom Personalities:** Any household member can create custom models via `POST /api/v1/agents`.
 * **Ownership Enforcement:** Custom models record `owner_id`. Only the creator can edit or delete their model.
-* **7-Day Soft-Delete & Trash:**
+* **7-Day Soft-Delete, Purge & Slug Reuse:**
   * Calling `DELETE /api/v1/agents/{id}` marks `deleted_at = now()` and hides the model from active listings.
   * Soft-deleted models remain in `GET /api/v1/agents/trash` with a countdown of remaining days.
   * Calling `POST /api/v1/agents/{id}/restore` restores the model within 7 days. After 7 days, restoration is rejected (`410 Gone`).
+  * Expired models (> 7 days) are automatically purged upon catalog updates, freeing their slug for reuse.
+  * Explicit purge endpoint `DELETE /api/v1/agents/trash/{id}` allows immediate permanent deletion and slug freeing by the owner or admin.
 
 ### 3.4 Conversation Sessions & Secret Mode
 * **Session Threads (`/api/v1/sessions`):** Private conversation threads linked to specific agent personalities.
+* **Session Timestamp Bumping:** Appending any `ChatMessage` immediately touches and refreshes `ConversationSession.updated_at`, keeping active threads at the top of the user's conversation list.
+* **Deterministic Message Ordering:** `ConversationSession.messages` explicitly orders records by `ChatMessage.created_at.asc()`.
 * **Secret Mode (`is_secret: true`):** A persistent confidentiality toggle on any conversation session. Used in Stage 3 to completely sever the session from the household gossip bus.
 
 ### 3.5 Agent Long-Term Memory & User Relationships
@@ -144,6 +151,7 @@ erDiagram
   * **Personal Memory (`GET /api/v1/memories`):** Stores user habits, preferences, and private constraints. Strictly private to the individual under Zero-Leak rules.
   * **Household Memory (`GET /api/v1/memories/household`):** Shared facts and constraints with user attribution.
 * **User Control (Audit & Revoke):** Users can view, edit (`PUT /api/v1/memories/{id}`), or permanently delete (`DELETE /api/v1/memories/{id}`) any memory formed by agents.
+* **Household Memory Curation:** To prevent household knowledge lockouts, shared household memories can be edited or revoked by either the creator or any Household Admin. Personal memories remain strictly accessible only to their owner.
 * **Secret Mode Hard-Barrier:** Memories originating from a session with `is_secret=True` cannot be saved with `scope="household"` (`400 Bad Request`).
 
 ---
@@ -155,12 +163,12 @@ Tests are implemented with `pytest`, `pytest-asyncio`, and an isolated in-memory
 | Test Module | Coverage Area | Scenarios Verified | Result |
 | :--- | :--- | :--- | :--- |
 | `test_health.py` | Health & Engine | DB connectivity, app version | ✅ 1 passed |
-| `test_auth.py` | Identity & Roles | First-run wizard, JWT, admin member provisioning, 403 checks | ✅ 6 passed |
+| `test_auth.py` | Identity & Roles | First-run wizard, JWT, admin member provisioning, 403 checks, password limits, production security | ✅ 8 passed |
 | `test_spaces.py` | Spaces & Privacy | Shared hub, Bento widgets, strict Zero-Leak 403 isolation | ✅ 4 passed |
-| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration | ✅ 5 passed |
-| `test_sessions.py` | Sessions & Privacy | Session lifecycle, messages, Secret Mode toggle, owner isolation | ✅ 2 passed |
-| `test_memories.py` | Agent Memory & Privacy | Personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, secret mode block | ✅ 5 passed |
-| **Total** | **23 tests** | **End-to-End API contracts** | **✅ 100% Pass (91% coverage)** |
+| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration, slug reuse, trash purge | ✅ 7 passed |
+| `test_sessions.py` | Sessions & Privacy | Session lifecycle, messages, Secret Mode toggle, owner isolation, updated_at bumping, message ordering | ✅ 3 passed |
+| `test_memories.py` | Agent Memory & Privacy | Personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, secret mode block, admin household curation | ✅ 6 passed |
+| **Total** | **29 tests** | **End-to-End API contracts** | **✅ 100% Pass (91% coverage)** |
 
 ---
 

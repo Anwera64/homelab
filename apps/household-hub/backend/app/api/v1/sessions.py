@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -143,7 +144,9 @@ async def add_message(
         content=payload.content,
         metadata_json=payload.metadata_json or {},
     )
+    session.updated_at = datetime.now(timezone.utc)
     db.add(message)
+    db.add(session)
     await db.commit()
     await db.refresh(message)
     return message

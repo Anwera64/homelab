@@ -223,3 +223,44 @@ async def test_secret_session_cannot_create_household_memory(client: httpx.Async
     )
     assert bad_mem_resp.status_code == 400
     assert "secret" in bad_mem_resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_household_memory_curation_by_admin(client: httpx.AsyncClient):
+    """
+    Household-scoped memories can be curated (edited or deleted) by Household Admins
+    to prevent shared household knowledge lockout.
+    """
+    admin_token, member_token, agent_id, session_id = await setup_environment(client)
+
+    # 1. Member creates a household memory
+    create_resp = await client.post(
+        "/api/v1/memories",
+        json={
+            "agent_id": agent_id,
+            "scope": "household",
+            "category": "fact",
+            "content": "Trash pickup is Wednesday morning",
+            "source_session_id": session_id,
+        },
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert create_resp.status_code == 201
+    mem_id = create_resp.json()["id"]
+
+    # 2. Admin edits the household memory
+    admin_edit = await client.put(
+        f"/api/v1/memories/{mem_id}",
+        json={"content": "Trash pickup is Wednesday morning before 7:00 AM"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert admin_edit.status_code == 200
+    assert admin_edit.json()["content"] == "Trash pickup is Wednesday morning before 7:00 AM"
+
+    # 3. Admin deletes the household memory
+    admin_del = await client.delete(
+        f"/api/v1/memories/{mem_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert admin_del.status_code == 200
+

@@ -38,6 +38,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await conn.run_sync(Base.metadata.create_all)
     
     async with TestingSessionLocal() as session:
+        from app.services.catalog_seeder import seed_builtin_agents
+        await seed_builtin_agents(session)
         yield session
         
     async with test_engine.begin() as conn:

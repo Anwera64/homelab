@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
@@ -11,7 +11,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(..., min_length=8, max_length=72)
     is_admin: Optional[bool] = False
 
 
@@ -28,4 +28,4 @@ class UserRead(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     avatar_color: Optional[str] = None
-    password: Optional[str] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=72)

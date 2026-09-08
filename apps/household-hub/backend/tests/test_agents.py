@@ -222,3 +222,88 @@ async def test_restore_after_grace_period_expired(client: httpx.AsyncClient, db_
     )
     assert expired_resp.status_code == 410
     assert "expired" in expired_resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_slug_reuse_after_grace_period_expired(client: httpx.AsyncClient, db_session):
+    """Once 7 days expire, the expired agent is auto-purged and its slug is reusable."""
+    from sqlalchemy import update
+    from app.models.agent import AgentPersonality
+
+    _, member_token = await setup_users(client)
+
+    # 1. Create model
+    create1 = await client.post(
+        "/api/v1/agents",
+        json={"slug": "renewable-bot", "name": "Renewable 1", "system_prompt": "First version"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert create1.status_code == 201
+    agent_id = create1.json()["id"]
+
+    # 2. Delete model
+    await client.delete(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+
+    # While in 7-day grace period, trying to create with same slug returns 400
+    collision = await client.post(
+        "/api/v1/agents",
+        json={"slug": "renewable-bot", "name": "Renewable 2", "system_prompt": "Second version"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert collision.status_code == 400
+    assert "trash" in collision.json()["detail"].lower()
+
+    # Age deleted_at to 8 days ago
+    eight_days_ago = datetime.now(timezone.utc) - timedelta(days=8)
+    await db_session.execute(
+        update(AgentPersonality)
+        .where(AgentPersonality.id == agent_id)
+        .values(deleted_at=eight_days_ago)
+    )
+    await db_session.commit()
+
+    # 3. Create model with the same slug again -> now succeeds!
+    create2 = await client.post(
+        "/api/v1/agents",
+        json={"slug": "renewable-bot", "name": "Renewable 2", "system_prompt": "Reborn version"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert create2.status_code == 201
+    assert create2.json()["slug"] == "renewable-bot"
+    assert create2.json()["name"] == "Renewable 2"
+
+
+@pytest.mark.asyncio
+async def test_trash_explicit_purge_and_slug_immediate_reuse(client: httpx.AsyncClient):
+    """Owner or admin can permanently purge a trashed model immediately, freeing its slug."""
+    admin_token, member_token = await setup_users(client)
+
+    # 1. Member creates model
+    res = await client.post(
+        "/api/v1/agents",
+        json={"slug": "disposable-bot", "name": "Disposable", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    agent_id = res.json()["id"]
+
+    # 2. Delete model
+    await client.delete(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {member_token}"})
+
+    # Non-owner / non-admin cannot purge -> 403 (we test with another user or admin permission)
+    # Admin can purge
+    purge_resp = await client.delete(
+        f"/api/v1/agents/trash/{agent_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert purge_resp.status_code == 200
+    assert "purged" in purge_resp.json()["message"].lower()
+
+    # Slug is now immediately available for reuse
+    recreate_resp = await client.post(
+        "/api/v1/agents",
+        json={"slug": "disposable-bot", "name": "Fresh Disposable", "system_prompt": "New Prompt"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert recreate_resp.status_code == 201
+    assert recreate_resp.json()["slug"] == "disposable-bot"
+

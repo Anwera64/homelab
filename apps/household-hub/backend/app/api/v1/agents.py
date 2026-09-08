@@ -1,14 +1,14 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.agent import AgentPersonality
 from app.schemas.agent import AgentCreate, AgentRead, AgentTrashRead, AgentUpdate
-from app.services.catalog_seeder import seed_builtin_agents
 
 router = APIRouter(prefix="/agents", tags=["Dynamic Agent Catalog"])
 
@@ -19,7 +19,6 @@ async def list_agents(
     _: User = Depends(get_current_user),
 ):
     """List all active agent personalities in the catalog."""
-    await seed_builtin_agents(db)
     stmt = (
         select(AgentPersonality)
         .where(AgentPersonality.deleted_at.is_(None))
@@ -62,6 +61,32 @@ async def list_trash(
     return trash_items
 
 
+@router.delete("/trash/{agent_id}")
+async def purge_trash_agent(
+    agent_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Permanently hard-delete a trashed model, immediately freeing its slug.
+    Only the model owner or an Admin can purge it.
+    """
+    result = await db.execute(select(AgentPersonality).where(AgentPersonality.id == agent_id))
+    agent = result.scalars().first()
+    if not agent or agent.deleted_at is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trashed model not found")
+
+    if agent.owner_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the model owner or an Admin can permanently purge this model.",
+        )
+
+    await db.delete(agent)
+    await db.commit()
+    return {"message": "Model permanently purged from trash. Slug is now available for reuse."}
+
+
 @router.get("/{id_or_slug}", response_model=AgentRead)
 async def get_agent(
     id_or_slug: str,
@@ -69,7 +94,6 @@ async def get_agent(
     _: User = Depends(get_current_user),
 ):
     """Get single active agent by ID or slug."""
-    await seed_builtin_agents(db)
     stmt = select(AgentPersonality).where(
         ((AgentPersonality.id == id_or_slug) | (AgentPersonality.slug == id_or_slug))
         & AgentPersonality.deleted_at.is_(None)
@@ -88,12 +112,41 @@ async def create_agent(
     current_user: User = Depends(get_current_user),
 ):
     """Any member can create a custom agent personality. Sets owner_id to current user."""
-    # Check uniqueness of slug
-    existing = await db.execute(select(AgentPersonality).where(AgentPersonality.slug == payload.slug))
-    if existing.scalars().first():
+    # 1. Purge any soft-deleted agents whose 7-day grace period has expired
+    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.AGENT_DELETE_GRACE_DAYS)
+    expired_stmt = select(AgentPersonality).where(
+        AgentPersonality.deleted_at.is_not(None),
+        AgentPersonality.deleted_at < cutoff,
+    )
+    expired_res = await db.execute(expired_stmt)
+    for exp in expired_res.scalars().all():
+        await db.delete(exp)
+    await db.flush()
+
+    # 2. Check if slug exists in active catalog
+    existing_active = await db.execute(
+        select(AgentPersonality).where(
+            AgentPersonality.slug == payload.slug,
+            AgentPersonality.deleted_at.is_(None),
+        )
+    )
+    if existing_active.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"An agent with slug '{payload.slug}' already exists.",
+            detail=f"An active agent with slug '{payload.slug}' already exists.",
+        )
+
+    # 3. Check if slug exists in trash (under active grace period)
+    existing_trash = await db.execute(
+        select(AgentPersonality).where(
+            AgentPersonality.slug == payload.slug,
+            AgentPersonality.deleted_at.is_not(None),
+        )
+    )
+    if existing_trash.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"An agent with slug '{payload.slug}' is currently in trash (under 7-day grace period). Restore it or purge trash to reuse this slug.",
         )
 
     agent = AgentPersonality(

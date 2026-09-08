@@ -24,7 +24,12 @@ class ConversationSession(Base):
     # Relationships
     user = relationship("User", back_populates="sessions")
     agent = relationship("AgentPersonality", back_populates="sessions")
-    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+    messages = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at.asc()",
+    )
 
 
 class ChatMessage(Base):

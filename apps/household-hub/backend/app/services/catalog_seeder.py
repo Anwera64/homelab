@@ -53,4 +53,7 @@ async def seed_builtin_agents(db: AsyncSession) -> None:
         if not existing:
             agent = AgentPersonality(**agent_data)
             db.add(agent)
-    await db.flush()
+        elif existing.deleted_at is not None:
+            existing.deleted_at = None
+            db.add(existing)
+    await db.commit()

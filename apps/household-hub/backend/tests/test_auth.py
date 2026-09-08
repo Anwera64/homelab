@@ -187,3 +187,59 @@ async def test_admin_member_management_lifecycle(client: httpx.AsyncClient):
         headers={"Authorization": f"Bearer {partner_token}"},
     )
     assert forbidden_resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_password_length_validation_rules(client: httpx.AsyncClient):
+    """Passwords must be between 8 and 72 characters (preventing bcrypt buffer overflow and weak passwords)."""
+    # 1. Too short (< 8 chars)
+    short_resp = await client.post(
+        "/api/v1/auth/register-initial",
+        json={
+            "username": "admin",
+            "email": "admin@homelab.local",
+            "password": "short",
+            "full_name": "Admin",
+        },
+    )
+    assert short_resp.status_code == 422
+
+    # 2. Too long (> 72 chars)
+    long_pwd = "A" * 73
+    long_resp = await client.post(
+        "/api/v1/auth/register-initial",
+        json={
+            "username": "admin",
+            "email": "admin@homelab.local",
+            "password": long_pwd,
+            "full_name": "Admin",
+        },
+    )
+    assert long_resp.status_code == 422
+
+
+def test_production_security_validation():
+    """Settings must refuse to start in production if SECRET_KEY is insecure or too short."""
+    from pydantic import ValidationError
+    from app.core.config import Settings
+
+    # Insecure key in production raises ValidationError
+    with pytest.raises(ValidationError):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="insecure-dev-secret-key-change-in-production-min-32chars",
+        )
+
+    with pytest.raises(ValidationError):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="short-secret-key",
+        )
+
+    # Valid key in production succeeds
+    valid_prod = Settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="a-very-strong-production-secret-key-with-over-32-characters!",
+    )
+    assert valid_prod.ENVIRONMENT == "production"
+

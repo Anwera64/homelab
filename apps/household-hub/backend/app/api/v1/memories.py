@@ -137,16 +137,20 @@ async def update_memory(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """User can edit or refine any memory an agent has formed."""
+    """
+    User can edit or refine any memory an agent has formed.
+    For household-scoped memories, Household Admins can also edit them.
+    """
     result = await db.execute(select(AgentMemory).where(AgentMemory.id == memory_id))
     memory = result.scalars().first()
     if not memory:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
 
-    if memory.user_id != current_user.id:
+    can_edit = (memory.user_id == current_user.id) or (memory.scope == "household" and current_user.is_admin)
+    if not can_edit:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the memory owner can edit this memory.",
+            detail="Only the memory owner (or a Household Admin for shared memories) can edit this memory.",
         )
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -165,16 +169,20 @@ async def delete_memory(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """User can revoke or permanently delete any memory an agent has formed."""
+    """
+    User can revoke or permanently delete any memory an agent has formed.
+    For household-scoped memories, Household Admins can also revoke them.
+    """
     result = await db.execute(select(AgentMemory).where(AgentMemory.id == memory_id))
     memory = result.scalars().first()
     if not memory:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
 
-    if memory.user_id != current_user.id:
+    can_delete = (memory.user_id == current_user.id) or (memory.scope == "household" and current_user.is_admin)
+    if not can_delete:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the memory owner can delete this memory.",
+            detail="Only the memory owner (or a Household Admin for shared memories) can delete this memory.",
         )
 
     await db.delete(memory)

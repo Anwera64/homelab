@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,20 @@ class Settings(BaseSettings):
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    @model_validator(mode="after")
+    def validate_security(self) -> "Settings":
+        insecure_keys = {
+            "insecure-dev-secret-key-change-in-production-min-32chars",
+            "changeme",
+            "secret",
+        }
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY in insecure_keys or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "Production deployment must specify a secure SECRET_KEY of at least 32 characters."
+                )
+        return self
 
     @property
     def database_url(self) -> str:

@@ -136,3 +136,70 @@ async def test_session_zero_leak_privacy_boundary(client: httpx.AsyncClient):
         headers={"Authorization": f"Bearer {member_token}"},
     )
     assert member_del.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_session_updated_at_bump_and_message_ordering(client: httpx.AsyncClient):
+    """
+    Verify that appending a message updates the session's updated_at timestamp,
+    bumping it to the top of list_user_sessions, and preserves message order.
+    """
+    import asyncio
+    _, member_token, agent_id = await setup_environment(client)
+
+    # 1. Create two sessions
+    sess1_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Session 1"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    sess1_id = sess1_resp.json()["id"]
+
+    sess2_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Session 2"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    sess2_id = sess2_resp.json()["id"]
+
+    # Initially, Session 2 is most recently updated
+    list_resp = await client.get("/api/v1/sessions", headers={"Authorization": f"Bearer {member_token}"})
+    assert list_resp.status_code == 200
+    sessions = list_resp.json()
+    assert sessions[0]["id"] == sess2_id
+
+    # Add a small delay to ensure distinct timestamps
+    await asyncio.sleep(0.01)
+
+    # 2. Append message to Session 1
+    msg1_resp = await client.post(
+        f"/api/v1/sessions/{sess1_id}/messages",
+        json={"role": "user", "content": "Message 1 in Session 1"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert msg1_resp.status_code == 201
+
+    await asyncio.sleep(0.01)
+
+    # Append second message to Session 1
+    msg2_resp = await client.post(
+        f"/api/v1/sessions/{sess1_id}/messages",
+        json={"role": "assistant", "content": "Message 2 in Session 1"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert msg2_resp.status_code == 201
+
+    # Session 1 should now be at the TOP of list_user_sessions
+    list_bumped = await client.get("/api/v1/sessions", headers={"Authorization": f"Bearer {member_token}"})
+    assert list_bumped.status_code == 200
+    bumped_sessions = list_bumped.json()
+    assert bumped_sessions[0]["id"] == sess1_id
+
+    # Verify messages in Session 1 are in ascending order
+    detail_resp = await client.get(f"/api/v1/sessions/{sess1_id}", headers={"Authorization": f"Bearer {member_token}"})
+    assert detail_resp.status_code == 200
+    detail_messages = detail_resp.json()["messages"]
+    assert len(detail_messages) == 2
+    assert detail_messages[0]["content"] == "Message 1 in Session 1"
+    assert detail_messages[1]["content"] == "Message 2 in Session 1"
+
