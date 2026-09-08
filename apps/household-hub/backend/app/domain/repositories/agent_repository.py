@@ -28,6 +28,9 @@ class IAgentRepository(Protocol):
     async def delete_permanent(self, agent_id: str) -> None:
         ...
 
+    async def get_expired_trash_ids(self, cutoff: datetime) -> List[str]:
+        ...
+
     async def purge_expired_trash(self, cutoff: datetime) -> List[str]:
         ...
 

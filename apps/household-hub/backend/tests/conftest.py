@@ -66,7 +66,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 async def client(db_session: AsyncSession) -> AsyncGenerator[httpx.AsyncClient, None]:
     """HTTP async test client with database dependency override."""
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        yield db_session
+        async with TestingSessionLocal() as session:
+            yield session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_session] = override_get_db

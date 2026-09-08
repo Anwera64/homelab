@@ -152,14 +152,40 @@ class FakeUnitOfWork:
         pass
 
 
+from app.domain.entities.system_setting import SystemSetting
+
+
+class FakeSystemSettingRepository:
+    def __init__(self):
+        self.settings = {}
+
+    async def get(self, key: str):
+        val = self.settings.get(key)
+        return SystemSetting(key=key, value=val) if val is not None else None
+
+    async def set(self, key: str, value: str):
+        self.settings[key] = value
+        return SystemSetting(key=key, value=value)
+
+    async def set_if_not_exists(self, key: str, value: str) -> bool:
+        if key in self.settings:
+            return False
+        self.settings[key] = value
+        return True
+
+    async def delete(self, key: str) -> bool:
+        return self.settings.pop(key, None) is not None
+
+
 @pytest.mark.asyncio
 async def test_register_initial_admin_use_case():
     user_repo = FakeUserRepository()
     space_repo = FakeSpaceRepository()
+    system_setting_repo = FakeSystemSettingRepository()
     hasher = FakePasswordHasher()
     uow = FakeUnitOfWork()
 
-    use_case = RegisterInitialAdminUseCase(user_repo, space_repo, hasher, uow)
+    use_case = RegisterInitialAdminUseCase(user_repo, space_repo, system_setting_repo, hasher, uow)
     admin_user = await use_case.execute(
         username="admin",
         email="admin@homelab.local",

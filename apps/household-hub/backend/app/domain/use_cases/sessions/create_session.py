@@ -4,7 +4,7 @@ from app.domain.entities.session import ConversationSession
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
-from app.domain.exceptions import EntityNotFoundException
+from app.domain.exceptions import EntityNotFoundException, InvalidOperationException
 
 
 class CreateSessionUseCase:
@@ -28,6 +28,9 @@ class CreateSessionUseCase:
         agent = await self.agent_repo.get_by_id(agent_id)
         if not agent or agent.deleted_at is not None:
             raise EntityNotFoundException("Agent personality not found")
+
+        if not agent.is_active:
+            raise InvalidOperationException(f"Agent '{agent.name}' is deactivated and cannot accept new conversation sessions.")
 
         session_title = title or f"Chat with {agent.name}"
         async with self.uow:

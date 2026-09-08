@@ -11,6 +11,7 @@ from app.data.datasources.space_data_source import SqliteSpaceDataSource
 from app.data.datasources.agent_data_source import SqliteAgentDataSource
 from app.data.datasources.session_data_source import SqliteSessionDataSource
 from app.data.datasources.memory_data_source import SqliteMemoryDataSource
+from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -18,6 +19,7 @@ from app.data.mappers.space_data_mapper import SpaceDataMapper
 from app.data.mappers.agent_data_mapper import AgentDataMapper
 from app.data.mappers.session_data_mapper import SessionDataMapper
 from app.data.mappers.memory_data_mapper import MemoryDataMapper
+from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -25,6 +27,7 @@ from app.data.repositories.space_repository_impl import SpaceRepositoryImpl
 from app.data.repositories.agent_repository_impl import AgentRepositoryImpl
 from app.data.repositories.session_repository_impl import SessionRepositoryImpl
 from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
+from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
 
 # Security & Persistence
 from app.data.security.bcrypt_hasher import BcryptPasswordHasher
@@ -58,6 +61,7 @@ from app.domain.use_cases.agents.soft_delete_agent import SoftDeleteAgentUseCase
 from app.domain.use_cases.agents.restore_agent import RestoreAgentUseCase
 from app.domain.use_cases.agents.list_trash_agents import ListTrashAgentsUseCase
 from app.domain.use_cases.agents.purge_trash_agent import PurgeTrashAgentUseCase
+from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUseCase
 
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
@@ -88,6 +92,7 @@ _space_mapper = SpaceDataMapper()
 _agent_mapper = AgentDataMapper()
 _session_mapper = SessionDataMapper()
 _memory_mapper = MemoryDataMapper()
+_system_setting_mapper = SystemSettingDataMapper()
 
 
 async def get_db_session():
@@ -102,19 +107,21 @@ def get_container(session: AsyncSession):
     agent_ds = SqliteAgentDataSource(session)
     session_ds = SqliteSessionDataSource(session)
     memory_ds = SqliteMemoryDataSource(session)
+    system_setting_ds = SqliteSystemSettingDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
     agent_repo = AgentRepositoryImpl(agent_ds, _agent_mapper)
     session_repo = SessionRepositoryImpl(session_ds, _session_mapper)
     memory_repo = MemoryRepositoryImpl(memory_ds, _memory_mapper)
+    system_setting_repo = SystemSettingRepositoryImpl(system_setting_ds, _system_setting_mapper)
 
     uow = SqliteUnitOfWork(session)
 
     return {
         # Auth
-        pres_deps.get_auth_status_use_case: GetAuthStatusUseCase(user_repo),
-        pres_deps.get_register_initial_admin_use_case: RegisterInitialAdminUseCase(user_repo, space_repo, _password_hasher, uow),
+        pres_deps.get_auth_status_use_case: GetAuthStatusUseCase(user_repo, system_setting_repo),
+        pres_deps.get_register_initial_admin_use_case: RegisterInitialAdminUseCase(user_repo, space_repo, system_setting_repo, _password_hasher, uow),
         pres_deps.get_login_use_case: LoginUseCase(user_repo, _password_hasher, _jwt_token_service, _dummy_password_hash),
         pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(user_repo, _jwt_token_service),
 
@@ -158,15 +165,25 @@ def get_container(session: AsyncSession):
         pres_deps.get_create_memory_use_case: CreateMemoryUseCase(memory_repo, session_repo, agent_repo, uow),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow),
         pres_deps.get_delete_memory_use_case: DeleteMemoryUseCase(memory_repo, uow),
+
+        # Lifecycle & Background Maintenance
+        SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
+        PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
     }
+
+
+async def get_request_container(session: AsyncSession = Depends(get_db_session)) -> dict:
+    """Assembles the request-scoped dependency container once per request."""
+    return get_container(session)
 
 
 def setup_dependency_injection(app: FastAPI):
     """
     Wires the DI coordinator with FastAPI's request lifecycle.
-    Each provider hook delegates to the request-scoped container.
+    Each provider hook delegates to the request-scoped container as an async coroutine,
+    ensuring no threadpool offloading and executing get_container only once per request.
     """
-    # Create wrapper factory for each stub that resolves via request session
+    # Create wrapper factory for each stub that resolves via request container
     for stub_fn in [
         pres_deps.get_auth_status_use_case,
         pres_deps.get_register_initial_admin_use_case,
@@ -205,8 +222,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_delete_memory_use_case,
     ]:
         def make_provider(target_stub):
-            def provider(session: AsyncSession = Depends(get_db_session)):
-                container = get_container(session)
+            async def provider(container: dict = Depends(get_request_container)):
                 return container[target_stub]
             return provider
 

@@ -42,6 +42,11 @@ class AddChatMessageUseCase:
                 "Cannot send messages while the agent is in trash. Restore the agent to continue chatting."
             )
 
+        if agent and not agent.is_active:
+            raise InvalidOperationException(
+                f"Agent '{agent.name}' is deactivated and cannot accept new messages."
+            )
+
         async with self.uow:
             message = ChatMessage(
                 session_id=session.id,

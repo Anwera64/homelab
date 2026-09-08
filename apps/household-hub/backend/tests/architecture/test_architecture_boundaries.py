@@ -146,3 +146,23 @@ def test_data_has_zero_presentation_dependencies():
                     )
 
     assert not violations, "Clean Architecture Data Violation:\n" + "\n".join(violations)
+
+
+def test_di_providers_are_async_coroutines_to_prevent_threadpool_offloading():
+    """
+    DI providers in app.dependency_overrides must be async coroutines to avoid
+    FastAPI offloading request-scoped database sessions to anyio worker threads.
+    """
+    import inspect
+    from app.main import app
+    from app.bootstrap.di import setup_dependency_injection
+
+    setup_dependency_injection(app)
+    violations = []
+    for stub, provider in app.dependency_overrides.items():
+        if not inspect.iscoroutinefunction(provider):
+            stub_name = getattr(stub, "__name__", str(stub))
+            provider_name = getattr(provider, "__name__", str(provider))
+            violations.append(f"Provider '{provider_name}' for stub '{stub_name}' is synchronous, causing threadpool offloading.")
+
+    assert not violations, "Synchronous DI Provider Violation:\n" + "\n".join(violations)

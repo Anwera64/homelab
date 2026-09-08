@@ -35,11 +35,13 @@ class CreateAgentUseCase:
         tool_permissions: Optional[List[str]] = None,
     ) -> AgentPersonality:
         async with self.uow:
-            # 1. Purge expired trash agents
+            # 1. Purge expired trash agents (archive sessions BEFORE agent deletion)
             cutoff = datetime.now(timezone.utc) - timedelta(days=self.grace_days)
-            purged_ids = await self.agent_repo.purge_expired_trash(cutoff)
-            for pid in purged_ids:
+            expired_ids = await self.agent_repo.get_expired_trash_ids(cutoff)
+            for pid in expired_ids:
                 await self.session_repo.archive_by_agent_id(pid)
+            if expired_ids:
+                await self.agent_repo.purge_expired_trash(cutoff)
 
             # 2. Check active slug
             existing_active = await self.agent_repo.get_by_slug(slug, include_deleted=False)

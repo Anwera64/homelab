@@ -62,6 +62,9 @@ class AgentRepositoryImpl(IAgentRepository):
     async def delete_permanent(self, agent_id: str) -> None:
         await self.data_source.delete_permanent(agent_id)
 
+    async def get_expired_trash_ids(self, cutoff: datetime) -> List[str]:
+        return await self.data_source.get_expired_trash_ids(cutoff)
+
     async def purge_expired_trash(self, cutoff: datetime) -> List[str]:
         return await self.data_source.purge_expired_trash(cutoff)
 

@@ -31,6 +31,9 @@ class IAgentDataSource(Protocol):
     async def delete_permanent(self, agent_id: str) -> None:
         ...
 
+    async def get_expired_trash_ids(self, cutoff: datetime) -> List[str]:
+        ...
+
     async def purge_expired_trash(self, cutoff: datetime) -> List[str]:
         ...
 
@@ -93,6 +96,14 @@ class SqliteAgentDataSource(IAgentDataSource):
         if agent:
             await self.session.delete(agent)
             await self.session.flush()
+
+    async def get_expired_trash_ids(self, cutoff: datetime) -> List[str]:
+        stmt = select(AgentModel.id).where(
+            AgentModel.deleted_at.is_not(None),
+            AgentModel.deleted_at < cutoff,
+        )
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
 
     async def purge_expired_trash(self, cutoff: datetime) -> List[str]:
         stmt = select(AgentModel).where(

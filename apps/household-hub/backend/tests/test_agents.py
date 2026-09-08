@@ -410,4 +410,134 @@ async def test_agent_tool_permissions_validation(client: httpx.AsyncClient):
     assert invalid_update.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_purge_expired_trash_archives_sessions_before_agent_deletion(client: httpx.AsyncClient, db_session):
+    """Sessions attached to an agent must be archived (is_archived=True) when the agent is purged from trash."""
+    from sqlalchemy import update
+    from app.data.models.agent_model import AgentModel
+
+    admin_token, member_token = await setup_users(client)
+
+    # 1. Create agent
+    agent_res = await client.post(
+        "/api/v1/agents",
+        json={"slug": "doomed-agent", "name": "Doomed Agent", "system_prompt": "You are doomed."},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert agent_res.status_code == 201
+    agent_id = agent_res.json()["id"]
+
+    # 2. Create session with this agent
+    sess_res = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Doomed Session", "is_secret": False},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert sess_res.status_code == 201
+    sess_id = sess_res.json()["id"]
+    assert sess_res.json()["is_archived"] is False
+    assert sess_res.json()["agent_id"] == agent_id
+
+    # 3. Soft-delete agent
+    del_res = await client.delete(
+        f"/api/v1/agents/{agent_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert del_res.status_code == 200
+
+    # 4. Age the agent beyond grace period (31 days ago)
+    thirty_one_days_ago = datetime.now(timezone.utc) - timedelta(days=31)
+    await db_session.execute(
+        update(AgentModel)
+        .where(AgentModel.id == agent_id)
+        .values(deleted_at=thirty_one_days_ago)
+    )
+    await db_session.commit()
+
+    # 5. Trigger purge by creating another agent
+    trigger_res = await client.post(
+        "/api/v1/agents",
+        json={"slug": "trigger-agent", "name": "Trigger Agent", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert trigger_res.status_code == 201
+
+    # 6. Verify agent was purged
+    get_agent = await client.get(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {admin_token}"})
+    assert get_agent.status_code == 404
+
+    # 7. Verify session still exists and is archived
+    get_sess = await client.get(f"/api/v1/sessions/{sess_id}", headers={"Authorization": f"Bearer {member_token}"})
+    assert get_sess.status_code == 200
+    sess_body = get_sess.json()
+    assert sess_body["agent_id"] is None
+    assert sess_body["is_archived"] is True, "Session must be marked as archived when agent is purged"
+
+
+@pytest.mark.asyncio
+async def test_inactive_agent_blocks_new_sessions_and_messages_but_permits_history_read(client: httpx.AsyncClient):
+    """Deactivated/inactive agents cannot accept new sessions or new messages, but conversation history remains accessible."""
+    admin_token, member_token = await setup_users(client)
+
+    # 1. Create active agent
+    agent_res = await client.post(
+        "/api/v1/agents",
+        json={"slug": "toggle-agent", "name": "Toggle Agent", "system_prompt": "Prompt"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert agent_res.status_code == 201
+    agent_id = agent_res.json()["id"]
+
+    # 2. Create session and post message while active
+    sess_res = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Toggle Session", "is_secret": False},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert sess_res.status_code == 201
+    sess_id = sess_res.json()["id"]
+
+    msg1_res = await client.post(
+        f"/api/v1/sessions/{sess_id}/messages",
+        json={"role": "user", "content": "Message 1 while active"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert msg1_res.status_code == 201
+
+    # 3. Deactivate agent
+    deact_res = await client.put(
+        f"/api/v1/agents/{agent_id}",
+        json={"is_active": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert deact_res.status_code == 200
+    assert deact_res.json()["is_active"] is False
+
+    # 4. Attempt to create a new session with inactive agent -> must be rejected (400)
+    blocked_sess = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Blocked Session", "is_secret": False},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert blocked_sess.status_code == 400
+    assert "inactive" in blocked_sess.json()["detail"].lower() or "suspended" in blocked_sess.json()["detail"].lower() or "deactivated" in blocked_sess.json()["detail"].lower()
+
+    # 5. Attempt to send message to existing session -> must be rejected (400)
+    blocked_msg = await client.post(
+        f"/api/v1/sessions/{sess_id}/messages",
+        json={"role": "user", "content": "Message 2 while inactive"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert blocked_msg.status_code == 400
+    assert "inactive" in blocked_msg.json()["detail"].lower() or "suspended" in blocked_msg.json()["detail"].lower() or "deactivated" in blocked_msg.json()["detail"].lower()
+
+    # 6. Read session history -> must still be permitted (200)
+    read_sess = await client.get(
+        f"/api/v1/sessions/{sess_id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert read_sess.status_code == 200
+    assert len(read_sess.json()["messages"]) >= 1
+
+
 

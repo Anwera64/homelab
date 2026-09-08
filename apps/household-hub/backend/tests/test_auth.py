@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 import httpx
 from unittest.mock import patch
@@ -63,6 +64,38 @@ async def test_register_initial_blocked_when_already_initialized(client: httpx.A
     resp = await client.post("/api/v1/auth/register-initial", json=second_payload)
     assert resp.status_code == 400
     assert "already initialized" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_register_initial_admin_prevents_multiple_admins(client: httpx.AsyncClient):
+    """Concurrent calls to register-initial must allow only 1 admin to register."""
+    payload1 = {
+        "username": "concurrent_admin1",
+        "email": "admin1@homelab.local",
+        "password": "Password123!",
+        "full_name": "Concurrent Admin 1",
+    }
+    payload2 = {
+        "username": "concurrent_admin2",
+        "email": "admin2@homelab.local",
+        "password": "Password123!",
+        "full_name": "Concurrent Admin 2",
+    }
+
+    resp1, resp2 = await asyncio.gather(
+        client.post("/api/v1/auth/register-initial", json=payload1),
+        client.post("/api/v1/auth/register-initial", json=payload2),
+    )
+
+    statuses = [resp1.status_code, resp2.status_code]
+    assert 201 in statuses, "At least one initial admin registration must succeed"
+    assert 400 in statuses, "The concurrent registration must be rejected with 400"
+    
+    # Confirm status reports exactly 1 member
+    status_resp = await client.get("/api/v1/auth/status")
+    assert status_resp.status_code == 200
+    assert status_resp.json()["is_initialized"] is True
+    assert status_resp.json()["member_count"] == 1
 
 
 @pytest.mark.asyncio

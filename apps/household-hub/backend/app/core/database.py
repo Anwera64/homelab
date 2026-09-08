@@ -30,6 +30,7 @@ import app.data.models.space_model
 import app.data.models.agent_model
 import app.data.models.session_model
 import app.data.models.memory_model
+import app.data.models.system_setting_model
 
 
 # Ensure SQLite enables foreign keys and WAL mode on synchronous driver connection
@@ -37,6 +38,7 @@ import app.data.models.memory_model
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA busy_timeout=5000")
     if settings.SQLITE_DB_PATH != ":memory:":
         cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
