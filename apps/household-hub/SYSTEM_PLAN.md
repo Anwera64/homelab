@@ -63,14 +63,15 @@ graph TD
 
     SharedCore --> LAN & Tailscale
 
-    subgraph BackendPillar [Pillar 3: Core Backend - Python FastAPI in Docker]
-        API[⚡ FastAPI Server & OpenAPI Contract]
-        Identity[🔐 Multi-User Auth & Session Management]
-        SpaceEngine[📁 Spaces Engine: Personal & Shared Hub]
-        DB[(🗄️ SQLite Database)]
+    subgraph BackendPillar [Pillar 3: Core Backend - Clean Architecture in Docker]
+        API[⚡ Presentation Routers & Schemas]
+        Domain[🧠 Pure Domain: Entities & Use Cases]
+        DataLayer[💾 Data Layer: Repositories, SQLite & Mutex]
+        Worker[⏰ Autonomous Background Purger Worker]
         
-        API --> Identity & SpaceEngine
-        SpaceEngine --> DB
+        API --> Domain
+        DataLayer --> Domain
+        Worker --> Domain
     end
 
     LAN & Tailscale --> API
@@ -89,7 +90,7 @@ graph TD
         
         GossipBus[🔄 Shared Gossip & Milestone Bus]
         Catalog <--> GossipBus
-        GossipBus <--> DB
+        GossipBus <--> DataLayer
     end
 
     subgraph IntegrationPillar [Pillar 5: Pluggable Integrations Layer]
@@ -112,9 +113,12 @@ graph TD
 * Seamless switching between personal views and the shared household hub.
 
 ### Pillar 2: Core Backend & Spaces Engine (FastAPI)
-* Manages multi-user authentication, long-lived sessions, and access control.
-* Manages data persistence for personal workspaces and the shared household space.
-* Exposes standardized REST and Server-Sent Events (SSE) for real-time agent streaming.
+* **Clean Architecture Design:** Strict inward dependency structure (`presentation -> domain <- data`) coordinated by a centralized async `bootstrap` dependency injection container.
+* **Pure Domain Core:** Business logic, use cases, and entities have zero dependencies on web frameworks, databases, or outside serialization libraries.
+* **Identity & Access Control:** Multi-user authentication, long-lived JWT sessions, distributed mutex onboarding lock, and role-based permissions.
+* **Zero-Leak Spaces Engine:** Manages isolated data persistence for personal workspaces and the shared household space.
+* **Autonomous Background Maintenance:** Continuous `lifespan` asyncio workers handling autonomous trash purges and data hygiene.
+* **Real-Time Delivery:** Exposes standardized REST and Server-Sent Events (SSE) for real-time agent streaming.
 
 ### Pillar 3: Open Agent Catalog & Gossip Bus
 * **Data-driven agent registry:** Manages agent definitions, system prompts, tool permissions, and model parameters.
@@ -154,7 +158,7 @@ We will proceed through the build in modular, sequential stages. Before touching
 ```
 
 1. **Stage 1: Backend Foundation, Spaces, Dynamic Agent Catalog & Memory Engine** `[COMPLETED ✅]`
-   * Core FastAPI service, multi-user identity (first-run onboarding & admin provisioning), strict zero-leak personal & shared space data models with Bento widgets, dynamic agent catalog with 2 baseline models (`researcher`, `assistant`), ownership permissions with 7-day undo grace period, and long-term memory engine with user audit/revoke.
+   * Core FastAPI service following Clean Architecture (`presentation -> domain <- data`, `bootstrap` DI), multi-user identity (first-run onboarding with distributed mutex & admin provisioning), strict zero-leak personal & shared space data models with Bento widgets, dynamic agent catalog with 2 baseline models (`researcher`, `assistant`), ownership permissions with 7-day undo grace period, autonomous background purger, inactive agent suspension, cascading session archival, and long-term memory engine with user audit/revoke. 70 automated tests (100% pass) with AST boundary enforcement.
    * Documented baseline: [`docs/STAGE_1_BASELINE.md`](./docs/STAGE_1_BASELINE.md)
 2. **Stage 2: Pluggable Integrations Engine**
    * Connector interfaces for Google Calendar, Apple CalDAV, SearXNG search, and PDF extraction.

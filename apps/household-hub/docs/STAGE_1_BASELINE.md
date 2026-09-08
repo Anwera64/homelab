@@ -1,7 +1,7 @@
 # Household Hub: Stage 1 Architecture Baseline
 
 **Status:** ✅ Hardened & Fully Tested (TDD)  
-**Test Suite:** 47 passing tests, 92% code coverage  
+**Test Suite:** 70 passing tests, 100% pass (Clean Architecture + AST boundary verified)  
 **Date:** September 2026
 
 
@@ -78,9 +78,10 @@ erDiagram
     ConversationSession {
         string id PK "UUID"
         string user_id FK
-        string agent_id FK
+        string agent_id FK "nullable for archived"
         string title
         boolean is_secret "Zero-leak gossip blocker"
+        boolean is_archived "Archived when agent purged or suspended"
         datetime created_at
         datetime updated_at
     }
@@ -107,6 +108,13 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
+
+    SystemSetting {
+        string key PK "Configuration key or distributed mutex"
+        text value "JSON or string state value"
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ---
@@ -115,7 +123,7 @@ erDiagram
 
 ### 3.1 First-Run Wizard, Authentication & Security Hardening
 * **Status Check:** `GET /api/v1/auth/status` indicates whether the hub has been initialized (`member_count == 0`).
-* **Admin Onboarding:** `POST /api/v1/auth/register-initial` provisions the first registered user as `is_admin=True`, creates their personal space, and initializes the shared hub. Once created, all future calls to `register-initial` are rejected (`400 Bad Request`).
+* **Admin Onboarding & Distributed Mutex:** `POST /api/v1/auth/register-initial` provisions the first registered user as `is_admin=True`, creates their personal space, and initializes the shared hub. The endpoint employs a distributed database lock (`system_settings` table via `set_if_not_exists`) within an atomic transaction. This prevents concurrent registration race conditions from provisioning multiple household administrators under high load. Once initialized, all future calls to `register-initial` are rejected (`400 Bad Request`).
 * **Member Provisioning:** `POST /api/v1/users` is restricted to the Admin (`is_admin=True`). Regular members attempting to add users receive `403 Forbidden`.
 * **Member Deletion & Knowledge Inheritance (`DELETE /api/v1/users/{id}`):**
   * Protected by admin permissions (`get_current_admin_user`).
@@ -140,6 +148,7 @@ erDiagram
 
 ### 3.3 Dynamic Agent Catalog, Seeding & Lifecycle
 * **Startup Lifespan Seeding:** Baseline models (`researcher` and `assistant`) and the shared space are seeded cleanly during the FastAPI `lifespan` startup hook with an explicit commit.
+* **Autonomous Background Trash Purger:** A background worker running inside the application `lifespan` loop periodically inspects the catalog and permanently expels soft-deleted agents whose 7-day grace period has expired, freeing their slugs and archiving sessions without requiring user interaction.
 * **Built-in System Models:**
   1. **Researcher** (`researcher`): `qwen3:14b`, Temp: 0.3, tools: `["pdf_reader", "searxng_search", "document_writer"]`.
   2. **Assistant** (`assistant`): `qwen3:14b`, Temp: 0.7, tools: `["calendar_read", "calendar_write", "searxng_search"]`.
@@ -154,14 +163,15 @@ erDiagram
   * Calling `DELETE /api/v1/agents/{id}` marks `deleted_at = now()` and hides the model from active listings.
   * Soft-deleted models remain in `GET /api/v1/agents/trash` with a countdown of remaining days.
   * Calling `POST /api/v1/agents/{id}/restore` restores the model within 7 days. After 7 days, restoration is rejected (`410 Gone`).
-  * Expired models (> 7 days) are automatically purged upon catalog updates, freeing their slug for reuse.
+  * Expired models (> 7 days) are automatically purged upon catalog updates or by the background purger, freeing their slug for reuse.
   * Explicit purge endpoint `DELETE /api/v1/agents/trash/{id}` allows immediate permanent deletion and slug freeing by the owner or admin.
   * When an agent is permanently purged, past conversation sessions transition to an archived state (`agent_id = None`, `is_archived = True`) rather than being cascade-deleted.
+* **Inactive Agent Suspension:** When an agent is marked inactive (`is_active = False`), it enters a suspended state. The agent remains in the catalog for its owner to reactivate, but attempting to send messages to sessions associated with an inactive agent is hard-blocked (`400 Bad Request`).
 
 ### 3.4 Conversation Sessions, Secret Mode & Archived State
 * **Session Threads (`/api/v1/sessions`):** Private conversation threads linked to specific agent personalities.
 * **Archived Non-Interactive Sessions:** When an agent is permanently purged, user sessions are preserved with `is_archived: true` and `agent_id: null`. Users can review their complete conversation history, but posting new messages to an archived session is rejected (`400 Bad Request`).
-* **Trash Grace Period Chat Guard:** If an agent is in the 7-day trash grace period, posting messages to existing sessions is rejected (`400 Bad Request`) until the agent is restored.
+* **Trash Grace Period & Inactive Chat Guard:** If an agent is in the 7-day trash grace period or marked inactive (`is_active: false`), posting messages to existing sessions is rejected (`400 Bad Request`) until the agent is restored or reactivated.
 * **Bounded Message Retrieval & Pagination:** `GET /api/v1/sessions/{session_id}` supports `limit` (default 50, bounded 1 to 100) and `before_id` cursor pagination, protecting the application against memory exhaustion on long-running conversation threads.
 * **Chat Message Schema Validation:** Enforces valid roles (`role: Literal["user", "assistant", "system"]`) and non-empty content (`min_length=1`).
 * **Session Timestamp Bumping:** Appending any `ChatMessage` immediately touches and refreshes `ConversationSession.updated_at`, keeping active threads at the top of the user's conversation list.
@@ -178,6 +188,19 @@ erDiagram
 * **Household Memory Curation:** To prevent household knowledge lockouts, shared household memories can be edited or revoked by either the creator or any Household Admin. Personal memories remain strictly accessible only to their owner.
 * **Secret Mode Hard-Barrier:** Memories originating from a session with `is_secret=True` cannot be saved with `scope="household"` (`400 Bad Request`).
 
+### 3.6 Clean Architecture & Automated Boundary Enforcement
+* **Strict Layer Decoupling (`presentation -> domain <- data`):**
+  * **`domain` Core:** Pure Python dataclass entities, use cases/interactors, repository protocols, and domain exceptions. Zero dependencies on web frameworks (`fastapi`), ORMs (`sqlalchemy`), or serialization libraries (`pydantic`).
+  * **`presentation`:** Thin FastAPI routers, Pydantic HTTP schemas, and presentation mappers. Depends solely on `domain`.
+  * **`data`:** SQLAlchemy 2.0 ORM models, DataSources (SQLite implementations), Data Mappers, and repository implementations. Depends solely on `domain`.
+  * **`bootstrap` (DI Coordinator):** Centralized dependency injection container wiring DataSources $\rightarrow$ Repositories $\rightarrow$ Use Cases $\rightarrow$ FastAPI dependencies. All dependency providers are implemented as asynchronous coroutines (`async def`) with request-scoped caching (`AsyncExitStack`).
+* **Automated Boundary Testing:** Static AST boundary test suite (`tests/architecture/test_architecture_boundaries.py`) verifies:
+  1. `domain` imports zero external packages or outer layers.
+  2. `presentation` never imports from `data`.
+  3. `data` never imports from `presentation`.
+  4. All dependency provider functions in `bootstrap` are asynchronous coroutines.
+  Runs as part of Git pre-commit hooks and CI test runs.
+
 ---
 
 ## 4. Test Suite Summary
@@ -186,14 +209,19 @@ Tests are implemented with `pytest`, `pytest-asyncio`, and an isolated in-memory
 
 | Test Module | Coverage Area | Scenarios Verified | Result |
 | :--- | :--- | :--- | :--- |
+| `test_architecture_boundaries.py` | Architecture Boundaries | Clean Architecture AST boundary rules, pure domain isolation, zero data leaks into presentation, async DI coroutine providers | ✅ 4 passed |
 | `test_health.py` | Health & Engine | DB connectivity, app version | ✅ 1 passed |
-| `test_auth.py` | Identity & Roles | First-run wizard, JWT, admin member provisioning, 403 checks, password limits, production security, constant-time login timing attack defense | ✅ 9 passed |
+| `test_auth.py` | Identity & Roles | First-run wizard, JWT, admin member provisioning, distributed mutex concurrency, 403 checks, password limits, production security, constant-time login timing attack defense | ✅ 10 passed |
 | `test_users.py` | User Deletion & Lifecycle | Admin deletes member, reassigns custom agents & household memories to admin, purges personal space & personal memories, sole admin protection, multi-admin deletion, self-service profile/password update, input validation bounds | ✅ 6 passed |
 | `test_spaces.py` | Spaces & Concurrency | Shared hub, Bento widgets, strict Zero-Leak 403 isolation, non-locking read optimization, collaborative member updates | ✅ 5 passed |
-| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration, slug reuse, trash purge, slug regex validation, inference parameter bounds, tool permissions allowlist | ✅ 10 passed |
-| `test_sessions.py` | Sessions & Archival | Session lifecycle, messages, Secret Mode toggle, owner isolation, updated_at bumping, message ordering, purged agent session archival, non-interactive archived sessions, trashed agent message guard, message pagination & bounds, message role/content validation | ✅ 8 passed |
+| `test_agents.py` | Agent Catalog | Built-in seeds, custom model ownership, soft-delete, 7-day restore, 410 expiration, slug reuse, trash purge, autonomous background purger task, inactive agent suspension, slug regex validation, inference parameter bounds, tool permissions allowlist | ✅ 12 passed |
+| `test_sessions.py` | Sessions & Archival | Session lifecycle, messages, Secret Mode toggle, owner isolation, updated_at bumping, message ordering, purged agent session archival, non-interactive archived sessions, trashed & inactive agent message guard, message pagination & bounds, message role/content validation | ✅ 8 passed |
 | `test_memories.py` | Agent Memory & Privacy | Personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, secret mode block, admin household curation, agent_id 404 validation, confidence range bounds | ✅ 8 passed |
-| **Total** | **47 tests** | **End-to-End API contracts across 10 TDD cycles** | **✅ 100% Pass (92% coverage)** |
+| `domain/test_entities.py` | Domain Entities | Pure entity dataclass behavior, immutability, defaults, helper methods without external framework dependencies | ✅ 5 passed |
+| `domain/test_use_cases.py` | Domain Use Cases | Business logic isolation, interactors executing against mock repository protocols | ✅ 4 passed |
+| `data/test_data_layer.py` | Data Layer & Mappers | SQLAlchemy ORM model bidirectional mapping to domain entities, column mapping fidelity | ✅ 2 passed |
+| `presentation/test_presentation_mappers.py` | Presentation Mappers | Domain entities to Pydantic HTTP schema bidirectional serialization and contract adherence | ✅ 5 passed |
+| **Total** | **70 tests** | **End-to-End API contracts, clean architecture boundaries, and domain logic across 12 test suites** | **✅ 100% Pass** |
 
 
 
