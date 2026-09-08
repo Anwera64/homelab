@@ -80,12 +80,12 @@ cd apps\household-hub\backend
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-The 157 automated tests (100% passing) cover:
+The 159 automated tests (100% passing) cover:
 * `tests/architecture/test_architecture_boundaries.py`: AST static analysis verifying strict layer boundaries and coroutine DI providers.
 * `tests/test_auth.py`: First-run admin onboarding, atomic concurrent registration mutex, JWT verification, and member provisioning.
 * `tests/test_spaces.py`: Shared singleton space, Bento widgets layout, and strict Zero-Leak 403 enforcement.
 * `tests/test_agents.py`: Builtin models seeding, custom model creation, soft-delete, 7-day restore, slug reuse, cascading trash purge, and inactive suspension.
-* `tests/test_sessions.py`: Session thread management, secret mode toggle, private history isolation, cursor pagination, 409 stream lock, agent provenance, and LLM 502/504 mapping.
+* `tests/test_sessions.py`: Session thread management, tool approval execution (`POST /tools/approve`), cascading session archival (`POST /archive`), secret mode toggle, private history isolation, cursor pagination, 409 stream lock, agent provenance, and LLM 502/504 mapping.
 * `tests/test_memories.py`: Agent memory personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, and secret mode block.
 * `tests/test_users.py`: User lifecycle, member deletion with knowledge inheritance, and profile updates.
 * `tests/test_integrations.py`: CalDAV calendar integration, SearXNG search client with LRU caching, PDF reader with chunked validation, and document store CRUD.

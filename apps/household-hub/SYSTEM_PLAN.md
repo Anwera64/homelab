@@ -166,9 +166,12 @@ We will proceed through the build in modular, sequential stages. Before touching
 3. **Stage 3: AI Inference, Tool Execution, Autonomous Memory & Gossip Bus** `[COMPLETED ✅]`
    * Local Ollama inference integration (`qwen3:14b` on RTX 5080) via OpenAI-compatible endpoints with progressive token-by-token SSE streaming (`execute_stream`); agent tool execution loop; context assembly with prompt injection delimiter stripping; autonomous memory reflection with in-place semantic deduplication; attributed gossip bus with milestone sanitization; durable background stream execution resilient to client disconnects; synchronous session lock registry (`HTTP 409 Conflict`) with atomic pruning; upstream LLM exception mapping (`HTTP 502 Bad Gateway` / `HTTP 504 Gateway Timeout`); strict CORS origin lockdown (`https://spicy-llama.duckdns.org`) with DuckDNS subdomain regex. 157 automated tests (100% pass) with AST boundary enforcement.
    * Documented baseline: [`docs/STAGE_3_BASELINE.md`](./docs/STAGE_3_BASELINE.md)
-4. **Stage 4: KMP Shared Client Core (`:shared`)** `[NEXT UP ⏳]`
-   * Shared Kotlin Multiplatform module (`:shared`), multiplatform Ktor HTTP client (configured for Android, iOS Darwin, and Web Wasm), shared domain models, SSE stream ingestion, session state management (StateFlow), and authentication token management.
-5. **Stage 5: Compose Multiplatform UI (`:composeApp`)**
+4. **Stage 4: KMP Shared Client Core (`:shared`)** `[COMPLETED ✅]`
+   * Multi-module Kotlin Multiplatform architecture (`:core:domain`, `:core:data`, `:core:presentation`, `:shared`) built with Kotlin 2.2+, Ktor 3.4.1, Koin 4.0, and AndroidX Lifecycle 2.8.4. Strict Clean Architecture boundary enforcement (`presentation -> domain <- data`, `:shared` DI coordinator).
+   * Features preemptive Bearer auth auto-propagation, defensive SSE token streaming with prompt delimiter stripping, multiplatform disk-backed `FileTokenStorage` surviving process death, portable `NetworkExceptionHelper` (zero `java.net.*` in `commonMain`), 409 conflict exponential backoff recovery with 60s timeout, 1-tap message retries, and collision-free monotonic nanosecond optimistic message tracking in `ChatSessionViewModel`.
+   * 20 automated test suites with 100% pass rate, AST layer boundary verification, and Koin dependency graph validation.
+   * Documented baseline: [`docs/STAGE_4_BASELINE.md`](./docs/STAGE_4_BASELINE.md)
+5. **Stage 5: Compose Multiplatform UI (`:composeApp`)** `[NEXT UP ⏳]`
    * Compose Multiplatform screens (`:composeApp`), theme, dashboard navigation, streaming chat, and agent memory audit & management UI ("What I Know About You").
 6. **Stage 6: Homelab Deployment & Tailscale Ingress**
    * Docker Compose integration, port bindings, and secure remote routing via Tailscale.
