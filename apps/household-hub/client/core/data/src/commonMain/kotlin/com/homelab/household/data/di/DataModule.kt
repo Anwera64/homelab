@@ -1,0 +1,89 @@
+package com.homelab.household.data.di
+
+import com.homelab.household.data.local.FileTokenStorage
+import com.homelab.household.data.local.InMemoryTokenStorage
+import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.remote.DefensiveSseStreamReader
+import com.homelab.household.data.remote.ServerHealthMonitor
+import com.homelab.household.data.repository.AgentRepositoryImpl
+import com.homelab.household.data.repository.AuthRepositoryImpl
+import com.homelab.household.data.repository.GossipRepositoryImpl
+import com.homelab.household.data.repository.MemoryRepositoryImpl
+import com.homelab.household.data.repository.ServerStatusRepositoryImpl
+import com.homelab.household.data.repository.SessionRepositoryImpl
+import com.homelab.household.data.repository.SpaceRepositoryImpl
+import com.homelab.household.domain.repository.AgentRepository
+import com.homelab.household.domain.repository.AuthRepository
+import com.homelab.household.domain.repository.GossipRepository
+import com.homelab.household.domain.repository.MemoryRepository
+import com.homelab.household.domain.repository.ServerStatusRepository
+import com.homelab.household.domain.repository.SessionRepository
+import com.homelab.household.domain.repository.SpaceRepository
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.providers.BearerTokens
+import io.ktor.client.plugins.auth.providers.bearer
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import org.koin.dsl.module
+
+const val DEFAULT_BASE_URL = "https://hub.spicy-llama.duckdns.org"
+
+val dataModule = module {
+    single {
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            prettyPrint = false
+        }
+    }
+
+    single<TokenStorage> { FileTokenStorage() }
+
+    single {
+        val tokenStorage: TokenStorage = get()
+        val jsonSerializer: Json = get()
+        HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json(jsonSerializer)
+            }
+            install(Logging) {
+                level = LogLevel.INFO
+            }
+            install(Auth) {
+                bearer {
+                    loadTokens {
+                        val access = tokenStorage.getAccessToken()
+                        val refresh = tokenStorage.getRefreshToken()
+                        if (access != null) {
+                            BearerTokens(accessToken = access, refreshToken = refresh ?: "")
+                        } else {
+                            null
+                        }
+                    }
+                    sendWithoutRequest { request ->
+                        val url = request.url.buildString()
+                        !url.contains("/auth/login") &&
+                            !url.contains("/auth/onboard") &&
+                            !url.contains("/auth/status") &&
+                            !url.contains("/health")
+                    }
+                }
+            }
+        }
+    }
+    single { DefensiveSseStreamReader(get()) }
+    single { ServerHealthMonitor(get(), DEFAULT_BASE_URL) }
+
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), DEFAULT_BASE_URL) }
+    single<SessionRepository> { SessionRepositoryImpl(get(), DEFAULT_BASE_URL, 1000L, get()) }
+    single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
+    single<AgentRepository> { AgentRepositoryImpl(get(), DEFAULT_BASE_URL) }
+    single<SpaceRepository> { SpaceRepositoryImpl(get(), DEFAULT_BASE_URL) }
+    single<MemoryRepository> { MemoryRepositoryImpl(get(), DEFAULT_BASE_URL) }
+    single<GossipRepository> { GossipRepositoryImpl(get(), DEFAULT_BASE_URL) }
+}

@@ -13,12 +13,18 @@ from app.presentation.schemas.session_schemas import (
     SessionRead,
     SessionSecretToggle,
 )
-from app.presentation.schemas.chat_schemas import ChatTurnRequest, ChatTurnResponse
+from app.presentation.schemas.chat_schemas import (
+    ChatTurnRequest,
+    ChatTurnResponse,
+    ToolApprovalRequest,
+    ToolApprovalResponse,
+)
 from app.presentation.mappers.session_presentation_mapper import SessionPresentationMapper
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
+from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 from app.domain.use_cases.agents.get_agent import GetAgentUseCase
@@ -30,6 +36,7 @@ from app.presentation.api.deps import (
     get_session_use_case,
     get_create_session_use_case,
     get_toggle_secret_mode_use_case,
+    get_archive_session_use_case,
     get_add_chat_message_use_case,
     get_delete_session_use_case,
     get_agent_use_case,
@@ -134,6 +141,34 @@ async def delete_session(
     """Delete a conversation session and all its messages."""
     await use_case.execute(session_id=session_id, current_user=current_user)
     return {"message": "Session deleted successfully"}
+
+
+@router.post("/{session_id}/archive", response_model=SessionRead)
+async def archive_session(
+    session_id: str,
+    use_case: ArchiveSessionUseCase = Depends(get_archive_session_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Archive an existing conversation session."""
+    session = await use_case.execute(session_id=session_id, current_user=current_user)
+    return SessionPresentationMapper.to_response(session)
+
+
+@router.post("/{session_id}/tools/approve", response_model=ToolApprovalResponse)
+async def approve_tool(
+    session_id: str,
+    payload: ToolApprovalRequest,
+    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Approve or reject a tool proposal for an active session."""
+    await get_session_uc.execute(session_id=session_id, current_user=current_user)
+    status_str = "approved" if payload.approved else "rejected"
+    return ToolApprovalResponse(
+        status=status_str,
+        tool_call_id=payload.tool_call_id,
+        result={"status": status_str, "tool_call_id": payload.tool_call_id}
+    )
 
 
 @router.post("/{session_id}/chat", response_model=ChatTurnResponse)

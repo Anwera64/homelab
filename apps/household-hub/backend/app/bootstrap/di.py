@@ -90,6 +90,7 @@ from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUse
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
+from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 
@@ -347,6 +348,7 @@ def get_container(session: AsyncSession):
         pres_deps.get_session_use_case: GetSessionUseCase(session_repo),
         pres_deps.get_create_session_use_case: CreateSessionUseCase(session_repo, agent_repo, uow),
         pres_deps.get_toggle_secret_mode_use_case: ToggleSecretModeUseCase(session_repo, uow),
+        pres_deps.get_archive_session_use_case: ArchiveSessionUseCase(session_repo, uow),
         pres_deps.get_add_chat_message_use_case: AddChatMessageUseCase(session_repo, agent_repo, uow),
         pres_deps.get_delete_session_use_case: DeleteSessionUseCase(session_repo, uow),
 
@@ -443,6 +445,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_session_use_case,
         pres_deps.get_create_session_use_case,
         pres_deps.get_toggle_secret_mode_use_case,
+        pres_deps.get_archive_session_use_case,
         pres_deps.get_add_chat_message_use_case,
         pres_deps.get_delete_session_use_case,
         pres_deps.get_list_user_memories_use_case,

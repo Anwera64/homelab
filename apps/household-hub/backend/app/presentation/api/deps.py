@@ -37,6 +37,7 @@ from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUse
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
+from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 
@@ -165,6 +166,9 @@ def get_create_session_use_case() -> CreateSessionUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_toggle_secret_mode_use_case() -> ToggleSecretModeUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_archive_session_use_case() -> ArchiveSessionUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_add_chat_message_use_case() -> AddChatMessageUseCase:

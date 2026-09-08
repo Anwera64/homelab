@@ -559,6 +559,62 @@ async def test_chat_turn_llm_inference_exception_returns_502_or_504(client: http
     assert "timed out" in resp_504.json()["detail"]
 
 
+@pytest.mark.asyncio
+async def test_approve_tool_proposal_endpoint(client: httpx.AsyncClient):
+    """Tool proposal endpoint accepts approvals and rejections."""
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "Tool Chat"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+
+    # 1. Approve tool proposal
+    resp = await client.post(
+        f"/api/v1/sessions/{session_id}/tools/approve",
+        json={"tool_call_id": "tc_123", "approved": True},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "approved"
+    assert data["tool_call_id"] == "tc_123"
+
+    # 2. Reject tool proposal
+    resp_reject = await client.post(
+        f"/api/v1/sessions/{session_id}/tools/approve",
+        json={"tool_call_id": "tc_456", "approved": False},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert resp_reject.status_code == 200
+    assert resp_reject.json()["status"] == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_archive_session_endpoint(client: httpx.AsyncClient):
+    """Archive session endpoint transitions is_archived to True."""
+    _, member_token, agent_id = await setup_environment(client)
+
+    sess_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent_id, "title": "To Archive"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    session_id = sess_resp.json()["id"]
+    assert sess_resp.json()["is_archived"] is False
+
+    # Archive session
+    archive_resp = await client.post(
+        f"/api/v1/sessions/{session_id}/archive",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert archive_resp.status_code == 200
+    assert archive_resp.json()["is_archived"] is True
+
+
+
 
 
 
