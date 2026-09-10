@@ -164,4 +164,55 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const malformedPattern = /-\s*icon:.*\n\s*-\s*href:/;
     assert.ok(!malformedPattern.test(bookmarksYamlContent), 'bookmarks.yaml must not have separate array items for icon and href');
   });
+
+  await t.test('docker-compose.yml pins Jellyfin to 12.0 and defines Seerr with init: true', () => {
+    assert.ok(
+      /container_name:\s*jellyfin[\s\S]*?image:\s*jellyfin\/jellyfin:12\.0(\.0)?/.test(dockerComposeContent) ||
+      /image:\s*jellyfin\/jellyfin:12\.0(\.0)?[\s\S]*?container_name:\s*jellyfin/.test(dockerComposeContent),
+      'docker-compose.yml must pin jellyfin to jellyfin/jellyfin:12.0'
+    );
+
+    assert.ok(
+      /container_name:\s*seerr/.test(dockerComposeContent),
+      'docker-compose.yml must contain container_name: seerr'
+    );
+    assert.ok(
+      /image:\s*ghcr\.io\/seerr-team\/seerr:latest/.test(dockerComposeContent),
+      'docker-compose.yml must use image ghcr.io/seerr-team/seerr:latest'
+    );
+    assert.ok(
+      /init:\s*true/.test(dockerComposeContent),
+      'docker-compose.yml must specify init: true for seerr'
+    );
+    assert.ok(
+      /\$\{CONFIG_PATH\}\/seerr:\/app\/config/.test(dockerComposeContent),
+      'docker-compose.yml must map ${CONFIG_PATH}/seerr:/app/config'
+    );
+  });
+
+  await t.test('Caddyfile reverse proxies Seerr on port 5055 and provides /emby/* strip fallback', () => {
+    assert.ok(
+      caddyfileContent.includes('reverse_proxy seerr:5055'),
+      'Caddyfile must reverse proxy port 5055 to seerr:5055'
+    );
+    assert.ok(
+      caddyfileContent.includes('handle_path /emby/*') || caddyfileContent.includes('uri strip_prefix /emby'),
+      'Caddyfile must contain /emby/* strip fallback for Jellyfin 12'
+    );
+  });
+
+  await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
+    assert.ok(
+      /container:\s*seerr/.test(servicesYamlContent),
+      'Homepage services.yaml must define container: seerr'
+    );
+    assert.ok(
+      /type:\s*seerr/.test(servicesYamlContent),
+      'Homepage services.yaml must define widget type: seerr'
+    );
+    assert.ok(
+      /version:\s*2/.test(servicesYamlContent),
+      'Homepage services.yaml Jellyfin widget must specify version: 2 to prevent legacy /emby/ calls'
+    );
+  });
 });

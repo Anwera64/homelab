@@ -279,7 +279,7 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  --- Homelab Service Endpoints (DuckDNS HTTPS) ---" -ForegroundColor Cyan
     Write-Host "  * Central Portal: https://$domain" -ForegroundColor Yellow
     Write-Host "  * Jellyfin:       https://jellyfin.$domain" -ForegroundColor White
-    Write-Host "  * Jellyseerr:     https://seerr.$domain" -ForegroundColor White
+    Write-Host "  * Seerr:          https://seerr.$domain" -ForegroundColor White
     Write-Host "  * Jellystat:      https://stat.$domain" -ForegroundColor White
     Write-Host "  * Sonarr:         https://sonarr.$domain" -ForegroundColor White
     Write-Host "  * Radarr:         https://radarr.$domain" -ForegroundColor White
@@ -292,7 +292,7 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray
     Write-Host "  * Dashboard:      http://localhost:3000" -ForegroundColor DarkGray
     Write-Host "  * Jellyfin:       http://localhost:8096" -ForegroundColor DarkGray
-    Write-Host "  * Jellyseerr:     http://localhost:5055" -ForegroundColor DarkGray
+    Write-Host "  * Seerr:          http://localhost:5055" -ForegroundColor DarkGray
     Write-Host "  * qBittorrent:    http://localhost:8080   (via Gluetun VPN)" -ForegroundColor DarkGray
     Write-Host ""
 }

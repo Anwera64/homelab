@@ -14,19 +14,20 @@
           type: jellyfin
           url: http://jellyfin:8096
           key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
+          version: 2
           enableNowPlaying: true
           enableBlocks: true
 
-    - Jellyseerr:
-        icon: jellyseerr.png
+    - Seerr:
+        icon: seerr.png
         href: https://seerr.spicy-llama.duckdns.org
         description: Netflix-style Request & Discovery UI
         server: my-docker
-        container: jellyseerr
+        container: seerr
         widget:
-          type: jellyseerr
-          url: http://jellyseerr:5055
-          key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
+          type: seerr
+          url: http://seerr:5055
+          key: "{{HOMEPAGE_VAR_SEERR_API_KEY}}"
 
     - Jellystat:
         icon: jellystat.png

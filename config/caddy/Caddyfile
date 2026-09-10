@@ -29,12 +29,15 @@
     # Media & Streaming
     @jellyfin host jellyfin.spicy-llama.duckdns.org
     handle @jellyfin {
+        handle_path /emby/* {
+            reverse_proxy jellyfin:8096
+        }
         reverse_proxy jellyfin:8096
     }
 
-    @jellyseerr host seerr.spicy-llama.duckdns.org jellyseerr.spicy-llama.duckdns.org
-    handle @jellyseerr {
-        reverse_proxy jellyseerr:5055
+    @seerr host seerr.spicy-llama.duckdns.org jellyseerr.spicy-llama.duckdns.org
+    handle @seerr {
+        reverse_proxy seerr:5055
     }
 
     @jellystat host stat.spicy-llama.duckdns.org jellystat.spicy-llama.duckdns.org
@@ -103,11 +106,14 @@ http://:3000 {
 # 3. Direct Local LAN Ports (Pure HTTP)
 # ------------------------------------------------------------------------------
 http://:8096 {
+    handle_path /emby/* {
+        reverse_proxy jellyfin:8096
+    }
     reverse_proxy jellyfin:8096
 }
 
 http://:5055 {
-    reverse_proxy jellyseerr:5055
+    reverse_proxy seerr:5055
 }
 
 http://:3005 {
