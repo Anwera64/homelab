@@ -8,6 +8,9 @@ import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.domain.exception.DomainException
+import com.homelab.household.domain.exception.NotFoundException
+import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
@@ -19,7 +22,9 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -82,7 +87,23 @@ class AuthRepositoryImpl(
 
     override suspend fun checkStatus(): AuthStatus {
         val dto = try {
-            client.get("$baseUrl/api/v1/auth/status").body<AuthStatusDto>()
+            val response = client.get("$baseUrl/api/v1/auth/status")
+            if (response.status.value in 502..504) {
+                throw ServerOfflineException(
+                    message = "Hub is offline or starting up (HTTP ${response.status.value})"
+                )
+            }
+            if (!response.status.isSuccess()) {
+                if (response.status == HttpStatusCode.NotFound) {
+                    throw NotFoundException("Hub endpoint returned HTTP 404. Check your hub address.")
+                }
+                throw DomainException("Hub returned HTTP ${response.status.value}: ${response.status.description}")
+            }
+            val contentType = response.contentType()?.withoutParameters()
+            if (contentType != null && contentType != ContentType.Application.Json) {
+                throw DomainException("Hub returned unexpected content type: $contentType. Check your network or hub address.")
+            }
+            response.body<AuthStatusDto>()
         } catch (e: Exception) {
             NetworkExceptionHelper.rethrowAsDomain(e)
         }

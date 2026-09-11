@@ -82,6 +82,11 @@
         reverse_proxy flaresolverr:8191
     }
 
+    # Household Hub Backend
+    @hub host hub.spicy-llama.duckdns.org
+    handle @hub {
+        reverse_proxy host.docker.internal:3050
+    }
 
     # Default / Dashboard (Homepage)
     handle {

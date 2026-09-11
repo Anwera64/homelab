@@ -79,6 +79,40 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun check_status_when_proxy_returns_502_bad_gateway_throws_server_offline() = runTest {
+        val mockEngine = MockEngine {
+            respond(
+                content = "Bad Gateway",
+                status = HttpStatusCode.BadGateway,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain")
+            )
+        }
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) { json(json) }
+        }
+        val repo = AuthRepositoryImpl(client, InMemoryTokenStorage(), baseUrl = DEFAULT_BASE_URL)
+
+        assertThrowsSuspend<ServerOfflineException> { repo.checkStatus() }
+    }
+
+    @Test
+    fun check_status_when_proxy_returns_404_html_throws_domain_exception() = runTest {
+        val mockEngine = MockEngine {
+            respond(
+                content = "<html><body>404 Not Found</body></html>",
+                status = HttpStatusCode.NotFound,
+                headers = headersOf(HttpHeaders.ContentType, "text/html; charset=utf-8")
+            )
+        }
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) { json(json) }
+        }
+        val repo = AuthRepositoryImpl(client, InMemoryTokenStorage(), baseUrl = DEFAULT_BASE_URL)
+
+        assertThrowsSuspend<com.homelab.household.domain.exception.DomainException> { repo.checkStatus() }
+    }
+
+    @Test
     fun concurrent_401_requests_trigger_single_flight_refresh_mutex() = runTest {
         val refreshCount = AtomicInteger(0)
 
