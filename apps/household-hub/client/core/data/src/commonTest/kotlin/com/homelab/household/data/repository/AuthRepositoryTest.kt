@@ -1,6 +1,9 @@
 package com.homelab.household.data.repository
 
+import com.homelab.household.data.assertThrowsSuspend
+import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.local.InMemoryTokenStorage
+import com.homelab.household.domain.exception.ServerOfflineException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -9,6 +12,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -54,13 +58,24 @@ class AuthRepositoryTest {
         }
 
         val tokenStorage = InMemoryTokenStorage()
-        val repo = AuthRepositoryImpl(client, tokenStorage, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = AuthRepositoryImpl(client, tokenStorage, baseUrl = DEFAULT_BASE_URL)
 
         val user = repo.login("alice", "password123")
 
         assertEquals("u-1", user.id)
         assertEquals("alice", user.username)
         assertEquals("jwt-token-123", tokenStorage.getAccessToken())
+    }
+
+    @Test
+    fun check_status_when_hub_unreachable_throws_server_offline() = runTest {
+        val mockEngine = MockEngine { throw IOException("Connection refused") }
+        val client = HttpClient(mockEngine) {
+            install(ContentNegotiation) { json(json) }
+        }
+        val repo = AuthRepositoryImpl(client, InMemoryTokenStorage(), baseUrl = DEFAULT_BASE_URL)
+
+        assertThrowsSuspend<ServerOfflineException> { repo.checkStatus() }
     }
 
     @Test
@@ -99,7 +114,7 @@ class AuthRepositoryTest {
 
         val tokenStorage = InMemoryTokenStorage()
         tokenStorage.saveTokens("expired-token", "refresh-token")
-        val repo = AuthRepositoryImpl(client, tokenStorage, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = AuthRepositoryImpl(client, tokenStorage, baseUrl = DEFAULT_BASE_URL)
 
         // Launch 5 parallel refresh operations
         val jobs = (1..5).map {

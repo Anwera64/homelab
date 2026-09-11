@@ -53,7 +53,7 @@ No features; everything after this builds on it.
 - **`:composeApp`.** A Kotlin Multiplatform library with the screens, theme and navigation, wired to Koin through `HouseholdHubSdk`.
 - **`:androidApp`.** The Android application module: `MainActivity`, SDK initialisation, `setContent { App() }`.
 - **Theme.** Copenhagen Day and Midnight Espresso tokens (design notes §3), ghost alphas per palette, Outfit / Inter / JetBrains Mono bundled.
-- **Hearth icons** as `ImageVector`s, all 27.
+- **Hearth icons** as `ImageVector`s — the sheet draws **30** (the sheet's own header still says 27).
 - **Shared components.** Bento card, chip, buttons (primary, secondary, destructive), text field with inline error, empty state, tool record line, message composer, bottom navigation with the centre +, and a scaffold that scrolls content under a pinned header and navigation.
 
 **Done when** the app opens on an Android phone or emulator, calls `GET /auth/status`, follows the system theme, and the existing JVM test suites still pass.
@@ -67,17 +67,19 @@ No features; everything after this builds on it.
 
 **Current catalog:** Kotlin 2.2.21, AGP 9.1.0, Ktor 3.4.1, Koin 4.0.2, lifecycle 2.8.6, Gradle 9.3.1.
 
-**Latest published versions** found when this plan was written. Pick the latest *stable* Compose Multiplatform release and align Kotlin to it at the start of slice 0:
+**Versions chosen and built in slice 0** (September 2026):
 
-| Artifact | Latest seen |
-| :--- | :--- |
-| Kotlin Gradle plugin | 2.4.20 |
-| Compose Multiplatform Gradle plugin | 1.13.0-alpha01 (pre-release — find the latest stable) |
-| `org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose` | 2.11.0 |
-| `org.jetbrains.androidx.navigation:navigation-compose` | 2.10.0-beta01 (pre-release) |
-| Koin (`koin-core`, `koin-compose`) | 4.2.2 |
-| Ktor (incl. `ktor-client-okhttp`) | 3.5.2 |
-| AGP | 9.5.0-alpha05 (pre-release; 9.1.0 is in use) |
+| Artifact | Version | Note |
+| :--- | :--- | :--- |
+| Kotlin + `plugin.compose` | 2.4.20 | latest stable |
+| Compose Multiplatform | 1.12.0 | latest stable |
+| `org.jetbrains.compose.material3:material3` | 1.12.0-alpha03 | the pairing stable CMP 1.12.0 itself ships; no stable Material3 pairs with it |
+| Navigation 3 (`navigation3-ui`) | 1.1.1 | stable. Nav2 paired with CMP 1.12 is `2.10.0-alpha02`, so Nav3 was taken instead |
+| `org.jetbrains.androidx.lifecycle:lifecycle-*` | 2.11.0 | |
+| Koin | 4.2.2 | |
+| Ktor (incl. `ktor-client-okhttp`) | 3.5.2 | |
+| AGP | 9.4.0 | **needs Gradle ≥ 9.6** — the wrapper went to 9.7.1 |
+| compileSdk / targetSdk / minSdk | 37 / 36 / 26 | **compileSdk 37** is required by Material3 `1.5.0-alpha22`, which CMP 1.12.0 depends on; AGP downloads the platform itself |
 
 **This machine:** JDK 21; Android SDK at `%LOCALAPPDATA%\Android\Sdk` with platforms 33–36.1, build-tools up to 36.1.0, emulator and system images installed. `ANDROID_HOME` isn't set, so the build needs `local.properties` with `sdk.dir` — already gitignored.
 

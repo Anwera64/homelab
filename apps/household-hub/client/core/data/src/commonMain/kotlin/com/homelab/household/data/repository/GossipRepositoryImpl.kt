@@ -14,7 +14,7 @@ import io.ktor.client.request.parameter
 
 class GossipRepositoryImpl(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) : GossipRepository {
 
     override suspend fun listHouseholdMilestones(limit: Int): List<HouseholdMilestone> {

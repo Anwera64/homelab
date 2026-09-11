@@ -20,7 +20,7 @@ import io.ktor.http.contentType
 
 class MemoryRepositoryImpl(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) : MemoryRepository {
 
     override suspend fun auditMemories(scope: MemoryScope?): List<AgentMemory> {

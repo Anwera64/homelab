@@ -17,7 +17,7 @@ import io.ktor.http.contentType
 
 class SpaceRepositoryImpl(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) : SpaceRepository {
 
     override suspend fun getPersonalSpace(): Space {

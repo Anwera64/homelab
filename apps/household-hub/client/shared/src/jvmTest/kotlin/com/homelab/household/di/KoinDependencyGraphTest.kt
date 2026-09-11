@@ -1,5 +1,6 @@
 package com.homelab.household.di
 
+import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.GossipRepository
@@ -16,6 +17,7 @@ import com.homelab.household.presentation.viewmodel.ChatSessionViewModel
 import com.homelab.household.presentation.viewmodel.DashboardViewModel
 import com.homelab.household.presentation.viewmodel.MemoryAuditViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
+import io.ktor.client.engine.HttpClientEngine
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
@@ -35,6 +37,10 @@ class KoinDependencyGraphTest : KoinTest {
         val koinApp = HouseholdHubSdk.init()
 
         assertNotNull(koinApp)
+
+        // Platform
+        assertNotNull(get<HttpClientEngine>())
+        assertNotNull(get<TokenStorage>())
 
         // Repositories
         assertNotNull(get<AuthRepository>())

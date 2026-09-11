@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.flow
 
 class SessionRepositoryImpl(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org",
+    private val baseUrl: String,
     private val pollDelayMs: Long = 1000L,
     private val sseStreamReader: DefensiveSseStreamReader = DefensiveSseStreamReader()
 ) : SessionRepository {
@@ -58,7 +58,7 @@ class SessionRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -75,7 +75,7 @@ class SessionRepositoryImpl(
             getOrCreateMessageFlow(sessionId).value = messages
             Pair(mappedSession, messages)
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -91,7 +91,7 @@ class SessionRepositoryImpl(
             }.body<SessionReadDto>()
             SessionDataMapper.toDomain(response)
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -99,7 +99,7 @@ class SessionRepositoryImpl(
         try {
             client.post("$baseUrl/api/v1/sessions/$sessionId/archive")
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -111,7 +111,7 @@ class SessionRepositoryImpl(
             }.body<SessionReadDto>()
             SessionDataMapper.toDomain(response)
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -119,7 +119,7 @@ class SessionRepositoryImpl(
         try {
             client.delete("$baseUrl/api/v1/sessions/$sessionId")
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -154,10 +154,7 @@ class SessionRepositoryImpl(
                 }
             }
         } catch (e: Throwable) {
-            if (NetworkExceptionHelper.isNetworkOfflineException(e)) {
-                throw ServerOfflineException(message = e.message ?: "Server is offline", cause = e)
-            }
-            throw e
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -217,7 +214,7 @@ class SessionRepositoryImpl(
             }
             response.status.isSuccess()
         } catch (e: Exception) {
-            handleOfflineOrThrow(e)
+            NetworkExceptionHelper.rethrowAsDomain(e)
         }
     }
 
@@ -252,12 +249,5 @@ class SessionRepositoryImpl(
 
     private fun getOrCreateMessageFlow(sessionId: String): MutableStateFlow<List<ChatMessage>> {
         return sessionMessagesCache.getOrPut(sessionId) { MutableStateFlow(emptyList()) }
-    }
-
-    private fun <T> handleOfflineOrThrow(e: Throwable): T {
-        if (NetworkExceptionHelper.isNetworkOfflineException(e)) {
-            throw ServerOfflineException(message = e.message ?: "Server is offline", cause = e)
-        }
-        throw e
     }
 }

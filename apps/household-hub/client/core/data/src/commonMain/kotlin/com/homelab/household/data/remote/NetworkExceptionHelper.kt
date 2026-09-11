@@ -1,11 +1,20 @@
 package com.homelab.household.data.remote
 
+import com.homelab.household.domain.exception.ServerOfflineException
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.utils.io.errors.IOException
 
 object NetworkExceptionHelper {
+    /** Rethrows network failures as [ServerOfflineException]; anything else is rethrown unchanged. */
+    fun rethrowAsDomain(e: Throwable): Nothing {
+        if (isNetworkOfflineException(e)) {
+            throw ServerOfflineException(message = e.message ?: "Server is offline", cause = e)
+        }
+        throw e
+    }
+
     fun isNetworkOfflineException(e: Throwable): Boolean {
         if (e is IOException ||
             e is SocketTimeoutException ||

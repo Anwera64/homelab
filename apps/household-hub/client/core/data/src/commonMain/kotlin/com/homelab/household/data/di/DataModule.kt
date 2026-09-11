@@ -1,9 +1,8 @@
 package com.homelab.household.data.di
 
-import com.homelab.household.data.local.FileTokenStorage
-import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.remote.DefensiveSseStreamReader
+import com.homelab.household.data.remote.HubConfig
 import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -20,7 +19,7 @@ import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
@@ -42,12 +41,10 @@ val dataModule = module {
         }
     }
 
-    single<TokenStorage> { FileTokenStorage() }
-
     single {
         val tokenStorage: TokenStorage = get()
         val jsonSerializer: Json = get()
-        HttpClient(CIO) {
+        HttpClient(get<HttpClientEngine>()) {
             install(ContentNegotiation) {
                 json(jsonSerializer)
             }
@@ -77,13 +74,13 @@ val dataModule = module {
         }
     }
     single { DefensiveSseStreamReader(get()) }
-    single { ServerHealthMonitor(get(), DEFAULT_BASE_URL) }
+    single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), DEFAULT_BASE_URL) }
-    single<SessionRepository> { SessionRepositoryImpl(get(), DEFAULT_BASE_URL, 1000L, get()) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
+    single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
-    single<AgentRepository> { AgentRepositoryImpl(get(), DEFAULT_BASE_URL) }
-    single<SpaceRepository> { SpaceRepositoryImpl(get(), DEFAULT_BASE_URL) }
-    single<MemoryRepository> { MemoryRepositoryImpl(get(), DEFAULT_BASE_URL) }
-    single<GossipRepository> { GossipRepositoryImpl(get(), DEFAULT_BASE_URL) }
+    single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }
+    single<SpaceRepository> { SpaceRepositoryImpl(get(), get<HubConfig>().baseUrl) }
+    single<MemoryRepository> { MemoryRepositoryImpl(get(), get<HubConfig>().baseUrl) }
+    single<GossipRepository> { GossipRepositoryImpl(get(), get<HubConfig>().baseUrl) }
 }

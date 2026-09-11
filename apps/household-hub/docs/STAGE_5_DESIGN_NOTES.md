@@ -57,7 +57,7 @@ The palette proof is the source of truth. What changed from the UI/UX specificat
 
 **Type:** Outfit (display), Inter (text), JetBrains Mono (times, handles, metadata). **Shape:** 24dp bento cards.
 
-**Hearth icons:** 24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
+**Hearth icons:** 24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **30** icons in six groups — its header and the table above still say 27, which predates the last additions. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
 
 ---
 

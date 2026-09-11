@@ -51,6 +51,19 @@ if [ -d "apps/household-hub/backend" ]; then
   fi
 fi
 
+# 4. Validate Household Hub client (KMP) boundaries and DI graph
+if git diff --cached --name-only | grep -q '^apps/household-hub/client/'; then
+  echo "  [+] Validating client Clean Architecture boundaries and Koin graph..."
+  (cd apps/household-hub/client && ./gradlew :shared:jvmTest \
+    --tests "*CleanArchitectureBoundaryTest*" --tests "*KoinDependencyGraphTest*" -q --console=plain)
+  CLIENT_EXIT_CODE=$?
+  if [ $CLIENT_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ [Pre-Commit FAILED] Client boundary or DI graph checks failed! Commit aborted."
+    exit 1
+  fi
+fi
+
 echo "✅ [Pre-Commit PASSED] All tests and configuration validations passed!"
 exit 0
 

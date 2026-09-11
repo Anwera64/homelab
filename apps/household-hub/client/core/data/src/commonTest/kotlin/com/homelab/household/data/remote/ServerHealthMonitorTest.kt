@@ -1,5 +1,6 @@
 package com.homelab.household.data.remote
 
+import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.domain.model.ServerStatus
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -38,7 +39,7 @@ class ServerHealthMonitorTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val monitor = ServerHealthMonitor(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val monitor = ServerHealthMonitor(client, baseUrl = DEFAULT_BASE_URL)
         val status = monitor.checkHealth()
 
         assertTrue(status is ServerStatus.Online)
@@ -54,7 +55,7 @@ class ServerHealthMonitorTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val monitor = ServerHealthMonitor(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val monitor = ServerHealthMonitor(client, baseUrl = DEFAULT_BASE_URL)
         val status = monitor.checkHealth()
 
         assertTrue(status is ServerStatus.Offline)
@@ -76,7 +77,7 @@ class ServerHealthMonitorTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val monitor = ServerHealthMonitor(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val monitor = ServerHealthMonitor(client, baseUrl = DEFAULT_BASE_URL)
         val status = monitor.checkHealth()
 
         assertTrue(status is ServerStatus.Offline)

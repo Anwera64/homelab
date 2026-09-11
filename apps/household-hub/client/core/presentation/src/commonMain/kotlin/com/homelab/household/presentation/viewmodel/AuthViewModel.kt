@@ -2,6 +2,7 @@ package com.homelab.household.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
@@ -18,8 +19,18 @@ data class AuthUiState(
     val isInitialized: Boolean = true,
     val memberCount: Int = 0,
     val user: User? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val hubStatus: HubStatus = HubStatus.Checking
 )
+
+/** What the launch screen learned from `GET /auth/status`. */
+sealed interface HubStatus {
+    data object Checking : HubStatus
+    data class Ready(val memberCount: Int) : HubStatus
+    data object FirstRun : HubStatus
+    data object Unreachable : HubStatus
+    data class Failed(val message: String) : HubStatus
+}
 
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
@@ -32,21 +43,36 @@ class AuthViewModel(
 
     fun checkStatus() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null, hubStatus = HubStatus.Checking) }
             try {
                 val status = checkAuthStatusUseCase()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isInitialized = status.isInitialized,
-                        memberCount = status.memberCount
+                        memberCount = status.memberCount,
+                        hubStatus = if (status.isInitialized) {
+                            HubStatus.Ready(memberCount = status.memberCount)
+                        } else {
+                            HubStatus.FirstRun
+                        }
                     )
                 }
-            } catch (e: Throwable) {
+            } catch (e: ServerOfflineException) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Failed to check status"
+                        errorMessage = e.message,
+                        hubStatus = HubStatus.Unreachable
+                    )
+                }
+            } catch (e: Throwable) {
+                val message = e.message ?: "Failed to check status"
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = message,
+                        hubStatus = HubStatus.Failed(message = message)
                     )
                 }
             }

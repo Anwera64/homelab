@@ -7,6 +7,7 @@ import com.homelab.household.data.dto.UserOnboardRequestDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.UserDataMapper
+import com.homelab.household.data.remote.NetworkExceptionHelper
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
@@ -32,7 +33,7 @@ import kotlinx.coroutines.sync.withLock
 class AuthRepositoryImpl(
     private val client: HttpClient,
     private val tokenStorage: TokenStorage,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) : AuthRepository {
 
     private val _currentUserFlow = MutableStateFlow<User?>(null)
@@ -80,7 +81,11 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun checkStatus(): AuthStatus {
-        val dto = client.get("$baseUrl/api/v1/auth/status").body<AuthStatusDto>()
+        val dto = try {
+            client.get("$baseUrl/api/v1/auth/status").body<AuthStatusDto>()
+        } catch (e: Exception) {
+            NetworkExceptionHelper.rethrowAsDomain(e)
+        }
         return AuthStatus(
             isInitialized = dto.is_initialized,
             memberCount = dto.member_count

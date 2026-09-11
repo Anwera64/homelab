@@ -20,7 +20,7 @@ import com.homelab.household.data.remote.NetworkExceptionHelper
 
 class AgentRepositoryImpl(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) : AgentRepository {
 
     override suspend fun listAgents(): List<AgentPersonality> {

@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.viewmodel
 
+import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UnauthorizedException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.User
@@ -59,6 +60,51 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state.isInitialized)
         assertEquals(3, state.memberCount)
+    }
+
+    @Test
+    fun hub_status_is_checking_before_first_result() = runTest(testDispatcher) {
+        assertEquals(HubStatus.Checking, viewModel.uiState.value.hubStatus)
+    }
+
+    @Test
+    fun hub_status_is_ready_with_member_count() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 2)
+
+        viewModel.checkStatus()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.Ready(memberCount = 2), viewModel.uiState.value.hubStatus)
+    }
+
+    @Test
+    fun hub_status_is_first_run_when_hub_not_initialized() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
+
+        viewModel.checkStatus()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.FirstRun, viewModel.uiState.value.hubStatus)
+    }
+
+    @Test
+    fun hub_status_is_unreachable_when_hub_offline() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws ServerOfflineException()
+
+        viewModel.checkStatus()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.Unreachable, viewModel.uiState.value.hubStatus)
+    }
+
+    @Test
+    fun hub_status_failed_keeps_message() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws IllegalStateException("Unexpected status 500")
+
+        viewModel.checkStatus()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.Failed(message = "Unexpected status 500"), viewModel.uiState.value.hubStatus)
     }
 
     @Test

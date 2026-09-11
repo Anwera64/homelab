@@ -1,18 +1,11 @@
 package com.homelab.household.data.local
 
 import java.io.File
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable
-private data class TokenDiskPayload(
-    val accessToken: String,
-    val refreshToken: String? = null
-)
-
-actual class FileTokenStorage actual constructor(
-    storageDir: String?
+class FileTokenStorage(
+    storageDir: String? = null
 ) : TokenStorage {
 
     private val json = Json { ignoreUnknownKeys = true }

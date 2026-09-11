@@ -1,5 +1,6 @@
 package com.homelab.household.data.repository
 
+import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.assertThrowsSuspend
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.ChatStreamEvent
@@ -52,7 +53,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         val events = repo.streamChatTurn("s-1", "Hello").toList()
 
         assertEquals(2, events.size)
@@ -102,7 +103,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org", pollDelayMs = 10)
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL, pollDelayMs = 10)
         val events = repo.streamChatTurn("s-1", "Hello").toList()
 
         assertTrue(events.isNotEmpty())
@@ -122,7 +123,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
 
         assertThrowsSuspend<ServerOfflineException> {
             repo.streamChatTurn("s-1", "Hello").toList()
@@ -147,7 +148,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         val success = repo.approveToolProposal("s-1", "tc-1", approved = true)
 
         assertTrue(success)
@@ -182,7 +183,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         val (session, messages) = repo.getSession("s-100")
 
         assertEquals("s-100", session.id)
@@ -208,7 +209,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         val result = repo.toggleSecretMode("s-100", isSecret = true)
 
         assertEquals("/api/v1/sessions/s-100/secret", patchedPath)
@@ -231,7 +232,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         repo.archiveSession("s-100")
 
         assertEquals("/api/v1/sessions/s-100/archive", postedPath)
@@ -281,7 +282,7 @@ class SessionRepositoryTest {
             install(ContentNegotiation) { json(json) }
         }
 
-        val repo = SessionRepositoryImpl(client, baseUrl = "https://hub.spicy-llama.duckdns.org")
+        val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
         // Populate cache
         repo.getSession("s-100")
 

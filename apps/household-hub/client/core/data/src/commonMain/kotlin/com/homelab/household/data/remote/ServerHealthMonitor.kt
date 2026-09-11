@@ -16,7 +16,7 @@ import kotlin.time.TimeSource
 
 class ServerHealthMonitor(
     private val client: HttpClient,
-    private val baseUrl: String = "https://hub.spicy-llama.duckdns.org"
+    private val baseUrl: String
 ) {
     suspend fun checkHealth(): ServerStatus {
         val mark = TimeSource.Monotonic.markNow()
