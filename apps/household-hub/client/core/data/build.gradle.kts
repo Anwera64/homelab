@@ -4,6 +4,26 @@ plugins {
     alias(libs.plugins.android.kotlin.multiplatform.library)
 }
 
+val generateBuildConfig = tasks.register("generateBuildConfig") {
+    val baseUrl = "https://hub.spicy-llama.duckdns.org"
+    val outputDir = layout.buildDirectory.dir("generated/source/buildConfig/commonMain/kotlin")
+    inputs.property("baseUrl", baseUrl)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("com/homelab/household/data/BuildConfig.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package com.homelab.household.data
+
+            object BuildConfig {
+                const val BASE_URL: String = "$baseUrl"
+            }
+            """.trimIndent()
+        )
+    }
+}
+
 kotlin {
     android {
         namespace = "com.homelab.household.data"
@@ -22,16 +42,19 @@ kotlin {
     }
 
     sourceSets {
-        commonMain.dependencies {
-            implementation(project(":core:domain"))
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.ktor.client.logging)
-            implementation(libs.ktor.client.auth)
-            implementation(libs.koin.core)
+        commonMain {
+            kotlin.srcDir(generateBuildConfig)
+            dependencies {
+                implementation(project(":core:domain"))
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.ktor.client.logging)
+                implementation(libs.ktor.client.auth)
+                implementation(libs.koin.core)
+            }
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)

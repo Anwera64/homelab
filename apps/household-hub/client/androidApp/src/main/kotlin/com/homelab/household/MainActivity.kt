@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.homelab.household.app.App
-import com.homelab.household.data.di.DEFAULT_BASE_URL
 
 class MainActivity : ComponentActivity() {
 
@@ -13,7 +12,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            App(hubAddress = DEFAULT_BASE_URL.substringAfter("://"))
+            App()
         }
     }
 }

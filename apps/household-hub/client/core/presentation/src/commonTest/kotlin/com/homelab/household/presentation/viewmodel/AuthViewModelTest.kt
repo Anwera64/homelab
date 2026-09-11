@@ -5,9 +5,11 @@ import com.homelab.household.domain.exception.UnauthorizedException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
-import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
+import com.homelab.household.domain.usecase.GetHubHostUseCase
+import com.homelab.household.domain.usecase.LoginUseCase
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,16 +34,19 @@ class AuthViewModelTest {
     private val loginUseCase = mockk<LoginUseCase>()
     private val onboardUseCase = mockk<FirstRunOnboardUseCase>()
     private val checkAuthStatusUseCase = mockk<CheckAuthStatusUseCase>()
+    private val getHubHostUseCase = mockk<GetHubHostUseCase>()
 
     private lateinit var viewModel: AuthViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        every { getHubHostUseCase() } returns "hub.spicy-llama.duckdns.org"
         viewModel = AuthViewModel(
             loginUseCase = loginUseCase,
             onboardUseCase = onboardUseCase,
-            checkAuthStatusUseCase = checkAuthStatusUseCase
+            checkAuthStatusUseCase = checkAuthStatusUseCase,
+            getHubHostUseCase = getHubHostUseCase
         )
     }
 
@@ -139,5 +144,10 @@ class AuthViewModelTest {
         assertFalse(state.isAuthenticated)
         assertNull(state.user)
         assertEquals("Invalid credentials", state.errorMessage)
+    }
+
+    @Test
+    fun ui_state_initializes_with_configured_hub_address() {
+        assertEquals("hub.spicy-llama.duckdns.org", viewModel.uiState.value.hubAddress)
     }
 }

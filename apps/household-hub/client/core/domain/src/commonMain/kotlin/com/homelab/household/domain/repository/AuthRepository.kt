@@ -12,4 +12,5 @@ interface AuthRepository {
     suspend fun logout()
     fun observeCurrentUser(): Flow<User?>
     suspend fun refreshToken(): String
+    fun getHubHost(): String
 }

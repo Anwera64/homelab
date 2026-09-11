@@ -161,4 +161,6 @@ class AuthRepositoryImpl(
         }
         return deferred.await()
     }
+
+    override fun getHubHost(): String = baseUrl.substringAfter("://").substringBefore("/")
 }

@@ -6,6 +6,7 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
+import com.homelab.household.domain.usecase.GetHubHostUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,8 @@ data class AuthUiState(
     val memberCount: Int = 0,
     val user: User? = null,
     val errorMessage: String? = null,
-    val hubStatus: HubStatus = HubStatus.Checking
+    val hubStatus: HubStatus = HubStatus.Checking,
+    val hubAddress: String = ""
 )
 
 /** What the launch screen learned from `GET /auth/status`. */
@@ -35,10 +37,11 @@ sealed interface HubStatus {
 class AuthViewModel(
     private val loginUseCase: LoginUseCase,
     private val onboardUseCase: FirstRunOnboardUseCase,
-    private val checkAuthStatusUseCase: CheckAuthStatusUseCase
+    private val checkAuthStatusUseCase: CheckAuthStatusUseCase,
+    private val getHubHostUseCase: GetHubHostUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(AuthUiState())
+    private val _uiState = MutableStateFlow(AuthUiState(hubAddress = getHubHostUseCase()))
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     fun checkStatus() {

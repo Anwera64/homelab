@@ -11,11 +11,10 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * The app shell: it owns the ViewModel and asks the hub where it stands on first composition.
- * [hubAddress] is passed in by the platform app module, so the UI never reaches into the data layer.
+ * The hub address is read directly from the ViewModel's UI state.
  */
 @Composable
 fun App(
-    hubAddress: String,
     authViewModel: AuthViewModel = koinViewModel()
 ) {
     val uiState by authViewModel.uiState.collectAsState()
@@ -25,7 +24,7 @@ fun App(
     HearthTheme {
         AppNavigation(
             hubStatus = uiState.hubStatus,
-            hubAddress = hubAddress,
+            hubAddress = uiState.hubAddress,
             onRetry = authViewModel::checkStatus
         )
     }

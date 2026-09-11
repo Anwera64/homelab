@@ -12,6 +12,7 @@ import com.homelab.household.domain.usecase.DeleteSessionUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
+import com.homelab.household.domain.usecase.GetHubHostUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
@@ -57,6 +58,7 @@ val domainModule = module {
     factory { GetCurrentUserUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { ObserveCurrentUserUseCase(get()) }
+    factory { GetHubHostUseCase(get()) }
 
     // Server status use cases
     factory { ObserveServerStatusUseCase(get()) }

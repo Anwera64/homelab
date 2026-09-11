@@ -49,3 +49,7 @@ class LogoutUseCase(private val authRepository: AuthRepository) {
 class ObserveCurrentUserUseCase(private val authRepository: AuthRepository) {
     operator fun invoke(): Flow<User?> = authRepository.observeCurrentUser()
 }
+
+class GetHubHostUseCase(private val authRepository: AuthRepository) {
+    operator fun invoke(): String = authRepository.getHubHost()
+}

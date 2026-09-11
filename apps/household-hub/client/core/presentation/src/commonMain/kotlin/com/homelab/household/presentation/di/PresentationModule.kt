@@ -9,6 +9,6 @@ import org.koin.dsl.module
 val presentationModule = module {
     factory { ChatSessionViewModel(get(), get(), get(), get()) }
     factory { DashboardViewModel(get(), get(), get(), get(), get()) }
-    factory { AuthViewModel(get(), get(), get()) }
+    factory { AuthViewModel(get(), get(), get(), get()) }
     factory { MemoryAuditViewModel(get(), get(), get(), get()) }
 }

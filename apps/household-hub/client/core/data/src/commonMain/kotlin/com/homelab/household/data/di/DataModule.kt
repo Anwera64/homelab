@@ -18,6 +18,7 @@ import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
+import com.homelab.household.data.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.auth.Auth
@@ -30,7 +31,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
-const val DEFAULT_BASE_URL = "https://hub.spicy-llama.duckdns.org"
+val DEFAULT_BASE_URL = BuildConfig.BASE_URL
 
 val dataModule = module {
     single {
