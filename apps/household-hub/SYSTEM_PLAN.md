@@ -173,5 +173,7 @@ We will proceed through the build in modular, sequential stages. Before touching
    * Documented baseline: [`docs/STAGE_4_BASELINE.md`](./docs/STAGE_4_BASELINE.md)
 5. **Stage 5: Compose Multiplatform UI (`:composeApp`)** `[NEXT UP ⏳]`
    * Compose Multiplatform screens (`:composeApp`), theme, dashboard navigation, streaming chat, and agent memory audit & management UI ("What I Know About You").
+   * Phone portrait on Android first, then iOS. Tablet layout deferred to a later stage.
+   * Plan: [`docs/STAGE_5_PLAN.md`](./docs/STAGE_5_PLAN.md) · Design notes and backend dependencies: [`docs/STAGE_5_DESIGN_NOTES.md`](./docs/STAGE_5_DESIGN_NOTES.md) · Secret chats: [`docs/STAGE_5_SECRET_SESSION_LOCKING.md`](./docs/STAGE_5_SECRET_SESSION_LOCKING.md)
 6. **Stage 6: Homelab Deployment & Tailscale Ingress**
    * Docker Compose integration, port bindings, and secure remote routing via Tailscale.
