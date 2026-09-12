@@ -152,7 +152,9 @@ adb shell am start -n com.homelab.household/.MainActivity
 
 ## 🌐 Network ingress
 
-* **Base URL:** `https://hub.spicy-llama.duckdns.org` (one value, `DEFAULT_BASE_URL`, injected as `HubConfig`)
+* **Base URL:** `https://hub.spicy-llama.duckdns.org`, set once as `hub.baseUrl` in `gradle.properties`.
+  `:core:data` generates it into `BuildConfig`, exposed as `DEFAULT_BASE_URL` and injected as `HubConfig`.
+  Override it per build with `-Phub.baseUrl=...`.
 * **API prefix:** `/api/v1`
 * **Local ingress:** on home Wi-Fi, local DNS resolves the domain to `192.168.1.20:3050`. Away from
   home, Tailscale MagicDNS and DuckDNS provide encrypted remote access.

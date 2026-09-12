@@ -31,7 +31,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
-val DEFAULT_BASE_URL = BuildConfig.BASE_URL
+const val DEFAULT_BASE_URL = BuildConfig.BASE_URL
 
 val dataModule = module {
     single {

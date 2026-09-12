@@ -5,7 +5,8 @@ plugins {
 }
 
 val generateBuildConfig = tasks.register("generateBuildConfig") {
-    val baseUrl = "https://hub.spicy-llama.duckdns.org"
+    val baseUrl = providers.gradleProperty("hub.baseUrl").orNull
+        ?: throw GradleException("hub.baseUrl is not set; add it to gradle.properties or pass -Phub.baseUrl=...")
     val outputDir = layout.buildDirectory.dir("generated/source/buildConfig/commonMain/kotlin")
     inputs.property("baseUrl", baseUrl)
     outputs.dir(outputDir)

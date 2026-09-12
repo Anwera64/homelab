@@ -14,13 +14,10 @@ android {
         versionCode = 1
         versionName = "0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        buildConfigField("String", "BASE_URL", "\"https://hub.spicy-llama.duckdns.org\"")
     }
 
     buildFeatures {
         compose = true
-        buildConfig = true
     }
 }
 
