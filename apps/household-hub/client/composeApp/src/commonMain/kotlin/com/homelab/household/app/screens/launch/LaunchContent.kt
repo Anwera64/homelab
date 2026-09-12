@@ -41,6 +41,7 @@ import com.homelab.household.app.resources.launch_unreachable_detail
 import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
+import com.homelab.household.app.resources.launch_action_description
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
@@ -113,7 +114,7 @@ fun LaunchContent(
                 Box(Modifier.width(56.dp).height(3.dp).background(colors.primary, HearthShapes.pill))
             }
             Text(
-                text = "Fetching auth status",
+                text = stringResource(Res.string.launch_action_description),
                 style = HearthTheme.typography.mono,
                 fontSize = 10.5.sp,
                 color = colors.textMuted
