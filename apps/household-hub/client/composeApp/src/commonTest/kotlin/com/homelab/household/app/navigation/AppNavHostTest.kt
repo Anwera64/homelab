@@ -1,62 +1,50 @@
 package com.homelab.household.app.navigation
 
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.screens.launch.FakeLaunchHub
-import com.homelab.household.app.testing.TestApp
-import com.homelab.household.app.testing.runScreenTest
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.runComposeUiTest
+import androidx.navigation3.runtime.NavKey
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
- * The back stack is the navigation host's only state; the screens decide when it moves.
- * `LaunchViewModelTest` covers how each decision is reached.
+ * The back stack is the navigation host's only state. The screens are stubs here — what each one
+ * does before it calls back is its own test's business — so this is about where the app goes,
+ * and nothing else.
  */
 @OptIn(ExperimentalTestApi::class)
 class AppNavHostTest {
 
+    private val backStack = mutableStateListOf<NavKey>(Destination.Launch)
+
     @Test
-    fun a_hub_with_members_lands_on_sign_in() = runScreenTest {
-        val hub = FakeLaunchHub().apply { respondsWith(initialized = true, members = 2) }
+    fun it_starts_on_launch() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
 
-        setContent {
-            TestApp(hub.engine) {
-                AppNavHost()
-            }
-        }
-        waitUntilExactlyOneExists(hasText("Sign in"), timeoutMillis = 5_000)
-
-        onNodeWithText("Sign in").assertIsDisplayed()
+        onNodeWithText(StubScreens.LAUNCH).assertIsDisplayed()
     }
 
     @Test
-    fun a_hub_with_nobody_on_it_lands_on_first_run() = runScreenTest {
-        val hub = FakeLaunchHub().apply { respondsWith(initialized = false, members = 0) }
+    fun launch_sends_the_user_to_sign_in() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
 
-        setContent {
-            TestApp(hub.engine) {
-                AppNavHost()
-            }
-        }
-        waitUntilExactlyOneExists(hasText("First run"), timeoutMillis = 5_000)
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
 
-        onNodeWithText("First run").assertIsDisplayed()
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        // Launch is answered once, so it leaves the stack rather than hiding under the answer.
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
     }
 
     @Test
-    fun an_unreachable_hub_stays_on_launch() = runScreenTest {
-        val hub = FakeLaunchHub().apply { isOffline() }
+    fun launch_sends_the_user_to_first_run() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
 
-        setContent {
-            TestApp(hub.engine) {
-                AppNavHost()
-            }
-        }
-        waitUntilExactlyOneExists(hasText("Can't reach your hub"), timeoutMillis = 5_000)
+        onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
 
-        onNodeWithText("Can't reach your hub").assertIsDisplayed()
-        onNodeWithText("Try again").assertIsDisplayed()
+        onNodeWithText(StubScreens.FIRST_RUN).assertIsDisplayed()
+        assertEquals(listOf(Destination.FirstRun), backStack.toList())
     }
 }
