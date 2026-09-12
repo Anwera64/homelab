@@ -22,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
@@ -116,11 +114,11 @@ private fun RowScope.NavItem(tab: NavTab, selected: NavTab, onSelect: (NavTab) -
             size = HearthTheme.size.iconLg,
             tint = tint
         )
+        // Selection reads through colour, not weight: a label that also thickens shifts the
+        // whole row by a hair as you move between tabs.
         Text(
             text = stringResource(tab.label),
-            fontFamily = HearthTheme.fonts.inter,
-            fontSize = 10.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            style = HearthTheme.typography.micro,
             color = tint
         )
     }

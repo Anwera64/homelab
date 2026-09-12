@@ -13,7 +13,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 
 private val LocalHearthColors = staticCompositionLocalOf { DayColors }
 private val LocalHearthFonts = staticCompositionLocalOf<HearthFonts> { error("HearthTheme is not applied") }
-private val LocalHearthTypography = staticCompositionLocalOf<HearthTypography> { error("HearthTheme is not applied") }
+
+// Internal for the same reason as the space and size locals below: a denser scale can be provided
+// over a subtree, and the test that proves it has to be able to provide one.
+internal val LocalHearthTypography =
+    staticCompositionLocalOf<HearthTypography> { error("HearthTheme is not applied") }
 
 // Space and size are the same in both palettes, but they still come through the theme: a later
 // size class provides its own scale here and every screen under it follows, untouched.

@@ -19,9 +19,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
@@ -47,11 +45,11 @@ fun HearthTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     val colors = HearthTheme.colors
-    val inter = HearthTheme.fonts.inter
-    val fieldStyle = textStyle ?: TextStyle(fontFamily = inter, fontSize = 15.sp, lineHeight = 22.sp)
+    val type = HearthTheme.typography
+    val fieldStyle = textStyle ?: type.bodyLarge
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-        Text(label, fontFamily = inter, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.textMuted)
+        Text(label, style = type.labelStrong, color = colors.textMuted)
 
         BasicTextField(
             value = value,
@@ -87,7 +85,7 @@ fun HearthTextField(
         )
 
         if (helper != null) {
-            Text(helper, fontFamily = inter, fontSize = 11.5.sp, color = colors.textMuted)
+            Text(helper, style = type.caption, color = colors.textMuted)
         }
         if (error != null) {
             Row(
@@ -101,7 +99,7 @@ fun HearthTextField(
                     tint = colors.error,
                     modifier = Modifier.padding(top = HearthTheme.spacing.xxs)
                 )
-                Text(error, fontFamily = inter, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.error)
+                Text(error, style = type.caption, color = colors.error)
             }
         }
     }

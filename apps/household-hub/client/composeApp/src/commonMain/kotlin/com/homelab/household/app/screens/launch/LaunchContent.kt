@@ -17,10 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
@@ -98,9 +96,9 @@ fun LaunchContent(
                 text = stringResource(
                     if (unreachable) Res.string.launch_unreachable_title else Res.string.app_name
                 ),
-                fontFamily = HearthTheme.fonts.outfit,
-                fontSize = if (unreachable) 23.sp else 27.sp,
-                fontWeight = FontWeight.SemiBold,
+                // A hub that answered gets the full-screen title; one that didn't gets the
+                // smaller one, because the reason underneath is the part you need to read.
+                style = with(HearthTheme.typography) { if (unreachable) title else hero },
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center
             )
@@ -126,8 +124,7 @@ fun LaunchContent(
             }
             Text(
                 text = stringResource(Res.string.launch_action_description),
-                style = HearthTheme.typography.mono,
-                fontSize = 10.5.sp,
+                style = HearthTheme.typography.monoSm,
                 color = colors.textMuted
             )
         }
@@ -171,9 +168,7 @@ private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
         lines.forEach { line ->
             Text(
                 text = line,
-                fontFamily = HearthTheme.fonts.inter,
-                fontSize = 14.5.sp,
-                lineHeight = 22.sp,
+                style = HearthTheme.typography.body,
                 color = colors.textMuted,
                 textAlign = TextAlign.Center
             )
@@ -209,7 +204,6 @@ private fun HubAddressPill(hubAddress: String, reachable: Boolean) {
         Text(
             text = hubAddress,
             style = HearthTheme.typography.mono,
-            fontSize = 11.5.sp,
             color = colors.textMuted
         )
     }

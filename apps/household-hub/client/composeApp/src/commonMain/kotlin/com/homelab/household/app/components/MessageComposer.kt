@@ -21,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
@@ -44,7 +43,7 @@ fun MessageComposer(
     leading: (@Composable () -> Unit)? = null
 ) {
     val colors = HearthTheme.colors
-    val textStyle = TextStyle(fontFamily = HearthTheme.fonts.inter, fontSize = 14.sp, lineHeight = 20.sp)
+    val textStyle = HearthTheme.typography.label
 
     Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)

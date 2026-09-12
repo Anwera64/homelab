@@ -10,9 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.sign_in_detail
 import com.homelab.household.app.resources.sign_in_title
@@ -39,17 +37,13 @@ fun PlaceholderContent(
     ) {
         Text(
             text = title,
-            fontFamily = HearthTheme.fonts.outfit,
-            fontSize = 27.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = HearthTheme.typography.hero,
             color = colors.textPrimary,
             textAlign = TextAlign.Center
         )
         Text(
             text = detail,
-            fontFamily = HearthTheme.fonts.inter,
-            fontSize = 14.5.sp,
-            lineHeight = 22.sp,
+            style = HearthTheme.typography.body,
             color = colors.textMuted,
             textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)

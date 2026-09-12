@@ -12,7 +12,7 @@ Everything decided while designing the Stage 5 mobile client, in one place: the 
 
 | Artefact | What it holds |
 | :--- | :--- |
-| Design canvas — *Household Hub Mobile* ([link](https://claude.ai/code/artifact/c8d66772-c6ea-4c07-90a7-8a4aba45b2b4)) | 79 screens in 20 flows, day theme, 390×844 |
+| Design canvas — *Household Hub Mobile* ([link](https://claude.ai/code/artifact/c8d66772-c6ea-4c07-90a7-8a4aba45b2b4)) | 79 screens in 20 flows, day theme, 390×844, plus the type proof |
 | Palette proof ([link](https://claude.ai/code/artifact/e0af0e37-e774-48a5-b3c2-de096de4d1f6)) | Final tokens, contrast checks, both themes |
 | Hearth icon set ([link](https://claude.ai/code/artifact/b87fc4c0-1259-4278-ba6d-71507297affc)) | 27 icons and their drawing rules |
 | [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md) | Approved spec for server-enforced secret chats |
@@ -55,7 +55,7 @@ The palette proof is the source of truth. What changed from the UI/UX specificat
 | Success | `#3A7455` | `#6FB58E` | New |
 | Night surfaces | — | `#191715` / `#211E1B` / `#2A2622` | Three elevation steps |
 
-**Type:** Outfit (display), Inter (text), JetBrains Mono (times, handles, metadata). **Shape:** 24dp bento cards.
+**Type:** Outfit (display), Inter (text), JetBrains Mono (times, handles, metadata) — the roles are below. **Shape:** 24dp bento cards.
 
 ### Space and size
 
@@ -80,11 +80,45 @@ Every padding, gap and dimension comes off a **4dp grid**, with one 2dp half-ste
 
 **What grew:** a header icon button and the composer's send button, both 44dp, now 48 — they were under the accessible floor. A launch hero tile went 76 → 80. Everything else moved by 2dp or less.
 
-**Type is not done.** The canvas still draws 28 distinct font sizes (9.5 through 36px, including 12.5, 13.5 and 14.5), and the components still write raw `sp` instead of the `HearthTypography` roles that already exist. Same disease, its own pass.
+### Type
 
-**In code:** a screen reads the scale off the theme, beside the palette — `HearthTheme.spacing.lg`, `HearthTheme.size.iconMd` — with the values held by `HearthSpacing`, `HearthSizes` and `HearthShapes` in `app/theme` and handed down by `HearthTheme` through a composition local. Space doesn't change between day and night, but going through the theme means a later size class (the deferred tablet) can provide its own scale and every screen follows without being touched. `DesignSystemTokenTest` fails the build on a raw `dp` written anywhere else in `composeApp/commonMain`, and on a screen reading `DefaultSpacing` / `DefaultSizes` past the theme. The one exception is the icon set: `HearthIcon` builds its vectors outside composition, and its 24-unit grid is the drawing itself, not a layout decision.
+Same disease, its own pass — and now done. The canvas drew **28 font sizes** (9.5 through 36px, including 12.5, 13.5 and 14.5) in **124 combinations** of family, size, weight, line height and tracking, every one written inline on the element; the components invented their own `sp` on top of that. Nothing was named, so each new screen copied whatever the last one happened to use.
 
-**Hearth icons:** 24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **30** icons in six groups — its header and the table above still say 27, which predates the last additions. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
+There are now **fifteen roles**. A role carries everything — family, size, weight, line height, tracking — and a screen picks one and writes nothing else. The proof is artboard `0 · The type scale` on the canvas; `HearthTypography` is the same table in code.
+
+| Role | Family | Size | Weight | Line | Tracking | For |
+| :--- | :--- | ---: | ---: | ---: | :--- | :--- |
+| `hero` | Outfit | 28 | 600 | 32 | -.015em | A full-screen title |
+| `title` | Outfit | 21 | 600 | 25 | -.012em | A screen or dialog title in the chrome |
+| `heading` | Outfit | 17 | 600 | 22 | -.01em | App bar, card, section |
+| `bodyLarge` | Inter | 15 | 400 | 23 | — | Lead prose, and a field's own text |
+| `body` | Inter | 14 | 400 | 21 | — | The default |
+| `bodyStrong` | Inter | 14 | 600 | 19 | — | A row's name, and every button label |
+| `label` | Inter | 13 | 500 | 18 | — | The second line of a row |
+| `labelStrong` | Inter | 12 | 600 | 16 | — | Chips, badges, field labels, ON/OFF |
+| `caption` | Inter | 12 | 400 | 17 | — | Helper text, and any supporting line |
+| `overline` | Inter | 11 | 600 | 13 | .11em | An eyebrow. The string carries the capitals |
+| `micro` | Inter | 10 | 600 | 12 | — | Nav labels and counts |
+| `monoSm` | Mono | 10 | 500 | 14 | — | Dense metadata: a status line, a latency |
+| `mono` | Mono | 12 | 500 | 17 | — | Times, handles, tool records |
+| `monoLg` | Mono | 15 | 500 | 21 | .06em | A credential you read back |
+| `codeHero` | Mono | 24 | 500 | 26 | .1em | The one code a screen exists to show |
+
+**Glyphs:** an emoji or an avatar's initial is not type — it is sized by the circle it sits in, one step per diameter: **20→10, 32→14, 40→18, 48→22, 56→26, 64→30, 96→36**. That removed 15/17/19/20 on a 40px circle, 18/19/22/23 on a 48px and 25/26/27/30 on a 64px. Circle diameters themselves didn't move.
+
+**Three modifiers, and only inside a role's own line:** `t-em` (600) for emphasis in prose, `t-soft` (500) for its opposite, `t-code` for a handle set in mono.
+
+**Off the scale on purpose:** the masked-PIN row keeps its `.42em` tracking. That is the spread between six dots, not a property of the type — the same reason a 1dp border sits off the 4dp grid. It is the only exception on the canvas.
+
+**What moved:** nav labels no longer thicken when selected — selection reads through colour, and a label that also changes weight shifts the row by a hair as you move between tabs. Prose at 13.5 and 14.5 became 14, small emphasis at 11 and 12.5 became 12, and the eyebrow settled at 11.
+
+### In code
+
+A screen reads the scale off the theme, beside the palette — `HearthTheme.spacing.lg`, `HearthTheme.size.iconMd` — with the values held by `HearthSpacing`, `HearthSizes` and `HearthShapes` in `app/theme` and handed down by `HearthTheme` through a composition local. Space doesn't change between day and night, but going through the theme means a later size class (the deferred tablet) can provide its own scale and every screen follows without being touched. Type reaches a screen the same way — `HearthTheme.typography.body` — and can be swapped over a subtree just as space can. `DesignSystemTokenTest` fails the build on a raw `dp` or a raw `sp` written anywhere else in `composeApp/commonMain`, on a `FontWeight` applied by hand at a call site, and on a screen reading `DefaultSpacing` / `DefaultSizes` past the theme. The one exception is the icon set: `HearthIcon` builds its vectors outside composition, and its 24-unit grid is the drawing itself, not a layout decision.
+
+### Hearth icons
+
+24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **30** icons in six groups — its header and the table above still say 27, which predates the last additions. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
 
 ---
 

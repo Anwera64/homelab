@@ -15,9 +15,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
@@ -96,5 +94,5 @@ private fun RowScope.ButtonContent(text: String, icon: HearthIcon?) {
         HearthIconImage(icon = icon, contentDescription = null, active = true, size = HearthTheme.size.iconMd)
         Spacer(Modifier.width(HearthTheme.spacing.sm))
     }
-    Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = HearthTheme.fonts.inter)
+    Text(text, style = HearthTheme.typography.bodyStrong)
 }

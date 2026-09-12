@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
@@ -45,6 +44,6 @@ fun ToolRecordLine(
         verticalAlignment = Alignment.CenterVertically
     ) {
         HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconSm, tint = tint)
-        Text(text = text, fontFamily = HearthTheme.fonts.inter, fontSize = 12.sp, color = tint)
+        Text(text = text, style = HearthTheme.typography.label, color = tint)
     }
 }

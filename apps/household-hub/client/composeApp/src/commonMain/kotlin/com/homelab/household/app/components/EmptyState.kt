@@ -13,9 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
@@ -64,18 +62,14 @@ fun EmptyState(
         }
         Text(
             text = title,
-            fontFamily = HearthTheme.fonts.outfit,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = HearthTheme.typography.heading,
             color = colors.textPrimary,
             textAlign = TextAlign.Center
         )
         Text(
             text = line,
             modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
-            fontFamily = HearthTheme.fonts.inter,
-            fontSize = 13.5.sp,
-            lineHeight = 21.sp,
+            style = HearthTheme.typography.label,
             color = colors.textMuted,
             textAlign = TextAlign.Center
         )
