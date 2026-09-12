@@ -10,6 +10,7 @@ import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
+import com.homelab.household.domain.util.runCatchingSafe
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.mock.MockEngine
@@ -69,7 +70,7 @@ class HubAddressWiringTest : KoinTest {
 
         calls.forEach { (name, call) ->
             val before = requestedHosts.size
-            runCatching { call() }
+            runCatchingSafe { call() }
             assertTrue(requestedHosts.size > before, "$name made no request")
         }
 

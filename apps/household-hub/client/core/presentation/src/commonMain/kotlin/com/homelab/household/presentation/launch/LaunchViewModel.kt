@@ -8,6 +8,7 @@ import com.homelab.household.domain.exception.UnexpectedContentTypeException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
+import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +38,7 @@ class LaunchViewModel(
         _uiState.update { it.copy(status = HubStatus.Checking) }
 
         viewModelScope.launch {
-            val status = runCatching { checkAuthStatusUseCase() }
+            val status = runCatchingSafe { checkAuthStatusUseCase() }
                 .fold(
                     onSuccess = { authStatus ->
                         if (authStatus.isInitialized) {
