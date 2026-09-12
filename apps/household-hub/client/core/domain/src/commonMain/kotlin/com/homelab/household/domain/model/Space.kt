@@ -1,10 +1,5 @@
 package com.homelab.household.domain.model
 
-enum class SpaceType {
-    PERSONAL,
-    HOUSEHOLD
-}
-
 data class Space(
     val id: String,
     val name: String,

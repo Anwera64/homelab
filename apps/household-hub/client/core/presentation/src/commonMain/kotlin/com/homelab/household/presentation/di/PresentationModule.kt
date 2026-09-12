@@ -1,9 +1,9 @@
 package com.homelab.household.presentation.di
 
-import com.homelab.household.presentation.viewmodel.AuthViewModel
-import com.homelab.household.presentation.viewmodel.ChatSessionViewModel
-import com.homelab.household.presentation.viewmodel.DashboardViewModel
-import com.homelab.household.presentation.viewmodel.MemoryAuditViewModel
+import com.homelab.household.presentation.viewmodel.auth.AuthViewModel
+import com.homelab.household.presentation.viewmodel.chatsession.ChatSessionViewModel
+import com.homelab.household.presentation.viewmodel.dashboard.DashboardViewModel
+import com.homelab.household.presentation.viewmodel.memoryaudit.MemoryAuditViewModel
 import org.koin.dsl.module
 
 val presentationModule = module {

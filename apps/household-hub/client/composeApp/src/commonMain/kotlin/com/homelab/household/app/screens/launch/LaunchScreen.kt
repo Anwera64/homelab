@@ -27,7 +27,7 @@ import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.presentation.viewmodel.HubStatus
+import com.homelab.household.presentation.viewmodel.auth.model.HubStatus
 
 /**
  * The first screen: what `GET /auth/status` found. Fixed shape, so it doesn't scroll.

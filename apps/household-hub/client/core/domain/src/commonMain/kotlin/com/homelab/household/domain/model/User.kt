@@ -11,14 +11,3 @@ data class User(
     val avatarColor: String? = "#4F46E5",
     val createdAt: String? = null
 )
-
-data class AuthStatus(
-    val isInitialized: Boolean,
-    val memberCount: Int
-)
-
-data class AuthToken(
-    val accessToken: String,
-    val tokenType: String = "bearer",
-    val user: User
-)

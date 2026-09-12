@@ -7,7 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.presentation.viewmodel.HubStatus
+import com.homelab.household.presentation.viewmodel.auth.model.HubStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

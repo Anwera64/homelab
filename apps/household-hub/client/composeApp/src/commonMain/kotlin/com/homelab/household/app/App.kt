@@ -6,7 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.homelab.household.app.navigation.AppNavigation
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.presentation.viewmodel.AuthViewModel
+import com.homelab.household.presentation.viewmodel.auth.AuthViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**

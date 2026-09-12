@@ -1,29 +1,5 @@
 package com.homelab.household.domain.model
 
-enum class MessageRole {
-    USER,
-    ASSISTANT,
-    SYSTEM,
-    TOOL
-}
-
-enum class MessageStatus {
-    SENDING,
-    SENT,
-    FAILED_OFFLINE,
-    FAILED_ERROR
-}
-
-data class ChatMessage(
-    val id: String,
-    val sessionId: String,
-    val role: MessageRole,
-    val content: String,
-    val status: MessageStatus = MessageStatus.SENT,
-    val metadata: Map<String, Any?> = emptyMap(),
-    val createdAt: String? = null
-)
-
 data class ConversationSession(
     val id: String,
     val userId: String,

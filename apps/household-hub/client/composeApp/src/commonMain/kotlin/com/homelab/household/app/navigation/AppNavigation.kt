@@ -8,7 +8,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.homelab.household.app.screens.launch.LaunchScreen
-import com.homelab.household.presentation.viewmodel.HubStatus
+import com.homelab.household.presentation.viewmodel.auth.model.HubStatus
 
 /** Slice 0 has one destination; slice 1 adds the onboarding branches behind it. */
 data object Launch : NavKey

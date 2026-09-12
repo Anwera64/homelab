@@ -1,10 +1,5 @@
 package com.homelab.household.domain.model
 
-enum class MemoryScope {
-    PERSONAL,
-    HOUSEHOLD
-}
-
 data class AgentMemory(
     val id: String,
     val userId: String,

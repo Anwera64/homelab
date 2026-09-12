@@ -12,10 +12,10 @@ import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
-import com.homelab.household.presentation.viewmodel.AuthViewModel
-import com.homelab.household.presentation.viewmodel.ChatSessionViewModel
-import com.homelab.household.presentation.viewmodel.DashboardViewModel
-import com.homelab.household.presentation.viewmodel.MemoryAuditViewModel
+import com.homelab.household.presentation.viewmodel.auth.AuthViewModel
+import com.homelab.household.presentation.viewmodel.chatsession.ChatSessionViewModel
+import com.homelab.household.presentation.viewmodel.dashboard.DashboardViewModel
+import com.homelab.household.presentation.viewmodel.memoryaudit.MemoryAuditViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import org.junit.jupiter.api.AfterEach
