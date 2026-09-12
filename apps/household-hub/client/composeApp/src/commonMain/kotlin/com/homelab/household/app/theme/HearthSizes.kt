@@ -39,9 +39,8 @@ data class HearthSizes(
     val emphasis: Dp = 2.dp,
     /** How wide centred prose is allowed to run before it stops being readable. */
     val readingWidth: Dp = 288.dp,
-    /** Launch's indeterminate bar: the track, the travelling fill, and their height. */
+    /** Launch's indeterminate bar: how wide it runs, and how thick. */
     val progressTrack: Dp = 160.dp,
-    val progressThumb: Dp = 56.dp,
     val progressHeight: Dp = 4.dp,
     /** The hub address pill's status dot. */
     val dot: Dp = 8.dp,

@@ -67,8 +67,7 @@ class HearthSpacingTest {
             "tile" to DefaultSizes.tile,
             "tileHero" to DefaultSizes.tileHero,
             "readingWidth" to DefaultSizes.readingWidth,
-            "progressTrack" to DefaultSizes.progressTrack,
-            "progressThumb" to DefaultSizes.progressThumb
+            "progressTrack" to DefaultSizes.progressTrack
         ).forEach { (name, size) -> assertOnGrid(size, 8, "size $name") }
     }
 

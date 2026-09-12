@@ -1,7 +1,10 @@
 package com.homelab.household.app.screens.launch
 
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
@@ -35,7 +38,11 @@ import org.jetbrains.compose.resources.getString
 @OptIn(ExperimentalTestApi::class)
 class LaunchRobot(private val test: ComposeUiTest) {
 
-    suspend fun seesItReachingTheHub() = seesText(getString(Res.string.launch_checking))
+    /** Checking has no end it can show, so the bar says "busy" rather than a percentage. */
+    suspend fun seesItReachingTheHub() {
+        seesText(getString(Res.string.launch_checking))
+        test.onNode(loading).assertIsDisplayed()
+    }
 
     suspend fun seesTheHubIsReady(members: Int) {
         seesText(getString(Res.string.launch_ready))
@@ -52,6 +59,7 @@ class LaunchRobot(private val test: ComposeUiTest) {
         seesText(getString(Res.string.launch_unreachable_title))
         seesText(getString(Res.string.launch_unreachable_detail))
         seesSomethingToRetry()
+        seesNothingLoading()
     }
 
     suspend fun seesTheHubFailed(reason: HubFailure) {
@@ -65,9 +73,15 @@ class LaunchRobot(private val test: ComposeUiTest) {
             }
         )
         seesSomethingToRetry()
+        seesNothingLoading()
     }
 
     suspend fun seesSomethingToRetry() = seesText(getString(Res.string.launch_retry))
+
+    /** A hub that already gave its answer isn't still being waited on. */
+    fun seesNothingLoading() {
+        test.onNode(loading).assertDoesNotExist()
+    }
 
     fun seesTheHubAddress(address: String) = seesText(address)
 
@@ -82,6 +96,11 @@ class LaunchRobot(private val test: ComposeUiTest) {
 
     private companion object {
         const val WAIT_MILLIS = 5_000L
+
+        val loading = SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo.Indeterminate
+        )
     }
 }
 

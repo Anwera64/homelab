@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.PrimaryButton
@@ -108,20 +110,15 @@ fun LaunchContent(
         HubAddressPill(hubAddress = state.hubAddress, reachable = !unreachable)
 
         if (status is HubStatus.Checking) {
-            Box(
+            LinearProgressIndicator(
                 modifier = Modifier
                     .width(HearthTheme.size.progressTrack)
-                    .height(HearthTheme.size.progressHeight)
-                    .background(colors.outline, HearthShapes.pill),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Box(
-                    Modifier
-                        .width(HearthTheme.size.progressThumb)
-                        .height(HearthTheme.size.progressHeight)
-                        .background(colors.primary, HearthShapes.pill)
-                )
-            }
+                    .height(HearthTheme.size.progressHeight),
+                color = colors.primary,
+                trackColor = colors.outline,
+                strokeCap = StrokeCap.Round,
+                gapSize = HearthTheme.spacing.none
+            )
             Text(
                 text = stringResource(Res.string.launch_action_description),
                 style = HearthTheme.typography.monoSm,
