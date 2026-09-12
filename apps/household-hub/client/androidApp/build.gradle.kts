@@ -31,6 +31,8 @@ dependencies {
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)
     implementation(libs.koin.android)
+    // Renders the commonMain @Preview functions in Android Studio.
+    debugImplementation(libs.compose.ui.tooling)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)

@@ -1,4 +1,4 @@
-package com.homelab.household.app.screens.launch
+package com.homelab.household.app.navigation
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -6,60 +6,51 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.ScreenTest
 import com.homelab.household.app.testing.TestApp
-import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.model.AuthStatus
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
-/** The screen owns its ViewModel: give it a hub, and it decides where the user goes next. */
+/**
+ * The back stack is the navigation host's only state; the screens decide when it moves.
+ * `LaunchViewModelTest` covers how each decision is reached.
+ */
 @OptIn(ExperimentalTestApi::class)
-class LaunchScreenTest : ScreenTest() {
+class AppNavHostTest : ScreenTest() {
 
     @Test
-    fun a_hub_with_members_sends_the_user_to_sign_in() = runComposeUiTest {
-        var signIn = 0
-        var firstRun = 0
-
+    fun a_hub_with_members_lands_on_sign_in() = runComposeUiTest {
         setContent {
             TestApp(authStatus = { AuthStatus(isInitialized = true, memberCount = 2) }) {
-                LaunchScreen(onSignIn = { signIn++ }, onFirstRun = { firstRun++ })
+                AppNavHost()
             }
         }
         waitForIdle()
 
-        assertEquals(1, signIn)
-        assertEquals(0, firstRun)
+        onNodeWithText("Sign in").assertIsDisplayed()
     }
 
     @Test
-    fun an_empty_hub_sends_the_user_to_first_run() = runComposeUiTest {
-        var signIn = 0
-        var firstRun = 0
-
+    fun a_hub_with_nobody_on_it_lands_on_first_run() = runComposeUiTest {
         setContent {
             TestApp(authStatus = { AuthStatus(isInitialized = false, memberCount = 0) }) {
-                LaunchScreen(onSignIn = { signIn++ }, onFirstRun = { firstRun++ })
+                AppNavHost()
             }
         }
         waitForIdle()
 
-        assertEquals(0, signIn)
-        assertEquals(1, firstRun)
+        onNodeWithText("First run").assertIsDisplayed()
     }
 
     @Test
-    fun an_unreachable_hub_keeps_the_user_here_with_something_to_retry() = runComposeUiTest {
-        var moved = 0
-
+    fun an_unreachable_hub_stays_on_launch() = runComposeUiTest {
         setContent {
             TestApp(authStatus = { throw ServerOfflineException() }) {
-                LaunchScreen(onSignIn = { moved++ }, onFirstRun = { moved++ })
+                AppNavHost()
             }
         }
         waitForIdle()
 
         onNodeWithText("Can't reach your hub").assertIsDisplayed()
         onNodeWithText("Try again").assertIsDisplayed()
-        assertEquals(0, moved)
     }
 }

@@ -31,6 +31,7 @@ kotlin {
             implementation(libs.compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
+            implementation(libs.jetbrains.lifecycle.runtime.compose)
             implementation(libs.navigation3.ui)
             implementation(libs.koin.compose.viewmodel)
         }

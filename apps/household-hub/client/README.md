@@ -26,16 +26,39 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
   * `HubConfig` — the one hub address, injected; no repository defaults it any more.
   * Token storage: `FileTokenStorage` (JVM) and `KeystoreTokenStorage` (Android, AES-256-GCM key in
     the Android Keystore, file in `noBackupFilesDir`, unreadable data reads as signed out).
-* **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. Multiplatform
-  `androidx.lifecycle.ViewModel`s exposing `StateFlow` UI state, including `AuthViewModel.hubStatus`
+* **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
+  screen (`presentation/launch/`), each holding that screen's `ViewModel`, its `UiState` and its
+  `Event` — for example `LaunchViewModel` with `HubStatus`
   (`Checking` / `Ready` / `FirstRun` / `Unreachable` / `Failed`).
 * **`:composeApp` (UI):** depends only on `:core:presentation` and `:core:domain`. Hearth theme
-  (Copenhagen Day / Midnight Espresso), 30 Hearth icons, shared components, launch screen, Nav3
-  navigation. Never imports `data`, `di`, `sdk` or Ktor — enforced by a test.
+  (Copenhagen Day / Midnight Espresso), 30 Hearth icons, shared components, the screens and the
+  Nav3 host. Never imports `data`, `di`, `sdk` or Ktor — enforced by a test.
 * **`:shared` (DI coordinator):** Koin graph, `platformModule` (`expect`/`actual`: HTTP engine and
   token storage per platform), `HouseholdHubSdk` entry point, and the architecture tests.
 * **`:androidApp`:** the Android application — `HouseholdHubApplication` (starts Koin with the
-  Android context), `MainActivity` (`setContent { App(...) }`), and the on-device tests.
+  Android context), `MainActivity` (`setContent { App() }`), and the on-device tests.
+
+---
+
+## 🧭 How a screen is built
+
+`App()` is the theme and nothing else; `AppNavHost` owns the back stack and is the only place that
+navigates. Every screen follows the same four files:
+
+| File | What it is |
+| :--- | :--- |
+| `presentation/<screen>/<Screen>ViewModel.kt` | `StateFlow<<Screen>UiState>` for what is drawn, `Channel<<Screen>Event>` for what happens once (navigation, a toast). Never Compose. |
+| `app/screens/<screen>/<Screen>Screen.kt` | **No dependencies in its signature** beyond navigation callbacks and a `Modifier`. It resolves its own ViewModel with `koinViewModel()`, collects the state with `collectAsStateWithLifecycle()`, collects the events with `ObserveEvents` and calls the content. |
+| `app/screens/<screen>/<Screen>Content.kt` | Stateless: state in, lambdas out. Holds the `@Preview` functions. |
+| `app/screens/<screen>/<Screen>UiStateProvider.kt` | A `PreviewParameterProvider` listing every state the screen can be in, so the previews and the content test cover all of them from one list. |
+
+Events go through a `Channel`, not state: a `Channel` is consumed once, so a recomposition can't
+navigate twice, and `ObserveEvents` only collects at `STARTED`, so a backgrounded screen can't
+navigate behind the user's back.
+
+Screen tests extend `ScreenTest` (Main dispatcher + a clean Koin context per test) and wrap the
+screen in `TestApp`, which builds the real ViewModel and use cases over a faked hub. Content tests
+need neither — they take a `UiState` directly.
 
 ---
 

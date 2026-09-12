@@ -12,10 +12,10 @@ import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
-import com.homelab.household.presentation.viewmodel.auth.AuthViewModel
-import com.homelab.household.presentation.viewmodel.chatsession.ChatSessionViewModel
-import com.homelab.household.presentation.viewmodel.dashboard.DashboardViewModel
-import com.homelab.household.presentation.viewmodel.memoryaudit.MemoryAuditViewModel
+import com.homelab.household.presentation.chatsession.ChatSessionViewModel
+import com.homelab.household.presentation.dashboard.DashboardViewModel
+import com.homelab.household.presentation.launch.LaunchViewModel
+import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import org.junit.jupiter.api.AfterEach
@@ -60,7 +60,7 @@ class KoinDependencyGraphTest : KoinTest {
         // ViewModels
         assertNotNull(get<ChatSessionViewModel>())
         assertNotNull(get<DashboardViewModel>())
-        assertNotNull(get<AuthViewModel>())
+        assertNotNull(get<LaunchViewModel>())
         assertNotNull(get<MemoryAuditViewModel>())
     }
 }
