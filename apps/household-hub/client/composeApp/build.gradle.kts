@@ -36,13 +36,16 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
         }
         commonTest.dependencies {
+            // The UI tests run the real graph over a faked hub, so they need the DI coordinator.
             implementation(project(":shared"))
-        }
-        jvmTest.dependencies {
-            implementation(compose.desktop.currentOs)
             implementation(libs.compose.ui.test)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+        }
+        jvmTest.dependencies {
+            // Only what it takes to run the common tests on the desktop runtime.
+            implementation(compose.desktop.currentOs)
             implementation(libs.junit.jupiter)
             implementation(libs.junit.platform.launcher)
         }
