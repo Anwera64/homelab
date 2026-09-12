@@ -9,7 +9,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.launch_checking
+import com.homelab.household.app.resources.launch_failed_address_not_found
+import com.homelab.household.app.resources.launch_failed_not_json
 import com.homelab.household.app.resources.launch_failed_title
+import com.homelab.household.app.resources.launch_failed_unknown
+import com.homelab.household.app.resources.launch_failed_upstream
 import com.homelab.household.app.resources.launch_first_run_title
 import com.homelab.household.app.resources.launch_member_count
 import com.homelab.household.app.resources.launch_ready
@@ -17,6 +21,7 @@ import com.homelab.household.app.resources.launch_retry
 import com.homelab.household.app.resources.launch_unreachable_detail
 import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.testing.TestApp
+import com.homelab.household.presentation.launch.HubFailure
 import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 
@@ -49,9 +54,17 @@ class LaunchRobot(private val test: ComposeUiTest) {
         seesSomethingToRetry()
     }
 
-    suspend fun seesTheHubSaid(message: String) {
+    suspend fun seesTheHubFailed(reason: HubFailure) {
         seesText(getString(Res.string.launch_failed_title))
-        seesText(message)
+        seesText(
+            when (reason) {
+                HubFailure.AddressNotFound -> getString(Res.string.launch_failed_address_not_found)
+                is HubFailure.Upstream -> getString(Res.string.launch_failed_upstream, reason.statusCode)
+                is HubFailure.NotJson -> getString(Res.string.launch_failed_not_json, reason.contentType)
+                HubFailure.Unknown -> getString(Res.string.launch_failed_unknown)
+            }
+        )
+        seesSomethingToRetry()
     }
 
     suspend fun seesSomethingToRetry() = seesText(getString(Res.string.launch_retry))

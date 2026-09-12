@@ -1,6 +1,7 @@
 package com.homelab.household.app.screens.launch
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import com.homelab.household.presentation.launch.LaunchUiState
 
@@ -15,7 +16,7 @@ class LaunchUiStateProvider : PreviewParameterProvider<LaunchUiState> {
         HubStatus.Ready(memberCount = 2),
         HubStatus.FirstRun,
         HubStatus.Unreachable,
-        HubStatus.Failed(message = "Hub returned HTTP 500: Internal Server Error")
+        HubStatus.Failed(HubFailure.Upstream(statusCode = 500))
     ).map { LaunchUiState(hubAddress = "hub.spicy-llama.duckdns.org", status = it) }
 
     override fun getDisplayName(index: Int): String =

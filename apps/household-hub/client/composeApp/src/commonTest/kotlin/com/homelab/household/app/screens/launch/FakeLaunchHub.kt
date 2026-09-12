@@ -43,6 +43,17 @@ class FakeLaunchHub {
         answer = { respond("", HttpStatusCode.ServiceUnavailable) }
     }
 
+    /** A captive portal or a proxy error page: it answers, just not with JSON. */
+    fun answersWithHtml() {
+        answer = {
+            respond(
+                content = "<html><body>Sign in to the network</body></html>",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString())
+            )
+        }
+    }
+
     fun fails(status: HttpStatusCode) {
         answer = { respond("", status) }
     }

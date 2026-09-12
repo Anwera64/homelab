@@ -2,7 +2,10 @@ package com.homelab.household.presentation.launch
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.exception.UnexpectedContentTypeException
+import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
 import kotlinx.coroutines.channels.Channel
@@ -46,7 +49,10 @@ class LaunchViewModel(
                     onFailure = { error ->
                         when (error) {
                             is ServerOfflineException -> HubStatus.Unreachable
-                            else -> HubStatus.Failed(message = error.message ?: "Failed to reach the hub")
+                            is NotFoundException -> HubStatus.Failed(HubFailure.AddressNotFound)
+                            is UpstreamGatewayException -> HubStatus.Failed(HubFailure.Upstream(error.statusCode))
+                            is UnexpectedContentTypeException -> HubStatus.Failed(HubFailure.NotJson(error.contentType))
+                            else -> HubStatus.Failed(HubFailure.Unknown)
                         }
                     }
                 )

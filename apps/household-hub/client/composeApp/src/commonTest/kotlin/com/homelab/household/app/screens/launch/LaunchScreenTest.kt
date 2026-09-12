@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import com.homelab.household.app.testing.TEST_HUB_HOST
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
+import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
 import kotlin.test.Test
@@ -69,9 +70,9 @@ class LaunchScreenTest {
         assertEquals(0, moved)
     }
 
-    /** The message is the hub's, all the way from `AuthRepositoryImpl` — not one we invented. */
+    /** A real 500 from the hub, said in the app's own words rather than the hub's. */
     @Test
-    fun a_failing_hub_keeps_its_own_words() {
+    fun a_failing_hub_says_what_it_answered() {
         val hub = FakeLaunchHub()
         hub.fails(HttpStatusCode.InternalServerError)
         var moved = 0
@@ -79,10 +80,22 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { moved++ }, onFirstRun = { moved++ })
 
-            onLaunch {
-                seesTheHubSaid("Hub returned HTTP 500: Internal Server Error")
-                seesSomethingToRetry()
-            }
+            onLaunch { seesTheHubFailed(HubFailure.Upstream(statusCode = 500)) }
+        }
+
+        assertEquals(0, moved)
+    }
+
+    @Test
+    fun something_answering_with_a_web_page_says_so() {
+        val hub = FakeLaunchHub()
+        hub.answersWithHtml()
+        var moved = 0
+
+        runScreenTest {
+            launchScreen(hub, onSignIn = { moved++ }, onFirstRun = { moved++ })
+
+            onLaunch { seesTheHubFailed(HubFailure.NotJson(contentType = "text/html")) }
         }
 
         assertEquals(0, moved)
@@ -147,11 +160,8 @@ class LaunchScreenTest {
                         is HubStatus.Ready -> seesTheHubIsReady(status.memberCount)
                         HubStatus.FirstRun -> seesNobodyLivesHereYet()
                         HubStatus.Unreachable -> seesTheHubIsOffline()
-                        is HubStatus.Failed -> {
-                            // The previewed message is the one the hub really sends.
-                            seesTheHubSaid(status.message)
-                            seesSomethingToRetry()
-                        }
+                        // The previewed reason is one the hub can really produce.
+                        is HubStatus.Failed -> seesTheHubFailed(status.reason)
                     }
                     seesTheHubAddress(TEST_HUB_HOST)
                 }

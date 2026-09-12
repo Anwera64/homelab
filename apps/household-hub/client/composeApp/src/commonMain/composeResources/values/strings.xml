@@ -12,5 +12,9 @@
     <string name="launch_unreachable_title">Can\'t reach your hub</string>
     <string name="launch_unreachable_detail">The app is running, but nothing answered at your home server. It may be off, or you may be away from home without Tailscale.</string>
     <string name="launch_failed_title">The hub answered with an error.</string>
+    <string name="launch_failed_address_not_found">Nothing is at that address. Check your hub address.</string>
+    <string name="launch_failed_upstream">The hub answered with HTTP %1$d.</string>
+    <string name="launch_failed_not_json">Something answered with %1$s instead of JSON. Check your network or your hub address.</string>
+    <string name="launch_failed_unknown">Something went wrong on the way to your hub.</string>
     <string name="launch_retry">Try again</string>
 </resources>

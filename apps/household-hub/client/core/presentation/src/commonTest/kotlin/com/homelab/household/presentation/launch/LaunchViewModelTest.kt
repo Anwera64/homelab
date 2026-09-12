@@ -1,7 +1,10 @@
 package com.homelab.household.presentation.launch
 
 import app.cash.turbine.test
+import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.exception.UnexpectedContentTypeException
+import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
@@ -100,18 +103,55 @@ class LaunchViewModelTest {
         }
     }
 
+    /**
+     * The screen has to say what went wrong in the user's language, so the reason is a type the
+     * UI can map — never a sentence the hub or the network happened to produce.
+     */
     @Test
-    fun a_failing_hub_keeps_its_own_words_and_stays_on_launch() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws IllegalStateException("Unexpected status 500")
+    fun a_hub_that_answers_with_an_error_reports_the_status_it_sent() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 500)
         val viewModel = viewModel()
 
         viewModel.events.test {
             advanceUntilIdle()
 
-            assertEquals(HubStatus.Failed(message = "Unexpected status 500"), viewModel.uiState.value.status)
+            assertEquals(
+                HubStatus.Failed(HubFailure.Upstream(statusCode = 500)),
+                viewModel.uiState.value.status
+            )
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun a_hub_that_is_not_there_reports_a_bad_address() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws NotFoundException()
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.Failed(HubFailure.AddressNotFound), viewModel.uiState.value.status)
+    }
+
+    @Test
+    fun a_hub_that_answers_with_something_other_than_json_reports_what_it_sent() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws UnexpectedContentTypeException("text/html")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(
+            HubStatus.Failed(HubFailure.NotJson(contentType = "text/html")),
+            viewModel.uiState.value.status
+        )
+    }
+
+    @Test
+    fun anything_else_is_an_unknown_failure() = runTest(testDispatcher) {
+        coEvery { checkAuthStatusUseCase() } throws IllegalStateException("something odd")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(HubStatus.Failed(HubFailure.Unknown), viewModel.uiState.value.status)
     }
 
     @Test

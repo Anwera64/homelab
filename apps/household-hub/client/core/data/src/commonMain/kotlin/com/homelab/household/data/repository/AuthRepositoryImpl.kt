@@ -8,9 +8,10 @@ import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.remote.NetworkExceptionHelper
-import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.exception.UnexpectedContentTypeException
+import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
@@ -97,11 +98,11 @@ class AuthRepositoryImpl(
                 if (response.status == HttpStatusCode.NotFound) {
                     throw NotFoundException("Hub endpoint returned HTTP 404. Check your hub address.")
                 }
-                throw DomainException("Hub returned HTTP ${response.status.value}: ${response.status.description}")
+                throw UpstreamGatewayException(statusCode = response.status.value)
             }
             val contentType = response.contentType()?.withoutParameters()
             if (contentType != null && contentType != ContentType.Application.Json) {
-                throw DomainException("Hub returned unexpected content type: $contentType. Check your network or hub address.")
+                throw UnexpectedContentTypeException(contentType = contentType.toString())
             }
             response.body<AuthStatusDto>()
         } catch (e: Exception) {

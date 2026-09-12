@@ -109,7 +109,8 @@ class AuthRepositoryTest {
         }
         val repo = AuthRepositoryImpl(client, InMemoryTokenStorage(), baseUrl = DEFAULT_BASE_URL)
 
-        assertThrowsSuspend<com.homelab.household.domain.exception.DomainException> { repo.checkStatus() }
+        // 404 on the status endpoint means the address is wrong, not that the hub is down.
+        assertThrowsSuspend<com.homelab.household.domain.exception.NotFoundException> { repo.checkStatus() }
     }
 
     @Test

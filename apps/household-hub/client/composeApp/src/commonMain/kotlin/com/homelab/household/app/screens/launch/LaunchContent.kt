@@ -28,7 +28,11 @@ import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
 import com.homelab.household.app.resources.launch_checking
+import com.homelab.household.app.resources.launch_failed_address_not_found
+import com.homelab.household.app.resources.launch_failed_not_json
 import com.homelab.household.app.resources.launch_failed_title
+import com.homelab.household.app.resources.launch_failed_unknown
+import com.homelab.household.app.resources.launch_failed_upstream
 import com.homelab.household.app.resources.launch_first_run_detail
 import com.homelab.household.app.resources.launch_first_run_title
 import com.homelab.household.app.resources.launch_member_count
@@ -40,6 +44,7 @@ import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import com.homelab.household.presentation.launch.LaunchUiState
 import org.jetbrains.compose.resources.pluralStringResource
@@ -140,7 +145,10 @@ private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
             stringResource(Res.string.launch_first_run_detail)
         )
         HubStatus.Unreachable -> listOf(stringResource(Res.string.launch_unreachable_detail))
-        is HubStatus.Failed -> listOf(stringResource(Res.string.launch_failed_title), status.message)
+        is HubStatus.Failed -> listOf(
+            stringResource(Res.string.launch_failed_title),
+            whatWentWrong(status.reason)
+        )
     }
 
     Column(
@@ -159,6 +167,15 @@ private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/** The reason in the user's own language; the hub's own words are English and technical. */
+@Composable
+private fun whatWentWrong(reason: HubFailure): String = when (reason) {
+    HubFailure.AddressNotFound -> stringResource(Res.string.launch_failed_address_not_found)
+    is HubFailure.Upstream -> stringResource(Res.string.launch_failed_upstream, reason.statusCode)
+    is HubFailure.NotJson -> stringResource(Res.string.launch_failed_not_json, reason.contentType)
+    HubFailure.Unknown -> stringResource(Res.string.launch_failed_unknown)
 }
 
 @Composable

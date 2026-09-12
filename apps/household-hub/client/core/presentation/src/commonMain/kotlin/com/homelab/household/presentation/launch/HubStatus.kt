@@ -6,5 +6,5 @@ sealed interface HubStatus {
     data class Ready(val memberCount: Int) : HubStatus
     data object FirstRun : HubStatus
     data object Unreachable : HubStatus
-    data class Failed(val message: String) : HubStatus
+    data class Failed(val reason: HubFailure) : HubStatus
 }
