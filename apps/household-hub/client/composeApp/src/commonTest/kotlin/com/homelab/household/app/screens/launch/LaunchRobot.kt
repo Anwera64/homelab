@@ -7,10 +7,22 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.launch_checking
+import com.homelab.household.app.resources.launch_failed_title
+import com.homelab.household.app.resources.launch_first_run_title
+import com.homelab.household.app.resources.launch_member_count
+import com.homelab.household.app.resources.launch_ready
+import com.homelab.household.app.resources.launch_retry
+import com.homelab.household.app.resources.launch_unreachable_detail
+import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.testing.TestApp
+import org.jetbrains.compose.resources.getPluralString
+import org.jetbrains.compose.resources.getString
 
 /**
- * Everything the launch screen says and does, named once.
+ * Everything the launch screen says and does, named once — as the resource the screen reads, not
+ * as a second copy of the text, so changing the copy in `strings.xml` can't quietly pass.
  *
  * Each assertion waits for its text first: the hub answers on its own coroutine, so `waitForIdle`
  * — which only waits for Compose — can run before the answer has arrived.
@@ -18,43 +30,41 @@ import com.homelab.household.app.testing.TestApp
 @OptIn(ExperimentalTestApi::class)
 class LaunchRobot(private val test: ComposeUiTest) {
 
-    fun seesItReachingTheHub() = seesText("Reaching your hub…")
+    suspend fun seesItReachingTheHub() = seesText(getString(Res.string.launch_checking))
 
-    fun seesTheHubIsReady(members: Int) = apply {
-        seesText("Your hub is ready")
-        seesText(if (members == 1) "1 member" else "$members members")
+    suspend fun seesTheHubIsReady(members: Int) {
+        seesText(getString(Res.string.launch_ready))
+        seesText(getPluralString(Res.plurals.launch_member_count, members, members))
     }
 
-    fun seesNobodyLivesHereYet() = seesText("Nobody lives here yet")
+    suspend fun seesNobodyLivesHereYet() = seesText(getString(Res.string.launch_first_run_title))
 
     /**
      * Unreachable, not merely failed: both draw the same title and button, so the explanation
      * is the only thing that tells them apart.
      */
-    fun seesTheHubIsOffline() = apply {
-        seesText("Can't reach your hub")
-        seesTextContaining("nothing answered at your home server")
+    suspend fun seesTheHubIsOffline() {
+        seesText(getString(Res.string.launch_unreachable_title))
+        seesText(getString(Res.string.launch_unreachable_detail))
         seesSomethingToRetry()
     }
 
-    fun seesTheHubSaid(message: String) = seesText(message)
+    suspend fun seesTheHubSaid(message: String) {
+        seesText(getString(Res.string.launch_failed_title))
+        seesText(message)
+    }
 
-    fun seesSomethingToRetry() = seesText("Try again")
+    suspend fun seesSomethingToRetry() = seesText(getString(Res.string.launch_retry))
 
     fun seesTheHubAddress(address: String) = seesText(address)
 
-    fun tapsTryAgain() = apply {
-        test.onNodeWithText("Try again").performClick()
+    suspend fun tapsTryAgain() {
+        test.onNodeWithText(getString(Res.string.launch_retry)).performClick()
     }
 
-    private fun seesText(text: String) = apply {
+    private fun seesText(text: String) {
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
         test.onNodeWithText(text).assertIsDisplayed()
-    }
-
-    private fun seesTextContaining(text: String) = apply {
-        test.waitUntilExactlyOneExists(hasText(text, substring = true), timeoutMillis = WAIT_MILLIS)
-        test.onNodeWithText(text, substring = true).assertIsDisplayed()
     }
 
     private companion object {
@@ -63,7 +73,7 @@ class LaunchRobot(private val test: ComposeUiTest) {
 }
 
 @OptIn(ExperimentalTestApi::class)
-fun ComposeUiTest.onLaunch(block: LaunchRobot.() -> Unit) {
+suspend fun ComposeUiTest.onLaunch(block: suspend LaunchRobot.() -> Unit) {
     LaunchRobot(this).block()
 }
 

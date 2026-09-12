@@ -1,0 +1,16 @@
+<resources>
+    <!-- Launch -->
+    <string name="app_name">HyggeHub</string>
+    <string name="launch_checking">Reaching your hub…</string>
+    <string name="launch_ready">Your hub is ready</string>
+    <plurals name="launch_member_count">
+        <item quantity="one">%1$d member</item>
+        <item quantity="other">%1$d members</item>
+    </plurals>
+    <string name="launch_first_run_title">Nobody lives here yet</string>
+    <string name="launch_first_run_detail">Set up the first account to begin.</string>
+    <string name="launch_unreachable_title">Can\'t reach your hub</string>
+    <string name="launch_unreachable_detail">The app is running, but nothing answered at your home server. It may be off, or you may be away from home without Tailscale.</string>
+    <string name="launch_failed_title">The hub answered with an error.</string>
+    <string name="launch_retry">Try again</string>
+</resources>

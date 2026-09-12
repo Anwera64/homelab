@@ -25,12 +25,25 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.app_name
+import com.homelab.household.app.resources.launch_checking
+import com.homelab.household.app.resources.launch_failed_title
+import com.homelab.household.app.resources.launch_first_run_detail
+import com.homelab.household.app.resources.launch_first_run_title
+import com.homelab.household.app.resources.launch_member_count
+import com.homelab.household.app.resources.launch_ready
+import com.homelab.household.app.resources.launch_retry
+import com.homelab.household.app.resources.launch_unreachable_detail
+import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.launch.HubStatus
 import com.homelab.household.presentation.launch.LaunchUiState
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The first screen: what `GET /auth/status` found. Fixed shape, so it doesn't scroll.
@@ -73,7 +86,9 @@ fun LaunchContent(
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Text(
-                text = if (unreachable) "Can't reach your hub" else "HyggeHub",
+                text = stringResource(
+                    if (unreachable) Res.string.launch_unreachable_title else Res.string.app_name
+                ),
                 fontFamily = HearthTheme.fonts.outfit,
                 fontSize = if (unreachable) 23.sp else 27.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -102,7 +117,7 @@ fun LaunchContent(
 
         if (unreachable) {
             PrimaryButton(
-                text = "Try again",
+                text = stringResource(Res.string.launch_retry),
                 onClick = onRetry,
                 icon = HearthIcon.Retry,
                 modifier = Modifier.fillMaxWidth()
@@ -115,17 +130,17 @@ fun LaunchContent(
 private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
     val colors = HearthTheme.colors
     val lines = when (status) {
-        HubStatus.Checking -> listOf("Reaching your hub…")
+        HubStatus.Checking -> listOf(stringResource(Res.string.launch_checking))
         is HubStatus.Ready -> listOf(
-            "Your hub is ready",
-            if (status.memberCount == 1) "1 member" else "${status.memberCount} members"
+            stringResource(Res.string.launch_ready),
+            pluralStringResource(Res.plurals.launch_member_count, status.memberCount, status.memberCount)
         )
-        HubStatus.FirstRun -> listOf("Nobody lives here yet", "Set up the first account to begin.")
-        HubStatus.Unreachable -> listOf(
-            "The app is running, but nothing answered at your home server. " +
-                "It may be off, or you may be away from home without Tailscale."
+        HubStatus.FirstRun -> listOf(
+            stringResource(Res.string.launch_first_run_title),
+            stringResource(Res.string.launch_first_run_detail)
         )
-        is HubStatus.Failed -> listOf("The hub answered with an error.", status.message)
+        HubStatus.Unreachable -> listOf(stringResource(Res.string.launch_unreachable_detail))
+        is HubStatus.Failed -> listOf(stringResource(Res.string.launch_failed_title), status.message)
     }
 
     Column(
