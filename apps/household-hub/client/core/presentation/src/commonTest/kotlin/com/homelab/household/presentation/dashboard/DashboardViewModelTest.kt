@@ -46,8 +46,6 @@ class DashboardViewModelTest {
         every { observeServerStatusUseCase() } returns flowOf(ServerStatus.Online(latencyMs = 25))
         coEvery { getCurrentUserUseCase() } returns User(
             id = "u-1",
-            username = "alice",
-            email = "alice@homelab.local",
             fullName = "Alice Doe",
             isAdmin = true,
             isActive = true
@@ -83,7 +81,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals("alice", state.currentUser?.username)
+        assertEquals("Alice Doe", state.currentUser?.fullName)
         assertTrue(state.serverStatus is ServerStatus.Online)
         assertEquals(1, state.householdMilestones.size)
         assertEquals("Family vacation planned", state.householdMilestones[0].summary)

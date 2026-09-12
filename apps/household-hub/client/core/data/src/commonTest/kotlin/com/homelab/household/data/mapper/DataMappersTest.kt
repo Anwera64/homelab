@@ -3,10 +3,12 @@ package com.homelab.household.data.mapper
 import com.homelab.household.data.dto.AgentReadDto
 import com.homelab.household.data.dto.ChatMessageReadDto
 import com.homelab.household.data.dto.GossipMilestoneDto
+import com.homelab.household.data.dto.MemberProfileDto
 import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.UserReadDto
+import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
@@ -19,21 +21,26 @@ class DataMappersTest {
     fun user_mapper_converts_dto_to_domain() {
         val dto = UserReadDto(
             id = "user-1",
-            username = "alice",
-            email = "alice@homelab.local",
             full_name = "Alice Doe",
             is_admin = true,
             is_active = true,
             personal_space_id = "space-1",
-            avatar_color = "#4F46E5",
+            avatar_color = "#C05638",
             created_at = "2026-09-08T00:00:00Z"
         )
         val user = UserDataMapper.toDomain(dto)
 
         assertEquals("user-1", user.id)
-        assertEquals("alice", user.username)
         assertEquals("Alice Doe", user.fullName)
+        assertEquals("#C05638", user.avatarColor)
         assertEquals(true, user.isAdmin)
+    }
+
+    @Test
+    fun a_member_profile_becomes_a_member() {
+        val member = UserDataMapper.toMember(MemberProfileDto(id = "emma", full_name = "Emma", avatar_color = "#3C6E4E"))
+
+        assertEquals(Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E"), member)
     }
 
     @Test

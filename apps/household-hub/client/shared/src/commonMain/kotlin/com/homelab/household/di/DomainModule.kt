@@ -20,6 +20,7 @@ import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
 import com.homelab.household.domain.usecase.ListUserAuditMilestonesUseCase
+import com.homelab.household.domain.usecase.ListMembersUseCase
 import com.homelab.household.domain.usecase.LockSecretSessionsUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
@@ -54,6 +55,7 @@ val domainModule = module {
     // Auth use cases
     factory { LoginUseCase(get()) }
     factory { FirstRunOnboardUseCase(get()) }
+    factory { ListMembersUseCase(get()) }
     factory { CheckAuthStatusUseCase(get()) }
     factory { GetCurrentUserUseCase(get()) }
     factory { LogoutUseCase(get()) }

@@ -1,21 +1,16 @@
 package com.homelab.household.domain.usecase
 
 import com.homelab.household.domain.exception.ValidationException
+import com.homelab.household.domain.model.MemberName
+import com.homelab.household.domain.model.Pin
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
 
+/** First run: the first member, and the hub's admin, with a name, a PIN and a colour. */
 class FirstRunOnboardUseCase(private val authRepository: AuthRepository) {
-    suspend operator fun invoke(
-        username: String,
-        email: String,
-        password: String,
-        fullName: String,
-        avatarColor: String? = null
-    ): User {
-        if (username.length < 3) throw ValidationException("Username must be at least 3 characters")
-        if (!email.contains("@")) throw ValidationException("Invalid email format")
-        if (password.length < 8) throw ValidationException("Password must be at least 8 characters")
-        if (fullName.isBlank()) throw ValidationException("Full name cannot be blank")
-        return authRepository.onboard(username.trim(), email.trim(), password, fullName.trim(), avatarColor)
+    suspend operator fun invoke(name: String, pin: String, avatarColor: String): User {
+        if (!MemberName.isValid(name)) throw ValidationException("A name is 1 to ${MemberName.MAX_LENGTH} characters")
+        if (!Pin.isValid(pin)) throw ValidationException("A PIN is ${Pin.LENGTH} digits")
+        return authRepository.onboard(name.trim(), pin, avatarColor)
     }
 }

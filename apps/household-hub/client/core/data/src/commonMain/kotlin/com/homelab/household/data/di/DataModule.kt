@@ -66,7 +66,8 @@ val dataModule = module {
                     sendWithoutRequest { request ->
                         val url = request.url.buildString()
                         !url.contains("/auth/login") &&
-                            !url.contains("/auth/onboard") &&
+                            !url.contains("/auth/register-initial") &&
+                            !url.contains("/auth/members") &&
                             !url.contains("/auth/status") &&
                             !url.contains("/health")
                     }

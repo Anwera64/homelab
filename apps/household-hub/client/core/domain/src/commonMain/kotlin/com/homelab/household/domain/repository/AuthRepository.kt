@@ -1,12 +1,14 @@
 package com.homelab.household.domain.repository
 
 import com.homelab.household.domain.model.AuthStatus
+import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
-    suspend fun login(username: String, password: String): User
-    suspend fun onboard(username: String, email: String, password: String, fullName: String, avatarColor: String? = null): User
+    suspend fun login(memberId: String, pin: String): User
+    suspend fun onboard(name: String, pin: String, avatarColor: String): User
+    suspend fun listMembers(): List<Member>
     suspend fun checkStatus(): AuthStatus
     suspend fun getCurrentUser(): User?
     suspend fun logout()
