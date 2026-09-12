@@ -4,6 +4,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -16,6 +17,14 @@ class LaunchSmokeTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.moveToState(Lifecycle.State.RESUMED)
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
+        }
+    }
+
+    /** Compose draws the whole screen; a platform action bar would sit on top of it. */
+    @Test
+    fun main_activity_has_no_action_bar() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> assertNull(activity.actionBar) }
         }
     }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Compose draws everything, so the window only needs no action bar and the Hearth canvas
+         behind the first frame. -->
+    <style name="Theme.HyggeHub" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/hearth_canvas</item>
+    </style>
+</resources>

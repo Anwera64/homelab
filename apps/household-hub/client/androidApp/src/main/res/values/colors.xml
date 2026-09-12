@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors DayColors.canvas in HearthColors.kt. -->
+    <color name="hearth_canvas">#F5F2EB</color>
+</resources>
