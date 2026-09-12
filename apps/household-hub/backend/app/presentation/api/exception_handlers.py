@@ -5,6 +5,8 @@ from app.domain.exceptions import (
     DomainException,
     EntityNotFoundException,
     AuthenticationException,
+    WrongPinException,
+    PinLockedException,
     ZeroLeakViolationException,
     SoleAdminDeletionException,
     SlugConflictException,
@@ -29,6 +31,22 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": str(exc)},
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    @app.exception_handler(WrongPinException)
+    async def wrong_pin_handler(request: Request, exc: WrongPinException):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": str(exc), "attempts_left": exc.attempts_left},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    @app.exception_handler(PinLockedException)
+    async def pin_locked_handler(request: Request, exc: PinLockedException):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": str(exc), "retry_after_seconds": exc.retry_after_seconds},
+            headers={"Retry-After": str(exc.retry_after_seconds)},
         )
 
     @app.exception_handler(EntityNotFoundException)

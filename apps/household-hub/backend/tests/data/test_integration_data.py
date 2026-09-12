@@ -60,10 +60,8 @@ async def test_calendar_credential_repository(data_db_session: AsyncSession):
     from app.data.models.user_model import UserModel
     test_user = UserModel(
         id="user-42",
-        username="user42",
-        email="user42@homelab.local",
         full_name="User 42",
-        hashed_password="hash",
+        hashed_pin="hash",
     )
     data_db_session.add(test_user)
     await data_db_session.commit()
@@ -113,10 +111,8 @@ async def test_document_repository(data_db_session: AsyncSession):
     from app.data.models.space_model import SpaceModel
     test_user = UserModel(
         id="user-10",
-        username="user10",
-        email="user10@homelab.local",
         full_name="User 10",
-        hashed_password="hash",
+        hashed_pin="hash",
     )
     test_space = SpaceModel(
         id="space-shared",

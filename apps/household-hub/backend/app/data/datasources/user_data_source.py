@@ -13,13 +13,10 @@ class IUserDataSource(Protocol):
     async def get_by_id(self, user_id: str) -> Optional[UserModel]:
         ...
 
-    async def get_by_username(self, username: str) -> Optional[UserModel]:
-        ...
-
-    async def get_by_username_or_email(self, username: str, email: str) -> Optional[UserModel]:
-        ...
-
     async def list_all(self) -> List[UserModel]:
+        ...
+
+    async def list_active(self) -> List[UserModel]:
         ...
 
     async def create(self, user: UserModel) -> UserModel:
@@ -51,18 +48,18 @@ class SqliteUserDataSource(IUserDataSource):
         res = await self.session.execute(stmt)
         return res.scalars().first()
 
-    async def get_by_username(self, username: str) -> Optional[UserModel]:
-        stmt = select(UserModel).where(UserModel.username == username).options(selectinload(UserModel.personal_space))
-        res = await self.session.execute(stmt)
-        return res.scalars().first()
-
-    async def get_by_username_or_email(self, username: str, email: str) -> Optional[UserModel]:
-        stmt = select(UserModel).where((UserModel.username == username) | (UserModel.email == email))
-        res = await self.session.execute(stmt)
-        return res.scalars().first()
-
     async def list_all(self) -> List[UserModel]:
         stmt = select(UserModel).options(selectinload(UserModel.personal_space)).order_by(UserModel.created_at)
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def list_active(self) -> List[UserModel]:
+        stmt = (
+            select(UserModel)
+            .where(UserModel.is_active.is_(True))
+            .options(selectinload(UserModel.personal_space))
+            .order_by(UserModel.created_at)
+        )
         res = await self.session.execute(stmt)
         return list(res.scalars().all())
 

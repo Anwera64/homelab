@@ -55,7 +55,7 @@ async def publish_milestone(
     """Manually publish a milestone to the household gossip bus."""
     published = await use_case.execute(
         source_user_id=current_user.id,
-        source_username=current_user.username,
+        source_username=current_user.full_name,
         reporting_agent_id=None,
         reporting_agent_name="Manual User Entry",
         summary=payload.summary,

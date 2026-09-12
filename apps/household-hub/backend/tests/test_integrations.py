@@ -4,28 +4,17 @@ import httpx
 from unittest.mock import patch, AsyncMock, MagicMock
 from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.entities.search_result import SearchResult, SearchResultItem
+from tests.auth_helpers import ADMIN_PIN, add_signed_in_member, register_admin, sign_in
 
 
-async def create_authenticated_user(client: httpx.AsyncClient, username: str = "testuser") -> str:
-    """Helper to create initial admin and return JWT access token."""
+async def create_authenticated_user(client: httpx.AsyncClient) -> str:
+    """Helper to create the initial admin, or sign them in again, and return a JWT access token."""
     status_resp = await client.get("/api/v1/auth/status")
     if not status_resp.json()["is_initialized"]:
-        reg_resp = await client.post(
-            "/api/v1/auth/register-initial",
-            json={
-                "username": username,
-                "email": f"{username}@homelab.local",
-                "password": "Password123!",
-                "full_name": "Test User",
-            },
-        )
-        return reg_resp.json()["access_token"]
-    else:
-        login_resp = await client.post(
-            "/api/v1/auth/login",
-            json={"username": username, "password": "Password123!"},
-        )
-        return login_resp.json()["access_token"]
+        token, _ = await register_admin(client, full_name="Test User")
+        return token
+    members = (await client.get("/api/v1/auth/members")).json()
+    return await sign_in(client, members[0]["id"], ADMIN_PIN)
 
 
 @pytest.mark.asyncio
@@ -123,7 +112,7 @@ async def test_tool_execution_endpoint_and_soft_degradation(client: httpx.AsyncC
 
 @pytest.mark.asyncio
 async def test_tool_execution_server_authoritative_session_controls(client: httpx.AsyncClient):
-    token = await create_authenticated_user(client, username="admin_session_test")
+    token = await create_authenticated_user(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     # Fetch built-in assistant id
@@ -198,21 +187,7 @@ async def test_tool_execution_server_authoritative_session_controls(client: http
     assert spoof_agent_resp.status_code == 403
 
     # 3. Create a second user and verify Zero-Leak cross-user session blocking
-    await client.post(
-        "/api/v1/users",
-        headers=headers,
-        json={
-            "username": "member_session_user",
-            "email": "member_sess@homelab.local",
-            "password": "Password123!",
-            "full_name": "Member User",
-        },
-    )
-    u2_login = await client.post(
-        "/api/v1/auth/login",
-        json={"username": "member_session_user", "password": "Password123!"},
-    )
-    u2_token = u2_login.json()["access_token"]
+    u2_token, _ = await add_signed_in_member(client, full_name="Member User")
     u2_headers = {"Authorization": f"Bearer {u2_token}"}
 
     u2_sess = await client.post(
@@ -467,7 +442,7 @@ async def test_calendar_events_corrupted_secret_returns_401(client: httpx.AsyncC
     from sqlalchemy import update
     from app.data.models.calendar_credential_model import CalendarCredentialModel
 
-    token = await create_authenticated_user(client, username="cipher_test_user")
+    token = await create_authenticated_user(client)
     headers = {"Authorization": f"Bearer {token}"}
 
     with patch("app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector.test_connection", return_value=True):

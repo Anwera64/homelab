@@ -205,7 +205,7 @@ async def chat_turn(
             reflection_runner(
                 session_id=session_id,
                 user_id=current_user.id,
-                username=current_user.username,
+                username=current_user.full_name,
                 agent_id=agent_id,
                 agent_name=agent_name,
                 user_message=payload.content,

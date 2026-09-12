@@ -2,43 +2,17 @@ import pytest
 import httpx
 from unittest.mock import patch
 
+from tests.auth_helpers import add_signed_in_member, register_admin
 
 
-async def create_user(client: httpx.AsyncClient, username: str, is_admin: bool = False, admin_token: str = None) -> tuple[str, str]:
-    """Helper to register initial admin or create member, returning (token, personal_space_id)."""
+async def create_user(client: httpx.AsyncClient, name: str, is_admin: bool = False, admin_token: str = None) -> tuple[str, str]:
+    """Helper to register the initial admin, or add a member once there is one. Returns (token, personal_space_id)."""
     if admin_token is None:
-        # Register initial admin
-        resp = await client.post(
-            "/api/v1/auth/register-initial",
-            json={
-                "username": username,
-                "email": f"{username}@homelab.local",
-                "password": "SecretPassword123!",
-                "full_name": username.capitalize(),
-            },
-        )
-        data = resp.json()
-        return data["access_token"], data["user"]["personal_space_id"]
+        token, _ = await register_admin(client, full_name=name)
     else:
-        # Admin creates member
-        resp = await client.post(
-            "/api/v1/users",
-            json={
-                "username": username,
-                "email": f"{username}@homelab.local",
-                "password": "SecretPassword123!",
-                "full_name": username.capitalize(),
-                "is_admin": is_admin,
-            },
-            headers={"Authorization": f"Bearer {admin_token}"},
-        )
-        member_data = resp.json()
-        # Login member to get token
-        login_resp = await client.post(
-            "/api/v1/auth/login",
-            json={"username": username, "password": "SecretPassword123!"},
-        )
-        return login_resp.json()["access_token"], member_data["personal_space_id"]
+        token, _ = await add_signed_in_member(client, full_name=name, is_admin=is_admin)
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    return token, me.json()["personal_space_id"]
 
 
 @pytest.mark.asyncio

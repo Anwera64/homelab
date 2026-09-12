@@ -17,8 +17,9 @@ The backend is structured into decoupled architectural layers strictly enforced 
 * **Multi-User Identity & Closed Household:**
   * **First-Run Onboarding:** Automatically detects an uninitialized database; the first registered user becomes the **Household Admin**.
   * **Distributed Mutex Onboarding:** Atomic `SystemSetting` mutex (`set_if_not_exists`) guarantees that concurrent onboarding requests across multiple workers cannot create duplicate administrators.
-  * **Admin Member Management:** Subsequent household member accounts are provisioned exclusively by the Admin.
-  * **First-Party JWT Auth:** Fast, self-contained JSON login issuing signed JWT tokens with salted `bcrypt` password hashing. Works 100% offline with zero external identity provider dependencies.
+  * **Profile Picker + PIN:** No username, email or password. `GET /auth/members` lists active members (id, name, colour) without signing in; `POST /auth/login` takes a member id and their 6-digit PIN, hashed with salted `bcrypt`, and issues a signed JWT. Works 100% offline with zero external identity provider dependencies.
+  * **PIN Lockout:** Five free tries, then a wait of 30 s that doubles with each further miss, up to 15 min; a right PIN clears it. A wrong PIN answers `401` with `attempts_left`, a locked member `429` with `retry_after_seconds`, and while locked the PIN isn't checked at all. Guesses for one member are serialized, and unknown members are checked against a dummy hash.
+  * **Member Management:** No endpoint adds a member yet — invites (Stage 5, slice 2) replace the admin creating accounts. Names are unique among active members.
 * **Strict Zero-Leak Spaces Engine:**
   * **Shared Household Hub (`/spaces/shared`):** Singleton collaborative space containing shared Bento widget configurations (household schedules, AI assistant launchers).
   * **Personal Spaces (`/spaces/personal`):** Strictly private workspaces auto-provisioned for each user.
@@ -80,9 +81,10 @@ cd apps\household-hub\backend
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-The 159 automated tests (100% passing) cover:
+The 193 automated tests (100% passing) cover:
 * `tests/architecture/test_architecture_boundaries.py`: AST static analysis verifying strict layer boundaries and coroutine DI providers.
-* `tests/test_auth.py`: First-run admin onboarding, atomic concurrent registration mutex, JWT verification, and member provisioning.
+* `tests/test_auth.py`: First-run onboarding with a name and PIN, atomic concurrent registration mutex, the public profile list, PIN sign-in, lockout responses and JWT verification. `tests/auth_helpers.py` signs people in for every HTTP test.
+* `tests/domain/test_pin_lockout.py`: The lockout schedule, waits expiring, and concurrent guesses checked one at a time.
 * `tests/test_spaces.py`: Shared singleton space, Bento widgets layout, and strict Zero-Leak 403 enforcement.
 * `tests/test_agents.py`: Builtin models seeding, custom model creation, soft-delete, 7-day restore, slug reuse, cascading trash purge, and inactive suspension.
 * `tests/test_sessions.py`: Session thread management, tool approval execution (`POST /tools/approve`), cascading session archival (`POST /archive`), secret mode toggle, private history isolation, cursor pagination, 409 stream lock, agent provenance, and LLM 502/504 mapping.

@@ -1,36 +1,13 @@
 import pytest
 import httpx
 
+from tests.auth_helpers import add_signed_in_member, register_admin
+
 
 async def setup_environment(client: httpx.AsyncClient) -> tuple[str, str, str]:
     """Helper to setup admin, member, and return (admin_token, member_token, agent_id)."""
-    admin_reg = await client.post(
-        "/api/v1/auth/register-initial",
-        json={
-            "username": "admin",
-            "email": "admin@homelab.local",
-            "password": "Password123!",
-            "full_name": "Admin",
-        },
-    )
-    admin_token = admin_reg.json()["access_token"]
-
-    # Create member
-    await client.post(
-        "/api/v1/users",
-        json={
-            "username": "member",
-            "email": "member@homelab.local",
-            "password": "Password123!",
-            "full_name": "Member",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    login_resp = await client.post(
-        "/api/v1/auth/login",
-        json={"username": "member", "password": "Password123!"},
-    )
-    member_token = login_resp.json()["access_token"]
+    admin_token, _ = await register_admin(client, full_name="Admin")
+    member_token, _ = await add_signed_in_member(client, full_name="Member")
 
     # Get assistant agent
     agent_resp = await client.get("/api/v1/agents/assistant", headers={"Authorization": f"Bearer {member_token}"})

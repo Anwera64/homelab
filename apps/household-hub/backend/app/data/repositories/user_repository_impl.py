@@ -17,16 +17,12 @@ class UserRepositoryImpl(IUserRepository):
         model = await self.data_source.get_by_id(user_id)
         return self.mapper.to_domain(model) if model else None
 
-    async def get_by_username(self, username: str) -> Optional[User]:
-        model = await self.data_source.get_by_username(username)
-        return self.mapper.to_domain(model) if model else None
-
-    async def get_by_username_or_email(self, username: str, email: str) -> Optional[User]:
-        model = await self.data_source.get_by_username_or_email(username, email)
-        return self.mapper.to_domain(model) if model else None
-
     async def list_all(self) -> List[User]:
         models = await self.data_source.list_all()
+        return [self.mapper.to_domain(m) for m in models]
+
+    async def list_active(self) -> List[User]:
+        models = await self.data_source.list_active()
         return [self.mapper.to_domain(m) for m in models]
 
     async def create(self, user: User) -> User:
@@ -37,13 +33,13 @@ class UserRepositoryImpl(IUserRepository):
     async def update(self, user: User) -> User:
         model = await self.data_source.get_by_id(user.id)
         if model:
-            model.username = user.username
-            model.email = user.email
             model.full_name = user.full_name
-            model.hashed_password = user.hashed_password
+            model.hashed_pin = user.hashed_pin
             model.avatar_color = user.avatar_color
             model.is_admin = user.is_admin
             model.is_active = user.is_active
+            model.failed_pin_attempts = user.failed_pin_attempts
+            model.pin_locked_until = user.pin_locked_until
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
         else:

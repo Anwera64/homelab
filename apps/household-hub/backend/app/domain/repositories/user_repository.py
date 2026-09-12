@@ -9,13 +9,10 @@ class IUserRepository(Protocol):
     async def get_by_id(self, user_id: str) -> Optional[User]:
         ...
 
-    async def get_by_username(self, username: str) -> Optional[User]:
-        ...
-
-    async def get_by_username_or_email(self, username: str, email: str) -> Optional[User]:
-        ...
-
     async def list_all(self) -> List[User]:
+        ...
+
+    async def list_active(self) -> List[User]:
         ...
 
     async def create(self, user: User) -> User:

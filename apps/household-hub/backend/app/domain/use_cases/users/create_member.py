@@ -1,4 +1,6 @@
-from app.domain.entities.user import User
+from typing import Optional
+
+from app.domain.entities.user import User, DEFAULT_AVATAR_COLOR
 from app.domain.entities.space import Space, DEFAULT_PERSONAL_SETTINGS
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.repositories.space_repository import ISpaceRepository
@@ -8,6 +10,10 @@ from app.domain.exceptions import InvalidOperationException
 
 
 class CreateMemberUseCase:
+    """
+    Adds a member with the PIN they chose. No endpoint calls it yet: redeeming an invite will.
+    """
+
     def __init__(
         self,
         user_repo: IUserRepository,
@@ -22,24 +28,21 @@ class CreateMemberUseCase:
 
     async def execute(
         self,
-        username: str,
-        email: str,
-        password: str,
         full_name: str,
-        avatar_color: str = "#4F46E5",
+        pin: str,
+        avatar_color: Optional[str] = None,
         is_admin: bool = False,
     ) -> User:
-        existing = await self.user_repo.get_by_username_or_email(username, email)
-        if existing:
-            raise InvalidOperationException("A user with this username or email already exists.")
+        # The profile picker tells members apart by name alone.
+        active = await self.user_repo.list_active()
+        if any(m.full_name.casefold() == full_name.casefold() for m in active):
+            raise InvalidOperationException("Someone in the household already has that name.")
 
         async with self.uow:
             user = User(
-                username=username,
-                email=email,
                 full_name=full_name,
-                avatar_color=avatar_color or "#4F46E5",
-                hashed_password=self.hasher.hash(password),
+                avatar_color=avatar_color or DEFAULT_AVATAR_COLOR,
+                hashed_pin=self.hasher.hash(pin),
                 is_admin=is_admin,
                 is_active=True,
             )

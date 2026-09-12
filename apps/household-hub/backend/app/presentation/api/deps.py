@@ -10,10 +10,10 @@ from app.domain.use_cases.auth.get_auth_status import GetAuthStatusUseCase
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.auth.login import LoginUseCase
 from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
+from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
-from app.domain.use_cases.users.create_member import CreateMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 
@@ -99,13 +99,13 @@ def get_login_use_case() -> LoginUseCase:
 def get_authenticate_token_use_case() -> AuthenticateTokenUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
+def get_list_public_members_use_case() -> ListPublicMembersUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
 def get_list_members_use_case() -> ListMembersUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_member_use_case() -> GetMemberUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
-
-def get_create_member_use_case() -> CreateMemberUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_update_profile_use_case() -> UpdateProfileUseCase:

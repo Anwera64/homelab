@@ -2,37 +2,13 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import httpx
 
+from tests.auth_helpers import add_signed_in_member, register_admin
+
 
 async def setup_users(client: httpx.AsyncClient) -> tuple[str, str]:
     """Helper to setup admin and a regular member, returning (admin_token, member_token)."""
-    # 1. Admin
-    admin_reg = await client.post(
-        "/api/v1/auth/register-initial",
-        json={
-            "username": "admin",
-            "email": "admin@homelab.local",
-            "password": "Password123!",
-            "full_name": "Admin User",
-        },
-    )
-    admin_token = admin_reg.json()["access_token"]
-
-    # 2. Member
-    await client.post(
-        "/api/v1/users",
-        json={
-            "username": "member",
-            "email": "member@homelab.local",
-            "password": "Password123!",
-            "full_name": "Member User",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    login_resp = await client.post(
-        "/api/v1/auth/login",
-        json={"username": "member", "password": "Password123!"},
-    )
-    member_token = login_resp.json()["access_token"]
+    admin_token, _ = await register_admin(client, full_name="Admin User")
+    member_token, _ = await add_signed_in_member(client, full_name="Member User")
     return admin_token, member_token
 
 

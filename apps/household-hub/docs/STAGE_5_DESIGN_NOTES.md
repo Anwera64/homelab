@@ -164,14 +164,14 @@ Items marked **⛔** break a designed flow until they're done.
 
 ### 5.1 Authentication and members
 
-- [ ] ⛔ **PIN replaces password.** `users.hashed_pin`, hashed like the password today. Add a per-member failed-attempt counter with backoff — `LoginUseCase` has timing defence but no attempt limit, and a PIN without a lockout is the weakest part of the system.
-- [ ] ⛔ **Public profile list** for the picker: id, name, colour; active members only. It reveals names to anyone who can reach the hub — acceptable on LAN + Tailscale, but deliberate.
+- [x] ⛔ **PIN replaces password.** `users.hashed_pin`, hashed like the password today. Add a per-member failed-attempt counter with backoff — `LoginUseCase` has timing defence but no attempt limit, and a PIN without a lockout is the weakest part of the system. *Done in slice 1: five free tries, then 30 s doubling to 15 min (`pin_lockout.py`), guesses for one member checked one at a time; 401 carries `attempts_left`, 429 carries `retry_after_seconds`. Username, email and password are gone; `POST /users` is removed until invites replace it.*
+- [x] ⛔ **Public profile list** for the picker: id, name, colour; active members only. It reveals names to anyone who can reach the hub — acceptable on LAN + Tailscale, but deliberate. *`GET /auth/members`.*
 - [ ] ⛔ **Invites.** `Invite` record (code, invited_name, is_admin, expires_at, used_at); `POST /invites` (admin) and `POST /invites/{code}/redeem` (public). `is_admin` comes from the stored invite, never the payload. Single use, short expiry, same lockout as PIN entry. `create_member` takes the PIN from the joiner.
 - [ ] **PIN reset.** `PinReset` record (code, target, approver, expires_at, used_at); approve endpoint checks the approver's own PIN; redeem endpoint.
 - [ ] **Sign out elsewhere on PIN change.** `token_version` on the user, bumped on change and checked on every request — the JWT is stateless and can't be revoked as issued.
 - [ ] **Deactivate instead of delete.** `is_active=false` (field and login check exist). Erase sessions, personal memories, personal space, calendar credential, documents and PIN hash. Shared facts keep their source; agents pass to the admin. Context assembly labels facts from inactive members as past; the picker excludes them; name uniqueness is scoped to active members.
 - [ ] Reword `SoleAdminDeletionException` — it tells you to promote another admin, which isn't possible.
-- [ ] Default `avatar_color` to a Hygge swatch instead of `#4F46E5`.
+- [x] Default `avatar_color` to a Hygge swatch instead of `#4F46E5`. *`#3C6E4E`, the first swatch on the first-run picker.*
 
 ### 5.2 Secret chats — see [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md)
 

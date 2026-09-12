@@ -13,6 +13,7 @@ from app.domain.exceptions import (
     EntityNotFoundException,
 )
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
+from app.domain.use_cases.users.create_member import CreateMemberUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 
@@ -27,14 +28,11 @@ class FakeUserRepository:
     async def get_by_id(self, user_id: str):
         return self.users.get(user_id)
 
-    async def get_by_username_or_email(self, username: str, email: str):
-        for u in self.users.values():
-            if u.username == username or u.email == email:
-                return u
-        return None
-
     async def list_all(self):
         return list(self.users.values())
+
+    async def list_active(self):
+        return [u for u in self.users.values() if u.is_active]
 
     async def create(self, user: User) -> User:
         self.users[user.id] = user
@@ -186,31 +184,37 @@ async def test_register_initial_admin_use_case():
     uow = FakeUnitOfWork()
 
     use_case = RegisterInitialAdminUseCase(user_repo, space_repo, system_setting_repo, hasher, uow)
-    admin_user = await use_case.execute(
-        username="admin",
-        email="admin@homelab.local",
-        password="secretpassword",
-        full_name="Admin",
-        avatar_color="#4F46E5",
-    )
+    admin_user = await use_case.execute(full_name="Admin", pin="135790")
     assert admin_user.is_admin is True
-    assert admin_user.username == "admin"
+    assert admin_user.full_name == "Admin"
+    assert admin_user.hashed_pin == "hashed_135790"
+    assert admin_user.avatar_color == "#3C6E4E"
     assert await user_repo.count() == 1
 
     # Second call must raise InvalidOperationException
     with pytest.raises(InvalidOperationException):
-        await use_case.execute(
-            username="admin2",
-            email="admin2@homelab.local",
-            password="secretpassword",
-            full_name="Admin 2",
-            avatar_color="#4F46E5",
-        )
+        await use_case.execute(full_name="Admin 2", pin="246801")
+
+
+@pytest.mark.asyncio
+async def test_a_new_member_cannot_take_an_active_members_name():
+    """The picker tells members apart by name, however it's capitalised. A past member's name is free."""
+    user_repo = FakeUserRepository([
+        User(id="emma", full_name="Emma"),
+        User(id="old-liam", full_name="Liam", is_active=False),
+    ])
+    use_case = CreateMemberUseCase(user_repo, FakeSpaceRepository(), FakePasswordHasher(), FakeUnitOfWork())
+
+    with pytest.raises(InvalidOperationException):
+        await use_case.execute(full_name="EMMA", pin="246801")
+
+    liam = await use_case.execute(full_name="Liam", pin="246801")
+    assert liam.full_name == "Liam"
 
 
 @pytest.mark.asyncio
 async def test_delete_sole_admin_is_prevented():
-    admin = User(id="admin-1", username="admin", email="a@a.com", full_name="Admin", hashed_password="h", is_admin=True)
+    admin = User(id="admin-1", full_name="Admin", hashed_pin="h", is_admin=True)
     user_repo = FakeUserRepository([admin])
     space_repo = FakeSpaceRepository()
     agent_repo = FakeAgentRepository()
@@ -255,8 +259,8 @@ async def test_get_memory_zero_leak_enforced():
     mem_repo = FakeMemoryRepository([mem])
     use_case = GetMemoryUseCase(mem_repo)
 
-    user_a = User(id="user-a", username="alice", email="a@a.com", full_name="Alice", hashed_password="h")
-    user_b = User(id="user-b", username="bob", email="b@b.com", full_name="Bob", hashed_password="h")
+    user_a = User(id="user-a", full_name="Alice", hashed_pin="h")
+    user_b = User(id="user-b", full_name="Bob", hashed_pin="h")
 
     # Owner can retrieve
     res = await use_case.execute("m1", user_a)

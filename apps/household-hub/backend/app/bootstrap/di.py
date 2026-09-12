@@ -61,10 +61,11 @@ from app.domain.use_cases.auth.get_auth_status import GetAuthStatusUseCase
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.auth.login import LoginUseCase
 from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
+from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
+from app.domain.use_cases.auth.verify_member_pin import MemberPinLocks, VerifyMemberPinUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
-from app.domain.use_cases.users.create_member import CreateMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 
@@ -137,7 +138,8 @@ _jwt_token_service = JwtTokenService(
     algorithm=settings.ALGORITHM,
     expire_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
 )
-_dummy_password_hash = _password_hasher.hash("dummy-constant-time-password-hash")
+_dummy_pin_hash = _password_hasher.hash("dummy-constant-time-pin-hash")
+_pin_locks = MemberPinLocks()
 
 _user_mapper = UserDataMapper()
 _space_mapper = SpaceDataMapper()
@@ -293,7 +295,7 @@ def get_container(session: AsyncSession):
                         await bg_reflect_uc.execute(
                             session_id=session_id,
                             user_id=current_user.id,
-                            username=current_user.username,
+                            username=current_user.full_name,
                             agent_id=agent_id or final_event.get("agent_id", ""),
                             agent_name=agent_name or final_event.get("agent_name", ""),
                             user_message=content,
@@ -315,14 +317,17 @@ def get_container(session: AsyncSession):
         # Auth
         pres_deps.get_auth_status_use_case: GetAuthStatusUseCase(user_repo, system_setting_repo),
         pres_deps.get_register_initial_admin_use_case: RegisterInitialAdminUseCase(user_repo, space_repo, system_setting_repo, _password_hasher, uow),
-        pres_deps.get_login_use_case: LoginUseCase(user_repo, _password_hasher, _jwt_token_service, _dummy_password_hash),
+        pres_deps.get_login_use_case: LoginUseCase(
+            VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
+            _jwt_token_service,
+        ),
         pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(user_repo, _jwt_token_service),
+        pres_deps.get_list_public_members_use_case: ListPublicMembersUseCase(user_repo),
 
         # Users
         pres_deps.get_list_members_use_case: ListMembersUseCase(user_repo),
         pres_deps.get_member_use_case: GetMemberUseCase(user_repo),
-        pres_deps.get_create_member_use_case: CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow),
-        pres_deps.get_update_profile_use_case: UpdateProfileUseCase(user_repo, _password_hasher, uow),
+        pres_deps.get_update_profile_use_case: UpdateProfileUseCase(user_repo, uow),
         pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
 
         # Spaces
@@ -422,9 +427,9 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_register_initial_admin_use_case,
         pres_deps.get_login_use_case,
         pres_deps.get_authenticate_token_use_case,
+        pres_deps.get_list_public_members_use_case,
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
-        pres_deps.get_create_member_use_case,
         pres_deps.get_update_profile_use_case,
         pres_deps.get_delete_member_use_case,
         pres_deps.get_shared_space_use_case,

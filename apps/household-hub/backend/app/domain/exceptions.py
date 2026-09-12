@@ -15,6 +15,20 @@ class AuthenticationException(DomainException):
     pass
 
 
+class WrongPinException(AuthenticationException):
+    """Raised when a member enters the wrong PIN and still has tries left before a wait."""
+    def __init__(self, attempts_left: int):
+        super().__init__("Wrong PIN")
+        self.attempts_left = attempts_left
+
+
+class PinLockedException(DomainException):
+    """Raised while a member has to wait before trying their PIN again."""
+    def __init__(self, retry_after_seconds: int):
+        super().__init__("Too many wrong PINs. Wait before trying again.")
+        self.retry_after_seconds = retry_after_seconds
+
+
 class ZeroLeakViolationException(DomainException):
     """Raised when a user attempts to access private data of another user."""
     pass

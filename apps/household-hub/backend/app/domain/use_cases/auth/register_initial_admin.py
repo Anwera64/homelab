@@ -1,11 +1,13 @@
-from app.domain.entities.user import User
+from typing import Optional
+
+from app.domain.entities.user import User, DEFAULT_AVATAR_COLOR
 from app.domain.entities.space import Space, DEFAULT_SHARED_SETTINGS, DEFAULT_PERSONAL_SETTINGS
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.repositories.space_repository import ISpaceRepository
 from app.domain.repositories.system_setting_repository import ISystemSettingRepository
 from app.domain.repositories.security_service import IPasswordHasher
 from app.domain.repositories.unit_of_work import IUnitOfWork
-from app.domain.exceptions import InvalidOperationException, SlugConflictException
+from app.domain.exceptions import InvalidOperationException
 
 
 class RegisterInitialAdminUseCase:
@@ -25,19 +27,13 @@ class RegisterInitialAdminUseCase:
 
     async def execute(
         self,
-        username: str,
-        email: str,
-        password: str,
         full_name: str,
-        avatar_color: str = "#4F46E5",
+        pin: str,
+        avatar_color: Optional[str] = None,
     ) -> User:
         count = await self.user_repo.count()
         if count > 0:
             raise InvalidOperationException("System is already initialized. New members must be added by an admin.")
-
-        existing = await self.user_repo.get_by_username_or_email(username, email)
-        if existing:
-            raise InvalidOperationException("A user with this username or email already exists.")
 
         claimed = await self.system_setting_repo.set_if_not_exists("initial_admin_id", "pending")
         if not claimed:
@@ -46,11 +42,9 @@ class RegisterInitialAdminUseCase:
         try:
             async with self.uow:
                 user = User(
-                    username=username,
-                    email=email,
                     full_name=full_name,
-                    avatar_color=avatar_color or "#4F46E5",
-                    hashed_password=self.hasher.hash(password),
+                    avatar_color=avatar_color or DEFAULT_AVATAR_COLOR,
+                    hashed_pin=self.hasher.hash(pin),
                     is_admin=True,
                     is_active=True,
                 )

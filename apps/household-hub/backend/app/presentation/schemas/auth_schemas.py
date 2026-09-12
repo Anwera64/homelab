@@ -1,19 +1,27 @@
-from typing import Optional
+from typing import Annotated, Optional
 from pydantic import BaseModel, Field
-from app.presentation.schemas.user_schemas import UserRead, USERNAME_REGEX, EMAIL_REGEX
+from app.presentation.schemas.user_schemas import AvatarColor, FullName, UserRead
+
+# [0-9], not \d: the regex engine behind pydantic counts other scripts' digits as \d.
+Pin = Annotated[str, Field(pattern=r"^[0-9]{6}$")]
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str = Field(..., max_length=72)
+    user_id: str = Field(..., min_length=1, max_length=36)
+    pin: Pin
 
 
 class FirstRunRegister(BaseModel):
-    username: str = Field(..., min_length=3, max_length=64, pattern=USERNAME_REGEX)
-    email: str = Field(..., min_length=5, max_length=255, pattern=EMAIL_REGEX)
-    password: str = Field(..., min_length=8, max_length=72)
-    full_name: str = Field(..., min_length=1, max_length=128)
-    avatar_color: Optional[str] = Field("#4F46E5", min_length=4, max_length=32)
+    full_name: FullName
+    pin: Pin
+    avatar_color: Optional[AvatarColor] = None
+
+
+class MemberProfile(BaseModel):
+    """What the profile picker shows before anyone signs in."""
+    id: str
+    full_name: str
+    avatar_color: str
 
 
 class Token(BaseModel):

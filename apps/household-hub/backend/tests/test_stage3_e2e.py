@@ -7,54 +7,14 @@ import httpx
 from app.domain.entities.llm_message import LLMResponse, LLMResponseChunk
 from app.bootstrap.di import _ollama_connector
 from app.main import app
+from tests.auth_helpers import add_signed_in_member, register_admin
 
 
 async def setup_stage3_environment(client: httpx.AsyncClient) -> tuple[str, str, str, str, str]:
     """Helper to setup admin, member1, member2, and return tokens + agent_id."""
-    admin_reg = await client.post(
-        "/api/v1/auth/register-initial",
-        json={
-            "username": "admin",
-            "email": "admin@homelab.local",
-            "password": "Password123!",
-            "full_name": "Admin User",
-        },
-    )
-    admin_token = admin_reg.json()["access_token"]
-
-    # Member 1
-    await client.post(
-        "/api/v1/users",
-        json={
-            "username": "alex",
-            "email": "alex@homelab.local",
-            "password": "Password123!",
-            "full_name": "Alex Member",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    login1 = await client.post(
-        "/api/v1/auth/login",
-        json={"username": "alex", "password": "Password123!"},
-    )
-    member1_token = login1.json()["access_token"]
-
-    # Member 2
-    await client.post(
-        "/api/v1/users",
-        json={
-            "username": "maria",
-            "email": "maria@homelab.local",
-            "password": "Password123!",
-            "full_name": "Maria Member",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    login2 = await client.post(
-        "/api/v1/auth/login",
-        json={"username": "maria", "password": "Password123!"},
-    )
-    member2_token = login2.json()["access_token"]
+    admin_token, _ = await register_admin(client, full_name="Admin User")
+    member1_token, _ = await add_signed_in_member(client, full_name="Alex")
+    member2_token, _ = await add_signed_in_member(client, full_name="Maria")
 
     # Get assistant agent
     agent_resp = await client.get("/api/v1/agents/assistant", headers={"Authorization": f"Bearer {member1_token}"})
@@ -250,7 +210,7 @@ async def test_stage3_e2e_gossip_bus_lifecycle(client: httpx.AsyncClient):
     assert create_resp.status_code == 201
     milestone_id = create_resp.json()["id"]
     assert create_resp.json()["summary"] == "UPC Thesis Jury presentation on Friday"
-    assert create_resp.json()["source_username"] == "alex"
+    assert create_resp.json()["source_username"] == "Alex"
 
     # 2. Member 2 can view it on the household gossip feed
     feed_resp = await client.get(

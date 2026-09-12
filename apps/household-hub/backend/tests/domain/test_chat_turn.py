@@ -114,7 +114,7 @@ class FakeUnitOfWork:
 
 @pytest.mark.asyncio
 async def test_process_chat_turn_simple():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", model_alias="qwen3:14b")
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 
@@ -144,7 +144,7 @@ async def test_process_chat_turn_simple():
 
 @pytest.mark.asyncio
 async def test_process_chat_turn_privacy_trigger():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant")
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1", is_secret=False)
 
@@ -173,7 +173,7 @@ async def test_process_chat_turn_privacy_trigger():
 
 @pytest.mark.asyncio
 async def test_process_chat_turn_with_tool_execution():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 
@@ -210,7 +210,7 @@ async def test_process_chat_turn_with_tool_execution():
 
 @pytest.mark.asyncio
 async def test_process_chat_turn_write_tool_confirmation():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_write"])
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 
@@ -245,7 +245,7 @@ async def test_process_chat_turn_write_tool_confirmation():
 
 @pytest.mark.asyncio
 async def test_execute_stream_progressive_token_streaming_no_tools():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 
@@ -292,7 +292,7 @@ async def test_execute_stream_progressive_token_streaming_no_tools():
 
 @pytest.mark.asyncio
 async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
-    user = User(id="u1", username="alex")
+    user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 

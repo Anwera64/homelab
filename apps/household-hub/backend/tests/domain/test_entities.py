@@ -21,15 +21,15 @@ from app.domain.exceptions import (
 def test_user_entity_defaults():
     user = User(
         id="user-1",
-        username="anwera",
-        email="anwera@homelab.local",
         full_name="Anwera",
-        hashed_password="hashed_pw",
+        hashed_pin="hashed_pin",
         is_admin=False,
     )
     assert user.id == "user-1"
     assert user.is_active is True
-    assert user.avatar_color == "#4F46E5"
+    assert user.avatar_color == "#3C6E4E"
+    assert user.failed_pin_attempts == 0
+    assert user.pin_locked_until is None
 
 
 def test_space_entity_zero_leak_rules():

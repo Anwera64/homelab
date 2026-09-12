@@ -35,7 +35,7 @@ class FakeGossipRepository:
 
 @pytest.mark.asyncio
 async def test_assemble_context_primacy_and_recency_layout():
-    user = User(id="u1", username="alex", full_name="Alex Rivera")
+    user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(
         id="a1",
         slug="assistant",
@@ -89,7 +89,7 @@ async def test_assemble_context_primacy_and_recency_layout():
 
     # Primacy check: Agent system prompt and persona at top
     assert "You are a helpful homelab coordinator." in system_msg.content
-    assert "Alex Rivera (@alex)" in system_msg.content
+    assert "You are speaking with Alex Rivera." in system_msg.content
 
     # Recency check: Memories and Anti-Echo Milestones placed with provenance
     assert "[What I Know About You]" in system_msg.content
@@ -100,7 +100,7 @@ async def test_assemble_context_primacy_and_recency_layout():
 
 @pytest.mark.asyncio
 async def test_assemble_context_secret_mode_sandwich_prompting():
-    user = User(id="u1", username="alex", full_name="Alex Rivera")
+    user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot")
     mem_repo = FakeMemoryRepository()
     gossip_repo = FakeGossipRepository()
@@ -124,7 +124,7 @@ async def test_assemble_context_secret_mode_sandwich_prompting():
 
 @pytest.mark.asyncio
 async def test_assemble_context_filters_expired_milestones():
-    user = User(id="u1", username="alex", full_name="Alex Rivera")
+    user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot")
     now = datetime.now(timezone.utc)
 
@@ -154,7 +154,7 @@ async def test_assemble_context_filters_expired_milestones():
 
 @pytest.mark.asyncio
 async def test_assemble_context_sanitizes_injection_markers():
-    user = User(id="u1", username="alex", full_name="Alex Rivera")
+    user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(id="a1", name="Assistant")
 
     malicious_mem = AgentMemory(

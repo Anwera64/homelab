@@ -16,11 +16,9 @@ def test_user_presentation_mapper():
     now = datetime.now(timezone.utc)
     user = User(
         id="u-1",
-        username="anwera",
-        email="a@homelab.local",
         full_name="Anwera",
-        hashed_password="pw",
-        avatar_color="#4F46E5",
+        hashed_pin="pin-hash",
+        avatar_color="#C05638",
         is_admin=True,
         is_active=True,
         personal_space_id="space-1",
@@ -29,7 +27,8 @@ def test_user_presentation_mapper():
 
     resp = UserPresentationMapper.to_response(user)
     assert resp.id == "u-1"
-    assert resp.username == "anwera"
+    assert resp.full_name == "Anwera"
+    assert "hashed_pin" not in resp.model_dump()
     assert resp.is_admin is True
     assert resp.personal_space_id == "space-1"
 

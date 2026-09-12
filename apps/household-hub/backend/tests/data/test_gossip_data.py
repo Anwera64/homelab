@@ -58,10 +58,8 @@ async def test_gossip_repository_crud_and_expiration(db_session: AsyncSession):
     # Setup user
     user = UserModel(
         id="user-gossip-1",
-        username="gossip_alice",
-        email="gossip_alice@example.com",
         full_name="Alice Gossip",
-        hashed_password="hashed_pw",
+        hashed_pin="hashed_pin",
     )
     db_session.add(user)
     await db_session.commit()
@@ -117,10 +115,8 @@ async def test_gossip_repository_crud_and_expiration(db_session: AsyncSession):
     # Add another user
     user2 = UserModel(
         id="user-gossip-admin",
-        username="gossip_admin",
-        email="gossip_admin@example.com",
         full_name="Admin Gossip",
-        hashed_password="hashed_pw",
+        hashed_pin="hashed_pin",
         is_admin=True,
     )
     db_session.add(user2)

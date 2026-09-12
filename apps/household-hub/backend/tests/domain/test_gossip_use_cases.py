@@ -131,12 +131,12 @@ async def test_revoke_milestone_permissions():
     revoke_uc = RevokeGossipMilestoneUseCase(gossip_repo=repo, uow=uow)
 
     # 1. Other non-admin user cannot revoke
-    other_user = User(id="user-other", username="other", is_admin=False)
+    other_user = User(id="user-other", full_name="Other", is_admin=False)
     with pytest.raises(ZeroLeakViolationException):
         await revoke_uc.execute(milestone_id="gm1", current_user=other_user)
 
     # 2. Author can revoke
-    author = User(id="user-author", username="author", is_admin=False)
+    author = User(id="user-author", full_name="Author", is_admin=False)
     revoked = await revoke_uc.execute(milestone_id="gm1", current_user=author)
     assert revoked is True
     assert m.is_active is False
@@ -144,7 +144,7 @@ async def test_revoke_milestone_permissions():
     # 3. Admin can revoke any milestone
     m2 = GossipMilestone(id="gm2", source_user_id="user-author", summary="Author event 2")
     repo.milestones["gm2"] = m2
-    admin = User(id="user-admin", username="admin", is_admin=True)
+    admin = User(id="user-admin", full_name="Admin", is_admin=True)
     revoked_admin = await revoke_uc.execute(milestone_id="gm2", current_user=admin)
     assert revoked_admin is True
     assert m2.is_active is False

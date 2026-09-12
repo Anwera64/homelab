@@ -72,7 +72,7 @@ class AssembleAgentContextUseCase:
         if agent.system_prompt:
             primacy_lines.append(agent.system_prompt.strip())
         primacy_lines.append(
-            f"You are speaking with {user.full_name} (@{user.username}). Maintain helpful, attentive, and relational awareness."
+            f"You are speaking with {user.full_name}. Maintain helpful, attentive, and relational awareness."
         )
         if is_secret:
             primacy_lines.append(

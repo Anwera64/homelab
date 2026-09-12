@@ -45,10 +45,8 @@ async def test_user_repository_and_mapper(session: AsyncSession):
 
     user = User(
         id="user-123",
-        username="anwera",
-        email="anwera@homelab.local",
         full_name="Anwera",
-        hashed_password="hash",
+        hashed_pin="hash",
         is_admin=True,
     )
 
@@ -56,11 +54,11 @@ async def test_user_repository_and_mapper(session: AsyncSession):
     await session.commit()
 
     assert created.id == "user-123"
-    assert created.username == "anwera"
+    assert created.full_name == "Anwera"
 
     fetched = await repo.get_by_id("user-123")
     assert fetched is not None
-    assert fetched.username == "anwera"
+    assert fetched.full_name == "Anwera"
     assert fetched.is_admin is True
 
     count = await repo.count()
