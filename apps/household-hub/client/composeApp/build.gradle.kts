@@ -35,6 +35,9 @@ kotlin {
             implementation(libs.navigation3.ui)
             implementation(libs.koin.compose.viewmodel)
         }
+        commonTest.dependencies {
+            implementation(project(":shared"))
+        }
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.compose.ui.test)

@@ -98,7 +98,10 @@ cd apps\household-hub\client
 
 The architecture tests enforce: domain has no outward dependencies; presentation never imports data;
 data never imports presentation; `commonMain` has no `java.`/`javax.`/`android.`/engine imports; the
-UI module imports only presentation and domain; and every module's Gradle dependencies point inward.
+UI module imports only presentation and domain; and every module's **production** Gradle
+dependencies point inward. Test source sets are exempt from that last one — the full-stack UI
+tests in `:composeApp` wire the real graph from `:shared`, while `composeApp/commonMain` still
+can't reach past `:core:presentation`.
 
 ## ▶️ Running the app
 

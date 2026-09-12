@@ -108,6 +108,11 @@ class CleanArchitectureBoundaryTest {
         )
     }
 
+    /**
+     * Production dependencies only. A test source set may depend outward — the full-stack UI
+     * tests in `:composeApp` wire the real graph from `:shared` — without the app itself being
+     * able to reach past `:core:presentation`.
+     */
     @Test
     fun module_dependencies_point_inward() {
         val allowedProjectDependencies = mapOf(
@@ -127,15 +132,42 @@ class CleanArchitectureBoundaryTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Module dependency points outward:\n" + violations.joinToString("\n")
+            "Production module dependency points outward:\n" + violations.joinToString("\n")
         )
     }
 
-    private fun projectDependencies(buildFile: File): Set<String> =
-        Regex("""project\("(:[^"]+)"\)""")
-            .findAll(buildFile.readText())
-            .map { it.groupValues[1] }
-            .toSet()
+    /**
+     * The `project(":x")` references a build file declares for its production source sets.
+     *
+     * Skips test declarations in both styles the client uses: a `<name>Test.dependencies { }`
+     * block in the multiplatform source-set DSL, and a `*[tT]est*Implementation(...)` line in a
+     * plain `dependencies { }` block.
+     */
+    private fun projectDependencies(buildFile: File): Set<String> {
+        val projectReference = Regex("""project\("(:[^"]+)"\)""")
+        val testSourceSet = Regex("""\w*[tT]est\w*\.dependencies\s*\{""")
+        val testConfiguration = Regex("""^\w*[tT]est\w*\s*\(""")
+
+        val dependencies = mutableSetOf<String>()
+        var depth = 0
+        var testBlockDepth: Int? = null
+
+        buildFile.forEachLine { line ->
+            if (testBlockDepth == null && testSourceSet.containsMatchIn(line)) {
+                testBlockDepth = depth
+            }
+
+            val isProduction = testBlockDepth == null && !testConfiguration.containsMatchIn(line.trim())
+            if (isProduction) {
+                projectReference.findAll(line).forEach { dependencies += it.groupValues[1] }
+            }
+
+            depth += line.count { it == '{' } - line.count { it == '}' }
+            testBlockDepth?.let { if (depth <= it) testBlockDepth = null }
+        }
+
+        return dependencies
+    }
 
     private fun importViolations(sourceDir: File, forbiddenImports: List<String>): List<String> =
         sourceDir.walkTopDown()
