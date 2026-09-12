@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.homelab.household.app.theme.HearthTheme
 
 /**
@@ -26,8 +25,9 @@ fun HearthScaffold(
     header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
-    contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-    contentSpacing: Dp = 14.dp,
+    contentPadding: PaddingValues =
+        PaddingValues(horizontal = HearthTheme.spacing.xl, vertical = HearthTheme.spacing.none),
+    contentSpacing: Dp = HearthTheme.spacing.lg,
     scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit
 ) {

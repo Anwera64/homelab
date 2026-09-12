@@ -21,7 +21,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -51,7 +50,7 @@ fun HearthTextField(
     val inter = HearthTheme.fonts.inter
     val fieldStyle = textStyle ?: TextStyle(fontFamily = inter, fontSize = 15.sp, lineHeight = 22.sp)
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         Text(label, fontFamily = inter, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.textMuted)
 
         BasicTextField(
@@ -69,14 +68,14 @@ fun HearthTextField(
             decorationBox = { innerField ->
                 Box(
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = HearthTheme.size.touchTarget)
                         .background(colors.surface, HearthShapes.item)
                         .border(
-                            width = if (error != null) 1.5.dp else 1.dp,
+                            width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
                             color = if (error != null) colors.error else colors.outline,
                             shape = HearthShapes.item
                         )
-                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                        .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (value.isEmpty() && placeholder != null) {
@@ -91,13 +90,16 @@ fun HearthTextField(
             Text(helper, fontFamily = inter, fontSize = 11.5.sp, color = colors.textMuted)
         }
         if (error != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
+                verticalAlignment = Alignment.Top
+            ) {
                 HearthIconImage(
                     icon = HearthIcon.Error,
                     contentDescription = null,
-                    size = 14.dp,
+                    size = HearthTheme.size.iconSm,
                     tint = colors.error,
-                    modifier = Modifier.padding(top = 1.dp)
+                    modifier = Modifier.padding(top = HearthTheme.spacing.xxs)
                 )
                 Text(error, fontFamily = inter, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.error)
             }

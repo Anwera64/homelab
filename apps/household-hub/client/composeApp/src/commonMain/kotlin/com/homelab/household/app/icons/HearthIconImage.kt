@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import com.homelab.household.app.theme.HearthTheme
 
 /** Draws a [HearthIcon] tinted with the current content colour. */
 @Composable
@@ -16,7 +16,7 @@ fun HearthIconImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     active: Boolean = false,
-    size: Dp = 24.dp,
+    size: Dp = HearthTheme.size.iconLg,
     tint: Color = LocalContentColor.current
 ) {
     Icon(

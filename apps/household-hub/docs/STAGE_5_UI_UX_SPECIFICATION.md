@@ -78,6 +78,10 @@ graph LR
 * **Interactive Pills & Badges:** Full round / stadium pill (`RoundedCornerShape(percent = 50)`).
 * **Elevation & Shadows:** Ultra-soft diffusion (`blur: 30dp`, `offsetY: 8dp`, `alpha: 4-6%`). No hard or heavy black drop shadows.
 
+### 2.4 Spacing & Sizing
+
+Space, size and radii are a **4dp grid**, defined in [`STAGE_5_DESIGN_NOTES.md`](STAGE_5_DESIGN_NOTES.md) §3 ("Space and size") and held in code by `HearthSpacing`, `HearthSizes` and `HearthShapes`. A screen picks a step and never writes a `dp` of its own; a guard test fails the build if it does. Radii settled at 4 / 8 / 12 / 16 / 20 / 24 / 32 plus the pill and circle, which supersedes the `12px - 16px` range named above.
+
 ---
 
 ## 3. Mobile Navigation & Screen Architecture (Portrait Phone)

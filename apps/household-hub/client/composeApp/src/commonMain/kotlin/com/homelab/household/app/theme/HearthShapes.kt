@@ -8,8 +8,11 @@ object HearthShapes {
     /** Bento cards. */
     val bento = RoundedCornerShape(24.dp)
 
+    /** The soft tile an icon sits on — the bento radius, so tiles stop inventing their own. */
+    val tile = bento
+
     /** Inner elements, list items and text fields. */
-    val item = RoundedCornerShape(14.dp)
+    val item = RoundedCornerShape(16.dp)
 
     /** Full-width actions. */
     val button = RoundedCornerShape(16.dp)

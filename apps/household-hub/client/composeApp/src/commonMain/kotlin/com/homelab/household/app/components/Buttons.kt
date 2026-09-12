@@ -11,11 +11,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -25,8 +26,16 @@ import com.homelab.household.app.theme.HearthTheme
 // Buttons deliberately have no `enabled` parameter: a primary action is never dimmed,
 // it explains what's missing when tapped (design notes §2).
 
-private val ButtonMinHeight = 52.dp
-private val ButtonPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)
+// Both come from the theme, so they are read inside a composition rather than at file scope.
+private val buttonMinHeight: Dp
+    @Composable
+    @ReadOnlyComposable
+    get() = HearthTheme.size.control
+
+private val buttonPadding: PaddingValues
+    @Composable
+    @ReadOnlyComposable
+    get() = PaddingValues(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.lg)
 
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: HearthIcon? = null) {
@@ -34,16 +43,16 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     Button(
         onClick = onClick,
         modifier = modifier
-            .heightIn(min = ButtonMinHeight)
+            .heightIn(min = buttonMinHeight)
             .shadow(
-                elevation = 10.dp,
+                elevation = HearthTheme.size.raised,
                 shape = HearthShapes.button,
                 ambientColor = colors.primary.copy(alpha = 0.30f),
                 spotColor = colors.primary.copy(alpha = 0.30f)
             ),
         shape = HearthShapes.button,
         colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.onPrimary),
-        contentPadding = ButtonPadding
+        contentPadding = buttonPadding
     ) {
         ButtonContent(text, icon)
     }
@@ -71,11 +80,11 @@ private fun OutlinedActionButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = ButtonMinHeight),
+        modifier = modifier.heightIn(min = buttonMinHeight),
         shape = HearthShapes.button,
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(HearthTheme.size.hairline, borderColor),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-        contentPadding = ButtonPadding
+        contentPadding = buttonPadding
     ) {
         ButtonContent(text, icon)
     }
@@ -84,8 +93,8 @@ private fun OutlinedActionButton(
 @Composable
 private fun RowScope.ButtonContent(text: String, icon: HearthIcon?) {
     if (icon != null) {
-        HearthIconImage(icon = icon, contentDescription = null, active = true, size = 19.dp)
-        Spacer(Modifier.width(9.dp))
+        HearthIconImage(icon = icon, contentDescription = null, active = true, size = HearthTheme.size.iconMd)
+        Spacer(Modifier.width(HearthTheme.spacing.sm))
     }
     Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = HearthTheme.fonts.inter)
 }

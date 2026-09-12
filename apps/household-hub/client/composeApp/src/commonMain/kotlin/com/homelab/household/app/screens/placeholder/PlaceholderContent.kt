@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.sign_in_detail
@@ -34,9 +33,9 @@ fun PlaceholderContent(
     val colors = HearthTheme.colors
 
     Column(
-        modifier = modifier.fillMaxSize().background(colors.canvas).padding(40.dp),
+        modifier = modifier.fillMaxSize().background(colors.canvas).padding(HearthTheme.spacing.huge),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm, Alignment.CenterVertically)
     ) {
         Text(
             text = title,
@@ -53,7 +52,7 @@ fun PlaceholderContent(
             lineHeight = 22.sp,
             color = colors.textMuted,
             textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 290.dp)
+            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
         )
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,10 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
+import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 
 const val EmptyStateIconTag = "EmptyStateIcon"
@@ -40,18 +39,28 @@ fun EmptyState(
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier = modifier.fillMaxWidth().padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 40.dp),
+        modifier = modifier.fillMaxWidth().padding(
+            start = HearthTheme.spacing.lg,
+            top = HearthTheme.spacing.xxl,
+            end = HearthTheme.spacing.lg,
+            bottom = HearthTheme.spacing.huge
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterVertically)
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .background(colors.outlineSoft, RoundedCornerShape(22.dp))
+                .size(HearthTheme.size.tile)
+                .background(colors.outlineSoft, HearthShapes.tile)
                 .testTag(EmptyStateIconTag),
             contentAlignment = Alignment.Center
         ) {
-            HearthIconImage(icon = icon, contentDescription = null, size = 28.dp, tint = colors.textMuted)
+            HearthIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = HearthTheme.size.iconXl,
+                tint = colors.textMuted
+            )
         }
         Text(
             text = title,
@@ -63,7 +72,7 @@ fun EmptyState(
         )
         Text(
             text = line,
-            modifier = Modifier.widthIn(max = 290.dp),
+            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
             fontFamily = HearthTheme.fonts.inter,
             fontSize = 13.5.sp,
             lineHeight = 21.sp,
@@ -71,7 +80,11 @@ fun EmptyState(
             textAlign = TextAlign.Center
         )
         if (action != null) {
-            PrimaryButton(text = action.label, onClick = action.onClick, modifier = Modifier.padding(top = 6.dp))
+            PrimaryButton(
+                text = action.label,
+                onClick = action.onClick,
+                modifier = Modifier.padding(top = HearthTheme.spacing.sm)
+            )
         }
     }
 }

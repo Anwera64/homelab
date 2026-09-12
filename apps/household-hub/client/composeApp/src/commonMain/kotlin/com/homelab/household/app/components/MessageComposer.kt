@@ -21,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -48,10 +47,15 @@ fun MessageComposer(
     val textStyle = TextStyle(fontFamily = HearthTheme.fonts.inter, fontSize = 14.sp, lineHeight = 20.sp)
 
     Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
-        HorizontalDivider(thickness = 1.dp, color = colors.outlineSoft)
+        HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(
+                start = HearthTheme.spacing.lg,
+                top = HearthTheme.spacing.md,
+                end = HearthTheme.spacing.lg,
+                bottom = HearthTheme.spacing.lg
+            ),
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             leading?.invoke()
@@ -66,8 +70,8 @@ fun MessageComposer(
                     Box(
                         modifier = Modifier
                             .background(colors.canvas, HearthShapes.pill)
-                            .border(1.dp, colors.outline, HearthShapes.pill)
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
+                            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md)
                     ) {
                         if (value.isEmpty()) {
                             Text(placeholder, style = textStyle, color = colors.textMuted)
@@ -78,7 +82,7 @@ fun MessageComposer(
             )
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(HearthTheme.size.touchTarget)
                     .clip(CircleShape)
                     .background(colors.primary)
                     .clickable(role = Role.Button) { onSend(value) },
@@ -88,7 +92,7 @@ fun MessageComposer(
                     icon = HearthIcon.Send,
                     contentDescription = stringResource(Res.string.send_message),
                     active = true,
-                    size = 20.dp,
+                    size = HearthTheme.size.iconMd,
                     tint = colors.onPrimary
                 )
             }

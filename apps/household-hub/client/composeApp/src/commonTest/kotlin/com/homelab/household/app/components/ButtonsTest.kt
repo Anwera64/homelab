@@ -11,7 +11,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.unit.dp
+import com.homelab.household.app.theme.DefaultSizes
 import com.homelab.household.app.theme.HearthTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,7 +45,7 @@ class ButtonsTest {
         onNodeWithText("Create")
             .assertIsEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assertHeightIsAtLeast(44.dp)
+            .assertHeightIsAtLeast(DefaultSizes.touchTarget)
             .performClick()
 
         assertEquals(1, clicks)

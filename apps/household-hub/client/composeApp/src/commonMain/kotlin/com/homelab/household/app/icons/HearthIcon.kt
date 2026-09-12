@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
-import androidx.compose.ui.unit.dp
+import com.homelab.household.app.theme.DefaultSizes
 
 /**
  * The Hearth icon set, drawn on a 24-unit grid with a 1.5 stroke (1.85 when active),
@@ -120,8 +120,8 @@ enum class HearthIcon(val token: String, private val shapes: List<IconShape>) {
     private fun build(strokeWidth: Float): ImageVector =
         ImageVector.Builder(
             name = token,
-            defaultWidth = 24.dp,
-            defaultHeight = 24.dp,
+            defaultWidth = DefaultSizes.iconLg,
+            defaultHeight = DefaultSizes.iconLg,
             viewportWidth = 24f,
             viewportHeight = 24f
         ).apply {

@@ -1,9 +1,12 @@
 package com.homelab.household.app.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -110,6 +113,59 @@ class HearthThemeTest {
         waitForIdle()
         assertEquals(DayColors, hearth)
         assertEquals(DayColors.primary, materialPrimary)
+    }
+
+    @Test
+    fun the_theme_hands_out_the_scale_beside_the_palette() = runComposeUiTest {
+        var spacing: HearthSpacing? = null
+        var size: HearthSizes? = null
+
+        setContent {
+            HearthTheme(darkTheme = false) {
+                spacing = HearthTheme.spacing
+                size = HearthTheme.size
+            }
+        }
+
+        waitForIdle()
+        assertEquals(DefaultSpacing, spacing)
+        assertEquals(DefaultSizes, size)
+    }
+
+    /** Space doesn't change with the palette: a screen reads the same step in either theme. */
+    @Test
+    fun the_scale_is_the_same_in_both_palettes() = runComposeUiTest {
+        var day: HearthSpacing? = null
+        var night: HearthSpacing? = null
+
+        setContent {
+            HearthTheme(darkTheme = false) { day = HearthTheme.spacing }
+            HearthTheme(darkTheme = true) { night = HearthTheme.spacing }
+        }
+
+        waitForIdle()
+        assertEquals(day, night)
+    }
+
+    /**
+     * The point of putting the scale behind a local: a denser or looser variant — a tablet, a
+     * later size class — can be provided once, and every screen follows without being touched.
+     */
+    @Test
+    fun a_provided_scale_reaches_the_screens_under_it() = runComposeUiTest {
+        val roomier = DefaultSpacing.copy(xl = 32.dp)
+        var seen: Dp? = null
+
+        setContent {
+            HearthTheme(darkTheme = false) {
+                CompositionLocalProvider(LocalHearthSpacing provides roomier) {
+                    seen = HearthTheme.spacing.xl
+                }
+            }
+        }
+
+        waitForIdle()
+        assertEquals(32.dp, seen)
     }
 
     private fun assertColor(expectedRgb: Long, actual: Color, token: String) {

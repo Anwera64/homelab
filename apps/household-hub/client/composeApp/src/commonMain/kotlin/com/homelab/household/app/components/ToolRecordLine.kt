@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -39,11 +38,13 @@ fun ToolRecordLine(
         Modifier
     }
     Row(
-        modifier = modifier.then(interaction).padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = modifier
+            .then(interaction)
+            .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        HearthIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = tint)
+        HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconSm, tint = tint)
         Text(text = text, fontFamily = HearthTheme.fonts.inter, fontSize = 12.sp, color = tint)
     }
 }

@@ -57,6 +57,33 @@ The palette proof is the source of truth. What changed from the UI/UX specificat
 
 **Type:** Outfit (display), Inter (text), JetBrains Mono (times, handles, metadata). **Shape:** 24dp bento cards.
 
+### Space and size
+
+Every padding, gap and dimension comes off a **4dp grid**, with one 2dp half-step for hairline insets. Before this, the canvas had invented 24 gaps, 120 padding combinations and 25 corner radii, and the code had copied them; the icon-and-text gap alone existed at 5, 6, 7, 9 and 10dp. The designs were re-snapped and the code follows them, token for token.
+
+| Space | dp | Size | dp |
+| :--- | :--- | :--- | :--- |
+| `none` | 0 | `iconSm` (inline with text) | 16 |
+| `xxs` (hairline inset) | 2 | `iconMd` (button, composer) | 20 |
+| `xs` | 4 | `iconLg` (nav, the drawing grid) | 24 |
+| `sm` (icon ↔ text, line ↔ line) | 8 | `iconXl` (empty-state tile) | 28 |
+| `md` (inside a card) | 12 | `iconXxl` (on a tile) | 32 |
+| `lg` (between blocks, field padding) | 16 | `iconHero` (on a hero tile) | 40 |
+| `xl` (screen gutter, card padding) | 20 | `touchTarget` (anything tappable, field height) | 48 |
+| `xxl` (between sections) | 24 | `control` (button height, the raised +) | 56 |
+| `xxxl` (around a hero) | 32 | `tile` / `tileHero` | 64 / 80 |
+| `huge` (full-screen state) | 40 | `readingWidth` (centred prose) | 288 |
+
+**Radii:** 4 / 8 / 12 / 16 / 20 / 24 / 32, plus the stadium pill and the circle. Bento cards stay 24; a list item, a field and a button are all 16; an icon tile reuses the bento radius instead of inventing r22 and r26.
+
+**Off the grid on purpose:** a 1dp border, the 2dp error edge and a shadow's blur. None of them is layout, and rounding them to 4dp would only make them wrong.
+
+**What grew:** a header icon button and the composer's send button, both 44dp, now 48 — they were under the accessible floor. A launch hero tile went 76 → 80. Everything else moved by 2dp or less.
+
+**Type is not done.** The canvas still draws 28 distinct font sizes (9.5 through 36px, including 12.5, 13.5 and 14.5), and the components still write raw `sp` instead of the `HearthTypography` roles that already exist. Same disease, its own pass.
+
+**In code:** a screen reads the scale off the theme, beside the palette — `HearthTheme.spacing.lg`, `HearthTheme.size.iconMd` — with the values held by `HearthSpacing`, `HearthSizes` and `HearthShapes` in `app/theme` and handed down by `HearthTheme` through a composition local. Space doesn't change between day and night, but going through the theme means a later size class (the deferred tablet) can provide its own scale and every screen follows without being touched. `DesignSystemTokenTest` fails the build on a raw `dp` written anywhere else in `composeApp/commonMain`, and on a screen reading `DefaultSpacing` / `DefaultSizes` past the theme. The one exception is the icon set: `HearthIcon` builds its vectors outside composition, and its 24-unit grid is the drawing itself, not a layout decision.
+
 **Hearth icons:** 24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **30** icons in six groups — its header and the table above still say 27, which predates the last additions. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
 
 ---

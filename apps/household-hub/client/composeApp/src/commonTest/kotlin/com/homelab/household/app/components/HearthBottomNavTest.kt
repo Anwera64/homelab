@@ -10,9 +10,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.unit.dp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.new_chat
+import com.homelab.household.app.theme.DefaultSizes
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -65,8 +65,12 @@ class HearthBottomNavTest {
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
         NavTab.entries.forEach {
-            onNodeWithText(labelOf(it)).assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp)
+            onNodeWithText(labelOf(it))
+                .assertHeightIsAtLeast(DefaultSizes.touchTarget)
+                .assertWidthIsAtLeast(DefaultSizes.touchTarget)
         }
-        onNodeWithContentDescription(getString(Res.string.new_chat)).assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp)
+        onNodeWithContentDescription(getString(Res.string.new_chat))
+            .assertHeightIsAtLeast(DefaultSizes.touchTarget)
+            .assertWidthIsAtLeast(DefaultSizes.touchTarget)
     }
 }

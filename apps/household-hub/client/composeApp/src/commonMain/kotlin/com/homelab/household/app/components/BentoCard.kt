@@ -9,7 +9,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
@@ -29,8 +28,8 @@ fun BentoCard(
         contentColor = colors.textPrimary
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(HearthTheme.spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
         ) {
             if (label != null) {
                 Text(

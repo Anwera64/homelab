@@ -5,8 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.theme.DefaultSizes
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -70,6 +73,20 @@ class MessageComposerTest {
         onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
 
         onNode(hasSetTextAction()).assertTextContains("Move dinner to 20:00")
+    }
+
+    /** Send used to be 44dp square, under the floor — the one thing the scale actually grew. */
+    @Test
+    fun send_is_big_enough_to_hit() = runComposeUiTest {
+        setContent {
+            HearthTheme(darkTheme = false) {
+                MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message…")
+            }
+        }
+
+        onNodeWithContentDescription(getString(Res.string.send_message))
+            .assertHeightIsAtLeast(DefaultSizes.touchTarget)
+            .assertWidthIsAtLeast(DefaultSizes.touchTarget)
     }
 
     @Test

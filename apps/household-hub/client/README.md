@@ -43,7 +43,9 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
 ## 🧭 How a screen is built
 
 `App()` is the theme and nothing else; `AppNavHost` owns the back stack and is the only place that
-navigates. Every screen follows the same four files:
+navigates. Space and size come off the theme like the palette does — `HearthTheme.spacing.lg`,
+`HearthTheme.size.iconMd` — and a screen never writes a `dp` of its own; `DesignSystemTokenTest`
+fails the build if it does. Every screen follows the same four files:
 
 | File | What it is |
 | :--- | :--- |
@@ -132,6 +134,12 @@ UI module imports only presentation and domain; and every module's **production*
 dependencies point inward. Test source sets are exempt from that last one — the full-stack UI
 tests in `:composeApp` wire the real graph from `:shared`, while `composeApp/commonMain` still
 can't reach past `:core:presentation`.
+
+`DesignSystemTokenTest` sits beside them and guards the design system instead of the layers: no raw
+`dp` in `composeApp/commonMain` outside `app/theme`, which is the only place space and size are
+decided, and no reading `DefaultSpacing` / `DefaultSizes` around the theme — `HearthIcon`, whose
+vectors are built outside composition, is the one listed exception. Test sources are exempt — an
+assertion is free to name a real number.
 
 ## ▶️ Running the app
 

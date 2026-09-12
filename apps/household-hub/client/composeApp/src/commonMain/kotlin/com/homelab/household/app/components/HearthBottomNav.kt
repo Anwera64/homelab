@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -54,9 +53,14 @@ fun HearthBottomNav(
 ) {
     val colors = HearthTheme.colors
     Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
-        HorizontalDivider(thickness = 1.dp, color = colors.outlineSoft)
+        HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, top = 10.dp, end = 6.dp, bottom = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                start = HearthTheme.spacing.sm,
+                top = HearthTheme.spacing.md,
+                end = HearthTheme.spacing.sm,
+                bottom = HearthTheme.spacing.lg
+            ),
             verticalAlignment = Alignment.Bottom
         ) {
             NavItem(NavTab.Household, selected, onSelect)
@@ -64,10 +68,10 @@ fun HearthBottomNav(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
-                        .offset(y = (-24).dp)
-                        .size(52.dp)
+                        .offset(y = -HearthTheme.spacing.xxl)
+                        .size(HearthTheme.size.control)
                         .shadow(
-                            elevation = 10.dp,
+                            elevation = HearthTheme.size.raised,
                             shape = CircleShape,
                             ambientColor = colors.primary.copy(alpha = 0.30f),
                             spotColor = colors.primary.copy(alpha = 0.30f)
@@ -81,7 +85,7 @@ fun HearthBottomNav(
                         icon = HearthIcon.NewChat,
                         contentDescription = stringResource(Res.string.new_chat),
                         active = true,
-                        size = 24.dp,
+                        size = HearthTheme.size.iconLg,
                         tint = colors.onPrimary
                     )
                 }
@@ -100,12 +104,18 @@ private fun RowScope.NavItem(tab: NavTab, selected: NavTab, onSelect: (NavTab) -
         modifier = Modifier
             .weight(1f)
             .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
-            .heightIn(min = 48.dp)
-            .padding(vertical = 4.dp),
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .padding(vertical = HearthTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.Bottom)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs, Alignment.Bottom)
     ) {
-        HearthIconImage(icon = tab.icon, contentDescription = null, active = isSelected, size = 23.dp, tint = tint)
+        HearthIconImage(
+            icon = tab.icon,
+            contentDescription = null,
+            active = isSelected,
+            size = HearthTheme.size.iconLg,
+            tint = tint
+        )
         Text(
             text = stringResource(tab.label),
             fontFamily = HearthTheme.fonts.inter,
