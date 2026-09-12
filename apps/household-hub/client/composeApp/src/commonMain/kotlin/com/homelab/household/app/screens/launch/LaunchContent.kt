@@ -22,8 +22,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.icons.HearthIcon
+import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
+import com.homelab.household.app.resources.launch_action_description
 import com.homelab.household.app.resources.launch_checking
 import com.homelab.household.app.resources.launch_failed_address_not_found
 import com.homelab.household.app.resources.launch_failed_not_json
@@ -37,9 +40,6 @@ import com.homelab.household.app.resources.launch_ready
 import com.homelab.household.app.resources.launch_retry
 import com.homelab.household.app.resources.launch_unreachable_detail
 import com.homelab.household.app.resources.launch_unreachable_title
-import com.homelab.household.app.icons.HearthIcon
-import com.homelab.household.app.icons.HearthIconImage
-import com.homelab.household.app.resources.launch_action_description
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
@@ -65,28 +65,49 @@ fun LaunchContent(
     val unreachable = status is HubStatus.Unreachable || status is HubStatus.Failed
 
     Column(
-        modifier = modifier.fillMaxSize().background(colors.canvas).padding(HearthTheme.spacing.huge),
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.canvas)
+            .padding(HearthTheme.spacing.huge),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(
+            HearthTheme.spacing.xxxl,
+            Alignment.CenterVertically
+        )
     ) {
         if (unreachable) {
             Box(
-                modifier = Modifier.size(HearthTheme.size.tile).background(colors.errorContainer, HearthShapes.tile),
+                modifier = Modifier
+                    .size(HearthTheme.size.tile)
+                    .background(
+                        color = colors.errorContainer,
+                        shape = HearthShapes.tile
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 HearthIconImage(
-                    HearthIcon.HubOffline,
-                    null,
+                    icon = HearthIcon.HubOffline,
+                    contentDescription = null,
                     size = HearthTheme.size.iconXxl,
                     tint = colors.onErrorContainer
                 )
             }
         } else {
             Box(
-                modifier = Modifier.size(HearthTheme.size.tileHero).background(colors.primary, HearthShapes.tile),
+                modifier = Modifier
+                    .size(HearthTheme.size.tileHero)
+                    .background(
+                        color = colors.primary,
+                        shape = HearthShapes.tile
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                HearthIconImage(HearthIcon.Household, null, size = HearthTheme.size.iconHero, tint = colors.onPrimary)
+                HearthIconImage(
+                    icon = HearthIcon.Household,
+                    contentDescription = null,
+                    size = HearthTheme.size.iconHero,
+                    tint = colors.onPrimary
+                )
             }
         }
 
@@ -104,10 +125,16 @@ fun LaunchContent(
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center
             )
-            StatusLines(status = status, modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth))
+            StatusLines(
+                status = status,
+                modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+            )
         }
 
-        HubAddressPill(hubAddress = state.hubAddress, reachable = !unreachable)
+        HubAddressPill(
+            hubAddress = state.hubAddress,
+            reachable = !unreachable
+        )
 
         if (status is HubStatus.Checking) {
             LinearProgressIndicator(
@@ -144,12 +171,18 @@ private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
         HubStatus.Checking -> listOf(stringResource(Res.string.launch_checking))
         is HubStatus.Ready -> listOf(
             stringResource(Res.string.launch_ready),
-            pluralStringResource(Res.plurals.launch_member_count, status.memberCount, status.memberCount)
+            pluralStringResource(
+                Res.plurals.launch_member_count,
+                status.memberCount,
+                status.memberCount
+            )
         )
+
         HubStatus.FirstRun -> listOf(
             stringResource(Res.string.launch_first_run_title),
             stringResource(Res.string.launch_first_run_detail)
         )
+
         HubStatus.Unreachable -> listOf(stringResource(Res.string.launch_unreachable_detail))
         is HubStatus.Failed -> listOf(
             stringResource(Res.string.launch_failed_title),
