@@ -15,7 +15,7 @@ class LaunchUiStateProvider : PreviewParameterProvider<LaunchUiState> {
         HubStatus.Ready(memberCount = 2),
         HubStatus.FirstRun,
         HubStatus.Unreachable,
-        HubStatus.Failed(message = "Unexpected status 500")
+        HubStatus.Failed(message = "Hub returned HTTP 500: Internal Server Error")
     ).map { LaunchUiState(hubAddress = "hub.spicy-llama.duckdns.org", status = it) }
 
     override fun getDisplayName(index: Int): String =

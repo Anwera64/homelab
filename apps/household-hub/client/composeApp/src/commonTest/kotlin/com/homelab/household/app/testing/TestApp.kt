@@ -15,8 +15,9 @@ import io.ktor.client.engine.HttpClientEngine
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 
-/** The address the screens will show; `getHubHost()` strips the scheme off it. */
-const val TEST_HUB_URL = "https://hub.test.local"
+/** The hub the screens will name; `getHubHost()` strips the scheme off it. */
+const val TEST_HUB_HOST = "hub.test.local"
+const val TEST_HUB_URL = "https://$TEST_HUB_HOST"
 
 /**
  * The app's real dependency graph with only its two outermost seams replaced: the HTTP engine

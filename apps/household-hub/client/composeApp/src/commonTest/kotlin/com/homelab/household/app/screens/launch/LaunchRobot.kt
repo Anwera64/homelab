@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.testing.TestApp
 
 /**
  * Everything the launch screen says and does, named once.
@@ -26,12 +27,19 @@ class LaunchRobot(private val test: ComposeUiTest) {
 
     fun seesNobodyLivesHereYet() = seesText("Nobody lives here yet")
 
+    /**
+     * Unreachable, not merely failed: both draw the same title and button, so the explanation
+     * is the only thing that tells them apart.
+     */
     fun seesTheHubIsOffline() = apply {
         seesText("Can't reach your hub")
-        seesText("Try again")
+        seesTextContaining("nothing answered at your home server")
+        seesSomethingToRetry()
     }
 
     fun seesTheHubSaid(message: String) = seesText(message)
+
+    fun seesSomethingToRetry() = seesText("Try again")
 
     fun seesTheHubAddress(address: String) = seesText(address)
 
@@ -44,6 +52,11 @@ class LaunchRobot(private val test: ComposeUiTest) {
         test.onNodeWithText(text).assertIsDisplayed()
     }
 
+    private fun seesTextContaining(text: String) = apply {
+        test.waitUntilExactlyOneExists(hasText(text, substring = true), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithText(text, substring = true).assertIsDisplayed()
+    }
+
     private companion object {
         const val WAIT_MILLIS = 5_000L
     }
@@ -52,4 +65,18 @@ class LaunchRobot(private val test: ComposeUiTest) {
 @OptIn(ExperimentalTestApi::class)
 fun ComposeUiTest.onLaunch(block: LaunchRobot.() -> Unit) {
     LaunchRobot(this).block()
+}
+
+/** The launch screen over a hub that answers however the test says. */
+@OptIn(ExperimentalTestApi::class)
+fun ComposeUiTest.launchScreen(
+    hub: FakeLaunchHub,
+    onSignIn: () -> Unit = {},
+    onFirstRun: () -> Unit = {}
+) {
+    setContent {
+        TestApp(hub.engine) {
+            LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun)
+        }
+    }
 }
