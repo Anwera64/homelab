@@ -50,15 +50,32 @@ navigates. Every screen follows the same four files:
 | `presentation/<screen>/<Screen>ViewModel.kt` | `StateFlow<<Screen>UiState>` for what is drawn, `Channel<<Screen>Event>` for what happens once (navigation, a toast). Never Compose. |
 | `app/screens/<screen>/<Screen>Screen.kt` | **No dependencies in its signature** beyond navigation callbacks and a `Modifier`. It resolves its own ViewModel with `koinViewModel()`, collects the state with `collectAsStateWithLifecycle()`, collects the events with `ObserveEvents` and calls the content. |
 | `app/screens/<screen>/<Screen>Content.kt` | Stateless: state in, lambdas out. Holds the `@Preview` functions. |
-| `app/screens/<screen>/<Screen>UiStateProvider.kt` | A `PreviewParameterProvider` listing every state the screen can be in, so the previews and the content test cover all of them from one list. |
+| `app/screens/<screen>/<Screen>UiStateProvider.kt` | A `PreviewParameterProvider` listing every state the screen can be in, so the previews and the screen test cover all of them from one list. |
 
 Events go through a `Channel`, not state: a `Channel` is consumed once, so a recomposition can't
 navigate twice, and `ObserveEvents` only collects at `STARTED`, so a backgrounded screen can't
 navigate behind the user's back.
 
-Screen tests extend `ScreenTest` (Main dispatcher + a clean Koin context per test) and wrap the
-screen in `TestApp`, which builds the real ViewModel and use cases over a faked hub. Content tests
-need neither — they take a `UiState` directly.
+### How a screen is tested
+
+**One test file per screen**, in `composeApp/src/commonTest` so Android and iOS reuse it as they
+are added. `<Screen>Test` composes the screen inside `TestApp`, which starts the app's real Koin
+graph and overrides only the two seams `platformModule` binds — the HTTP engine and where tokens
+are kept. Everything between the screen and the network is the production wiring, so one test
+covers the drawing, the ViewModel, the use case, the repository and the error mapping at once.
+
+| Piece | Where | What it is |
+| :--- | :--- | :--- |
+| `TestApp`, `runScreenTest` | `app/testing/` | Shared, and screen-agnostic. `runScreenTest` installs a Main dispatcher and stops the global Koin context `KoinApplication` leaves behind — per composition, so one test can compose more than once. |
+| `Fake<Screen>Hub` | beside the screen's tests | A `MockEngine` speaking only the endpoints that screen calls, with a swappable answer so a test can change the hub's mind halfway through. Named for its screen; when a second screen needs a hub, lift the shared parts out then. |
+| `<Screen>Robot` | beside the screen's tests | Every string the screen shows, named once. Each assertion **waits** for its text: the hub answers on its own coroutine, so `waitForIdle` — which only waits for Compose — can run first. |
+
+Navigation is tested on its own: `AppNavHostTest` passes `StubScreens` to `AppNavHost` and reads
+the hoisted back stack, so it covers where the app goes with no Koin, no hub and no real screen.
+
+No MockK in `:composeApp` — only JVM artifacts exist, and one mock in `commonTest` would nail the
+UI suite to the JVM. `InMemoryTokenStorage` and hand-written fakes do the job and compile for
+iOS. MockK stays in the `:core:presentation` ViewModel tests.
 
 ---
 
