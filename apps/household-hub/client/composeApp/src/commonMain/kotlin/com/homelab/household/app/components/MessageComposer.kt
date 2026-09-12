@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The message box under a conversation. Stateless: sending never clears the text here —
@@ -83,7 +86,7 @@ fun MessageComposer(
             ) {
                 HearthIconImage(
                     icon = HearthIcon.Send,
-                    contentDescription = "Send",
+                    contentDescription = stringResource(Res.string.send_message),
                     active = true,
                     size = 20.dp,
                     tint = colors.onPrimary

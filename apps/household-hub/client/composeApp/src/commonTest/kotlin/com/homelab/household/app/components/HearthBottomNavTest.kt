@@ -11,29 +11,33 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.new_chat
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class HearthBottomNavTest {
 
-    private val labels = listOf("Household", "Schedule", "Chats", "My Space")
+    private suspend fun labelOf(tab: NavTab) = getString(tab.label)
 
     @Test
     fun shows_four_tabs_and_the_centre_plus() = runComposeUiTest {
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
-        labels.forEach { onNodeWithText(it).assertIsDisplayed() }
-        onNodeWithContentDescription("New chat").assertIsDisplayed()
+        NavTab.entries.forEach { onNodeWithText(labelOf(it)).assertIsDisplayed() }
+        onNodeWithContentDescription(getString(Res.string.new_chat)).assertIsDisplayed()
     }
 
     @Test
     fun only_the_current_tab_is_selected() = runComposeUiTest {
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Chats, onSelect = {}, onNewChat = {}) } }
 
-        onNodeWithText("Chats").assertIsSelected()
-        listOf("Household", "Schedule", "My Space").forEach { onNodeWithText(it).assertIsNotSelected() }
+        onNodeWithText(labelOf(NavTab.Chats)).assertIsSelected()
+        NavTab.entries.filterNot { it == NavTab.Chats }
+            .forEach { onNodeWithText(labelOf(it)).assertIsNotSelected() }
     }
 
     @Test
@@ -41,7 +45,7 @@ class HearthBottomNavTest {
         var chosen: NavTab? = null
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = { chosen = it }, onNewChat = {}) } }
 
-        onNodeWithText("My Space").performClick()
+        onNodeWithText(labelOf(NavTab.MySpace)).performClick()
 
         assertEquals(NavTab.MySpace, chosen)
     }
@@ -51,7 +55,7 @@ class HearthBottomNavTest {
         var newChats = 0
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = { newChats++ }) } }
 
-        onNodeWithContentDescription("New chat").performClick()
+        onNodeWithContentDescription(getString(Res.string.new_chat)).performClick()
 
         assertEquals(1, newChats)
     }
@@ -60,7 +64,9 @@ class HearthBottomNavTest {
     fun every_target_is_at_least_44dp() = runComposeUiTest {
         setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
-        labels.forEach { onNodeWithText(it).assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp) }
-        onNodeWithContentDescription("New chat").assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp)
+        NavTab.entries.forEach {
+            onNodeWithText(labelOf(it)).assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp)
+        }
+        onNodeWithContentDescription(getString(Res.string.new_chat)).assertHeightIsAtLeast(44.dp).assertWidthIsAtLeast(44.dp)
     }
 }

@@ -17,4 +17,20 @@
     <string name="launch_failed_not_json">Something answered with %1$s instead of JSON. Check your network or your hub address.</string>
     <string name="launch_failed_unknown">Something went wrong on the way to your hub.</string>
     <string name="launch_retry">Try again</string>
+
+    <!-- Bottom navigation -->
+    <string name="tab_household">Household</string>
+    <string name="tab_schedule">Schedule</string>
+    <string name="tab_chats">Chats</string>
+    <string name="tab_my_space">My Space</string>
+    <string name="new_chat">New chat</string>
+
+    <!-- Destinations a later slice still has to build -->
+    <string name="sign_in_title">Sign in</string>
+    <string name="sign_in_detail">The profile picker and PIN arrive in slice 1.</string>
+    <string name="first_run_title">First run</string>
+    <string name="first_run_detail">Setting up the first account arrives in slice 1.</string>
+
+    <!-- Chat -->
+    <string name="send_message">Send</string>
 </resources>

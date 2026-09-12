@@ -56,6 +56,14 @@ Events go through a `Channel`, not state: a `Channel` is consumed once, so a rec
 navigate twice, and `ObserveEvents` only collects at `STARTED`, so a backgrounded screen can't
 navigate behind the user's back.
 
+Every string the UI writes lives in
+`composeApp/src/commonMain/composeResources/values/strings.xml`, read with `stringResource` (or
+`pluralStringResource` for counts). A reusable component takes its text as a `String` parameter and
+the caller resolves it; only strings a component writes itself become resources. Nothing that
+reaches a screen from below is a sentence — `HubStatus.Failed` carries a `HubFailure` and the
+screen picks the wording, so the copy is translatable and the data layer stays out of the
+language business.
+
 ### How a screen is tested
 
 **One test file per screen**, in `composeApp/src/commonTest` so Android and iOS reuse it as they
@@ -68,10 +76,15 @@ covers the drawing, the ViewModel, the use case, the repository and the error ma
 | :--- | :--- | :--- |
 | `TestApp`, `runScreenTest` | `app/testing/` | Shared, and screen-agnostic. `runScreenTest` installs a Main dispatcher and stops the global Koin context `KoinApplication` leaves behind — per composition, so one test can compose more than once. |
 | `Fake<Screen>Hub` | beside the screen's tests | A `MockEngine` speaking only the endpoints that screen calls, with a swappable answer so a test can change the hub's mind halfway through. Named for its screen; when a second screen needs a hub, lift the shared parts out then. |
-| `<Screen>Robot` | beside the screen's tests | Every string the screen shows, named once. Each assertion **waits** for its text: the hub answers on its own coroutine, so `waitForIdle` — which only waits for Compose — can run first. |
+| `<Screen>Robot` | beside the screen's tests | Every string the screen shows, named once — as the **resource**, resolved with `getString`, never as a second copy of the text. Each assertion **waits** for its text: the hub answers on its own coroutine, so `waitForIdle` — which only waits for Compose — can run first. |
 
 Navigation is tested on its own: `AppNavHostTest` passes `StubScreens` to `AppNavHost` and reads
 the hoisted back stack, so it covers where the app goes with no Koin, no hub and no real screen.
+
+Because both the screen and its robot read the same resource, editing `strings.xml` can't fail a
+test — that is the point, and it means copy is not what these tests are about. What they do pin is
+the wiring, so prove a change by mutating that instead: swap two resource keys, or render the
+wrong one, and the tests should fail.
 
 No MockK in `:composeApp` — only JVM artifacts exist, and one mock in `commonTest` would nail the
 UI suite to the JVM. `InMemoryTokenStorage` and hand-written fakes do the job and compile for

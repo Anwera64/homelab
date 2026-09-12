@@ -13,7 +13,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -36,7 +39,7 @@ class MessageComposerTest {
         }
 
         onNode(hasSetTextAction()).performTextInput("What's left this week?")
-        onNodeWithContentDescription("Send").performClick()
+        onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
 
         assertEquals("What's left this week?", sent)
     }
@@ -50,7 +53,7 @@ class MessageComposerTest {
             }
         }
 
-        onNodeWithContentDescription("Send").assertIsEnabled().assertHasClickAction().performClick()
+        onNodeWithContentDescription(getString(Res.string.send_message)).assertIsEnabled().assertHasClickAction().performClick()
 
         assertEquals(1, sends)
     }
@@ -64,7 +67,7 @@ class MessageComposerTest {
             }
         }
 
-        onNodeWithContentDescription("Send").performClick()
+        onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
 
         onNode(hasSetTextAction()).assertTextContains("Move dinner to 20:00")
     }

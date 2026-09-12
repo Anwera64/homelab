@@ -15,7 +15,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.sign_in_detail
+import com.homelab.household.app.resources.sign_in_title
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A destination that navigation already reaches and a later slice still has to build.
@@ -58,6 +62,9 @@ fun PlaceholderContent(
 @Composable
 private fun PlaceholderContentPreview() {
     HearthTheme(darkTheme = false) {
-        PlaceholderContent(title = "Sign in", detail = "The profile picker and PIN arrive in slice 1.")
+        PlaceholderContent(
+            title = stringResource(Res.string.sign_in_title),
+            detail = stringResource(Res.string.sign_in_detail)
+        )
     }
 }

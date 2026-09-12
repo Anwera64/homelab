@@ -27,13 +27,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.new_chat
+import com.homelab.household.app.resources.tab_chats
+import com.homelab.household.app.resources.tab_household
+import com.homelab.household.app.resources.tab_my_space
+import com.homelab.household.app.resources.tab_schedule
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
-enum class NavTab(val label: String, val icon: HearthIcon) {
-    Household("Household", HearthIcon.Household),
-    Schedule("Schedule", HearthIcon.Schedule),
-    Chats("Chats", HearthIcon.Chats),
-    MySpace("My Space", HearthIcon.MySpace)
+enum class NavTab(val label: StringResource, val icon: HearthIcon) {
+    Household(Res.string.tab_household, HearthIcon.Household),
+    Schedule(Res.string.tab_schedule, HearthIcon.Schedule),
+    Chats(Res.string.tab_chats, HearthIcon.Chats),
+    MySpace(Res.string.tab_my_space, HearthIcon.MySpace)
 }
 
 /** Four tabs around the raised + — the only way a chat is started. */
@@ -71,7 +79,7 @@ fun HearthBottomNav(
                 ) {
                     HearthIconImage(
                         icon = HearthIcon.NewChat,
-                        contentDescription = "New chat",
+                        contentDescription = stringResource(Res.string.new_chat),
                         active = true,
                         size = 24.dp,
                         tint = colors.onPrimary
@@ -99,7 +107,7 @@ private fun RowScope.NavItem(tab: NavTab, selected: NavTab, onSelect: (NavTab) -
     ) {
         HearthIconImage(icon = tab.icon, contentDescription = null, active = isSelected, size = 23.dp, tint = tint)
         Text(
-            text = tab.label,
+            text = stringResource(tab.label),
             fontFamily = HearthTheme.fonts.inter,
             fontSize = 10.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,

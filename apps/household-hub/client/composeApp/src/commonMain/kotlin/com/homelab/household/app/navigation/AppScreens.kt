@@ -1,8 +1,14 @@
 package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.first_run_detail
+import com.homelab.household.app.resources.first_run_title
+import com.homelab.household.app.resources.sign_in_detail
+import com.homelab.household.app.resources.sign_in_title
 import com.homelab.household.app.screens.launch.LaunchScreen
 import com.homelab.household.app.screens.placeholder.PlaceholderContent
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The screens [AppNavHost] can show, behind one seam.
@@ -30,16 +36,16 @@ object RealAppScreens : AppScreens {
     @Composable
     override fun SignIn() {
         PlaceholderContent(
-            title = "Sign in",
-            detail = "The profile picker and PIN arrive in slice 1."
+            title = stringResource(Res.string.sign_in_title),
+            detail = stringResource(Res.string.sign_in_detail)
         )
     }
 
     @Composable
     override fun FirstRun() {
         PlaceholderContent(
-            title = "First run",
-            detail = "Setting up the first account arrives in slice 1."
+            title = stringResource(Res.string.first_run_title),
+            detail = stringResource(Res.string.first_run_detail)
         )
     }
 }
