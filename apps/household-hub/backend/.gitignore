@@ -17,6 +17,10 @@ env/
 *.sqlite
 *.sqlite3
 
+# Dev server (scripts/dev.ps1)
+.dev-server.pid
+.dev-server.log
+
 # Test and coverage artifacts
 .pytest_cache/
 .coverage
