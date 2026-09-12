@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +41,7 @@ import com.homelab.household.app.resources.launch_unreachable_detail
 import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
+import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.launch.HubFailure
@@ -113,7 +113,7 @@ fun LaunchContent(
                 Box(Modifier.width(56.dp).height(3.dp).background(colors.primary, HearthShapes.pill))
             }
             Text(
-                text = "GET /api/v1/auth/status",
+                text = "Fetching auth status",
                 style = HearthTheme.typography.mono,
                 fontSize = 10.5.sp,
                 color = colors.textMuted
@@ -203,22 +203,12 @@ private fun HubAddressPill(hubAddress: String, reachable: Boolean) {
     }
 }
 
-@Preview
+@DayNightPreviews
 @Composable
 private fun LaunchContentPreview(
     @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState
 ) {
-    HearthTheme(darkTheme = false) {
-        LaunchContent(state = state, onRetry = {})
-    }
-}
-
-@Preview
-@Composable
-private fun LaunchContentDarkPreview(
-    @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState
-) {
-    HearthTheme(darkTheme = true) {
+    HearthTheme {
         LaunchContent(state = state, onRetry = {})
     }
 }

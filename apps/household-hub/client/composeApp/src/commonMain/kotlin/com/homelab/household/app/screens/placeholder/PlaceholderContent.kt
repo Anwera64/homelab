@@ -12,12 +12,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.sign_in_detail
 import com.homelab.household.app.resources.sign_in_title
+import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,10 +58,10 @@ fun PlaceholderContent(
     }
 }
 
-@Preview
+@DayNightPreviews
 @Composable
 private fun PlaceholderContentPreview() {
-    HearthTheme(darkTheme = false) {
+    HearthTheme {
         PlaceholderContent(
             title = stringResource(Res.string.sign_in_title),
             detail = stringResource(Res.string.sign_in_detail)
