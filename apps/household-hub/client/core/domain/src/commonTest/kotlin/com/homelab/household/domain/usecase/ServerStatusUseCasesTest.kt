@@ -4,19 +4,20 @@ import com.homelab.household.domain.model.ServerStatus
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.mock
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
 
 class ServerStatusUseCasesTest {
 
-    private val statusRepo = mockk<ServerStatusRepository>()
+    private val statusRepo = mock<ServerStatusRepository>()
     private val observeStatusUseCase = ObserveServerStatusUseCaseImpl(statusRepo)
     private val checkHealthUseCase = CheckServerHealthUseCaseImpl(statusRepo)
 
@@ -40,7 +41,7 @@ class ServerStatusUseCasesTest {
 
     @Test
     fun check_health_returns_latest_status() = runTest {
-        coEvery { statusRepo.checkHealth() } returns ServerStatus.Online(latencyMs = 8)
+        everySuspend { statusRepo.checkHealth() } returns ServerStatus.Online(latencyMs = 8)
 
         val status = checkHealthUseCase()
 
@@ -48,3 +49,4 @@ class ServerStatusUseCasesTest {
         assertEquals(8L, (status as ServerStatus.Online).latencyMs)
     }
 }
+

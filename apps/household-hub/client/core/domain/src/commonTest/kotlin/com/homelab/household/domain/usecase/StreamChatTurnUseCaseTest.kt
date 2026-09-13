@@ -4,24 +4,25 @@ import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
-import io.mockk.every
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.mock
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
 
 class StreamChatTurnUseCaseTest {
 
-    private val sessionRepo = mockk<SessionRepository>()
+    private val sessionRepo = mock<SessionRepository>()
     private val streamChatTurnUseCase = StreamChatTurnUseCaseImpl(sessionRepo)
 
     @Test
     fun execute_with_blank_content_throws_validation_error() {
-        assertThrows(ValidationException::class.java) {
+        assertFailsWith<ValidationException> {
             streamChatTurnUseCase("session-1", "   ", autoApproveWrites = false)
         }
     }
@@ -53,3 +54,4 @@ class StreamChatTurnUseCaseTest {
         assertEquals("Hello world", (result[2] as ChatStreamEvent.Done).assistantContent)
     }
 }
+

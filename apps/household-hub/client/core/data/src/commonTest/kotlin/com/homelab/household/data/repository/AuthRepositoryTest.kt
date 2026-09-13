@@ -1,9 +1,9 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.assertThrowsSuspend
 import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.domain.exception.HubAlreadySetUpException
+import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.PinLockedException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UnauthorizedException
@@ -25,11 +25,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.fail
-import org.junit.jupiter.api.Test
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class AuthRepositoryTest {
 
@@ -86,12 +87,8 @@ class AuthRepositoryTest {
         }
         val tokenStorage = InMemoryTokenStorage()
 
-        try {
-            repo(engine, tokenStorage).login("emma", "000000")
-            fail("Expected a wrong PIN")
-        } catch (e: WrongPinException) {
-            assertEquals(3, e.attemptsLeft)
-        }
+        val e = assertFailsWith<WrongPinException> { repo(engine, tokenStorage).login("emma", "000000") }
+        assertEquals(3, e.attemptsLeft)
         assertNull(tokenStorage.getAccessToken())
     }
 
@@ -101,26 +98,22 @@ class AuthRepositoryTest {
             respondJson("""{"detail": "Too many wrong PINs", "retry_after_seconds": 30}""", HttpStatusCode.TooManyRequests)
         }
 
-        try {
-            repo(engine).login("emma", "000000")
-            fail("Expected a lock")
-        } catch (e: PinLockedException) {
-            assertEquals(30, e.retryAfterSeconds)
-        }
+        val e = assertFailsWith<PinLockedException> { repo(engine).login("emma", "000000") }
+        assertEquals(30, e.retryAfterSeconds)
     }
 
     @Test
     fun a_refusal_without_attempts_is_plain_unauthorized() = runTest {
         val engine = MockEngine { respondJson("""{"detail": "Wrong PIN"}""", HttpStatusCode.Unauthorized) }
 
-        assertThrowsSuspend<UnauthorizedException> { repo(engine).login("gone", "482913") }
+        assertFailsWith<UnauthorizedException> { repo(engine).login("gone", "482913") }
     }
 
     @Test
     fun signing_in_with_the_hub_unreachable_throws_server_offline() = runTest {
         val engine = MockEngine { throw IOException("Connection refused") }
 
-        assertThrowsSuspend<ServerOfflineException> { repo(engine).login("emma", "482913") }
+        assertFailsWith<ServerOfflineException> { repo(engine).login("emma", "482913") }
     }
 
     @Test
@@ -149,7 +142,7 @@ class AuthRepositoryTest {
             respondJson("""{"detail": "System is already initialized."}""", HttpStatusCode.BadRequest)
         }
 
-        assertThrowsSuspend<HubAlreadySetUpException> { repo(engine).onboard("Emma", "482913", "#3C6E4E") }
+        assertFailsWith<HubAlreadySetUpException> { repo(engine).onboard("Emma", "482913", "#3C6E4E") }
     }
 
     @Test
@@ -179,14 +172,14 @@ class AuthRepositoryTest {
     fun the_member_list_behind_a_dead_proxy_throws_server_offline() = runTest {
         val engine = MockEngine { respond("Bad Gateway", HttpStatusCode.BadGateway) }
 
-        assertThrowsSuspend<ServerOfflineException> { repo(engine).listMembers() }
+        assertFailsWith<ServerOfflineException> { repo(engine).listMembers() }
     }
 
     @Test
     fun check_status_when_hub_unreachable_throws_server_offline() = runTest {
         val engine = MockEngine { throw IOException("Connection refused") }
 
-        assertThrowsSuspend<ServerOfflineException> { repo(engine).checkStatus() }
+        assertFailsWith<ServerOfflineException> { repo(engine).checkStatus() }
     }
 
     @Test
@@ -199,7 +192,7 @@ class AuthRepositoryTest {
             )
         }
 
-        assertThrowsSuspend<ServerOfflineException> { repo(engine).checkStatus() }
+        assertFailsWith<ServerOfflineException> { repo(engine).checkStatus() }
     }
 
     @Test
@@ -213,7 +206,7 @@ class AuthRepositoryTest {
         }
 
         // 404 on the status endpoint means the address is wrong, not that the hub is down.
-        assertThrowsSuspend<com.homelab.household.domain.exception.NotFoundException> { repo(engine).checkStatus() }
+        assertFailsWith<NotFoundException> { repo(engine).checkStatus() }
     }
 
     @Test
@@ -235,13 +228,14 @@ class AuthRepositoryTest {
     }
 
     @Test
+    @OptIn(ExperimentalAtomicApi::class)
     fun concurrent_401_requests_trigger_single_flight_refresh_mutex() = runTest {
-        val refreshCount = AtomicInteger(0)
+        val refreshCount = AtomicInt(0)
 
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
                 "/api/v1/auth/refresh" -> {
-                    refreshCount.incrementAndGet()
+                    refreshCount.addAndFetch(1)
                     respondJson("""{"access_token": "new-jwt-token-456", "token_type": "bearer", "user": $emmaJson}""")
                 }
                 else -> respond("Not Found", HttpStatusCode.NotFound)
@@ -260,7 +254,7 @@ class AuthRepositoryTest {
 
         assertEquals(5, results.size)
         // Verify exactly 1 refresh HTTP call was dispatched across all 5 threads!
-        assertEquals(1, refreshCount.get())
+        assertEquals(1, refreshCount.load())
         assertEquals("new-jwt-token-456", tokenStorage.getAccessToken())
     }
 }

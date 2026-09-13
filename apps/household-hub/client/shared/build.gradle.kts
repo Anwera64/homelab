@@ -32,14 +32,15 @@ kotlin {
             implementation(libs.koin.android)
         }
         commonTest.dependencies {
+            implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
+            implementation(libs.turbine)
+        }
+        jvmTest.dependencies {
             implementation(libs.junit.jupiter)
             implementation(libs.junit.platform.launcher)
-            implementation(libs.mockk)
-            implementation(libs.assertj)
-            implementation(libs.turbine)
         }
     }
 }

@@ -9,10 +9,18 @@ import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.answering.throws
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.mock
+import dev.mokkery.verify.VerifyMode
+import dev.mokkery.verifySuspend
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -24,11 +32,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 
 /**
  * Launch is only reached by a phone with nobody signed in. It asks the hub where it stands and
@@ -40,16 +43,16 @@ class LaunchViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val checkAuthStatusUseCase = mockk<CheckAuthStatusUseCase>()
-    private val getHubHostUseCase = mockk<GetHubHostUseCase>()
+    private val checkAuthStatusUseCase = mock<CheckAuthStatusUseCase>()
+    private val getHubHostUseCase = mock<GetHubHostUseCase>()
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { getHubHostUseCase() } returns "hub.spicy-llama.duckdns.org"
     }
 
-    @AfterEach
+    @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
@@ -68,7 +71,7 @@ class LaunchViewModelTest {
 
     @Test
     fun it_names_the_hub_it_is_reaching_before_any_answer() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
 
         val state = viewModel().uiState.value
 
@@ -78,7 +81,7 @@ class LaunchViewModelTest {
 
     @Test
     fun a_hub_with_members_leads_to_sign_in_straight_from_checking() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 2)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 2)
         val viewModel = viewModel()
 
         viewModel.events.test {
@@ -92,7 +95,7 @@ class LaunchViewModelTest {
 
     @Test
     fun an_empty_hub_leads_to_first_run_straight_from_checking() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
         val viewModel = viewModel()
 
         viewModel.events.test {
@@ -106,7 +109,7 @@ class LaunchViewModelTest {
 
     @Test
     fun an_offline_hub_has_no_route_and_counts_down_to_asking_again() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws ServerOfflineException()
+        everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
         val viewModel = viewModel()
 
         viewModel.events.test {
@@ -126,10 +129,10 @@ class LaunchViewModelTest {
 
     @Test
     fun when_the_countdown_runs_out_it_asks_the_hub_again() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws ServerOfflineException()
+        everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
         val viewModel = viewModel()
         runCurrent()
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
 
         viewModel.events.test {
             advanceTimeBy(10_000)
@@ -138,13 +141,13 @@ class LaunchViewModelTest {
             assertEquals(LaunchEvent.GoToSignIn, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 2) { checkAuthStatusUseCase() }
+        verifySuspend(VerifyMode.exactly(2)) { checkAuthStatusUseCase() }
         assertNull(viewModel.uiState.value.retryInSeconds)
     }
 
     @Test
     fun trying_again_by_hand_stops_the_countdown() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws ServerOfflineException()
+        everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
         val viewModel = viewModel()
         runCurrent()
 
@@ -161,28 +164,28 @@ class LaunchViewModelTest {
      */
     @Test
     fun a_hub_that_answers_with_an_error_reports_the_status_it_sent() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 500)
+        everySuspend { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 500)
 
         assertUnavailableAndCountingDown(HubFailure.Upstream(statusCode = 500))
     }
 
     @Test
     fun a_hub_that_is_not_there_reports_a_bad_address() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws NotFoundException()
+        everySuspend { checkAuthStatusUseCase() } throws NotFoundException()
 
         assertUnavailableAndCountingDown(HubFailure.AddressNotFound)
     }
 
     @Test
     fun a_hub_that_answers_with_something_other_than_json_reports_what_it_sent() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws UnexpectedContentTypeException("text/html")
+        everySuspend { checkAuthStatusUseCase() } throws UnexpectedContentTypeException("text/html")
 
         assertUnavailableAndCountingDown(HubFailure.NotJson(contentType = "text/html"))
     }
 
     @Test
     fun anything_else_is_an_unknown_failure() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws IllegalStateException("something odd")
+        everySuspend { checkAuthStatusUseCase() } throws IllegalStateException("something odd")
 
         assertUnavailableAndCountingDown(HubFailure.Unknown)
     }
@@ -190,10 +193,10 @@ class LaunchViewModelTest {
     /** Not only a hub with no route: one that answered badly may be starting up, so it's asked again too. */
     @Test
     fun a_hub_that_answered_badly_is_asked_again_by_itself() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 503)
+        everySuspend { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 503)
         val viewModel = viewModel()
         runCurrent()
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
 
         viewModel.events.test {
             advanceTimeBy(10_000)
@@ -202,16 +205,16 @@ class LaunchViewModelTest {
             assertEquals(LaunchEvent.GoToFirstRun, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 2) { checkAuthStatusUseCase() }
+        verifySuspend(VerifyMode.exactly(2)) { checkAuthStatusUseCase() }
     }
 
     @Test
     fun retrying_asks_the_hub_again() = runTest(testDispatcher) {
-        coEvery { checkAuthStatusUseCase() } throws ServerOfflineException()
+        everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
         val viewModel = viewModel()
         runCurrent()
 
-        coEvery { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
+        everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
 
         viewModel.events.test {
             viewModel.checkHub()

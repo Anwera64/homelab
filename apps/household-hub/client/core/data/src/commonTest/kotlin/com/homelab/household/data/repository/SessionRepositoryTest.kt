@@ -1,7 +1,6 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
-import com.homelab.household.data.assertThrowsSuspend
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.client.HttpClient
@@ -16,10 +15,11 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import io.ktor.utils.io.errors.IOException
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class SessionRepositoryTest {
 
@@ -125,7 +125,7 @@ class SessionRepositoryTest {
 
         val repo = SessionRepositoryImpl(client, baseUrl = DEFAULT_BASE_URL)
 
-        assertThrowsSuspend<ServerOfflineException> {
+        assertFailsWith<ServerOfflineException> {
             repo.streamChatTurn("s-1", "Hello").toList()
         }
     }

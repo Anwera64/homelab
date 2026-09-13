@@ -7,9 +7,16 @@ import com.homelab.household.domain.usecase.AuditMemoriesUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
 import com.homelab.household.domain.usecase.RevokeMilestoneUseCase
 import com.homelab.household.domain.usecase.UpdateMemoryUseCase
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
+import dev.mokkery.verifySuspend
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -17,25 +24,20 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MemoryAuditViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val auditMemoriesUseCase = mockk<AuditMemoriesUseCase>()
-    private val deleteMemoryUseCase = mockk<RevokeMemoryUseCase>()
-    private val updateMemoryUseCase = mockk<UpdateMemoryUseCase>()
-    private val revokeMilestoneUseCase = mockk<RevokeMilestoneUseCase>()
+    private val auditMemoriesUseCase = mock<AuditMemoriesUseCase>()
+    private val deleteMemoryUseCase = mock<RevokeMemoryUseCase>()
+    private val updateMemoryUseCase = mock<UpdateMemoryUseCase>()
+    private val revokeMilestoneUseCase = mock<RevokeMilestoneUseCase>()
 
     private lateinit var viewModel: MemoryAuditViewModel
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         viewModel = MemoryAuditViewModel(
@@ -46,7 +48,7 @@ class MemoryAuditViewModelTest {
         )
     }
 
-    @AfterEach
+    @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
@@ -61,7 +63,7 @@ class MemoryAuditViewModelTest {
                 scope = MemoryScope.PERSONAL
             )
         )
-        coEvery { auditMemoriesUseCase(MemoryScope.PERSONAL) } returns memories
+        everySuspend { auditMemoriesUseCase(MemoryScope.PERSONAL) } returns memories
 
         viewModel.loadAudit(MemoryScope.PERSONAL)
         advanceUntilIdle()
@@ -74,22 +76,22 @@ class MemoryAuditViewModelTest {
 
     @Test
     fun delete_memory_calls_usecase_and_reloads() = runTest(testDispatcher) {
-        coEvery { auditMemoriesUseCase(any()) } returns emptyList()
-        coEvery { deleteMemoryUseCase("mem-1") } returns Unit
+        everySuspend { auditMemoriesUseCase(any()) } returns emptyList()
+        everySuspend { deleteMemoryUseCase("mem-1") } returns Unit
 
         viewModel.deleteMemory("mem-1")
         advanceUntilIdle()
 
-        coVerify { deleteMemoryUseCase("mem-1") }
+        verifySuspend { deleteMemoryUseCase("mem-1") }
     }
 
     @Test
     fun revoke_milestone_calls_usecase() = runTest(testDispatcher) {
-        coEvery { revokeMilestoneUseCase("mile-1") } returns Unit
+        everySuspend { revokeMilestoneUseCase("mile-1") } returns Unit
 
         viewModel.revokeMilestone("mile-1")
         advanceUntilIdle()
 
-        coVerify { revokeMilestoneUseCase("mile-1") }
+        verifySuspend { revokeMilestoneUseCase("mile-1") }
     }
 }
