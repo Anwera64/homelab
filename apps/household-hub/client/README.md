@@ -29,7 +29,7 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
 * **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
   screen (`presentation/launch/`, `firstrun/`, `profilepicker/`, `pinentry/`), each holding that
   screen's `ViewModel`, its `UiState` and its `Event` — for example `LaunchViewModel` with
-  `HubStatus` (`Checking` / `Ready` / `FirstRun` / `Unreachable` / `Failed`).
+  `HubStatus` (`Checking` / `Unavailable`).
 * **`:composeApp` (UI):** depends only on `:core:presentation` and `:core:domain`. Hearth theme
   (Copenhagen Day / Midnight Espresso), 31 Hearth icons (the sheet's 30 and the PIN pad's delete),
   shared components, the screens and the Nav3 host. `ExternalApps` is the seam for handing the
@@ -67,7 +67,7 @@ Every string the UI writes lives in
 `composeApp/src/commonMain/composeResources/values/strings.xml`, read with `stringResource` (or
 `pluralStringResource` for counts). A reusable component takes its text as a `String` parameter and
 the caller resolves it; only strings a component writes itself become resources. Nothing that
-reaches a screen from below is a sentence — `HubStatus.Failed` carries a `HubFailure` and the
+reaches a screen from below is a sentence — `HubStatus.Unavailable` carries a `HubFailure` and the
 screen picks the wording, so the copy is translatable and the data layer stays out of the
 language business.
 
@@ -88,6 +88,9 @@ covers the drawing, the ViewModel, the use case, the repository and the error ma
 
 Navigation is tested on its own: `AppNavHostTest` passes `StubScreens` to `AppNavHost` and reads
 the hoisted back stack, so it covers where the app goes with no Koin, no hub and no real screen.
+Where it *opens* is `AppStartTest`: the host's own back stack reads the stored session through
+Koin, so that one runs the stubs inside `TestApp` — home with a token kept on the phone, launch
+without, and the hub never asked.
 
 Because both the screen and its robot read the same resource, editing `strings.xml` can't fail a
 test — that is the point, and it means copy is not what these tests are about. What they do pin is

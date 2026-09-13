@@ -14,12 +14,11 @@ import com.homelab.household.domain.model.Member
 class StubScreens : AppScreens {
 
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit) {
+    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
         Column {
             Text(LAUNCH)
             Text(GO_TO_SIGN_IN, modifier = Modifier.clickable { onSignIn() })
             Text(GO_TO_FIRST_RUN, modifier = Modifier.clickable { onFirstRun() })
-            Text(GO_HOME, modifier = Modifier.clickable { onSignedIn() })
         }
     }
 
@@ -61,7 +60,6 @@ class StubScreens : AppScreens {
         const val HOME = "home screen"
         const val GO_TO_SIGN_IN = "go to sign in"
         const val GO_TO_FIRST_RUN = "go to first run"
-        const val GO_HOME = "go home"
         const val CREATED = "household created"
         const val SIGN_IN_INSTEAD = "sign in instead"
         const val PICK_EMMA = "pick emma"

@@ -11,6 +11,7 @@ import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.HasStoredSessionUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
@@ -61,6 +62,7 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<GetSessionUseCase>())
         assertNotNull(get<StreamChatTurnUseCase>())
         assertNotNull(get<CheckAuthStatusUseCase>())
+        assertNotNull(get<HasStoredSessionUseCase>())
 
         // ViewModels
         assertNotNull(get<ChatSessionViewModel>())

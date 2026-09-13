@@ -9,6 +9,7 @@ import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -22,6 +23,7 @@ class AuthUseCasesTest {
     private val listMembersUseCase = ListMembersUseCase(authRepo)
     private val checkAuthStatusUseCase = CheckAuthStatusUseCase(authRepo)
     private val logoutUseCase = LogoutUseCase(authRepo)
+    private val hasStoredSessionUseCase = HasStoredSessionUseCase(authRepo)
 
     private val emma = User(
         id = "emma",
@@ -91,6 +93,18 @@ class AuthUseCasesTest {
 
         assertEquals(true, result.isInitialized)
         assertEquals(2, result.memberCount)
+    }
+
+    /** Asked before anything is drawn, so it can't wait on the hub. */
+    @Test
+    fun a_stored_session_is_answered_without_the_hub() {
+        every { authRepo.hasStoredSession() } returns true
+
+        assertEquals(true, hasStoredSessionUseCase())
+
+        every { authRepo.hasStoredSession() } returns false
+
+        assertEquals(false, hasStoredSessionUseCase())
     }
 
     @Test

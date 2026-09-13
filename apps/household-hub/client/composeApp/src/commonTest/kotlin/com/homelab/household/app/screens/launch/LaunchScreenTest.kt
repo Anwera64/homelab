@@ -4,7 +4,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.TEST_HUB_HOST
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
@@ -16,12 +15,15 @@ import kotlin.test.assertEquals
  * and the Ktor client. Only the hub at the far end is faked.
  *
  * Navigation is a counted lambda here — where those lambdas take the user is `AppNavHostTest`.
+ * Because the lambdas don't navigate, the screen stays put after it calls one, which is how these
+ * tests see what launch draws once the hub has answered.
  */
 @OptIn(ExperimentalTestApi::class)
 class LaunchScreenTest {
 
+    /** No "your hub is ready" on the way: the splash is all there is until the user moves on. */
     @Test
-    fun a_hub_with_members_sends_the_user_to_sign_in() {
+    fun a_hub_with_members_sends_the_user_to_sign_in_from_the_splash() {
         val hub = FakeLaunchHub()
         hub.respondsWith(initialized = true, members = 2)
         var signIn = 0
@@ -30,8 +32,8 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { signIn++ }, onFirstRun = { firstRun++ })
 
-            onLaunch { seesTheHubIsReady(members = 2) }
             waitUntil(timeoutMillis = WAIT_MILLIS) { signIn == 1 }
+            onLaunch { seesItReachingTheHub() }
         }
 
         assertEquals(1, signIn)
@@ -39,42 +41,21 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun a_member_still_signed_in_on_this_phone_goes_straight_home() {
+    fun a_hub_with_nobody_on_it_sends_the_user_to_first_run_from_the_splash() {
         val hub = FakeLaunchHub()
-        hub.respondsWith(initialized = true, members = 2)
-        hub.acceptsTheStoredToken()
-        val tokens = InMemoryTokenStorage()
+        hub.respondsWith(initialized = false, members = 0)
         var signIn = 0
-        var home = 0
+        var firstRun = 0
 
         runScreenTest {
-            tokens.saveTokens("token-from-last-time")
-            launchScreen(hub, onSignIn = { signIn++ }, onSignedIn = { home++ }, tokenStorage = tokens)
+            launchScreen(hub, onSignIn = { signIn++ }, onFirstRun = { firstRun++ })
 
-            waitUntil(timeoutMillis = WAIT_MILLIS) { home == 1 }
+            waitUntil(timeoutMillis = WAIT_MILLIS) { firstRun == 1 }
+            onLaunch { seesItReachingTheHub() }
         }
 
         assertEquals(0, signIn)
-        assertEquals(1, home)
-    }
-
-    @Test
-    fun a_token_the_hub_no_longer_accepts_sends_the_user_to_sign_in() {
-        val hub = FakeLaunchHub()
-        hub.respondsWith(initialized = true, members = 2)
-        val tokens = InMemoryTokenStorage()
-        var signIn = 0
-        var home = 0
-
-        runScreenTest {
-            tokens.saveTokens("expired-token")
-            launchScreen(hub, onSignIn = { signIn++ }, onSignedIn = { home++ }, tokenStorage = tokens)
-
-            waitUntil(timeoutMillis = WAIT_MILLIS) { signIn == 1 }
-        }
-
-        assertEquals(1, signIn)
-        assertEquals(0, home)
+        assertEquals(1, firstRun)
     }
 
     @Test
@@ -87,30 +68,12 @@ class LaunchScreenTest {
             launchScreen(hub, externalApps = apps)
 
             onLaunch {
-                seesTheHubIsOffline()
+                seesTheHubIsUnavailable(HubFailure.NoRoute)
                 tapsOpenTailscale()
             }
         }
 
         assertEquals(1, apps.tailscaleOpened)
-    }
-
-    @Test
-    fun a_hub_with_nobody_on_it_sends_the_user_to_first_run() {
-        val hub = FakeLaunchHub()
-        hub.respondsWith(initialized = false, members = 0)
-        var signIn = 0
-        var firstRun = 0
-
-        runScreenTest {
-            launchScreen(hub, onSignIn = { signIn++ }, onFirstRun = { firstRun++ })
-
-            onLaunch { seesNobodyLivesHereYet() }
-            waitUntil(timeoutMillis = WAIT_MILLIS) { firstRun == 1 }
-        }
-
-        assertEquals(0, signIn)
-        assertEquals(1, firstRun)
     }
 
     @Test
@@ -122,13 +85,13 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { moved++ }, onFirstRun = { moved++ })
 
-            onLaunch { seesTheHubIsOffline() }
+            onLaunch { seesTheHubIsUnavailable(HubFailure.NoRoute) }
         }
 
         assertEquals(0, moved)
     }
 
-    /** A real 500 from the hub, said in the app's own words rather than the hub's. */
+    /** A real 500 from the hub, said in the app's own words rather than the hub's — and retried. */
     @Test
     fun a_failing_hub_says_what_it_answered() {
         val hub = FakeLaunchHub()
@@ -138,7 +101,7 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { moved++ }, onFirstRun = { moved++ })
 
-            onLaunch { seesTheHubFailed(HubFailure.Upstream(statusCode = 500)) }
+            onLaunch { seesTheHubIsUnavailable(HubFailure.Upstream(statusCode = 500)) }
         }
 
         assertEquals(0, moved)
@@ -153,7 +116,7 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { moved++ }, onFirstRun = { moved++ })
 
-            onLaunch { seesTheHubFailed(HubFailure.NotJson(contentType = "text/html")) }
+            onLaunch { seesTheHubIsUnavailable(HubFailure.NotJson(contentType = "text/html")) }
         }
 
         assertEquals(0, moved)
@@ -183,12 +146,11 @@ class LaunchScreenTest {
         runScreenTest {
             launchScreen(hub, onSignIn = { signIn++ })
 
-            onLaunch { seesTheHubIsOffline() }
+            onLaunch { seesTheHubIsUnavailable(HubFailure.NoRoute) }
 
             hub.respondsWith(initialized = true, members = 1)
             onLaunch { tapsTryAgain() }
 
-            onLaunch { seesTheHubIsReady(members = 1) }
             waitUntil(timeoutMillis = WAIT_MILLIS) { signIn == 1 }
         }
 
@@ -197,13 +159,13 @@ class LaunchScreenTest {
 
     /**
      * The preview provider is the list of states launch can be in. Each one is reached the way
-     * the app reaches it — through the hub — and has to draw. A new `HubStatus` without a
-     * previewed state, or without a hub behaviour that produces it, fails here.
+     * the app reaches it — through the hub — and has to draw. A new `HubStatus` or `HubFailure`
+     * without a previewed state, or without a hub behaviour that produces it, fails here.
      */
     @Test
     fun every_previewed_state_draws() {
         val states = LaunchUiStateProvider().values.toList()
-        assertEquals(5, states.size)
+        assertEquals(6, states.size)
 
         states.forEach { state ->
             val hub = FakeLaunchHub()
@@ -215,11 +177,8 @@ class LaunchScreenTest {
                 onLaunch {
                     when (val status = state.status) {
                         HubStatus.Checking -> seesItReachingTheHub()
-                        is HubStatus.Ready -> seesTheHubIsReady(status.memberCount)
-                        HubStatus.FirstRun -> seesNobodyLivesHereYet()
-                        HubStatus.Unreachable -> seesTheHubIsOffline()
                         // The previewed reason is one the hub can really produce.
-                        is HubStatus.Failed -> seesTheHubFailed(status.reason)
+                        is HubStatus.Unavailable -> seesTheHubIsUnavailable(status.reason)
                     }
                     seesTheHubAddress(TEST_HUB_HOST)
                 }

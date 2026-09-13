@@ -11,6 +11,9 @@ interface AuthRepository {
     suspend fun listMembers(): List<Member>
     suspend fun checkStatus(): AuthStatus
     suspend fun getCurrentUser(): User?
+
+    /** A token is kept on this phone. Doesn't ask the hub whether it still accepts it. */
+    fun hasStoredSession(): Boolean
     suspend fun logout()
     fun observeCurrentUser(): Flow<User?>
     suspend fun refreshToken(): String

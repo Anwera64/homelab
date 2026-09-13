@@ -33,34 +33,36 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
 import com.homelab.household.app.resources.launch_action_description
 import com.homelab.household.app.resources.launch_checking
-import com.homelab.household.app.resources.launch_failed_address_not_found
-import com.homelab.household.app.resources.launch_failed_not_json
-import com.homelab.household.app.resources.launch_failed_title
-import com.homelab.household.app.resources.launch_failed_unknown
-import com.homelab.household.app.resources.launch_failed_upstream
-import com.homelab.household.app.resources.launch_first_run_detail
-import com.homelab.household.app.resources.launch_first_run_title
-import com.homelab.household.app.resources.launch_member_count
-import com.homelab.household.app.resources.launch_no_route
+import com.homelab.household.app.resources.launch_no_route_chip
+import com.homelab.household.app.resources.launch_no_route_detail
+import com.homelab.household.app.resources.launch_no_route_title
+import com.homelab.household.app.resources.launch_not_found_chip
+import com.homelab.household.app.resources.launch_not_found_detail
+import com.homelab.household.app.resources.launch_not_found_title
 import com.homelab.household.app.resources.launch_offline_hint
 import com.homelab.household.app.resources.launch_open_tailscale
-import com.homelab.household.app.resources.launch_ready
 import com.homelab.household.app.resources.launch_retry
 import com.homelab.household.app.resources.launch_retrying_in
 import com.homelab.household.app.resources.launch_retrying_seconds
-import com.homelab.household.app.resources.launch_unreachable_detail
-import com.homelab.household.app.resources.launch_unreachable_title
+import com.homelab.household.app.resources.launch_unknown_chip
+import com.homelab.household.app.resources.launch_unknown_detail
+import com.homelab.household.app.resources.launch_unknown_title
+import com.homelab.household.app.resources.launch_upstream_chip
+import com.homelab.household.app.resources.launch_upstream_detail
+import com.homelab.household.app.resources.launch_upstream_title
+import com.homelab.household.app.resources.launch_web_page_chip
+import com.homelab.household.app.resources.launch_web_page_detail
+import com.homelab.household.app.resources.launch_web_page_title
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import com.homelab.household.presentation.launch.LaunchUiState
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The first screen: what `GET /auth/status` found. Fixed shape, so it doesn't scroll.
+ * The first screen a signed-out phone shows. Fixed shape, so it doesn't scroll.
  *
  * Stateless — [LaunchScreen] owns the ViewModel and hands the state down.
  */
@@ -71,19 +73,26 @@ fun LaunchContent(
     onOpenTailscale: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (state.status is HubStatus.Unreachable) {
-        OfflineContent(state = state, onRetry = onRetry, onOpenTailscale = onOpenTailscale, modifier = modifier)
-    } else {
-        AnsweredContent(state = state, onRetry = onRetry, modifier = modifier)
+    when (val status = state.status) {
+        HubStatus.Checking -> CheckingContent(hubAddress = state.hubAddress, modifier = modifier)
+        is HubStatus.Unavailable -> OfflineContent(
+            reason = status.reason,
+            hubAddress = state.hubAddress,
+            retryInSeconds = state.retryInSeconds,
+            onRetry = onRetry,
+            onOpenTailscale = onOpenTailscale,
+            modifier = modifier
+        )
     }
 }
 
-/** The hub answered — or is being asked. */
+/**
+ * The splash: the hub is being asked. A useful answer moves the user on from here, so this is
+ * the only frame they see on the way to signing in or setting up.
+ */
 @Composable
-private fun AnsweredContent(state: LaunchUiState, onRetry: () -> Unit, modifier: Modifier) {
+private fun CheckingContent(hubAddress: String, modifier: Modifier) {
     val colors = HearthTheme.colors
-    val status = state.status
-    val failed = status is HubStatus.Failed
 
     Column(
         modifier = modifier
@@ -96,25 +105,21 @@ private fun AnsweredContent(state: LaunchUiState, onRetry: () -> Unit, modifier:
             Alignment.CenterVertically
         )
     ) {
-        if (failed) {
-            OfflineTile()
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(HearthTheme.size.tileHero)
-                    .background(
-                        color = colors.primary,
-                        shape = HearthShapes.tile
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                HearthIconImage(
-                    icon = HearthIcon.Household,
-                    contentDescription = null,
-                    size = HearthTheme.size.iconHero,
-                    tint = colors.onPrimary
-                )
-            }
+        Box(
+            modifier = Modifier
+                .size(HearthTheme.size.tileHero)
+                .background(
+                    color = colors.primary,
+                    shape = HearthShapes.tile
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            HearthIconImage(
+                icon = HearthIcon.Household,
+                contentDescription = null,
+                size = HearthTheme.size.iconHero,
+                tint = colors.onPrimary
+            )
         }
 
         Column(
@@ -122,67 +127,56 @@ private fun AnsweredContent(state: LaunchUiState, onRetry: () -> Unit, modifier:
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
         ) {
             Text(
-                text = stringResource(
-                    if (failed) Res.string.launch_unreachable_title else Res.string.app_name
-                ),
-                // A hub that answered gets the full-screen title; one that failed gets the
-                // smaller one, because the reason underneath is the part you need to read.
-                style = with(HearthTheme.typography) { if (failed) title else hero },
+                text = stringResource(Res.string.app_name),
+                style = HearthTheme.typography.hero,
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center
             )
-            StatusLines(
-                status = status,
+            Text(
+                text = stringResource(Res.string.launch_checking),
+                style = HearthTheme.typography.body,
+                color = colors.textMuted,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
             )
         }
 
-        HubAddressPill(
-            hubAddress = state.hubAddress,
-            reachable = !failed
+        HubAddressPill(hubAddress = hubAddress)
+
+        LinearProgressIndicator(
+            modifier = Modifier
+                .width(HearthTheme.size.progressTrack)
+                .height(HearthTheme.size.progressHeight),
+            color = colors.primary,
+            trackColor = colors.outline,
+            strokeCap = StrokeCap.Round,
+            gapSize = HearthTheme.spacing.none
         )
-
-        if (status is HubStatus.Checking) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .width(HearthTheme.size.progressTrack)
-                    .height(HearthTheme.size.progressHeight),
-                color = colors.primary,
-                trackColor = colors.outline,
-                strokeCap = StrokeCap.Round,
-                gapSize = HearthTheme.spacing.none
-            )
-            Text(
-                text = stringResource(Res.string.launch_action_description),
-                style = HearthTheme.typography.monoSm,
-                color = colors.textMuted
-            )
-        }
-
-        if (failed) {
-            PrimaryButton(
-                text = stringResource(Res.string.launch_retry),
-                onClick = onRetry,
-                icon = HearthIcon.Retry,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        Text(
+            text = stringResource(Res.string.launch_action_description),
+            style = HearthTheme.typography.monoSm,
+            color = colors.textMuted
+        )
     }
 }
 
 /**
- * Nothing answered. Not an error page: a hub that's off and a phone away from home without
- * Tailscale both land here before anything is typed, so it says which ways back there are.
+ * The hub couldn't be read. Not an error page: a hub that's off, one still starting, a Wi-Fi
+ * sign-in page and a phone away from home without Tailscale all land here before anything is
+ * typed, so it says which it was, asks again by itself, and offers the ways back.
  */
 @Composable
 private fun OfflineContent(
-    state: LaunchUiState,
+    reason: HubFailure,
+    hubAddress: String,
+    retryInSeconds: Int?,
     onRetry: () -> Unit,
     onOpenTailscale: () -> Unit,
     modifier: Modifier
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
+    val words = wordsFor(reason)
 
     Column(
         modifier = modifier
@@ -199,13 +193,13 @@ private fun OfflineContent(
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
         ) {
             Text(
-                text = stringResource(Res.string.launch_unreachable_title),
+                text = words.title,
                 style = type.title,
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = stringResource(Res.string.launch_unreachable_detail),
+                text = words.detail,
                 style = type.body,
                 color = colors.textMuted,
                 textAlign = TextAlign.Center,
@@ -219,14 +213,14 @@ private fun OfflineContent(
                 horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
             ) {
                 Text(
-                    text = state.hubAddress,
+                    text = hubAddress,
                     style = type.monoSm,
                     color = colors.textMuted,
                     modifier = Modifier.weight(1f)
                 )
-                HearthChip(label = stringResource(Res.string.launch_no_route), variant = ChipVariant.Error)
+                HearthChip(label = words.chip, variant = ChipVariant.Error)
             }
-            state.retryInSeconds?.let { seconds ->
+            retryInSeconds?.let { seconds ->
                 HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -273,6 +267,39 @@ private fun OfflineContent(
     }
 }
 
+/** What the offline screen says about one reason. */
+private class OfflineWords(val title: String, val detail: String, val chip: String)
+
+/** The reason in the user's own language; the hub's own words are English and technical. */
+@Composable
+private fun wordsFor(reason: HubFailure): OfflineWords = when (reason) {
+    HubFailure.NoRoute -> OfflineWords(
+        title = stringResource(Res.string.launch_no_route_title),
+        detail = stringResource(Res.string.launch_no_route_detail),
+        chip = stringResource(Res.string.launch_no_route_chip)
+    )
+    is HubFailure.Upstream -> OfflineWords(
+        title = stringResource(Res.string.launch_upstream_title),
+        detail = stringResource(Res.string.launch_upstream_detail, reason.statusCode),
+        chip = stringResource(Res.string.launch_upstream_chip, reason.statusCode)
+    )
+    is HubFailure.NotJson -> OfflineWords(
+        title = stringResource(Res.string.launch_web_page_title),
+        detail = stringResource(Res.string.launch_web_page_detail),
+        chip = stringResource(Res.string.launch_web_page_chip)
+    )
+    HubFailure.AddressNotFound -> OfflineWords(
+        title = stringResource(Res.string.launch_not_found_title),
+        detail = stringResource(Res.string.launch_not_found_detail),
+        chip = stringResource(Res.string.launch_not_found_chip)
+    )
+    HubFailure.Unknown -> OfflineWords(
+        title = stringResource(Res.string.launch_unknown_title),
+        detail = stringResource(Res.string.launch_unknown_detail),
+        chip = stringResource(Res.string.launch_unknown_chip)
+    )
+}
+
 @Composable
 private fun OfflineTile() {
     val colors = HearthTheme.colors
@@ -295,58 +322,7 @@ private fun OfflineTile() {
 }
 
 @Composable
-private fun StatusLines(status: HubStatus, modifier: Modifier = Modifier) {
-    val colors = HearthTheme.colors
-    val lines = when (status) {
-        HubStatus.Checking -> listOf(stringResource(Res.string.launch_checking))
-        is HubStatus.Ready -> listOf(
-            stringResource(Res.string.launch_ready),
-            pluralStringResource(
-                Res.plurals.launch_member_count,
-                status.memberCount,
-                status.memberCount
-            )
-        )
-
-        HubStatus.FirstRun -> listOf(
-            stringResource(Res.string.launch_first_run_title),
-            stringResource(Res.string.launch_first_run_detail)
-        )
-
-        HubStatus.Unreachable -> listOf(stringResource(Res.string.launch_unreachable_detail))
-        is HubStatus.Failed -> listOf(
-            stringResource(Res.string.launch_failed_title),
-            whatWentWrong(status.reason)
-        )
-    }
-
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
-    ) {
-        lines.forEach { line ->
-            Text(
-                text = line,
-                style = HearthTheme.typography.body,
-                color = colors.textMuted,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-/** The reason in the user's own language; the hub's own words are English and technical. */
-@Composable
-private fun whatWentWrong(reason: HubFailure): String = when (reason) {
-    HubFailure.AddressNotFound -> stringResource(Res.string.launch_failed_address_not_found)
-    is HubFailure.Upstream -> stringResource(Res.string.launch_failed_upstream, reason.statusCode)
-    is HubFailure.NotJson -> stringResource(Res.string.launch_failed_not_json, reason.contentType)
-    HubFailure.Unknown -> stringResource(Res.string.launch_failed_unknown)
-}
-
-@Composable
-private fun HubAddressPill(hubAddress: String, reachable: Boolean) {
+private fun HubAddressPill(hubAddress: String) {
     val colors = HearthTheme.colors
     Row(
         modifier = Modifier
@@ -359,7 +335,7 @@ private fun HubAddressPill(hubAddress: String, reachable: Boolean) {
         Box(
             Modifier
                 .size(HearthTheme.size.dot)
-                .background(if (reachable) colors.primary else colors.error, HearthShapes.pill)
+                .background(colors.primary, HearthShapes.pill)
         )
         Text(
             text = hubAddress,

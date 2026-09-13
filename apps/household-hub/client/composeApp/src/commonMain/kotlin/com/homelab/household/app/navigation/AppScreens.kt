@@ -20,7 +20,7 @@ import org.jetbrains.compose.resources.stringResource
  * the navigation tests stub the screens out and test the back stack alone.
  */
 interface AppScreens {
-    @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit)
+    @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit)
 
     @Composable fun SignIn(onMemberSelected: (Member) -> Unit)
 
@@ -35,8 +35,8 @@ interface AppScreens {
 object RealAppScreens : AppScreens {
 
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit) {
-        LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun, onSignedIn = onSignedIn)
+    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
+        LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun)
     }
 
     @Composable

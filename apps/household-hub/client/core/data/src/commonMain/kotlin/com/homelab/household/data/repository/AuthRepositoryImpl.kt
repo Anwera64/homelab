@@ -122,6 +122,8 @@ class AuthRepositoryImpl(
         }
     }
 
+    override fun hasStoredSession(): Boolean = tokenStorage.getAccessToken() != null
+
     override suspend fun logout() {
         tokenStorage.clear()
         _currentUserFlow.value = null

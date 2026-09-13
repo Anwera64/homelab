@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import com.homelab.household.domain.usecase.HasStoredSessionUseCase
+import org.koin.compose.koinInject
 
 /**
  * The root of the app: it owns the back stack and nothing else. Screens own their own state and
@@ -28,8 +30,7 @@ fun AppNavHost(
                 WithEntryViewModels {
                     screens.Launch(
                         onSignIn = { backStack.startOver(Destination.SignIn) },
-                        onFirstRun = { backStack.startOver(Destination.FirstRun) },
-                        onSignedIn = { backStack.startOver(Destination.Home) }
+                        onFirstRun = { backStack.startOver(Destination.FirstRun) }
                     )
                 }
             }
@@ -63,10 +64,18 @@ fun AppNavHost(
     )
 }
 
-/** Where the app starts. Hoisted so a test can watch where it goes. */
+/**
+ * Where the app starts, decided on the phone: home for a member still signed in here, launch for
+ * everyone else. Asks the hub nothing — a token the hub no longer accepts is found out later.
+ * Hoisted so a test can watch where it goes.
+ */
 @Composable
-fun rememberAppBackStack(): SnapshotStateList<NavKey> =
-    remember { mutableStateListOf(Destination.Launch) }
+fun rememberAppBackStack(): SnapshotStateList<NavKey> {
+    val hasStoredSession = koinInject<HasStoredSessionUseCase>()
+    return remember {
+        mutableStateListOf(if (hasStoredSession()) Destination.Home else Destination.Launch)
+    }
+}
 
 /** Somewhere the user can't come back from: launch's answer, a finished form, a signed-in member. */
 private fun SnapshotStateList<NavKey>.startOver(destination: Destination) {

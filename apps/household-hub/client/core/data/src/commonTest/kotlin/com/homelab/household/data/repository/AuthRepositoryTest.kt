@@ -217,6 +217,24 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun a_phone_with_a_kept_token_has_a_stored_session_without_asking_the_hub() {
+        var calls = 0
+        val engine = MockEngine {
+            calls++
+            respond("Not Found", HttpStatusCode.NotFound)
+        }
+        val tokenStorage = InMemoryTokenStorage()
+        val repo = repo(engine, tokenStorage)
+
+        assertEquals(false, repo.hasStoredSession())
+
+        tokenStorage.saveTokens("token-from-last-time")
+
+        assertEquals(true, repo.hasStoredSession())
+        assertEquals(0, calls)
+    }
+
+    @Test
     fun concurrent_401_requests_trigger_single_flight_refresh_mutex() = runTest {
         val refreshCount = AtomicInteger(0)
 

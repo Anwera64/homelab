@@ -11,14 +11,14 @@ import com.homelab.household.presentation.launch.LaunchViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Launch asks the hub where it stands the moment it appears, and moves on once it knows.
- * An unreachable hub stays here, counting down to asking again, with Tailscale one tap away.
+ * Launch asks the hub where it stands the moment it appears, and moves on once it knows. A hub
+ * that can't be read keeps the user here, counting down to asking again, with Tailscale one tap
+ * away. Only a phone with nobody signed in opens here.
  */
 @Composable
 fun LaunchScreen(
     onSignIn: () -> Unit,
     onFirstRun: () -> Unit,
-    onSignedIn: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val viewModel: LaunchViewModel = koinViewModel()
@@ -29,7 +29,6 @@ fun LaunchScreen(
         when (event) {
             LaunchEvent.GoToSignIn -> onSignIn()
             LaunchEvent.GoToFirstRun -> onFirstRun()
-            LaunchEvent.GoToHome -> onSignedIn()
         }
     }
 

@@ -7,7 +7,6 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UnexpectedContentTypeException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
-import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.Job
@@ -23,8 +22,7 @@ import kotlinx.coroutines.launch
 
 class LaunchViewModel(
     private val checkAuthStatusUseCase: CheckAuthStatusUseCase,
-    private val getHubHostUseCase: GetHubHostUseCase,
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getHubHostUseCase: GetHubHostUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LaunchUiState(hubAddress = getHubHostUseCase()))
@@ -46,39 +44,24 @@ class LaunchViewModel(
         _uiState.update { it.copy(status = HubStatus.Checking, retryInSeconds = null) }
 
         viewModelScope.launch {
-            val status = runCatchingSafe { checkAuthStatusUseCase() }
-                .fold(
-                    onSuccess = { authStatus ->
-                        if (authStatus.isInitialized) {
-                            HubStatus.Ready(memberCount = authStatus.memberCount)
-                        } else {
-                            HubStatus.FirstRun
-                        }
-                    },
-                    onFailure = { error ->
-                        when (error) {
-                            is ServerOfflineException -> HubStatus.Unreachable
-                            is NotFoundException -> HubStatus.Failed(HubFailure.AddressNotFound)
-                            is UpstreamGatewayException -> HubStatus.Failed(HubFailure.Upstream(error.statusCode))
-                            is UnexpectedContentTypeException -> HubStatus.Failed(HubFailure.NotJson(error.contentType))
-                            else -> HubStatus.Failed(HubFailure.Unknown)
-                        }
-                    }
-                )
-
-            _uiState.update { it.copy(status = status) }
-
-            when (status) {
-                is HubStatus.Ready -> _events.send(if (isStillSignedIn()) LaunchEvent.GoToHome else LaunchEvent.GoToSignIn)
-                HubStatus.FirstRun -> _events.send(LaunchEvent.GoToFirstRun)
-                HubStatus.Unreachable -> countDownToAskingAgain()
-                else -> Unit
-            }
+            runCatchingSafe { checkAuthStatusUseCase() }
+                .onSuccess { authStatus ->
+                    _events.send(if (authStatus.isInitialized) LaunchEvent.GoToSignIn else LaunchEvent.GoToFirstRun)
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(status = HubStatus.Unavailable(whyUnavailable(error))) }
+                    countDownToAskingAgain()
+                }
         }
     }
 
-    /** A token kept from last time only counts if the hub still accepts it. */
-    private suspend fun isStillSignedIn(): Boolean = runCatchingSafe { getCurrentUserUseCase() }.getOrNull() != null
+    private fun whyUnavailable(error: Throwable): HubFailure = when (error) {
+        is ServerOfflineException -> HubFailure.NoRoute
+        is NotFoundException -> HubFailure.AddressNotFound
+        is UpstreamGatewayException -> HubFailure.Upstream(error.statusCode)
+        is UnexpectedContentTypeException -> HubFailure.NotJson(error.contentType)
+        else -> HubFailure.Unknown
+    }
 
     private fun countDownToAskingAgain() {
         autoRetry = viewModelScope.launch {
