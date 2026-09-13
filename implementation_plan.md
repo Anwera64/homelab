@@ -203,7 +203,20 @@ Native. Its vocabulary is MockK's: `mock<T>()`, `every { }`, `everySuspend { }`,
   restored onto a new device, which is what `noBackupFilesDir` buys on Android. `SecItemCopyMatching`
   → `SecItemUpdate`/`SecItemAdd` → `SecItemDelete`; anything unreadable is deleted and reads as signed
   out. The Keychain is itself thread-safe, so there is no lock and no cached copy to go stale.
-- **Verify:** `./gradlew :core:data:iosSimulatorArm64Test`.
+- **Verify:** ~~`./gradlew :core:data:iosSimulatorArm64Test`~~ — **not possible, and this is the
+  cycle's real finding.** Every `SecItem*` call from a Kotlin/Native test binary returns
+  `errSecNotAvailable` (-25291): Gradle spawns the binary with `simctl spawn --standalone`, outside
+  the booted simulator's daemon environment, so `securityd` is unreachable. It is not the
+  `errSecMissingEntitlement` (-34018) the plan half-expected, but the same family of problem.
+  `kSecUseDataProtectionKeychain` changes nothing (it is a macOS-side switch), and running
+  non-standalone against a booted device hangs with no output. Both knobs are one-liners if anyone
+  wants to revisit.
+- **Decided:** the tests that cannot run are deleted rather than left red or faked against a seam.
+  `KeychainTokenStorage` is proven at the app level in cycle 7, where the real app bundle has the
+  entitlements a bare test binary lacks. Until then the implementation is **unverified by any
+  automated test** — reviewed by eye only, and that is the trade this decision accepts.
+- The class therefore ships without the `accessibility()` helper and the accessibility constant
+  accessor, which existed only for the deleted tests.
 
 ### Cycle 5 — The iOS `platformModule`
 
@@ -256,9 +269,14 @@ longer than the engine's default timeout.
     `./gradlew :iosApp:embedAndSignAppleFrameworkForXcode`, plus `FRAMEWORK_SEARCH_PATHS` and
     `LD_RUNPATH_SEARCH_PATHS` for the built framework.
   - `.gitignore`: `*.xcodeproj/`, `xcuserdata/`, `*.xcworkspace/xcuserdata/`, `DerivedData/`.
-- **Verify:** build and run on an iPhone 16 simulator; the launch screen names the hub, calls
+  - An **XCUITest target** in `project.yml`, carrying cycle 4's debt: it drives the real app bundle,
+    which has the entitlements a bare Kotlin/Native test binary lacks, and proves
+    `KeychainTokenStorage` end to end — sign in, terminate the app, relaunch, still signed in; sign
+    out, relaunch, signed out. This is the only automated cover `KeychainTokenStorage` gets.
+- **Verify:** build and run on an iPhone 17 simulator; the launch screen names the hub, calls
   `GET /auth/status` and shows ready / first run; airplane-mode the hub (point `HubConfig` at an unused
-  host) and the offline state appears; toggle the simulator to dark and the theme follows.
+  host) and the offline state appears; toggle the simulator to dark and the theme follows; and the
+  Keychain XCUITest passes.
 
 ### Cycle 8 — The UI tests on the simulator
 
@@ -318,6 +336,7 @@ light and dark, tokens surviving a relaunch.
 
 | Risk | Mitigation |
 | :--- | :--- |
+| `KeychainTokenStorage` is unverified until cycle 7 | Accepted deliberately (cycle 4). The blast radius is "the app forgets you are signed in", which the first manual run on a simulator would expose immediately; the XCUITest then holds the line |
 | The 36-use-case split is a wide diff mid-stage | It is mechanical and guarded: every domain test and the Koin graph test must pass unchanged, and it lands as its own commit before any iOS work, so a bisect separates it cleanly |
 | The test port quietly weakens assertions | Every ported file is mutation-checked against a deliberate production bug before the cycle closes |
 | Mokkery is a compiler plugin, so it is pinned to the Kotlin version | 3.5.0 covers 2.4.0–2.4.20 and shipped six days after we picked 2.4.20, so the project is tracking it closely. A future Kotlin bump waits for a Mokkery release — the same coupling the Compose compiler plugin already imposes |
