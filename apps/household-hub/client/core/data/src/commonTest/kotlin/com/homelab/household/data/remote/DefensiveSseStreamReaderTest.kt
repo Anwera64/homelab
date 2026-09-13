@@ -25,7 +25,7 @@ class DefensiveSseStreamReaderTest {
 
         """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.toByteArray(Charsets.UTF_8))
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
         val events = reader.readEvents(channel).toList()
 
         assertEquals(3, events.size)
@@ -46,7 +46,7 @@ class DefensiveSseStreamReaderTest {
 
         """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.toByteArray(Charsets.UTF_8))
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
         val events = reader.readEvents(channel).toList()
 
         assertEquals(1, events.size)

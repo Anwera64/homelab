@@ -180,6 +180,16 @@ Native. Its vocabulary is MockK's: `mock<T>()`, `every { }`, `everySuspend { }`,
   `DayNightPreviews` actually imports, is multiplatform and stays.
 - **Verify:** `./gradlew compileKotlinIosSimulatorArm64 compileTestKotlinIosSimulatorArm64` green for
   every module except `:shared`; `jvmTest` still green.
+- **Correction, found while doing it:** `:composeApp`'s *test* compilation cannot be part of this
+  cycle. Its `commonTest` depends on `:shared` by design — the UI tests wire the real Koin graph — so
+  it cannot compile for iOS until `:shared` has iOS targets in cycle 5. This cycle takes
+  `:composeApp`'s `commonMain` only; its tests are verified in cycle 8, where they were going to be
+  run anyway.
+- **What actually broke** (both invisible to an import grep, which is why the compiler had to be the
+  judge): `Charsets.UTF_8` in `DefensiveSseStreamReaderTest` — JVM-only and default-imported, so it
+  needs no `import` line to find — replaced with `encodeToByteArray()`; and
+  `org.jetbrains.compose.ui:ui-tooling`, which has no iOS klib and moved to `androidMain` as
+  predicted.
 
 ### Cycle 4 — `KeychainTokenStorage` (iOS)
 
