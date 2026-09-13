@@ -32,7 +32,12 @@ fun AppNavHost(
                 )
             }
             entry<Destination.SignIn> { screens.SignIn() }
-            entry<Destination.FirstRun> { screens.FirstRun() }
+            entry<Destination.FirstRun> {
+                screens.FirstRun(
+                    onCreated = { backStack.startOver(Destination.Home) },
+                    onSignIn = { backStack.startOver(Destination.SignIn) }
+                )
+            }
             entry<Destination.Home> { screens.Home() }
         }
     )

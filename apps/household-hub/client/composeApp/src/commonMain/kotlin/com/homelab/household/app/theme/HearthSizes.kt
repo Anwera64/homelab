@@ -33,6 +33,8 @@ data class HearthSizes(
     val tile: Dp = 64.dp,
     /** Launch's ready and offline tile. */
     val tileHero: Dp = 80.dp,
+    /** A colour to pick on first run; a ring around it in the rest of the touch target marks the choice. */
+    val swatch: Dp = 40.dp,
     /** Borders and dividers. */
     val hairline: Dp = 1.dp,
     /** A field's error edge. */

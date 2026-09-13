@@ -28,8 +28,12 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun FirstRun() {
-        Text(FIRST_RUN)
+    override fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit) {
+        Column {
+            Text(FIRST_RUN)
+            Text(CREATED, modifier = Modifier.clickable { onCreated() })
+            Text(SIGN_IN_INSTEAD, modifier = Modifier.clickable { onSignIn() })
+        }
     }
 
     @Composable
@@ -45,5 +49,7 @@ class StubScreens : AppScreens {
         const val GO_TO_SIGN_IN = "go to sign in"
         const val GO_TO_FIRST_RUN = "go to first run"
         const val GO_HOME = "go home"
+        const val CREATED = "household created"
+        const val SIGN_IN_INSTEAD = "sign in instead"
     }
 }

@@ -2,12 +2,11 @@ package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.first_run_detail
-import com.homelab.household.app.resources.first_run_title
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
 import com.homelab.household.app.resources.sign_in_detail
 import com.homelab.household.app.resources.sign_in_title
+import com.homelab.household.app.screens.firstrun.FirstRunScreen
 import com.homelab.household.app.screens.launch.LaunchScreen
 import com.homelab.household.app.screens.placeholder.PlaceholderContent
 import org.jetbrains.compose.resources.stringResource
@@ -24,7 +23,7 @@ interface AppScreens {
 
     @Composable fun SignIn()
 
-    @Composable fun FirstRun()
+    @Composable fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit)
 
     @Composable fun Home()
 }
@@ -46,11 +45,8 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun FirstRun() {
-        PlaceholderContent(
-            title = stringResource(Res.string.first_run_title),
-            detail = stringResource(Res.string.first_run_detail)
-        )
+    override fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit) {
+        FirstRunScreen(onCreated = onCreated, onSignIn = onSignIn)
     }
 
     @Composable

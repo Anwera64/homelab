@@ -49,6 +49,29 @@ class AppNavHostTest {
     }
 
     @Test
+    fun first_run_goes_home_once_the_household_exists() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
+        onNodeWithText(StubScreens.CREATED).performClick()
+
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+        // The form is done with; back from home doesn't return to it.
+        assertEquals(listOf(Destination.Home), backStack.toList())
+    }
+
+    @Test
+    fun first_run_on_a_hub_already_set_up_goes_to_sign_in() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
+        onNodeWithText(StubScreens.SIGN_IN_INSTEAD).performClick()
+
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
+    }
+
+    @Test
     fun launch_sends_a_member_still_signed_in_straight_home() = runComposeUiTest {
         setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
 

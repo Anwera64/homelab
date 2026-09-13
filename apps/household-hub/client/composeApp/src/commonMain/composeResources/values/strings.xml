@@ -24,6 +24,27 @@
     <string name="launch_open_tailscale">Open Tailscale</string>
     <string name="launch_offline_hint">On home Wi-Fi the hub resolves on your LAN. Away from home it needs Tailscale.</string>
 
+    <!-- First run -->
+    <string name="first_run_overline">FIRST RUN</string>
+    <string name="first_run_title">Set up your household</string>
+    <string name="first_run_detail">This hub has no members yet. You'll become its admin, and everyone after you gets added from inside.</string>
+    <string name="first_run_name_label">Your name</string>
+    <string name="first_run_name_helper">This is how you'll sign in, and how agents will address you.</string>
+    <string name="first_run_name_missing">Add the name you'll sign in with.</string>
+    <string name="first_run_name_too_long">Keep your name to %1$d characters.</string>
+    <string name="first_run_pin_label">Choose a PIN</string>
+    <string name="first_run_pin_helper">6 digits</string>
+    <string name="first_run_pin_not_six_digits">Your PIN needs exactly 6 digits.</string>
+    <string name="first_run_colour_label">Your colour</string>
+    <string name="first_run_colour_helper">Marks your events on the shared schedule.</string>
+    <string name="first_run_colour_swatch">Colour %1$d of %2$d</string>
+    <string name="first_run_create">Create household</string>
+    <string name="first_run_create_detail">Creates your personal space and the shared household space.</string>
+    <string name="first_run_failed_unreachable">Nothing answered at your hub, so the household wasn't created. Everything you typed is still here.</string>
+    <string name="first_run_failed_already_set_up">Someone has already set up this hub.</string>
+    <string name="first_run_sign_in_instead">Sign in instead</string>
+    <string name="first_run_failed_unknown">The household couldn't be created. Try again.</string>
+
     <!-- Bottom navigation -->
     <string name="tab_household">Household</string>
     <string name="tab_schedule">Schedule</string>
@@ -34,8 +55,6 @@
     <!-- Destinations a later slice still has to build -->
     <string name="sign_in_title">Sign in</string>
     <string name="sign_in_detail">The profile picker and PIN arrive in slice 1.</string>
-    <string name="first_run_title">First run</string>
-    <string name="first_run_detail">Setting up the first account arrives in slice 1.</string>
     <string name="home_title">You're signed in</string>
     <string name="home_detail">The household arrives in slice 3.</string>
 
