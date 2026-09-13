@@ -55,4 +55,31 @@ class DefensiveSseStreamReaderTest {
         assertTrue(!delta.content.contains("###"))
         assertTrue(delta.content.contains("Filtered content"))
     }
+
+    /**
+     * A line can be valid JSON and still be shaped wrongly — `"type"` arriving as an object rather
+     * than a string. `JsonElement.jsonPrimitive` reports that with `error(...)`, i.e. an
+     * IllegalStateException, not the IllegalArgumentException that a syntax error raises. The
+     * reader must skip such a line and keep streaming, or one odd event kills the whole answer.
+     */
+    @Test
+    fun an_unexpectedly_shaped_event_is_skipped_and_the_stream_continues() = runTest {
+        val ssePayload = """
+            data: {"type": "delta", "content": "before"}
+
+            data: {"type": {"unexpected": "shape"}, "content": "ignored"}
+
+            data: {"type": "delta", "content": "after"}
+
+            data: [DONE]
+
+        """.trimIndent()
+
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+        val events = reader.readEvents(channel).toList()
+
+        assertEquals(2, events.size, "The malformed line should be skipped, not end the stream")
+        assertEquals("before", (events[0] as ChatStreamEvent.Delta).content)
+        assertEquals("after", (events[1] as ChatStreamEvent.Delta).content)
+    }
 }

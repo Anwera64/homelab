@@ -142,6 +142,25 @@ cd apps\household-hub\client
 .\gradlew.bat :androidApp:connectedDebugAndroidTest # launch smoke test + SSE streaming proof
 ```
 
+```bash
+# iOS simulator (macOS only; needs python3 for the SSE fixture server in tools/sse_fixture.py,
+# which Gradle starts and stops around these tasks on the fixed port 8749)
+cd apps/household-hub/client
+
+./gradlew :shared:iosSimulatorArm64Test   # ~10s, includes the Darwin SSE lock-step proof
+
+# SLOW, >75s: the only thing guarding timeoutIntervalForRequest in PlatformModule.ios.kt.
+# Opt-in — `check` and `build` skip it, it runs only when named.
+./gradlew :shared:iosSimulatorArm64SlowSseLongPauseTest
+```
+
+The two iOS SSE proofs drive the real `Flow<ChatStreamEvent>` the app collects — the Koin Darwin
+engine, the real `SessionRepositoryImpl.streamChatTurn`, collected off the engine's dispatcher.
+`DarwinSseLockstepStreamingTest` proves incremental delivery causally: the fixture refuses to write
+delta N+1 until the client has acked delta N over a second connection, so a buffering engine
+deadlocks rather than passing by luck. `DarwinSseLongPauseTest` outlasts NSURLSession's 60-second
+default `timeoutIntervalForRequest`, which is why it cannot be made cheap.
+
 The architecture tests enforce: domain has no outward dependencies; presentation never imports data;
 data never imports presentation; `commonMain` has no `java.`/`javax.`/`android.`/engine imports; the
 UI module imports only presentation and domain; and every module's **production** Gradle

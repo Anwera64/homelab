@@ -42,8 +42,11 @@ class DefensiveSseStreamReader(
                         parseEvent(dataContent)
                     } catch (_: IllegalArgumentException) {
                         // Malformed or unexpectedly shaped JSON: skip the line, keep streaming.
-                        // kotlinx.serialization.SerializationException is an IllegalArgumentException,
-                        // as are the jsonObject/jsonPrimitive shape casts below.
+                        // SerializationException is an IllegalArgumentException, and so is a shape
+                        // mismatch from jsonObject/jsonPrimitive: those call kotlinx's own private
+                        // error(JsonElement, String) helper, which throws IllegalArgumentException —
+                        // not kotlin.error(), which would be an IllegalStateException. A reviewer
+                        // read it the other way once; the shape test below pins which it is.
                         null
                     }
                     if (event != null) {
