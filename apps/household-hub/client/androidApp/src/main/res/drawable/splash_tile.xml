@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launch tile, for the system splash. The splash icon area is 240dp, and only its central
+    160dp circle is guaranteed to show, so the tile sits well inside it: an 80dp rounded square
+    (24dp corners) in the Hearth primary, holding the 40dp household glyph in onPrimary.
+    The glyph is drawn in its own 24-unit space and scaled up, so its 1.5 stroke scales with it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="240dp"
+    android:viewportWidth="240"
+    android:viewportHeight="240">
+
+    <path
+        android:fillColor="@color/hearth_primary"
+        android:pathData="M104,80 H136 A24,24 0 0 1 160,104 V136 A24,24 0 0 1 136,160 H104 A24,24 0 0 1 80,136 V104 A24,24 0 0 1 104,80 Z" />
+
+    <group
+        android:translateX="100"
+        android:translateY="100"
+        android:scaleX="1.6666666"
+        android:scaleY="1.6666666">
+        <path
+            android:pathData="M3.6 10.4 12 3.8l8.4 6.6"
+            android:strokeColor="@color/hearth_on_primary"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M5.8 9.2V19a1.4 1.4 0 0 0 1.4 1.4h9.6a1.4 1.4 0 0 0 1.4-1.4V9.2"
+            android:strokeColor="@color/hearth_on_primary"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

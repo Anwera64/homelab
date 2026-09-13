@@ -38,8 +38,9 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
 * **`:shared` (DI coordinator):** Koin graph, `platformModule` (`expect`/`actual`: HTTP engine and
   token storage per platform), `HouseholdHubSdk` entry point, and the architecture tests.
 * **`:androidApp`:** the Android application — `HouseholdHubApplication` (starts Koin with the
-  Android context), `MainActivity` (`setContent { App(AndroidExternalApps(this)) }`), and the
-  on-device tests.
+  Android context), `MainActivity` (`installSplashScreen()`, then
+  `setContent { App(AndroidExternalApps(this)) }`), the system splash (`Theme.HyggeHub.Starting`:
+  the launch tile, `drawable/splash_tile`, on the canvas, day and night), and the on-device tests.
 
 ---
 

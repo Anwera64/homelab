@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Mirrors NightColors.canvas in HearthColors.kt. -->
+    <!-- Mirror NightColors in HearthColors.kt: the window before Compose draws, and the splash tile. -->
     <color name="hearth_canvas">#100F0E</color>
+    <color name="hearth_primary">#7FB894</color>
+    <color name="hearth_on_primary">#100F0E</color>
 </resources>

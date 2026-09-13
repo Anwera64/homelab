@@ -6,4 +6,12 @@
     <style name="Theme.HyggeHub" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/hearth_canvas</item>
     </style>
+
+    <!-- The system splash: the launch tile on the canvas, until the first frame, then the app's
+         own theme. Day and night follow the colour resources. -->
+    <style name="Theme.HyggeHub.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/hearth_canvas</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_tile</item>
+        <item name="postSplashScreenTheme">@style/Theme.HyggeHub</item>
+    </style>
 </resources>
