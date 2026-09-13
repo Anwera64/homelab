@@ -218,6 +218,48 @@ Native. Its vocabulary is MockK's: `mock<T>()`, `every { }`, `everySuspend { }`,
 - The class therefore ships without the `accessibility()` helper and the accessibility constant
   accessor, which existed only for the deleted tests.
 
+### Cycle 4b — The chat stream survives a dispatcher switch (production bug, found in cycle 4)
+
+**Not in the original plan.** Three `SessionRepositoryTest` cases pass on the JVM and fail on iOS.
+The diagnosis is a production defect, not a test artifact, and it is the exact class of bug this
+stage's iOS work exists to find.
+
+**What is wrong.** `SessionRepositoryImpl.streamChatTurn` calls `emit()` from inside
+`statement.execute { }`. Ktor 3.5.2 switches dispatchers there on Native — `useEngineDispatcher` is
+unconditionally `true` off the JVM — so the block runs on the engine's `Dispatchers.IO` while the
+`flow { }` collector runs on the caller's dispatcher, and every `emit` violates the flow-context
+invariant. On the JVM the flag is off, which is why it has never shown: the Android path is
+*accidentally* safe, and Ktor 4.0 turns the switch on everywhere.
+
+Proved by setting `-Dio.ktor.client.statement.useEngineDispatcher=true` on the JVM test task, which
+reproduces all three failures on the JVM with the same MockEngine and the same `runTest`.
+
+**Why it is silent.** `DefensiveSseStreamReader.readEvents` holds its `emit` calls inside a
+`catch (_: Exception)` meant for malformed JSON. The invariant `IllegalStateException` is an
+`Exception`, so every event is swallowed as a "malformed line" and the flow completes normally with
+nothing emitted. On the 409 path the same violation is discarded by `catch (e: Throwable)`, so
+polling never completes and burns its whole 60 s budget.
+
+**What a user would see on iOS:** an assistant reply that never arrives, with no error — and a 409
+recovery that always times out even when the server answered immediately.
+
+- **Red:** a JVM test task running with `useEngineDispatcher=true`, reproducing the three failures in
+  seconds without a simulator. It stays as a permanent guard, and it pre-qualifies the codebase for
+  Ktor 4.0.
+- **Green:**
+  1. Hoist emission out of `execute`: `channelFlow { … send(event) … }`, whose `send` is safe from
+     any context — in `streamChatTurn` and in `pollUntilFinished`. **Not** `flowOn`, which would move
+     the whole upstream instead of fixing the boundary.
+  2. Narrow `DefensiveSseStreamReader`'s `catch (_: Exception)` to the JSON parse it was written for,
+     so a collector error can never again be mistaken for a malformed line.
+- **Refactor:** `SessionRepositoryImpl.pollDelayMs` is declared, passed by the test as `10`, and never
+  read — `pollUntilFinished` hardcodes `500L`. Wire it up; it is why the 409 test spends real seconds.
+- **Verify:** `jvmTest` green both with and without the flag; `:core:data:iosSimulatorArm64Test` green.
+- **Note for cycle 6:** `androidApp`'s `SseStreamingDeviceTest` collects inside `execute` with a plain
+  lambda rather than emitting through a `flow {}`, so it could never have caught this. Cycle 6's
+  Darwin proof must drive the real `Flow<ChatStreamEvent>` boundary the app uses, and assert on event
+  count and content — "no exception thrown" would have passed throughout this bug.
+
 ### Cycle 5 — The iOS `platformModule`
 
 - **Red:** `shared/src/iosTest/…/IosPlatformModuleTest.kt` — `HouseholdHubSdk.init()` binds a Darwin

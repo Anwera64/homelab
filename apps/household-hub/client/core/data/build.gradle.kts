@@ -77,3 +77,23 @@ kotlin {
         }
     }
 }
+
+/**
+ * Mirror of [jvmTest] that forces Ktor's `HttpStatement.execute` to run its block on the engine's
+ * dispatcher, as it does unconditionally on every non-JVM target (and will do everywhere in Ktor 4).
+ * This makes the flow-context invariant observable on the JVM, guarding against re-introducing an
+ * `emit` that crosses the `execute` dispatcher boundary.
+ */
+val jvmEngineDispatcherTest = tasks.register<Test>("jvmEngineDispatcherTest") {
+    val jvmTestCompilation = kotlin.jvm().compilations.getByName("test")
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs the JVM tests with io.ktor.client.statement.useEngineDispatcher=true."
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    useJUnitPlatform()
+    systemProperty("io.ktor.client.statement.useEngineDispatcher", "true")
+}
+
+tasks.named("check") {
+    dependsOn(jvmEngineDispatcherTest)
+}
