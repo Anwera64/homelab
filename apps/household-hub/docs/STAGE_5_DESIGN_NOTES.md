@@ -12,9 +12,9 @@ Everything decided while designing the Stage 5 mobile client, in one place: the 
 
 | Artefact | What it holds |
 | :--- | :--- |
-| Design canvas — *Household Hub Mobile* ([link](https://claude.ai/code/artifact/c8d66772-c6ea-4c07-90a7-8a4aba45b2b4)) | 79 screens in 20 flows, day theme, 390×844, plus the type proof |
+| Design canvas — *Household Hub Mobile* ([link](https://claude.ai/code/artifact/c8d66772-c6ea-4c07-90a7-8a4aba45b2b4)) | 84 screens in 20 flows, day theme, 390×844, plus the type proof |
 | Palette proof ([link](https://claude.ai/code/artifact/e0af0e37-e774-48a5-b3c2-de096de4d1f6)) | Final tokens, contrast checks, both themes |
-| Hearth icon set ([link](https://claude.ai/code/artifact/b87fc4c0-1259-4278-ba6d-71507297affc)) | 27 icons and their drawing rules |
+| Hearth icon set ([link](https://claude.ai/code/artifact/b87fc4c0-1259-4278-ba6d-71507297affc)) | 31 icons and their drawing rules |
 | [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md) | Approved spec for server-enforced secret chats |
 | [`STAGE_5_UI_UX_SPECIFICATION.md`](STAGE_5_UI_UX_SPECIFICATION.md) | The original Stage 5 spec. **Its token table and some flows are out of date** — see §7 |
 
@@ -118,7 +118,7 @@ A screen reads the scale off the theme, beside the palette — `HearthTheme.spac
 
 ### Hearth icons
 
-24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **30** icons in six groups — its header and the table above still say 27, which predates the last additions. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes). Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
+24-unit grid, 1.5 stroke with round caps and joins, `currentColor`, 1.85 stroke when active. The sheet draws **31** icons, and its header count now says so. Added this stage: `attach` (paperclip), `biometricUnlock` (viewfinder corners around a keyhole — deliberately no face or finger, see the Secret Mode notes), and `delete` (a backspace key, for the PIN pad) in a "Sign in" group. Removed: `voice`. Agents keep emoji avatars; chrome never uses emoji.
 
 ---
 
@@ -246,13 +246,33 @@ The notes that sat beside each group of screens on the canvas.
 
 ### 6.1 Onboarding
 
-*Screens:* 1 · Reaching the hub, 2a · First run — no members, 2b · Who’s here — hub ready, 2c · PIN, PIN · forgotten, PIN · the other member approves, Hub unreachable
+*Screens:* 0 · System splash, 1 · Splash — reaching the hub, 2a · First run — no members, 2b · Who’s here — hub ready, 2c · PIN, PIN · forgotten, PIN · the other member approves, Hub unreachable, Hub error — HTTP 500, Something else answered — web page, Not at that address — 404, Something went wrong
 
-#### Onboarding — the first thing a new hub does
+#### Launch — where the app goes first
 
-Launch calls GET /auth/status, then branches on is_initialized: false → 2a First run (POST /auth/register-initial) true  → 2b Sign in  (POST /auth/login)
+- **Signed in on this phone** (a token is stored) → Home straight away. There is no hub call, so it works offline. A token the hub no longer accepts is handled later: slice 2 needs 401 handling anyway, because changing a PIN signs out other devices.
+- **Signed out** → the "Reaching the hub" frame is the splash: tile, name, "Reaching your hub…", the hub address and a loading bar, while GET /auth/status runs. Then straight to 2a First run (no members) or 2b Who's here (members). There is no "hub is ready" frame in between.
+- **Any failure** → the offline layout, worded for what came back. Every failure retries by itself every 10 seconds.
 
-All four bind to AuthViewModel, which is fully built — none of this is blocked on backend work.
+| What came back | Title | Chip |
+| :--- | :--- | :--- |
+| Nothing (no route) | Can't reach your hub | No route |
+| An HTTP error | Your hub isn't answering properly | HTTP 500 |
+| A web page instead of JSON | Something else answered | Web page |
+| 404 | Your hub isn't at that address | Not found |
+| Anything else | Something went wrong reaching your hub | Error |
+
+The offline card no longer shows a Tailscale status row. Android can tell a VPN is on, not that it is Tailscale. It keeps the hub address, the chip and "Retrying in".
+
+Each screen has its own ViewModel; the planned AuthViewModel was not built.
+
+On the canvas: 1 · Splash — reaching the hub, Hub unreachable, and one artboard per other failure — Hub error — HTTP 500, Something else answered — web page, Not at that address — 404, Something went wrong.
+
+#### 0 · System splash
+
+The platform's static splash — canvas colour, launch tile centred — shows only until the app draws. The animated waiting happens in Compose, so it works the same on iOS, whose launch screen can't stay up while code runs.
+
+The tile moves up slightly when the launch frame takes over. Accepted.
 
 #### What's left on the form
 
@@ -286,7 +306,7 @@ Hash it exactly like the password (bcrypt handles short inputs); never store dig
 
 The backend defaults avatar_color to #4F46E5 — an indigo from no palette we use. The swatches here are Hygge values. One-line change, and no rows exist yet to migrate.
 
-The offline screen is not an error page — it's the likely first experience. A hub that isn't running, and a phone away from home without Tailscale, both land here before any credential is typed. It names which of the two failed.
+The offline screen is not an error page — it's the likely first experience. A hub that isn't running, and a phone away from home without Tailscale, both land here before any credential is typed. It says what came back, since the phone can't tell which of the two it was (see Launch above).
 
 #### PIN recovery without email
 

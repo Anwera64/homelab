@@ -53,7 +53,7 @@ No features; everything after this builds on it.
 - **`:composeApp`.** A Kotlin Multiplatform library with the screens, theme and navigation, wired to Koin through `HouseholdHubSdk`.
 - **`:androidApp`.** The Android application module: `MainActivity`, SDK initialisation, `setContent { App() }`.
 - **Theme.** Copenhagen Day and Midnight Espresso tokens (design notes §3), ghost alphas per palette, Outfit / Inter / JetBrains Mono bundled.
-- **Hearth icons** as `ImageVector`s — the sheet draws **30** (the sheet's own header still says 27).
+- **Hearth icons** as `ImageVector`s — the sheet now draws **31**, with the PIN pad's `delete` added in slice 1.
 - **Shared components.** Bento card, chip, buttons (primary, secondary, destructive), text field with inline error, empty state, tool record line, message composer, bottom navigation with the centre +, and a scaffold that scrolls content under a pinned header and navigation.
 
 **Done when** the app opens on an Android phone or emulator, calls `GET /auth/status`, follows the system theme, and the existing JVM test suites still pass.
@@ -85,13 +85,19 @@ No features; everything after this builds on it.
 
 **iOS prerequisite:** the owner's Mac with Xcode. An Apple developer account is needed to keep the app on a real iPhone beyond free provisioning's 7-day limit — check when iOS is picked up.
 
+**iOS launch screen**, when the iOS app module is created on the Mac:
+- Declare `UILaunchScreen` in `Info.plist`: `UIColorName` set to a colour asset (e.g. `HearthCanvas` — Any `#F5F2EB`, Dark `#100F0E`), `UIImageName` set to an image asset of the launch tile, and `UIImageRespectsSafeAreaInsets` true.
+- The tile asset is a vector (PDF or SVG) with Any and Dark appearances: tile `#3C6E4E` by day, `#7FB894` by night, with the household glyph.
+- Export the tile once as SVG, so Android's vector drawable and the iOS asset come from one source.
+- The launch screen is static and disappears when the app draws its first frame. The animated waiting, routing and offline screens are already Compose in `commonMain`, so nothing else is iOS-specific.
+
 ---
 
 ## 4. Slices
 
 Canvas bands are named as on the design canvas; backend and client items refer to design notes §5.
 
-**Slice 1 — built (13 September 2026).** Backend: PIN sign-in with a lockout of five free tries, then 30 s doubling to 15 min; `GET /auth/members`; username, email and password removed; `POST /users` removed until invites. Client: first run, "Who's here?", the PIN pad, and launch skipping sign-in while a stored token is still accepted; offline counts down to asking again and opens Tailscale. One ViewModel per screen replaced the planned `AuthViewModel`. Left for slice 2 as designed there: "I have an invite code" and "Forgotten it?". Not drawn: the hub latency pill and the offline screen's Tailscale status line.
+**Slice 1 — built (13 September 2026).** Backend: PIN sign-in with a lockout of five free tries, then 30 s doubling to 15 min; `GET /auth/members`; username, email and password removed; `POST /users` removed until invites. Client: first run, "Who's here?", the PIN pad, and launch; offline counts down to asking again and opens Tailscale. One ViewModel per screen replaced the planned `AuthViewModel`. A follow-up reworked launch: a phone that is signed in opens on Home without calling the hub; signed out, launch is a splash while it checks; every failure uses the offline layout with its own wording and retries by itself; and Android shows a system splash of the launch tile (`core-splashscreen`). Left for slice 2 as designed there: "I have an invite code" and "Forgotten it?". Not drawn: the hub latency pill. The offline screen's Tailscale status line was dropped from the design, because Android can tell a VPN is on but not that it is Tailscale.
 
 | # | Slice | Screens | Backend | Client core | Done when |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -129,3 +135,58 @@ Canvas bands are named as on the design canvas; backend and client items refer t
 
 1. ~~The iOS build machine~~ — decided: the owner's Mac, after Android.
 2. **Offline reading** — in this stage as slice 10, or moved to the next. Needed before slice 10 starts.
+
+---
+
+## 7. Carried forward
+
+Picked up in later clean sessions. 7.1 comes before slice 3 starts; 7.2 can follow it.
+
+### 7.1 Rebuild `HearthScaffold` on Material 3's `Scaffold` — before slice 3
+
+**Why.** Slice 0 built `HearthScaffold` (`composeApp/.../components/HearthScaffold.kt`) as a hand-made `Column`: header, a `weight(1f)` content region that always scrolls, bottom bar. Material 3's `Scaffold` already does that job, and the `Column` falls short in four ways:
+- **Lists crash in it.** The content region always wraps a scrolling `Column`, so a `LazyColumn` inside it gets infinite height. Slice 3's Chats list is a `LazyColumn`.
+- **No window insets.** `Scaffold` applies the system bars' insets and hands the result to the content as `PaddingValues`. With the `Column`, first run had to add `safeDrawingPadding()` by hand, and the bottom navigation would need the same.
+- **No snackbar slot.** Slice 6's publish notice, with its Undo, is a transient message: that is what a snackbar host is for.
+- **Content can't pass under the bars.** `Scaffold` measures the bars and pads the content; the `Column` just stacks them.
+
+**Agreed shape.**
+- Keep the name `HearthScaffold` as the design-system wrapper, built on `Scaffold`: canvas `containerColor`, header as `topBar`, `bottomBar`, and the screen gutter.
+- The content receives the scaffold's `PaddingValues` and chooses how it scrolls: a `Column` with `verticalScroll` for forms (first run), `LazyColumn(contentPadding = …)` for lists.
+- Add the snackbar slot when slice 6 needs it, not before.
+- Only caller today: `FirstRunContent` — move it over, and drop its hand-added `safeDrawingPadding()` if the scaffold's insets cover it.
+- **Move the PIN pad onto it too.** `PinEntryContent` draws its own back button: a padded `Box` holding a 48dp circular, clickable `Box` with the `Back` icon and a content description. That is a top app bar with an empty title. Give `HearthScaffold` a header built on Material 3's `TopAppBar` (empty title, `navigationIcon` = an `IconButton` with `HearthIcon.Back` tinted `textMuted`, container colour the canvas) — as a small reusable `HearthTopBar(onBack)` so later screens with a back arrow (invite, members, profile) share it. The PIN pad keeps its fixed, non-scrolling content; drop its own `safeDrawingPadding()` once the scaffold handles insets. `PinEntryRobot.tapsBack()` finds the button by its content description, so keep `pin_back` on the icon.
+
+**Tests (first).** The existing `HearthScaffoldTest` (header and bottom bar stay put while content scrolls) keeps passing; add one proving a `LazyColumn` works inside, and one proving the bars' insets reach the content padding. `FirstRunScreenTest` must stay green.
+
+**Commit.** On its own, before slice 3 starts.
+
+### 7.2 Previews for the reusable components
+
+**Why.** Every screen's `Content` file has day/night previews driven by its `UiStateProvider`, but none of the shared components in `composeApp/.../app/components/` has one, nor does the icon set. Someone maintaining the app later should be able to open a component and see what it looks like.
+
+**Scope.** `@DayNightPreviews` beside each component, in its own file, showing the states that matter:
+- `Buttons` — primary, secondary, destructive; with and without an icon
+- `HearthChip` — one per `ChipVariant`
+- `HearthTextField` — empty with placeholder, with helper, with error, filled
+- `BentoCard` — with and without its label
+- `EmptyState` — with and without its action
+- `MemberAvatar` — the sizes in use (Who's here, PIN pad)
+- `HearthBottomNav` — a tab selected
+- `MessageComposer` — empty and with text
+- `ToolRecordLine` — a record
+- `HearthScaffold` — header, scrolling content and bottom nav; do it after (or with) 7.1 so it previews the `Scaffold`-based version
+- `HearthIcon` — the whole set in a grid, resting and active
+
+`ChipColors`, `ChipVariant` and `IconShape` are not composables and need none. No guard test: previews only.
+
+**Commit.** On its own.
+
+### 7.3 Smaller items
+
+- **A token the hub no longer accepts.** A signed-in phone opens on Home without calling the hub, so a revoked or expired token only shows when Home makes a call. Slice 2 needs 401 handling anyway — changing a PIN signs out other devices — so route a 401 back to sign-in there.
+- **No `/auth/refresh` on the backend.** The client's `AuthRepository.refreshToken()` calls it; tokens last 30 days. Decide in slice 2 whether to add the endpoint or drop the client code.
+- **Dead backend code.** `backend/app/api`, `app/models` and `app/schemas` are a legacy layer nothing mounts; they still speak username and password. Delete or migrate.
+- **Icon sheet leftovers** (Hearth icon set artefact): section 04's intro still says "the twenty-six above", and section 02's "Shared set — chosen" option shows a stray `biometricUnlock` cell beside `memory`.
+- **First-run swatches.** Two of the five match other meanings: `#6B655F` is the Secret Mode ghost and `#A33B2A` is the error red. Built as drawn; revisit on the canvas if they read wrong.
+- **System splash tile.** On the canvas, "0 · System splash" draws the tile without the drop shadow launch's tile has.
