@@ -164,7 +164,9 @@ Picked up in later clean sessions. 7.1 comes before slice 3 starts; 7.2 can foll
 
 **Commit.** On its own, before slice 3 starts.
 
-### 7.2 Previews for the reusable components
+### 7.2 Previews for the reusable components — done (13 September 2026)
+
+**Built.** Every component in `app/components/` has a `<Component>Preview.kt` beside it, one day/night preview per state, and `icons/HearthIconPreview.kt` draws the set in a grid, resting and active. `HearthTopBar`, added by 7.1 after this list was written, has one too. They share `ComponentPreview`, which puts the component on the theme's canvas — the tooling's background is white in both modes — except the scaffold and the bars, which draw edge to edge. Sample copy is written in the previews, not `strings.xml`: it never reaches the app.
 
 **Why.** Every screen's `Content` file has day/night previews driven by its `UiStateProvider`, but none of the shared components in `composeApp/.../app/components/` has one, nor does the icon set. Someone maintaining the app later should be able to open a component and see what it looks like.
 

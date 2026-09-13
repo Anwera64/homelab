@@ -60,6 +60,10 @@ fails the build if it does. Every screen follows the same four files:
 | `app/screens/<screen>/<Screen>Content.kt` | Stateless: state in, lambdas out. Holds the `@Preview` functions. |
 | `app/screens/<screen>/<Screen>UiStateProvider.kt` | A `PreviewParameterProvider` listing every state the screen can be in, so the previews and the screen test cover all of them from one list. |
 
+Shared components in `app/components/` keep their previews beside them, in `<Component>Preview.kt`,
+drawn inside `ComponentPreview` so they sit on the canvas; the icon set's grid is
+`icons/HearthIconPreview.kt`. A new component gets one.
+
 Events go through a `Channel`, not state: a `Channel` is consumed once, so a recomposition can't
 navigate twice, and `ObserveEvents` only collects at `STARTED`, so a backgrounded screen can't
 navigate behind the user's back.
