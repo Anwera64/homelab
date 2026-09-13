@@ -1,0 +1,142 @@
+# XcodeGen spec for the iOS app — the source of truth for HouseholdHub.xcodeproj.
+#
+# The .xcodeproj is generated (`cd iosApp && xcodegen generate`) and is NOT committed: a pbxproj is
+# a merge-conflict machine, and every setting that matters is legible here instead. Anything you
+# would otherwise click in Xcode's target editor belongs in this file, or the next `xcodegen
+# generate` will throw it away.
+#
+# The Kotlin half is built by Gradle, not by Xcode: the `Build Kotlin framework` script phase below
+# runs `:iosApp:embedAndSignAppleFrameworkForXcode`, which links HouseholdHubKit.framework for the
+# right architecture and configuration and copies it where these targets' FRAMEWORK_SEARCH_PATHS
+# point.
+name: HouseholdHub
+
+options:
+  minimumXcodeGenVersion: "2.40.0"
+  createIntermediateGroups: true
+  # iOS 15.0 is what the iOS 26.5 SDK itself names as the floor: SDKSettings.plist lists
+  # RecommendedDeploymentTarget 15.0 and SwiftConcurrencyMinimumDeploymentTarget 15.0 (below that,
+  # Swift Concurrency has to be back-deployed into the app). The SDK still accepts 12.0, and
+  # neither Compose Multiplatform 1.12 nor Kotlin/Native asks for more than that, so nothing here
+  # forces a higher number — 15.0 is the toolchain's own recommendation, taken as-is.
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # Xcode 15+ sandboxes script phases by default, which denies the Gradle daemon every write
+    # outside DerivedData — including `client/.gradle`, the Kotlin build directories and the konan
+    # cache. With it on, the framework phase fails with permission errors that read as unrelated
+    # Gradle problems. The phase genuinely needs to write across the repo, so it stays off.
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  HouseholdHub:
+    type: application
+    platform: iOS
+    sources:
+      - path: HouseholdHub
+    # Info.plist is *generated* from these properties into HouseholdHub/Info.plist (and is
+    # git-ignored alongside the .xcodeproj). Xcode's own GENERATE_INFOPLIST_FILE was the first
+    # choice, but it only understands an allowlist of INFOPLIST_KEY_* settings and silently drops
+    # anything else — including CADisableMinimumFrameDurationOnPhone, which Compose requires.
+    info:
+      path: HouseholdHub/Info.plist
+      properties:
+        CFBundleDisplayName: HyggeHub
+        # Compose Multiplatform 1.12 refuses to start without this: `PlistSanityCheck` throws on
+        # the first composition if the key is missing or false, because capping the app at 60Hz on
+        # a ProMotion iPhone would be a performance bug nobody would think to look for. The crash
+        # names the key, so it is at least a loud failure.
+        CADisableMinimumFrameDurationOnPhone: true
+        UIApplicationSupportsIndirectInputEvents: true
+        # Without a launch screen iOS runs the app in a letterboxed compatibility window and
+        # Compose draws into a small box in the middle of the screen. An empty UILaunchScreen dict
+        # is the modern way to say "full size, no artwork".
+        UILaunchScreen: {}
+        # `canOpenURL` answers honestly only for schemes declared here; without the entry it
+        # returns false even when Tailscale is installed, and IosExternalApps would always fall
+        # through to the store page. The counterpart of the Android manifest's <queries> block.
+        LSApplicationQueriesSchemes:
+          - tailscale
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.homelab.household
+        PRODUCT_NAME: HouseholdHub
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "0.1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # `embedAndSignAppleFrameworkForXcode` stages the framework it just linked under
+        # build/xcode-frameworks/<CONFIGURATION>/<SDK_NAME>, so the search path has to be spelled
+        # with those two build settings rather than a fixed path — Debug/Release and
+        # simulator/device each get their own directory.
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        # The framework is static, so it is linked, not embedded. It is deliberately NOT declared
+        # as an XcodeGen `dependencies:` entry: it does not exist until the script phase below has
+        # run at least once, and XcodeGen resolves dependency paths at generate time.
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - HouseholdHubKit
+    preBuildScripts:
+      - name: Build Kotlin framework
+        # The script's real inputs are every Kotlin source in the repo, which Xcode cannot express.
+        # Gradle already knows what is up to date, so let it decide and run the phase every time.
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$ACTION" = "indexbuild" ]; then
+            echo "note: index build, skipping the Kotlin framework"
+            exit 0
+          fi
+          # A script phase inherits a minimal PATH with no JAVA_HOME, so gradlew has to be told
+          # where the JDK is.
+          export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 21)}"
+          cd "$SRCROOT/.."
+          ./gradlew :iosApp:embedAndSignAppleFrameworkForXcode
+
+  HouseholdHubTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HouseholdHubTests
+    # A unit-test bundle hosted by the app: it is injected into HouseholdHub.app and runs in its
+    # process, under its entitlements. That is the only way the Keychain answers on this platform.
+    # The dependency also makes XcodeGen fill in TEST_HOST and BUNDLE_LOADER.
+    dependencies:
+      - target: HouseholdHub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.homelab.household.tests
+        GENERATE_INFOPLIST_FILE: YES
+        # Needed to *compile* `import HouseholdHubKit`; the symbols themselves are resolved
+        # against the host app binary at link time via BUNDLE_LOADER, so the static framework is
+        # not linked a second time into the test bundle.
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+
+schemes:
+  HouseholdHub:
+    build:
+      targets:
+        HouseholdHub: all
+        HouseholdHubTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HouseholdHubTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
