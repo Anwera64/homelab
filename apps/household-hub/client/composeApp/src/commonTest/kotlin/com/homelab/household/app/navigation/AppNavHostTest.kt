@@ -47,4 +47,14 @@ class AppNavHostTest {
         onNodeWithText(StubScreens.FIRST_RUN).assertIsDisplayed()
         assertEquals(listOf(Destination.FirstRun), backStack.toList())
     }
+
+    @Test
+    fun launch_sends_a_member_still_signed_in_straight_home() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_HOME).performClick()
+
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+        assertEquals(listOf(Destination.Home), backStack.toList())
+    }
 }

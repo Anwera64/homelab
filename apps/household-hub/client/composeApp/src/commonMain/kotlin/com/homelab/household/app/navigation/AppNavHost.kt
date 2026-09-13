@@ -27,11 +27,13 @@ fun AppNavHost(
             entry<Destination.Launch> {
                 screens.Launch(
                     onSignIn = { backStack.startOver(Destination.SignIn) },
-                    onFirstRun = { backStack.startOver(Destination.FirstRun) }
+                    onFirstRun = { backStack.startOver(Destination.FirstRun) },
+                    onSignedIn = { backStack.startOver(Destination.Home) }
                 )
             }
             entry<Destination.SignIn> { screens.SignIn() }
             entry<Destination.FirstRun> { screens.FirstRun() }
+            entry<Destination.Home> { screens.Home() }
         }
     )
 }

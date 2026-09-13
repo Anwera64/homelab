@@ -7,17 +7,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * Screens as black boxes: each destination says which one it is, and launch offers the two ways
- * out that the real screen decides between.
+ * Screens as black boxes: each destination says which one it is, and offers the ways out that
+ * the real screen decides between.
  */
 class StubScreens : AppScreens {
 
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
+    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit) {
         Column {
             Text(LAUNCH)
             Text(GO_TO_SIGN_IN, modifier = Modifier.clickable { onSignIn() })
             Text(GO_TO_FIRST_RUN, modifier = Modifier.clickable { onFirstRun() })
+            Text(GO_HOME, modifier = Modifier.clickable { onSignedIn() })
         }
     }
 
@@ -31,11 +32,18 @@ class StubScreens : AppScreens {
         Text(FIRST_RUN)
     }
 
+    @Composable
+    override fun Home() {
+        Text(HOME)
+    }
+
     companion object {
         const val LAUNCH = "launch screen"
         const val SIGN_IN = "sign in screen"
         const val FIRST_RUN = "first run screen"
+        const val HOME = "home screen"
         const val GO_TO_SIGN_IN = "go to sign in"
         const val GO_TO_FIRST_RUN = "go to first run"
+        const val GO_HOME = "go home"
     }
 }

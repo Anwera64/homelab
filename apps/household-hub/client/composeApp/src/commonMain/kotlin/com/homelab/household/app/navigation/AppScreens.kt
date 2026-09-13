@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.first_run_detail
 import com.homelab.household.app.resources.first_run_title
+import com.homelab.household.app.resources.home_detail
+import com.homelab.household.app.resources.home_title
 import com.homelab.household.app.resources.sign_in_detail
 import com.homelab.household.app.resources.sign_in_title
 import com.homelab.household.app.screens.launch.LaunchScreen
@@ -18,19 +20,21 @@ import org.jetbrains.compose.resources.stringResource
  * the navigation tests stub the screens out and test the back stack alone.
  */
 interface AppScreens {
-    @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit)
+    @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit)
 
     @Composable fun SignIn()
 
     @Composable fun FirstRun()
+
+    @Composable fun Home()
 }
 
 /** The screens the app actually runs. */
 object RealAppScreens : AppScreens {
 
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
-        LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun)
+    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit) {
+        LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun, onSignedIn = onSignedIn)
     }
 
     @Composable
@@ -46,6 +50,14 @@ object RealAppScreens : AppScreens {
         PlaceholderContent(
             title = stringResource(Res.string.first_run_title),
             detail = stringResource(Res.string.first_run_detail)
+        )
+    }
+
+    @Composable
+    override fun Home() {
+        PlaceholderContent(
+            title = stringResource(Res.string.home_title),
+            detail = stringResource(Res.string.home_detail)
         )
     }
 }

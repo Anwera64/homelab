@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import com.homelab.household.app.components.BentoCard
+import com.homelab.household.app.components.ChipVariant
+import com.homelab.household.app.components.HearthChip
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
@@ -36,8 +41,13 @@ import com.homelab.household.app.resources.launch_failed_upstream
 import com.homelab.household.app.resources.launch_first_run_detail
 import com.homelab.household.app.resources.launch_first_run_title
 import com.homelab.household.app.resources.launch_member_count
+import com.homelab.household.app.resources.launch_no_route
+import com.homelab.household.app.resources.launch_offline_hint
+import com.homelab.household.app.resources.launch_open_tailscale
 import com.homelab.household.app.resources.launch_ready
 import com.homelab.household.app.resources.launch_retry
+import com.homelab.household.app.resources.launch_retrying_in
+import com.homelab.household.app.resources.launch_retrying_seconds
 import com.homelab.household.app.resources.launch_unreachable_detail
 import com.homelab.household.app.resources.launch_unreachable_title
 import com.homelab.household.app.theme.DayNightPreviews
@@ -58,11 +68,22 @@ import org.jetbrains.compose.resources.stringResource
 fun LaunchContent(
     state: LaunchUiState,
     onRetry: () -> Unit,
+    onOpenTailscale: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (state.status is HubStatus.Unreachable) {
+        OfflineContent(state = state, onRetry = onRetry, onOpenTailscale = onOpenTailscale, modifier = modifier)
+    } else {
+        AnsweredContent(state = state, onRetry = onRetry, modifier = modifier)
+    }
+}
+
+/** The hub answered — or is being asked. */
+@Composable
+private fun AnsweredContent(state: LaunchUiState, onRetry: () -> Unit, modifier: Modifier) {
     val colors = HearthTheme.colors
     val status = state.status
-    val unreachable = status is HubStatus.Unreachable || status is HubStatus.Failed
+    val failed = status is HubStatus.Failed
 
     Column(
         modifier = modifier
@@ -75,23 +96,8 @@ fun LaunchContent(
             Alignment.CenterVertically
         )
     ) {
-        if (unreachable) {
-            Box(
-                modifier = Modifier
-                    .size(HearthTheme.size.tile)
-                    .background(
-                        color = colors.errorContainer,
-                        shape = HearthShapes.tile
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                HearthIconImage(
-                    icon = HearthIcon.HubOffline,
-                    contentDescription = null,
-                    size = HearthTheme.size.iconXxl,
-                    tint = colors.onErrorContainer
-                )
-            }
+        if (failed) {
+            OfflineTile()
         } else {
             Box(
                 modifier = Modifier
@@ -117,11 +123,11 @@ fun LaunchContent(
         ) {
             Text(
                 text = stringResource(
-                    if (unreachable) Res.string.launch_unreachable_title else Res.string.app_name
+                    if (failed) Res.string.launch_unreachable_title else Res.string.app_name
                 ),
-                // A hub that answered gets the full-screen title; one that didn't gets the
+                // A hub that answered gets the full-screen title; one that failed gets the
                 // smaller one, because the reason underneath is the part you need to read.
-                style = with(HearthTheme.typography) { if (unreachable) title else hero },
+                style = with(HearthTheme.typography) { if (failed) title else hero },
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center
             )
@@ -133,7 +139,7 @@ fun LaunchContent(
 
         HubAddressPill(
             hubAddress = state.hubAddress,
-            reachable = !unreachable
+            reachable = !failed
         )
 
         if (status is HubStatus.Checking) {
@@ -153,7 +159,7 @@ fun LaunchContent(
             )
         }
 
-        if (unreachable) {
+        if (failed) {
             PrimaryButton(
                 text = stringResource(Res.string.launch_retry),
                 onClick = onRetry,
@@ -161,6 +167,130 @@ fun LaunchContent(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+}
+
+/**
+ * Nothing answered. Not an error page: a hub that's off and a phone away from home without
+ * Tailscale both land here before anything is typed, so it says which ways back there are.
+ */
+@Composable
+private fun OfflineContent(
+    state: LaunchUiState,
+    onRetry: () -> Unit,
+    onOpenTailscale: () -> Unit,
+    modifier: Modifier
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.canvas)
+            .padding(horizontal = HearthTheme.spacing.xxxl, vertical = HearthTheme.spacing.huge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically)
+    ) {
+        OfflineTile()
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        ) {
+            Text(
+                text = stringResource(Res.string.launch_unreachable_title),
+                style = type.title,
+                color = colors.textPrimary,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(Res.string.launch_unreachable_detail),
+                style = type.body,
+                color = colors.textMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+            )
+        }
+
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            ) {
+                Text(
+                    text = state.hubAddress,
+                    style = type.monoSm,
+                    color = colors.textMuted,
+                    modifier = Modifier.weight(1f)
+                )
+                HearthChip(label = stringResource(Res.string.launch_no_route), variant = ChipVariant.Error)
+            }
+            state.retryInSeconds?.let { seconds ->
+                HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                ) {
+                    Text(
+                        text = stringResource(Res.string.launch_retrying_in),
+                        style = type.monoSm,
+                        color = colors.textMuted,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = stringResource(Res.string.launch_retrying_seconds, seconds),
+                        style = type.monoSm,
+                        color = colors.textPrimary
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        ) {
+            PrimaryButton(
+                text = stringResource(Res.string.launch_retry),
+                onClick = onRetry,
+                icon = HearthIcon.Retry,
+                modifier = Modifier.fillMaxWidth()
+            )
+            SecondaryButton(
+                text = stringResource(Res.string.launch_open_tailscale),
+                onClick = onOpenTailscale,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Text(
+            text = stringResource(Res.string.launch_offline_hint),
+            style = type.caption,
+            color = colors.textMuted,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OfflineTile() {
+    val colors = HearthTheme.colors
+    Box(
+        modifier = Modifier
+            .size(HearthTheme.size.tile)
+            .background(
+                color = colors.errorContainer,
+                shape = HearthShapes.tile
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        HearthIconImage(
+            icon = HearthIcon.HubOffline,
+            contentDescription = null,
+            size = HearthTheme.size.iconXxl,
+            tint = colors.onErrorContainer
+        )
     }
 }
 
@@ -245,6 +375,6 @@ private fun LaunchContentPreview(
     @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState
 ) {
     HearthTheme {
-        LaunchContent(state = state, onRetry = {})
+        LaunchContent(state = state, onRetry = {}, onOpenTailscale = {})
     }
 }

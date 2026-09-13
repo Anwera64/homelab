@@ -11,8 +11,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val externalApps = AndroidExternalApps(this)
         setContent {
-            App()
+            App(externalApps = externalApps)
         }
     }
 }

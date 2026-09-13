@@ -7,4 +7,7 @@ sealed interface Destination : NavKey {
     data object Launch : Destination
     data object SignIn : Destination
     data object FirstRun : Destination
+
+    /** Where a signed-in member lands. */
+    data object Home : Destination
 }

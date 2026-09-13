@@ -14,11 +14,11 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.awaitCancellation
 
 /**
- * The hub as the launch screen needs it: `GET /api/v1/auth/status` and nothing else.
+ * The hub as the launch screen needs it: `GET /api/v1/auth/status`, and `GET /api/v1/auth/me` for
+ * a phone that still has a token.
  *
  * One engine with a swappable answer, so a test can change the hub's mind halfway through —
- * which "Try again" needs. When a second screen needs a hub, lift the shared parts out of here
- * into a common fake rather than growing this one.
+ * which "Try again" needs.
  */
 class FakeLaunchHub {
 
@@ -26,14 +26,27 @@ class FakeLaunchHub {
         respond("The test did not say what the hub should answer", HttpStatusCode.NotImplemented)
     }
 
-    val engine: HttpClientEngine = MockEngine { request -> answer(request) }
+    private var me: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData = {
+        respond("", HttpStatusCode.Unauthorized)
+    }
+
+    val engine: HttpClientEngine = MockEngine { request ->
+        when (request.url.encodedPath) {
+            "/api/v1/auth/me" -> me(request)
+            else -> answer(request)
+        }
+    }
 
     fun respondsWith(initialized: Boolean, members: Int) {
-        answer = {
-            respond(
-                content = """{"is_initialized":$initialized,"member_count":$members}""",
-                status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+        answer = { json("""{"is_initialized":$initialized,"member_count":$members}""") }
+    }
+
+    /** The token this phone kept from last time is still good. */
+    fun acceptsTheStoredToken() {
+        me = {
+            json(
+                """{"id":"emma","full_name":"Emma","avatar_color":"#3C6E4E","is_admin":true,
+                    "is_active":true,"created_at":"2026-09-13T00:00:00Z"}"""
             )
         }
     }
@@ -71,4 +84,10 @@ class FakeLaunchHub {
         HubStatus.Unreachable -> isOffline()
         is HubStatus.Failed -> fails(HttpStatusCode.InternalServerError)
     }
+
+    private fun MockRequestHandleScope.json(content: String) = respond(
+        content = content,
+        status = HttpStatusCode.OK,
+        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+    )
 }

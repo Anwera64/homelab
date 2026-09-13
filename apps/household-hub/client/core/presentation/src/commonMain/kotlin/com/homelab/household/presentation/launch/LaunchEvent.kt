@@ -7,4 +7,7 @@ package com.homelab.household.presentation.launch
 sealed interface LaunchEvent {
     data object GoToSignIn : LaunchEvent
     data object GoToFirstRun : LaunchEvent
+
+    /** This phone is still signed in from last time, and the hub still accepts it. */
+    data object GoToHome : LaunchEvent
 }

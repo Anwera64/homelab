@@ -1,9 +1,10 @@
 package com.homelab.household.app.screens.launch
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.TEST_HUB_HOST
-import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
+import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
@@ -35,6 +36,63 @@ class LaunchScreenTest {
 
         assertEquals(1, signIn)
         assertEquals(0, firstRun)
+    }
+
+    @Test
+    fun a_member_still_signed_in_on_this_phone_goes_straight_home() {
+        val hub = FakeLaunchHub()
+        hub.respondsWith(initialized = true, members = 2)
+        hub.acceptsTheStoredToken()
+        val tokens = InMemoryTokenStorage()
+        var signIn = 0
+        var home = 0
+
+        runScreenTest {
+            tokens.saveTokens("token-from-last-time")
+            launchScreen(hub, onSignIn = { signIn++ }, onSignedIn = { home++ }, tokenStorage = tokens)
+
+            waitUntil(timeoutMillis = WAIT_MILLIS) { home == 1 }
+        }
+
+        assertEquals(0, signIn)
+        assertEquals(1, home)
+    }
+
+    @Test
+    fun a_token_the_hub_no_longer_accepts_sends_the_user_to_sign_in() {
+        val hub = FakeLaunchHub()
+        hub.respondsWith(initialized = true, members = 2)
+        val tokens = InMemoryTokenStorage()
+        var signIn = 0
+        var home = 0
+
+        runScreenTest {
+            tokens.saveTokens("expired-token")
+            launchScreen(hub, onSignIn = { signIn++ }, onSignedIn = { home++ }, tokenStorage = tokens)
+
+            waitUntil(timeoutMillis = WAIT_MILLIS) { signIn == 1 }
+        }
+
+        assertEquals(1, signIn)
+        assertEquals(0, home)
+    }
+
+    @Test
+    fun open_tailscale_hands_the_user_over_to_tailscale() {
+        val hub = FakeLaunchHub()
+        hub.isOffline()
+        val apps = FakeExternalApps()
+
+        runScreenTest {
+            launchScreen(hub, externalApps = apps)
+
+            onLaunch {
+                seesTheHubIsOffline()
+                tapsOpenTailscale()
+            }
+        }
+
+        assertEquals(1, apps.tailscaleOpened)
     }
 
     @Test
