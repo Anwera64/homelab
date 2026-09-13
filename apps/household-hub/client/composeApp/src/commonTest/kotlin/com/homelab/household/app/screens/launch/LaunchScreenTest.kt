@@ -1,12 +1,24 @@
 package com.homelab.household.app.screens.launch
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.launch_offline_hint
 import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.TEST_HUB_HOST
 import com.homelab.household.app.testing.runScreenTest
+import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -184,6 +196,21 @@ class LaunchScreenTest {
                 }
             }
         }
+    }
+
+    /** A short phone or a large font: the offline screen scrolls rather than clipping its buttons. */
+    @Test
+    fun the_offline_screen_scrolls_when_it_does_not_fit() = runComposeUiTest {
+        val offline = LaunchUiStateProvider().values.first { it.status is HubStatus.Unavailable }
+        setContent {
+            HearthTheme(darkTheme = false) {
+                Box(Modifier.size(width = 360.dp, height = 320.dp)) {
+                    LaunchContent(state = offline, onRetry = {}, onOpenTailscale = {})
+                }
+            }
+        }
+
+        onNodeWithText(getString(Res.string.launch_offline_hint)).performScrollTo().assertIsDisplayed()
     }
 
     private companion object {

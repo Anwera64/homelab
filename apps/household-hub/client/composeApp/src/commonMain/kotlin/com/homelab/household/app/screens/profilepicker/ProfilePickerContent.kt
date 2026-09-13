@@ -1,6 +1,5 @@
 package com.homelab.household.app.screens.profilepicker
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.LinearProgressIndicator
@@ -22,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.icons.HearthIcon
@@ -59,64 +58,65 @@ fun ProfilePickerContent(
     val type = HearthTheme.typography
     val status = state.status
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.canvas)
-            .safeDrawingPadding()
-            .padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.huge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically)
-    ) {
+    HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.xxl) { padding ->
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically)
         ) {
-            Text(
-                text = stringResource(Res.string.picker_title),
-                style = type.hero,
-                color = colors.textPrimary,
-                textAlign = TextAlign.Center
-            )
-            if (status is PickerStatus.Loaded) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            ) {
                 Text(
-                    text = pluralStringResource(Res.plurals.picker_member_count, status.members.size, status.members.size),
-                    style = type.body,
-                    color = colors.textMuted
-                )
-            }
-        }
-
-        when (status) {
-            PickerStatus.Loading -> LinearProgressIndicator(
-                modifier = Modifier
-                    .width(HearthTheme.size.progressTrack)
-                    .height(HearthTheme.size.progressHeight),
-                color = colors.primary,
-                trackColor = colors.outline,
-                strokeCap = StrokeCap.Round,
-                gapSize = HearthTheme.spacing.none
-            )
-
-            is PickerStatus.Loaded -> {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
-                ) {
-                    status.members.forEach { member ->
-                        Face(member = member, onClick = { onMemberSelected(member) })
-                    }
-                }
-                Text(
-                    text = stringResource(Res.string.picker_hint),
-                    style = type.label,
-                    color = colors.textMuted,
+                    text = stringResource(Res.string.picker_title),
+                    style = type.hero,
+                    color = colors.textPrimary,
                     textAlign = TextAlign.Center
                 )
+                if (status is PickerStatus.Loaded) {
+                    Text(
+                        text = pluralStringResource(Res.plurals.picker_member_count, status.members.size, status.members.size),
+                        style = type.body,
+                        color = colors.textMuted
+                    )
+                }
             }
 
-            PickerStatus.Unreachable -> Problem(stringResource(Res.string.picker_unreachable), onRetry)
-            PickerStatus.Failed -> Problem(stringResource(Res.string.picker_failed), onRetry)
+            when (status) {
+                PickerStatus.Loading -> LinearProgressIndicator(
+                    modifier = Modifier
+                        .width(HearthTheme.size.progressTrack)
+                        .height(HearthTheme.size.progressHeight),
+                    color = colors.primary,
+                    trackColor = colors.outline,
+                    strokeCap = StrokeCap.Round,
+                    gapSize = HearthTheme.spacing.none
+                )
+
+                is PickerStatus.Loaded -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+                    ) {
+                        status.members.forEach { member ->
+                            Face(member = member, onClick = { onMemberSelected(member) })
+                        }
+                    }
+                    Text(
+                        text = stringResource(Res.string.picker_hint),
+                        style = type.label,
+                        color = colors.textMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                PickerStatus.Unreachable -> Problem(stringResource(Res.string.picker_unreachable), onRetry)
+                PickerStatus.Failed -> Problem(stringResource(Res.string.picker_failed), onRetry)
+            }
         }
     }
 }

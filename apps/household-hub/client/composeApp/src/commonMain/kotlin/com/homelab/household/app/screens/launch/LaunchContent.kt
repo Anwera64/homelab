@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -25,6 +27,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.BentoCard
 import com.homelab.household.app.components.ChipVariant
 import com.homelab.household.app.components.HearthChip
+import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.icons.HearthIcon
@@ -62,7 +65,8 @@ import com.homelab.household.presentation.launch.LaunchUiState
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The first screen a signed-out phone shows. Fixed shape, so it doesn't scroll.
+ * The first screen a signed-out phone shows. Fixed shape; the offline frame scrolls only when it
+ * doesn't fit.
  *
  * Stateless — [LaunchScreen] owns the ViewModel and hands the state down.
  */
@@ -94,69 +98,71 @@ fun LaunchContent(
 private fun CheckingContent(hubAddress: String, modifier: Modifier) {
     val colors = HearthTheme.colors
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.canvas)
-            .padding(HearthTheme.spacing.huge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(
-            HearthTheme.spacing.xxxl,
-            Alignment.CenterVertically
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .size(HearthTheme.size.tileHero)
-                .background(
-                    color = colors.primary,
-                    shape = HearthShapes.tile
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            HearthIconImage(
-                icon = HearthIcon.Household,
-                contentDescription = null,
-                size = HearthTheme.size.iconHero,
-                tint = colors.onPrimary
-            )
-        }
-
+    HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.huge) { padding ->
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            verticalArrangement = Arrangement.spacedBy(
+                HearthTheme.spacing.xxxl,
+                Alignment.CenterVertically
+            )
         ) {
-            Text(
-                text = stringResource(Res.string.app_name),
-                style = HearthTheme.typography.hero,
-                color = colors.textPrimary,
-                textAlign = TextAlign.Center
+            Box(
+                modifier = Modifier
+                    .size(HearthTheme.size.tileHero)
+                    .background(
+                        color = colors.primary,
+                        shape = HearthShapes.tile
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                HearthIconImage(
+                    icon = HearthIcon.Household,
+                    contentDescription = null,
+                    size = HearthTheme.size.iconHero,
+                    tint = colors.onPrimary
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            ) {
+                Text(
+                    text = stringResource(Res.string.app_name),
+                    style = HearthTheme.typography.hero,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = stringResource(Res.string.launch_checking),
+                    style = HearthTheme.typography.body,
+                    color = colors.textMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+                )
+            }
+
+            HubAddressPill(hubAddress = hubAddress)
+
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .width(HearthTheme.size.progressTrack)
+                    .height(HearthTheme.size.progressHeight),
+                color = colors.primary,
+                trackColor = colors.outline,
+                strokeCap = StrokeCap.Round,
+                gapSize = HearthTheme.spacing.none
             )
             Text(
-                text = stringResource(Res.string.launch_checking),
-                style = HearthTheme.typography.body,
-                color = colors.textMuted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+                text = stringResource(Res.string.launch_action_description),
+                style = HearthTheme.typography.monoSm,
+                color = colors.textMuted
             )
         }
-
-        HubAddressPill(hubAddress = hubAddress)
-
-        LinearProgressIndicator(
-            modifier = Modifier
-                .width(HearthTheme.size.progressTrack)
-                .height(HearthTheme.size.progressHeight),
-            color = colors.primary,
-            trackColor = colors.outline,
-            strokeCap = StrokeCap.Round,
-            gapSize = HearthTheme.spacing.none
-        )
-        Text(
-            text = stringResource(Res.string.launch_action_description),
-            style = HearthTheme.typography.monoSm,
-            color = colors.textMuted
-        )
     }
 }
 
@@ -178,92 +184,97 @@ private fun OfflineContent(
     val type = HearthTheme.typography
     val words = wordsFor(reason)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.canvas)
-            .padding(horizontal = HearthTheme.spacing.xxxl, vertical = HearthTheme.spacing.huge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically)
-    ) {
-        OfflineTile()
-
+    HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.xxxl) { padding ->
+        // Fixed shape by design, but a short phone or a large font would clip the buttons: it scrolls
+        // only then, and stays centred otherwise.
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically)
         ) {
-            Text(
-                text = words.title,
-                style = type.title,
-                color = colors.textPrimary,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = words.detail,
-                style = type.body,
-                color = colors.textMuted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
-            )
-        }
+            OfflineTile()
 
-        BentoCard(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
             ) {
                 Text(
-                    text = hubAddress,
-                    style = type.monoSm,
-                    color = colors.textMuted,
-                    modifier = Modifier.weight(1f)
+                    text = words.title,
+                    style = type.title,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.Center
                 )
-                HearthChip(label = words.chip, variant = ChipVariant.Error)
+                Text(
+                    text = words.detail,
+                    style = type.body,
+                    color = colors.textMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+                )
             }
-            retryInSeconds?.let { seconds ->
-                HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
                 ) {
                     Text(
-                        text = stringResource(Res.string.launch_retrying_in),
+                        text = hubAddress,
                         style = type.monoSm,
                         color = colors.textMuted,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        text = stringResource(Res.string.launch_retrying_seconds, seconds),
-                        style = type.monoSm,
-                        color = colors.textPrimary
-                    )
+                    HearthChip(label = words.chip, variant = ChipVariant.Error)
+                }
+                retryInSeconds?.let { seconds ->
+                    HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.launch_retrying_in),
+                            style = type.monoSm,
+                            color = colors.textMuted,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = stringResource(Res.string.launch_retrying_seconds, seconds),
+                            style = type.monoSm,
+                            color = colors.textPrimary
+                        )
+                    }
                 }
             }
-        }
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
-        ) {
-            PrimaryButton(
-                text = stringResource(Res.string.launch_retry),
-                onClick = onRetry,
-                icon = HearthIcon.Retry,
-                modifier = Modifier.fillMaxWidth()
-            )
-            SecondaryButton(
-                text = stringResource(Res.string.launch_open_tailscale),
-                onClick = onOpenTailscale,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            ) {
+                PrimaryButton(
+                    text = stringResource(Res.string.launch_retry),
+                    onClick = onRetry,
+                    icon = HearthIcon.Retry,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SecondaryButton(
+                    text = stringResource(Res.string.launch_open_tailscale),
+                    onClick = onOpenTailscale,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Text(
+                text = stringResource(Res.string.launch_offline_hint),
+                style = type.caption,
+                color = colors.textMuted,
+                textAlign = TextAlign.Center
             )
         }
-
-        Text(
-            text = stringResource(Res.string.launch_offline_hint),
-            style = type.caption,
-            color = colors.textMuted,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
