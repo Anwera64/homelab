@@ -7,6 +7,12 @@ import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
+import com.homelab.household.domain.usecase.impl.CheckAuthStatusUseCaseImpl
+import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
+import com.homelab.household.domain.usecase.impl.HasStoredSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListMembersUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LoginUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -18,12 +24,12 @@ import org.junit.jupiter.api.Test
 class AuthUseCasesTest {
 
     private val authRepo = mockk<AuthRepository>()
-    private val loginUseCase = LoginUseCase(authRepo)
-    private val onboardUseCase = FirstRunOnboardUseCase(authRepo)
-    private val listMembersUseCase = ListMembersUseCase(authRepo)
-    private val checkAuthStatusUseCase = CheckAuthStatusUseCase(authRepo)
-    private val logoutUseCase = LogoutUseCase(authRepo)
-    private val hasStoredSessionUseCase = HasStoredSessionUseCase(authRepo)
+    private val loginUseCase = LoginUseCaseImpl(authRepo)
+    private val onboardUseCase = FirstRunOnboardUseCaseImpl(authRepo)
+    private val listMembersUseCase = ListMembersUseCaseImpl(authRepo)
+    private val checkAuthStatusUseCase = CheckAuthStatusUseCaseImpl(authRepo)
+    private val logoutUseCase = LogoutUseCaseImpl(authRepo)
+    private val hasStoredSessionUseCase = HasStoredSessionUseCaseImpl(authRepo)
 
     private val emma = User(
         id = "emma",

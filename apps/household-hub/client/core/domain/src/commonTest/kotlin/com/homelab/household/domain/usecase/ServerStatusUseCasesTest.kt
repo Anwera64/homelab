@@ -2,6 +2,8 @@ package com.homelab.household.domain.usecase
 
 import com.homelab.household.domain.model.ServerStatus
 import com.homelab.household.domain.repository.ServerStatusRepository
+import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -15,8 +17,8 @@ import org.junit.jupiter.api.Test
 class ServerStatusUseCasesTest {
 
     private val statusRepo = mockk<ServerStatusRepository>()
-    private val observeStatusUseCase = ObserveServerStatusUseCase(statusRepo)
-    private val checkHealthUseCase = CheckServerHealthUseCase(statusRepo)
+    private val observeStatusUseCase = ObserveServerStatusUseCaseImpl(statusRepo)
+    private val checkHealthUseCase = CheckServerHealthUseCaseImpl(statusRepo)
 
     @Test
     fun observe_status_emits_flow_of_server_statuses() = runTest {

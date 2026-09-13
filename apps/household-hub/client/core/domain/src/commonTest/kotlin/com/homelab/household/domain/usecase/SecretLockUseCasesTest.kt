@@ -3,6 +3,8 @@ package com.homelab.household.domain.usecase
 import com.homelab.household.domain.assertThrowsSuspend
 import com.homelab.household.domain.exception.UnauthorizedException
 import com.homelab.household.domain.repository.SessionRepository
+import com.homelab.household.domain.usecase.impl.LockSecretSessionsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -13,8 +15,8 @@ import org.junit.jupiter.api.Test
 class SecretLockUseCasesTest {
 
     private val sessionRepo = mockk<SessionRepository>()
-    private val lockSecretSessionsUseCase = LockSecretSessionsUseCase(sessionRepo)
-    private val unlockSecretSessionUseCase = UnlockSecretSessionUseCase(sessionRepo)
+    private val lockSecretSessionsUseCase = LockSecretSessionsUseCaseImpl(sessionRepo)
+    private val unlockSecretSessionUseCase = UnlockSecretSessionUseCaseImpl(sessionRepo)
 
     @Test
     fun lock_secret_sessions_marks_sessions_locked() = runTest {

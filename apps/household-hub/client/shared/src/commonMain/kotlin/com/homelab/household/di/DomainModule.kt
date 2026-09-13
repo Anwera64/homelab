@@ -38,56 +38,94 @@ import com.homelab.household.domain.usecase.UnlockSecretSessionUseCase
 import com.homelab.household.domain.usecase.UpdateAgentUseCase
 import com.homelab.household.domain.usecase.UpdateMemoryUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
+import com.homelab.household.domain.usecase.impl.ApproveToolProposalUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CheckAuthStatusUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CreateAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CreateSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.DeleteAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.HasStoredSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListAgentsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListHouseholdMilestonesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListMembersUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListSessionsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListUserAuditMilestonesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LockSecretSessionsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LoginUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ObserveCurrentUserUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RevokeMilestoneUseCaseImpl
+import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UpdateAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UpdateMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UpdateSpaceSettingsUseCaseImpl
 import org.koin.dsl.module
 
 val domainModule = module {
     // Session use cases
-    factory { CreateSessionUseCase(get()) }
-    factory { GetSessionUseCase(get()) }
-    factory { ListSessionsUseCase(get()) }
-    factory { ArchiveSessionUseCase(get()) }
-    factory { ToggleSecretModeUseCase(get()) }
-    factory { DeleteSessionUseCase(get()) }
-    factory { ApproveToolProposalUseCase(get()) }
-    factory { ObserveMessagesUseCase(get()) }
-    factory { RetryMessageUseCase(get()) }
-    factory { StreamChatTurnUseCase(get()) }
+    factory<CreateSessionUseCase> { CreateSessionUseCaseImpl(get()) }
+    factory<GetSessionUseCase> { GetSessionUseCaseImpl(get()) }
+    factory<ListSessionsUseCase> { ListSessionsUseCaseImpl(get()) }
+    factory<ArchiveSessionUseCase> { ArchiveSessionUseCaseImpl(get()) }
+    factory<ToggleSecretModeUseCase> { ToggleSecretModeUseCaseImpl(get()) }
+    factory<DeleteSessionUseCase> { DeleteSessionUseCaseImpl(get()) }
+    factory<ApproveToolProposalUseCase> { ApproveToolProposalUseCaseImpl(get()) }
+    factory<ObserveMessagesUseCase> { ObserveMessagesUseCaseImpl(get()) }
+    factory<RetryMessageUseCase> { RetryMessageUseCaseImpl(get()) }
+    factory<StreamChatTurnUseCase> { StreamChatTurnUseCaseImpl(get()) }
 
     // Auth use cases
-    factory { LoginUseCase(get()) }
-    factory { FirstRunOnboardUseCase(get()) }
-    factory { ListMembersUseCase(get()) }
-    factory { CheckAuthStatusUseCase(get()) }
-    factory { GetCurrentUserUseCase(get()) }
-    factory { LogoutUseCase(get()) }
-    factory { ObserveCurrentUserUseCase(get()) }
-    factory { GetHubHostUseCase(get()) }
-    factory { HasStoredSessionUseCase(get()) }
+    factory<LoginUseCase> { LoginUseCaseImpl(get()) }
+    factory<FirstRunOnboardUseCase> { FirstRunOnboardUseCaseImpl(get()) }
+    factory<ListMembersUseCase> { ListMembersUseCaseImpl(get()) }
+    factory<CheckAuthStatusUseCase> { CheckAuthStatusUseCaseImpl(get()) }
+    factory<GetCurrentUserUseCase> { GetCurrentUserUseCaseImpl(get()) }
+    factory<LogoutUseCase> { LogoutUseCaseImpl(get()) }
+    factory<ObserveCurrentUserUseCase> { ObserveCurrentUserUseCaseImpl(get()) }
+    factory<GetHubHostUseCase> { GetHubHostUseCaseImpl(get()) }
+    factory<HasStoredSessionUseCase> { HasStoredSessionUseCaseImpl(get()) }
 
     // Server status use cases
-    factory { ObserveServerStatusUseCase(get()) }
-    factory { CheckServerHealthUseCase(get()) }
+    factory<ObserveServerStatusUseCase> { ObserveServerStatusUseCaseImpl(get()) }
+    factory<CheckServerHealthUseCase> { CheckServerHealthUseCaseImpl(get()) }
 
     // Secret lock use cases
-    factory { LockSecretSessionsUseCase(get()) }
-    factory { UnlockSecretSessionUseCase(get()) }
+    factory<LockSecretSessionsUseCase> { LockSecretSessionsUseCaseImpl(get()) }
+    factory<UnlockSecretSessionUseCase> { UnlockSecretSessionUseCaseImpl(get()) }
 
     // Gossip & Memory use cases
-    factory { ListHouseholdMilestonesUseCase(get()) }
-    factory { ListUserAuditMilestonesUseCase(get()) }
-    factory { RevokeMilestoneUseCase(get()) }
-    factory { AuditMemoriesUseCase(get()) }
-    factory { RevokeMemoryUseCase(get()) }
-    factory { UpdateMemoryUseCase(get()) }
+    factory<ListHouseholdMilestonesUseCase> { ListHouseholdMilestonesUseCaseImpl(get()) }
+    factory<ListUserAuditMilestonesUseCase> { ListUserAuditMilestonesUseCaseImpl(get()) }
+    factory<RevokeMilestoneUseCase> { RevokeMilestoneUseCaseImpl(get()) }
+    factory<AuditMemoriesUseCase> { AuditMemoriesUseCaseImpl(get()) }
+    factory<RevokeMemoryUseCase> { RevokeMemoryUseCaseImpl(get()) }
+    factory<UpdateMemoryUseCase> { UpdateMemoryUseCaseImpl(get()) }
 
     // Space & Agent use cases
-    factory { GetPersonalSpaceUseCase(get()) }
-    factory { GetHouseholdSpaceUseCase(get()) }
-    factory { UpdateSpaceSettingsUseCase(get()) }
-    factory { ListAgentsUseCase(get()) }
-    factory { GetAgentUseCase(get()) }
-    factory { CreateAgentUseCase(get()) }
-    factory { UpdateAgentUseCase(get()) }
-    factory { DeleteAgentUseCase(get()) }
-    factory { RestoreAgentUseCase(get()) }
+    factory<GetPersonalSpaceUseCase> { GetPersonalSpaceUseCaseImpl(get()) }
+    factory<GetHouseholdSpaceUseCase> { GetHouseholdSpaceUseCaseImpl(get()) }
+    factory<UpdateSpaceSettingsUseCase> { UpdateSpaceSettingsUseCaseImpl(get()) }
+    factory<ListAgentsUseCase> { ListAgentsUseCaseImpl(get()) }
+    factory<GetAgentUseCase> { GetAgentUseCaseImpl(get()) }
+    factory<CreateAgentUseCase> { CreateAgentUseCaseImpl(get()) }
+    factory<UpdateAgentUseCase> { UpdateAgentUseCaseImpl(get()) }
+    factory<DeleteAgentUseCase> { DeleteAgentUseCaseImpl(get()) }
+    factory<RestoreAgentUseCase> { RestoreAgentUseCaseImpl(get()) }
 }

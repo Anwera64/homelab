@@ -3,6 +3,7 @@ package com.homelab.household.domain.usecase
 import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.repository.SessionRepository
+import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test
 class StreamChatTurnUseCaseTest {
 
     private val sessionRepo = mockk<SessionRepository>()
-    private val streamChatTurnUseCase = StreamChatTurnUseCase(sessionRepo)
+    private val streamChatTurnUseCase = StreamChatTurnUseCaseImpl(sessionRepo)
 
     @Test
     fun execute_with_blank_content_throws_validation_error() {

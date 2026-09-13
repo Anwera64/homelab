@@ -7,6 +7,10 @@ import com.homelab.household.domain.model.HouseholdMilestone
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
+import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListHouseholdMilestonesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RevokeMilestoneUseCaseImpl
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -19,10 +23,10 @@ class GossipAndMemoryUseCasesTest {
     private val gossipRepo = mockk<GossipRepository>()
     private val memoryRepo = mockk<MemoryRepository>()
 
-    private val listMilestonesUseCase = ListHouseholdMilestonesUseCase(gossipRepo)
-    private val revokeMilestoneUseCase = RevokeMilestoneUseCase(gossipRepo)
-    private val auditMemoriesUseCase = AuditMemoriesUseCase(memoryRepo)
-    private val revokeMemoryUseCase = RevokeMemoryUseCase(memoryRepo)
+    private val listMilestonesUseCase = ListHouseholdMilestonesUseCaseImpl(gossipRepo)
+    private val revokeMilestoneUseCase = RevokeMilestoneUseCaseImpl(gossipRepo)
+    private val auditMemoriesUseCase = AuditMemoriesUseCaseImpl(memoryRepo)
+    private val revokeMemoryUseCase = RevokeMemoryUseCaseImpl(memoryRepo)
 
     private val dummyMilestone = HouseholdMilestone(
         id = "milestone-1",

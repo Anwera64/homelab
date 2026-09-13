@@ -109,6 +109,28 @@ class CleanArchitectureBoundaryTest {
     }
 
     /**
+     * Use case implementations are named in exactly one place: the Koin module that binds them.
+     * Every other file depends on the `fun interface` protocol in
+     * `com.homelab.household.domain.usecase`, so a ViewModel's collaborators stay mockable by a
+     * compile-time mocking library on iOS.
+     */
+    @Test
+    fun use_case_implementations_are_named_only_by_the_di_module() {
+        val outsideDomainDirs = commonMainDirs.filterNot { it == domainDir }
+        assertTrue(outsideDomainDirs.isNotEmpty(), "No commonMain directories found outside :core:domain")
+
+        val violations = outsideDomainDirs
+            .flatMap { importViolations(it, listOf("com.homelab.household.domain.usecase.impl")) }
+            .filterNot { it.startsWith("DomainModule.kt:") }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Use case implementation imported outside :core:domain (depend on the protocol instead, " +
+                "only DomainModule.kt may name an implementation):\n" + violations.joinToString("\n")
+        )
+    }
+
+    /**
      * Production dependencies only. A test source set may depend outward — the full-stack UI
      * tests in `:composeApp` wire the real graph from `:shared` — without the app itself being
      * able to reach past `:core:presentation`.

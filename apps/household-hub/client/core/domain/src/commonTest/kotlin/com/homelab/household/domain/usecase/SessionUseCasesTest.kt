@@ -7,6 +7,10 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.repository.SessionRepository
+import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CreateSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -17,10 +21,10 @@ import org.junit.jupiter.api.Test
 class SessionUseCasesTest {
 
     private val sessionRepo = mockk<SessionRepository>()
-    private val createSessionUseCase = CreateSessionUseCase(sessionRepo)
-    private val getSessionUseCase = GetSessionUseCase(sessionRepo)
-    private val archiveSessionUseCase = ArchiveSessionUseCase(sessionRepo)
-    private val toggleSecretModeUseCase = ToggleSecretModeUseCase(sessionRepo)
+    private val createSessionUseCase = CreateSessionUseCaseImpl(sessionRepo)
+    private val getSessionUseCase = GetSessionUseCaseImpl(sessionRepo)
+    private val archiveSessionUseCase = ArchiveSessionUseCaseImpl(sessionRepo)
+    private val toggleSecretModeUseCase = ToggleSecretModeUseCaseImpl(sessionRepo)
 
     private val dummySession = ConversationSession(
         id = "session-1",
