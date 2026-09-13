@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The household glyph for the launcher icon — the same drawing as HearthIcon.Household and the
+    splash tile. An adaptive icon is 108dp, and only the central 66dp circle is sure to survive the
+    launcher's mask, so the glyph's 24-unit grid is scaled to 54dp and centred: its farthest point
+    sits about 24dp from the centre, well inside the 33dp safe radius. Also the monochrome layer.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:translateX="27"
+        android:translateY="27"
+        android:scaleX="2.25"
+        android:scaleY="2.25">
+        <path
+            android:pathData="M3.6 10.4 12 3.8l8.4 6.6"
+            android:strokeColor="@color/launcher_glyph"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M5.8 9.2V19a1.4 1.4 0 0 0 1.4 1.4h9.6a1.4 1.4 0 0 0 1.4-1.4V9.2"
+            android:strokeColor="@color/launcher_glyph"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

@@ -3,6 +3,7 @@ package com.homelab.household
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -18,6 +19,15 @@ class LaunchSmokeTest {
             scenario.moveToState(Lifecycle.State.RESUMED)
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
         }
+    }
+
+    /** The launcher shows HyggeHub's own icon, not the Android default. */
+    @Test
+    fun the_app_uses_the_hyggehub_launcher_icon() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = context.packageManager.getApplicationInfo(context.packageName, 0)
+
+        assertEquals(R.mipmap.ic_launcher, app.icon)
     }
 
     /** Compose draws the whole screen; a platform action bar would sit on top of it. */

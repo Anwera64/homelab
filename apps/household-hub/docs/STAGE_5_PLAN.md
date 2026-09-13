@@ -89,6 +89,7 @@ No features; everything after this builds on it.
 - Declare `UILaunchScreen` in `Info.plist`: `UIColorName` set to a colour asset (e.g. `HearthCanvas` — Any `#F5F2EB`, Dark `#100F0E`), `UIImageName` set to an image asset of the launch tile, and `UIImageRespectsSafeAreaInsets` true.
 - The tile asset is a vector (PDF or SVG) with Any and Dark appearances: tile `#3C6E4E` by day, `#7FB894` by night, with the household glyph.
 - Export the tile once as SVG, so Android's vector drawable and the iOS asset come from one source.
+- App icon: an `AppIcon` asset (1024×1024, no transparency) with the same artwork as Android's launcher icon — full-bleed Hearth green `#3C6E4E` with the white household glyph centred. iOS applies its own corner mask.
 - The launch screen is static and disappears when the app draws its first frame. The animated waiting, routing and offline screens are already Compose in `commonMain`, so nothing else is iOS-specific.
 
 ---

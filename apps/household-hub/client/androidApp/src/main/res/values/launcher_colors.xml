@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher icon keeps the day Hearth green in every theme: an app icon is the app's mark,
+         not part of its UI, so it has no night values. Android 13+ themed icons tint the
+         monochrome layer instead. -->
+    <color name="launcher_background">#3C6E4E</color>
+    <color name="launcher_glyph">#FFFFFF</color>
+</resources>
