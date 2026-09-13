@@ -1,47 +1,49 @@
 package com.homelab.household.app.components
 
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import com.homelab.household.app.theme.HearthTheme
 
 /**
- * Header and navigation stay put; only the content between them scrolls.
- * Fixed-shape screens (the PIN pad, launch, full-screen states) don't use this.
+ * Header and navigation stay put; the content passes between them. The content is handed the
+ * space the bars and the window leave it, plus the screen [gutter] on both sides, and chooses how
+ * it scrolls: a scrolling `Column` for forms, `LazyColumn(contentPadding = …)` for lists.
+ *
+ * Bars pad their own window insets, as Material 3's do; the content gets the insets only on a side
+ * with no bar. [contentWindowInsets] includes the keyboard, so a form's footer rises above it.
  */
 @Composable
 fun HearthScaffold(
-    header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    header: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    contentPadding: PaddingValues =
-        PaddingValues(horizontal = HearthTheme.spacing.xl, vertical = HearthTheme.spacing.none),
-    contentSpacing: Dp = HearthTheme.spacing.lg,
-    scrollState: ScrollState = rememberScrollState(),
-    content: @Composable ColumnScope.() -> Unit
+    gutter: Dp = HearthTheme.spacing.xl,
+    contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
+    content: @Composable (PaddingValues) -> Unit
 ) {
-    Column(modifier = modifier.fillMaxSize().background(HearthTheme.colors.canvas)) {
-        header()
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(contentSpacing),
-            content = content
+    Scaffold(
+        modifier = modifier,
+        topBar = header,
+        bottomBar = bottomBar,
+        containerColor = HearthTheme.colors.canvas,
+        contentWindowInsets = contentWindowInsets
+    ) { bars ->
+        val layoutDirection = LocalLayoutDirection.current
+        content(
+            PaddingValues(
+                start = bars.calculateStartPadding(layoutDirection) + gutter,
+                top = bars.calculateTopPadding(),
+                end = bars.calculateEndPadding(layoutDirection) + gutter,
+                bottom = bars.calculateBottomPadding()
+            )
         )
-        bottomBar()
     }
 }

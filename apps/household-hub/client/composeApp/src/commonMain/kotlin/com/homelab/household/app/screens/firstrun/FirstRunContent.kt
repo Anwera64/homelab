@@ -5,16 +5,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -86,45 +92,51 @@ fun FirstRunContent(
     val type = HearthTheme.typography
 
     HearthScaffold(
-        header = {},
-        modifier = modifier.safeDrawingPadding(),
-        contentPadding = PaddingValues(horizontal = HearthTheme.spacing.xxl),
-        contentSpacing = HearthTheme.spacing.xxl,
+        modifier = modifier,
+        gutter = HearthTheme.spacing.xxl,
         bottomBar = { CreateFooter(state = state, onCreate = onCreate, onSignIn = onSignIn) }
-    ) {
+    ) { padding ->
         Column(
-            modifier = Modifier.padding(top = HearthTheme.spacing.huge),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
         ) {
-            Text(stringResource(Res.string.first_run_overline), style = type.overline, color = colors.textMuted)
-            Text(stringResource(Res.string.first_run_title), style = type.hero, color = colors.textPrimary)
-            Text(stringResource(Res.string.first_run_detail), style = type.body, color = colors.textMuted)
-        }
+            Column(
+                modifier = Modifier.padding(top = HearthTheme.spacing.huge),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            ) {
+                Text(stringResource(Res.string.first_run_overline), style = type.overline, color = colors.textMuted)
+                Text(stringResource(Res.string.first_run_title), style = type.hero, color = colors.textPrimary)
+                Text(stringResource(Res.string.first_run_detail), style = type.body, color = colors.textMuted)
+            }
 
-        HearthTextField(
-            value = state.name,
-            onValueChange = onNameChange,
-            label = stringResource(Res.string.first_run_name_label),
-            helper = if (state.nameError == null) stringResource(Res.string.first_run_name_helper) else null,
-            error = state.nameError?.let { nameErrorText(it) },
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Next
+            HearthTextField(
+                value = state.name,
+                onValueChange = onNameChange,
+                label = stringResource(Res.string.first_run_name_label),
+                helper = if (state.nameError == null) stringResource(Res.string.first_run_name_helper) else null,
+                error = state.nameError?.let { nameErrorText(it) },
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next
+                )
             )
-        )
 
-        HearthTextField(
-            value = state.pin,
-            onValueChange = onPinChange,
-            label = stringResource(Res.string.first_run_pin_label),
-            helper = if (state.pinError == null) stringResource(Res.string.first_run_pin_helper) else null,
-            error = state.pinError?.let { pinErrorText(it) },
-            textStyle = type.monoLg,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-            visualTransformation = PasswordVisualTransformation()
-        )
+            HearthTextField(
+                value = state.pin,
+                onValueChange = onPinChange,
+                label = stringResource(Res.string.first_run_pin_label),
+                helper = if (state.pinError == null) stringResource(Res.string.first_run_pin_helper) else null,
+                error = state.pinError?.let { pinErrorText(it) },
+                textStyle = type.monoLg,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                visualTransformation = PasswordVisualTransformation()
+            )
 
-        ColourPicker(selected = state.colour, onSelect = onColourSelect)
+            ColourPicker(selected = state.colour, onSelect = onColourSelect)
+        }
     }
 }
 
@@ -177,6 +189,8 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.canvas)
+            // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
     ) {

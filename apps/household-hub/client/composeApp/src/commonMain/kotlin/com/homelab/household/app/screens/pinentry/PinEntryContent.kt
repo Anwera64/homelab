@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -25,6 +24,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import com.homelab.household.app.components.HearthScaffold
+import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
@@ -62,29 +63,21 @@ fun PinEntryContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    HearthScaffold(
+        modifier = modifier,
+        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.pin_back)) },
+        gutter = HearthTheme.spacing.none
+    ) { padding ->
+        PinPad(state = state, onDigit = onDigit, onDelete = onDelete, modifier = Modifier.fillMaxSize().padding(padding))
+    }
+}
+
+@Composable
+private fun PinPad(state: PinEntryUiState, onDigit: (Char) -> Unit, onDelete: () -> Unit, modifier: Modifier) {
     val colors = HearthTheme.colors
     val spacing = HearthTheme.spacing
-    val backDescription = stringResource(Res.string.pin_back)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.canvas)
-            .safeDrawingPadding()
-    ) {
-        Box(modifier = Modifier.padding(start = spacing.lg, top = spacing.xxl)) {
-            Box(
-                modifier = Modifier
-                    .size(HearthTheme.size.touchTarget)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack)
-                    .semantics { contentDescription = backDescription },
-                contentAlignment = Alignment.Center
-            ) {
-                HearthIconImage(icon = HearthIcon.Back, contentDescription = null, tint = colors.textMuted)
-            }
-        }
-
+    Column(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
