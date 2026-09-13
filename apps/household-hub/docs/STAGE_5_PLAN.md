@@ -91,6 +91,8 @@ No features; everything after this builds on it.
 
 Canvas bands are named as on the design canvas; backend and client items refer to design notes §5.
 
+**Slice 1 — built (13 September 2026).** Backend: PIN sign-in with a lockout of five free tries, then 30 s doubling to 15 min; `GET /auth/members`; username, email and password removed; `POST /users` removed until invites. Client: first run, "Who's here?", the PIN pad, and launch skipping sign-in while a stored token is still accepted; offline counts down to asking again and opens Tailscale. One ViewModel per screen replaced the planned `AuthViewModel`. Left for slice 2 as designed there: "I have an invite code" and "Forgotten it?". Not drawn: the hub latency pill and the offline screen's Tailscale status line.
+
 | # | Slice | Screens | Backend | Client core | Done when |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 | **Sign in** | Onboarding (launch, first run, profile picker, PIN, signed-out offline) | PIN replaces password, attempt counter with backoff, public profile list, Hygge avatar default (§5.1) | `LoginUseCase` takes a member and PIN instead of username and password; `AuthViewModel` follows | First run creates the admin with a PIN; the picker lists members; repeated wrong PINs back off; an unreachable hub shows the offline screen |

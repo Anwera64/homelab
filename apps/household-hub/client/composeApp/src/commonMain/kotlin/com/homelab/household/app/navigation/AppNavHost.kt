@@ -25,20 +25,40 @@ fun AppNavHost(
         onBack = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
             entry<Destination.Launch> {
-                screens.Launch(
-                    onSignIn = { backStack.startOver(Destination.SignIn) },
-                    onFirstRun = { backStack.startOver(Destination.FirstRun) },
-                    onSignedIn = { backStack.startOver(Destination.Home) }
-                )
+                WithEntryViewModels {
+                    screens.Launch(
+                        onSignIn = { backStack.startOver(Destination.SignIn) },
+                        onFirstRun = { backStack.startOver(Destination.FirstRun) },
+                        onSignedIn = { backStack.startOver(Destination.Home) }
+                    )
+                }
             }
-            entry<Destination.SignIn> { screens.SignIn() }
+            entry<Destination.SignIn> {
+                WithEntryViewModels {
+                    // The picker stays under the PIN pad, so back from a PIN returns to it.
+                    screens.SignIn(onMemberSelected = { member -> backStack.add(Destination.Pin(member)) })
+                }
+            }
+            entry<Destination.Pin> { destination ->
+                WithEntryViewModels {
+                    screens.Pin(
+                        member = destination.member,
+                        onSignedIn = { backStack.startOver(Destination.Home) },
+                        onBack = { backStack.removeLastOrNull() }
+                    )
+                }
+            }
             entry<Destination.FirstRun> {
-                screens.FirstRun(
-                    onCreated = { backStack.startOver(Destination.Home) },
-                    onSignIn = { backStack.startOver(Destination.SignIn) }
-                )
+                WithEntryViewModels {
+                    screens.FirstRun(
+                        onCreated = { backStack.startOver(Destination.Home) },
+                        onSignIn = { backStack.startOver(Destination.SignIn) }
+                    )
+                }
             }
-            entry<Destination.Home> { screens.Home() }
+            entry<Destination.Home> {
+                WithEntryViewModels { screens.Home() }
+            }
         }
     )
 }
@@ -48,7 +68,7 @@ fun AppNavHost(
 fun rememberAppBackStack(): SnapshotStateList<NavKey> =
     remember { mutableStateListOf(Destination.Launch) }
 
-/** Launch is answered once; there is nothing to come back to. */
+/** Somewhere the user can't come back from: launch's answer, a finished form, a signed-in member. */
 private fun SnapshotStateList<NavKey>.startOver(destination: Destination) {
     clear()
     add(destination)

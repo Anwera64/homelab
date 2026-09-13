@@ -35,6 +35,10 @@ data class HearthSizes(
     val tileHero: Dp = 80.dp,
     /** A colour to pick on first run; a ring around it in the rest of the touch target marks the choice. */
     val swatch: Dp = 40.dp,
+    /** A face on "Who's here?". */
+    val avatarHero: Dp = 96.dp,
+    /** One of the six dots over the PIN pad. */
+    val pinDot: Dp = 16.dp,
     /** Borders and dividers. */
     val hairline: Dp = 1.dp,
     /** A field's error edge. */

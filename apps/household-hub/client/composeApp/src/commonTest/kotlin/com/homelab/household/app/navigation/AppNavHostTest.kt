@@ -72,6 +72,41 @@ class AppNavHostTest {
     }
 
     @Test
+    fun tapping_a_face_opens_that_members_pin_over_the_picker() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.PICK_EMMA).performClick()
+
+        onNodeWithText(StubScreens.pinOf(StubScreens.EMMA)).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn, Destination.Pin(StubScreens.EMMA)), backStack.toList())
+    }
+
+    @Test
+    fun back_from_the_pin_returns_to_the_picker() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.PICK_EMMA).performClick()
+        onNodeWithText(StubScreens.BACK).performClick()
+
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
+    }
+
+    @Test
+    fun the_right_pin_goes_home_and_leaves_sign_in_behind() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.PICK_EMMA).performClick()
+        onNodeWithText(StubScreens.SIGNED_IN).performClick()
+
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+        assertEquals(listOf(Destination.Home), backStack.toList())
+    }
+
+    @Test
     fun launch_sends_a_member_still_signed_in_straight_home() = runComposeUiTest {
         setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
 

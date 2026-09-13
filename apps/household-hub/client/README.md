@@ -27,23 +27,28 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
   * Token storage: `FileTokenStorage` (JVM) and `KeystoreTokenStorage` (Android, AES-256-GCM key in
     the Android Keystore, file in `noBackupFilesDir`, unreadable data reads as signed out).
 * **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
-  screen (`presentation/launch/`), each holding that screen's `ViewModel`, its `UiState` and its
-  `Event` — for example `LaunchViewModel` with `HubStatus`
-  (`Checking` / `Ready` / `FirstRun` / `Unreachable` / `Failed`).
+  screen (`presentation/launch/`, `firstrun/`, `profilepicker/`, `pinentry/`), each holding that
+  screen's `ViewModel`, its `UiState` and its `Event` — for example `LaunchViewModel` with
+  `HubStatus` (`Checking` / `Ready` / `FirstRun` / `Unreachable` / `Failed`).
 * **`:composeApp` (UI):** depends only on `:core:presentation` and `:core:domain`. Hearth theme
-  (Copenhagen Day / Midnight Espresso), 30 Hearth icons, shared components, the screens and the
-  Nav3 host. Never imports `data`, `di`, `sdk` or Ktor — enforced by a test.
+  (Copenhagen Day / Midnight Espresso), 31 Hearth icons (the sheet's 30 and the PIN pad's delete),
+  shared components, the screens and the Nav3 host. `ExternalApps` is the seam for handing the
+  user to another app (Tailscale, from the offline screen). Never imports `data`, `di`, `sdk` or
+  Ktor — enforced by a test.
 * **`:shared` (DI coordinator):** Koin graph, `platformModule` (`expect`/`actual`: HTTP engine and
   token storage per platform), `HouseholdHubSdk` entry point, and the architecture tests.
 * **`:androidApp`:** the Android application — `HouseholdHubApplication` (starts Koin with the
-  Android context), `MainActivity` (`setContent { App() }`), and the on-device tests.
+  Android context), `MainActivity` (`setContent { App(AndroidExternalApps(this)) }`), and the
+  on-device tests.
 
 ---
 
 ## 🧭 How a screen is built
 
-`App()` is the theme and nothing else; `AppNavHost` owns the back stack and is the only place that
-navigates. Space and size come off the theme like the palette does — `HearthTheme.spacing.lg`,
+`App()` is the theme and the platform's `ExternalApps`, and nothing else; `AppNavHost` owns the back
+stack and is the only place that navigates. It wraps every destination in `WithEntryViewModels`, so
+a screen's ViewModels go when it leaves the stack and a screen opened again starts fresh. Space
+and size come off the theme like the palette does — `HearthTheme.spacing.lg`,
 `HearthTheme.size.iconMd` — and a screen never writes a `dp` of its own; `DesignSystemTokenTest`
 fails the build if it does. Every screen follows the same four files:
 
@@ -71,13 +76,14 @@ language business.
 **One test file per screen**, in `composeApp/src/commonTest` so Android and iOS reuse it as they
 are added. `<Screen>Test` composes the screen inside `TestApp`, which starts the app's real Koin
 graph and overrides only the two seams `platformModule` binds — the HTTP engine and where tokens
-are kept. Everything between the screen and the network is the production wiring, so one test
+are kept — plus a counting `FakeExternalApps`. Everything between the screen and the network is
+the production wiring, so one test
 covers the drawing, the ViewModel, the use case, the repository and the error mapping at once.
 
 | Piece | Where | What it is |
 | :--- | :--- | :--- |
 | `TestApp`, `runScreenTest` | `app/testing/` | Shared, and screen-agnostic. `runScreenTest` installs a Main dispatcher and stops the global Koin context `KoinApplication` leaves behind — per composition, so one test can compose more than once. |
-| `Fake<Screen>Hub` | beside the screen's tests | A `MockEngine` speaking only the endpoints that screen calls, with a swappable answer so a test can change the hub's mind halfway through. Named for its screen; when a second screen needs a hub, lift the shared parts out then. |
+| `Fake<Screen>Hub` | beside the screen's tests | A `MockEngine` speaking only the endpoints that screen calls, with a swappable answer so a test can change the hub's mind halfway through. Named for its screen; a hub two screens share moves to `app/testing/` — `FakeSignInHub` serves both "Who's here?" and the PIN pad. |
 | `<Screen>Robot` | beside the screen's tests | Every string the screen shows, named once — as the **resource**, resolved with `getString`, never as a second copy of the text. Each assertion **waits** for its text: the hub answers on its own coroutine, so `waitForIdle` — which only waits for Compose — can run first. |
 
 Navigation is tested on its own: `AppNavHostTest` passes `StubScreens` to `AppNavHost` and reads

@@ -67,9 +67,15 @@ class HearthSpacingTest {
             "tile" to DefaultSizes.tile,
             "tileHero" to DefaultSizes.tileHero,
             "swatch" to DefaultSizes.swatch,
+            "avatarHero" to DefaultSizes.avatarHero,
             "readingWidth" to DefaultSizes.readingWidth,
             "progressTrack" to DefaultSizes.progressTrack
         ).forEach { (name, size) -> assertOnGrid(size, 8, "size $name") }
+    }
+
+    @Test
+    fun the_pin_dot_sits_on_the_four_dp_grid() {
+        assertOnGrid(DefaultSizes.pinDot, 4, "size pinDot")
     }
 
     @Test

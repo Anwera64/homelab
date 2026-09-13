@@ -4,11 +4,12 @@ import androidx.compose.runtime.Composable
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
-import com.homelab.household.app.resources.sign_in_detail
-import com.homelab.household.app.resources.sign_in_title
 import com.homelab.household.app.screens.firstrun.FirstRunScreen
 import com.homelab.household.app.screens.launch.LaunchScreen
+import com.homelab.household.app.screens.pinentry.PinEntryScreen
 import com.homelab.household.app.screens.placeholder.PlaceholderContent
+import com.homelab.household.app.screens.profilepicker.ProfilePickerScreen
+import com.homelab.household.domain.model.Member
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -21,7 +22,9 @@ import org.jetbrains.compose.resources.stringResource
 interface AppScreens {
     @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit, onSignedIn: () -> Unit)
 
-    @Composable fun SignIn()
+    @Composable fun SignIn(onMemberSelected: (Member) -> Unit)
+
+    @Composable fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit)
 
     @Composable fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit)
 
@@ -37,11 +40,13 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun SignIn() {
-        PlaceholderContent(
-            title = stringResource(Res.string.sign_in_title),
-            detail = stringResource(Res.string.sign_in_detail)
-        )
+    override fun SignIn(onMemberSelected: (Member) -> Unit) {
+        ProfilePickerScreen(onMemberSelected = onMemberSelected)
+    }
+
+    @Composable
+    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit) {
+        PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack)
     }
 
     @Composable

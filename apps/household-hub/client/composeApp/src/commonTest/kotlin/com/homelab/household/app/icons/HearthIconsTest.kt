@@ -27,7 +27,9 @@ class HearthIconsTest {
         // Hub status and feedback
         "hubOnline", "hubOffline", "synced", "warning", "error",
         // Profile and settings
-        "profile", "settings", "signOut", "chevronRight"
+        "profile", "settings", "signOut", "chevronRight",
+        // Sign in: the PIN pad's delete key, drawn on the PIN artboard rather than the sheet
+        "delete"
     )
 
     private val solidShapeCounts = mapOf(

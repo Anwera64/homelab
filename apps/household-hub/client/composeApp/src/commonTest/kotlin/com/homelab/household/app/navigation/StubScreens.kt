@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.homelab.household.domain.model.Member
 
 /**
  * Screens as black boxes: each destination says which one it is, and offers the ways out that
@@ -23,8 +24,20 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun SignIn() {
-        Text(SIGN_IN)
+    override fun SignIn(onMemberSelected: (Member) -> Unit) {
+        Column {
+            Text(SIGN_IN)
+            Text(PICK_EMMA, modifier = Modifier.clickable { onMemberSelected(EMMA) })
+        }
+    }
+
+    @Composable
+    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit) {
+        Column {
+            Text(pinOf(member))
+            Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
     }
 
     @Composable
@@ -51,5 +64,12 @@ class StubScreens : AppScreens {
         const val GO_HOME = "go home"
         const val CREATED = "household created"
         const val SIGN_IN_INSTEAD = "sign in instead"
+        const val PICK_EMMA = "pick emma"
+        const val SIGNED_IN = "signed in"
+        const val BACK = "back"
+
+        val EMMA = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
+
+        fun pinOf(member: Member) = "pin pad of ${member.name}"
     }
 }

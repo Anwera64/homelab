@@ -45,6 +45,39 @@
     <string name="first_run_sign_in_instead">Sign in instead</string>
     <string name="first_run_failed_unknown">The household couldn't be created. Try again.</string>
 
+    <!-- Who's here -->
+    <string name="picker_title">Who's here?</string>
+    <plurals name="picker_member_count">
+        <item quantity="one">HyggeHub · %1$d member</item>
+        <item quantity="other">HyggeHub · %1$d members</item>
+    </plurals>
+    <string name="picker_hint">Tap your profile to sign in</string>
+    <string name="picker_member_description">Sign in as %1$s</string>
+    <string name="picker_unreachable">Nothing answered at your hub, so there's nobody to show yet.</string>
+    <string name="picker_failed">The household couldn't be loaded.</string>
+    <string name="picker_retry">Try again</string>
+
+    <!-- PIN -->
+    <string name="pin_title">%1$s's PIN</string>
+    <string name="pin_back">Back</string>
+    <string name="pin_delete">Delete the last digit</string>
+    <plurals name="pin_entered">
+        <item quantity="one">%1$d of 6 digits entered</item>
+        <item quantity="other">%1$d of 6 digits entered</item>
+    </plurals>
+    <plurals name="pin_attempts_left">
+        <item quantity="one">%1$d attempt left before a 30-second wait</item>
+        <item quantity="other">%1$d attempts left before a 30-second wait</item>
+    </plurals>
+    <string name="pin_wrong">That PIN didn't match.</string>
+    <string name="pin_locked">Too many tries.</string>
+    <plurals name="pin_locked_countdown">
+        <item quantity="one">Try again in %1$d second.</item>
+        <item quantity="other">Try again in %1$d seconds.</item>
+    </plurals>
+    <string name="pin_unreachable">Nothing answered at your hub. Try your PIN again.</string>
+    <string name="pin_failed">Something went wrong. Try your PIN again.</string>
+
     <!-- Bottom navigation -->
     <string name="tab_household">Household</string>
     <string name="tab_schedule">Schedule</string>
@@ -53,8 +86,6 @@
     <string name="new_chat">New chat</string>
 
     <!-- Destinations a later slice still has to build -->
-    <string name="sign_in_title">Sign in</string>
-    <string name="sign_in_detail">The profile picker and PIN arrive in slice 1.</string>
     <string name="home_title">You're signed in</string>
     <string name="home_detail">The household arrives in slice 3.</string>
 

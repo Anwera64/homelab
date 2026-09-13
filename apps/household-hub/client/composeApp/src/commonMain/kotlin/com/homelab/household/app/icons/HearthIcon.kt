@@ -110,7 +110,16 @@ enum class HearthIcon(val token: String, private val shapes: List<IconShape>) {
             "M10.6 12h9M16.4 8.8 19.6 12l-3.2 3.2"
         )
     ),
-    ChevronRight("chevronRight", strokes("M9.6 5.6 16 12l-6.4 6.4"));
+    ChevronRight("chevronRight", strokes("M9.6 5.6 16 12l-6.4 6.4")),
+
+    // Sign in — drawn on the PIN artboard rather than the sheet
+    Delete(
+        "delete",
+        strokes(
+            "M20.4 5.6H9.2L3 12l6.2 6.4h11.2a1.6 1.6 0 0 0 1.6-1.6V7.2a1.6 1.6 0 0 0-1.6-1.6Z",
+            "m12.6 9.6 5 4.8M17.6 9.6l-5 4.8"
+        )
+    );
 
     private val restingVector: ImageVector by lazy { build(strokeWidth = 1.5f) }
     private val activeVector: ImageVector by lazy { build(strokeWidth = 1.85f) }

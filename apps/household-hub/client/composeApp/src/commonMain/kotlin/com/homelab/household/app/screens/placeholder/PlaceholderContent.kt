@@ -12,8 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.sign_in_detail
-import com.homelab.household.app.resources.sign_in_title
+import com.homelab.household.app.resources.home_detail
+import com.homelab.household.app.resources.home_title
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
@@ -56,8 +56,8 @@ fun PlaceholderContent(
 private fun PlaceholderContentPreview() {
     HearthTheme {
         PlaceholderContent(
-            title = stringResource(Res.string.sign_in_title),
-            detail = stringResource(Res.string.sign_in_detail)
+            title = stringResource(Res.string.home_title),
+            detail = stringResource(Res.string.home_detail)
         )
     }
 }
