@@ -8,6 +8,7 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/household-hub-client.yml');
 const SETUP_ACTION_PATH = path.join(ROOT_DIR, '.github/actions/setup-client/action.yml');
 const GRADLEW_PATH = 'apps/household-hub/client/gradlew';
+const GRADLE_PROPERTIES_PATH = path.join(ROOT_DIR, 'apps/household-hub/client/gradle.properties');
 
 // Missing files read as empty so each check fails with its own message instead of aborting the suite.
 function readIfExists(filePath) {
@@ -66,6 +67,36 @@ test('Household Hub client CI workflow', async (t) => {
     assert.ok(
       !/-x\s+:composeApp:jvmTest\b/.test(workflowContent),
       'Workflow must not exclude :composeApp:jvmTest'
+    );
+  });
+
+  await t.test('Jobs run compile -> JVM tests -> on-device tests, and the emulator reuses the build', () => {
+    const jobsBlock = topLevelBlock(workflowContent, 'jobs');
+    const compileJob = nestedBlock(jobsBlock, 'compile', 2);
+    const uiTestsJob = nestedBlock(jobsBlock, 'android-ui-tests', 2);
+    const needsOf = (job) => {
+      const match = job.match(/^\s+needs:\s*(?:\[([^\]]*)\]|([\w-]+))/m) || [];
+      return (match[1] ?? match[2] ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+    };
+    // Its own job, so a compile failure reads as one instead of hiding in a test log.
+    assert.ok(compileJob.includes(':androidApp:assembleDebug'), 'A separate compile job must run :androidApp:assembleDebug');
+    assert.ok(needsOf(nestedBlock(jobsBlock, 'jvm-tests', 2)).includes('compile'), 'jvm-tests must need compile');
+    assert.ok(needsOf(uiTestsJob).includes('jvm-tests'), 'android-ui-tests must need jvm-tests');
+    // The compile job hands its Gradle build cache to the emulator job, keyed on the commit.
+    assert.ok(
+      /uses:\s*actions\/cache\/save@[\s\S]*?key:[^\n]*github\.sha/.test(compileJob),
+      'compile must save the Gradle build cache keyed on github.sha'
+    );
+    assert.ok(
+      /uses:\s*actions\/cache\/restore@[\s\S]*?key:[^\n]*github\.sha/.test(uiTestsJob),
+      'android-ui-tests must restore the build cache compile saved'
+    );
+  });
+
+  await t.test('Gradle build cache is on', () => {
+    assert.ok(
+      /^org\.gradle\.caching=true\s*$/m.test(readIfExists(GRADLE_PROPERTIES_PATH)),
+      'apps/household-hub/client/gradle.properties must set org.gradle.caching=true'
     );
   });
 

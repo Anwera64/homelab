@@ -22,12 +22,12 @@ New workflow `.github/workflows/household-hub-client.yml`:
 - **Triggers:** `push` to `master`, `pull_request` to `master`, `workflow_dispatch`; path-filtered to `apps/household-hub/client/**`, the workflow and the shared setup action. `concurrency` cancels superseded pull-request runs.
 - **Public-repo hardening:** `permissions: contents: read`; third-party actions pinned to commit SHAs; `pull_request` only (never `pull_request_target`); Gradle cache written only from `master`; Gradle wrapper validated by `setup-gradle`.
 - **Shared setup** in a composite action, `.github/actions/setup-client` (Temurin 21 — the daemon JVM `gradle-daemon-jvm.properties` asks for — and `setup-gradle`), so a later macOS job reuses it unchanged.
-- **Jobs (Linux, in parallel):**
+- **Jobs (Linux), chained `compile` → `jvm-tests` → `android-ui-tests`** — each stage only runs once the previous one passed, and a compile failure shows up as its own job. `org.gradle.caching=true` is on; `compile` saves its Gradle build cache keyed on the commit and `android-ui-tests` restores it, so the emulator job doesn't recompile the APKs (setup-gradle alone only writes its cache from `master`).
 
 | Job | Runs |
 |---|---|
-| `jvm-tests` | `./gradlew jvmTest` — unit tests and the `commonTest` Compose screen tests |
 | `compile` | `:androidApp:assembleDebug`, `:androidApp:assembleDebugAndroidTest`, `:core:data:assembleAndroidDeviceTest` |
+| `jvm-tests` | `./gradlew jvmTest` — unit tests and the `commonTest` Compose screen tests |
 | `android-ui-tests` | `reactivecircus/android-emulator-runner` (KVM, API 36, `google_apis`, x86_64, cached AVD snapshot): `:androidApp:connectedDebugAndroidTest` and `:core:data:connectedAndroidDeviceTest` |
 
   Test reports are uploaded as artifacts on failure.
@@ -36,7 +36,7 @@ New workflow `.github/workflows/household-hub-client.yml`:
 
 ## 3. TDD cycles
 
-1. **Red** — `tests/ci-workflow.test.js`, in the style of `config-integrity.test.js`, asserts: the workflow exists and is path-filtered to the client; it runs `jvmTest` (never excluding `:composeApp:jvmTest`), the Android assemble and both connected-test tasks; permissions are read-only; every third-party `uses:` is pinned to a 40-character SHA; the workflow uses the shared setup action; `gradlew` is executable in the git index. `node --test` fails.
+1. **Red** — `tests/ci-workflow.test.js`, in the style of `config-integrity.test.js`, asserts: the workflow exists and is path-filtered to the client; it runs `jvmTest` (never excluding `:composeApp:jvmTest`), the Android assemble and both connected-test tasks; jobs chain `compile` → `jvm-tests` → `android-ui-tests` with the build cache handed from `compile` to the emulator job; `org.gradle.caching=true` is set; permissions are read-only; every third-party `uses:` is pinned to a 40-character SHA; the workflow uses the shared setup action; `gradlew` is executable in the git index. `node --test` fails.
 2. **Green** — `git update-index --chmod=+x apps/household-hub/client/gradlew`, the setup action and the workflow. `node --test` passes; `actionlint` is clean.
 3. **Refactor** — tidy the workflow; open the pull request and iterate on real runs until every job is green, then re-run to confirm it is stable.
 
