@@ -29,8 +29,8 @@ defaults:
     working-directory: apps/household-hub/client
 
 jobs:
-  unit-tests:
-    name: Unit tests (JVM)
+  jvm-tests:
+    name: Unit and Compose UI tests (JVM)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,16 +38,16 @@ jobs:
 
       - uses: ./.github/actions/setup-client
 
-      # The app ships on Android and iOS only; the JVM target exists for tests, so the
-      # desktop Compose UI tests are skipped. :shared:jvmTest keeps the architecture guards.
-      - name: Run unit tests
-        run: ./gradlew jvmTest -x :composeApp:jvmTest --continue
+      # The JVM target is only a test host: :composeApp:jvmTest is where the commonTest
+      # screen tests run, and :shared:jvmTest holds the architecture guards.
+      - name: Run tests
+        run: ./gradlew jvmTest --continue
 
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: unit-test-reports
+          name: jvm-test-reports
           path: apps/household-hub/client/**/build/reports/
 
   compile:

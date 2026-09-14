@@ -62,10 +62,10 @@ test('Household Hub client CI workflow', async (t) => {
         `Workflow must run ./gradlew ${task}`
       );
     }
-    // The app ships on Android and iOS only; its JVM target exists for tests, so desktop Compose UI tests stay out of CI.
+    // :composeApp:jvmTest is how the commonTest screen tests run; skipping it drops them from CI.
     assert.ok(
-      /\.\/gradlew\b[^\n]*\sjvmTest\b[^\n]*\s-x\s+:composeApp:jvmTest(\s|$)/m.test(workflowContent),
-      'Workflow must run jvmTest with -x :composeApp:jvmTest'
+      !/-x\s+:composeApp:jvmTest\b/.test(workflowContent),
+      'Workflow must not exclude :composeApp:jvmTest'
     );
   });
 

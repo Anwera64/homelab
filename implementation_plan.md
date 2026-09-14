@@ -11,9 +11,9 @@ The repo is public and its only workflow, `.github/workflows/test.yml`, runs `no
 - The on-device tests (`:androidApp` launch smoke, splash theme, SSE streaming; `:core:data` Keystore storage) only run against a local emulator or phone.
 - `gradlew` is committed as `100644`, so it cannot execute on a Linux runner.
 
-**Scope:** the app targets Android and iOS. The desktop (JVM) Compose UI tests in `:composeApp` are **not** run in CI; the JVM target is used only to run the unit tests.
+**Scope:** the app targets Android and iOS. The JVM target is only a test host — `commonTest` runs once per target that has tests, and `:composeApp`'s only such target is `jvm`, so `:composeApp:jvmTest` is where the common screen tests run. CI runs all of `jvmTest`.
 
-**Done when:** a pull request touching the client runs the unit tests, compiles the Android app and its test APKs, and runs the on-device tests on an emulator — all green, repeatably.
+**Done when:** a pull request touching the client runs the unit and `commonTest` screen tests, compiles the Android app and its test APKs, and runs the on-device tests on an emulator — all green, repeatably.
 
 ## 2. Design
 
@@ -26,7 +26,7 @@ New workflow `.github/workflows/household-hub-client.yml`:
 
 | Job | Runs |
 |---|---|
-| `unit-tests` | `./gradlew jvmTest -x :composeApp:jvmTest` |
+| `jvm-tests` | `./gradlew jvmTest` — unit tests and the `commonTest` Compose screen tests |
 | `compile` | `:androidApp:assembleDebug`, `:androidApp:assembleDebugAndroidTest`, `:core:data:assembleAndroidDeviceTest` |
 | `android-ui-tests` | `reactivecircus/android-emulator-runner` (KVM, API 36, `google_apis`, x86_64, cached AVD snapshot): `:androidApp:connectedDebugAndroidTest` and `:core:data:connectedAndroidDeviceTest` |
 
@@ -36,7 +36,7 @@ New workflow `.github/workflows/household-hub-client.yml`:
 
 ## 3. TDD cycles
 
-1. **Red** — `tests/ci-workflow.test.js`, in the style of `config-integrity.test.js`, asserts: the workflow exists and is path-filtered to the client; it runs `jvmTest` without `:composeApp:jvmTest`, the Android assemble and both connected-test tasks; permissions are read-only; every third-party `uses:` is pinned to a 40-character SHA; the workflow uses the shared setup action; `gradlew` is executable in the git index. `node --test` fails.
+1. **Red** — `tests/ci-workflow.test.js`, in the style of `config-integrity.test.js`, asserts: the workflow exists and is path-filtered to the client; it runs `jvmTest` (never excluding `:composeApp:jvmTest`), the Android assemble and both connected-test tasks; permissions are read-only; every third-party `uses:` is pinned to a 40-character SHA; the workflow uses the shared setup action; `gradlew` is executable in the git index. `node --test` fails.
 2. **Green** — `git update-index --chmod=+x apps/household-hub/client/gradlew`, the setup action and the workflow. `node --test` passes; `actionlint` is clean.
 3. **Refactor** — tidy the workflow; open the pull request and iterate on real runs until every job is green, then re-run to confirm it is stable.
 
@@ -48,6 +48,8 @@ New workflow `.github/workflows/household-hub-client.yml`:
 - The pull request's own runs: all three jobs green, and green again on a re-run.
 
 ## 5. Risks
+
+- The Compose screen tests draw off-screen through Skiko on the JVM; if Linux runners need a display for that → `xvfb-run` fallback.
 
 - Emulator jobs are slow (~10–15 min) and can flake → AVD snapshot cache; one retry at most, never masking a real failure.
 - The API 36 `google_apis` x86_64 image availability is confirmed only by a third-party mirror → fall back to API 35 if the image can't be installed.
