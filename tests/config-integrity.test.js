@@ -10,6 +10,7 @@ const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
 const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
+const SEARXNG_SETTINGS_PATH = path.join(ROOT_DIR, 'config/searxng/settings.yml');
 
 test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const caddyfileContent = fs.readFileSync(CADDYFILE_PATH, 'utf8');
@@ -17,6 +18,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const servicesYamlContent = fs.readFileSync(SERVICES_YAML_PATH, 'utf8');
   const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
+  const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
 
   await t.test('Caddyfile contains DuckDNS wildcard TLS block with dns duckdns plugin', () => {
     assert.ok(
@@ -147,6 +149,22 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const recyclarrEnv = recyclarrMatch[1];
     assert.ok(recyclarrEnv.includes('SONARR_API_KEY'), 'Recyclarr service must receive SONARR_API_KEY');
     assert.ok(recyclarrEnv.includes('RADARR_API_KEY'), 'Recyclarr service must receive RADARR_API_KEY');
+  });
+
+  await t.test('SearXNG settings.yml does not commit a secret_key', () => {
+    assert.ok(
+      !/^\s*secret_key\s*:/m.test(searxngSettingsContent),
+      'config/searxng/settings.yml must not contain secret_key; it is injected via SEARXNG_SECRET'
+    );
+  });
+
+  await t.test('SearXNG service receives SEARXNG_SECRET in docker-compose.yml', () => {
+    const searxngMatch = dockerComposeContent.match(/container_name:\s*searxng[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|$)/);
+    assert.ok(searxngMatch, 'docker-compose.yml must contain a searxng service with environment section');
+    assert.ok(
+      searxngMatch[1].includes('SEARXNG_SECRET=${SEARXNG_SECRET}'),
+      'SearXNG service must receive SEARXNG_SECRET=${SEARXNG_SECRET}'
+    );
   });
 
   await t.test('qBittorrent service enforces healthy Gluetun dependency in docker-compose.yml', () => {

@@ -11,7 +11,7 @@ general:
 server:
   port: 8080
   bind_address: "0.0.0.0"
-  secret_key: "3575471c0360b753489e38d1b3f21a52db795ad1a3e386c50d96477934dd74cb"
+  # secret_key is injected via SEARXNG_SECRET (.env)
   limiter: false # Crucial: internal Docker queries from Perplexica & Open WebUI must not be rate limited
   image_proxy: true
 

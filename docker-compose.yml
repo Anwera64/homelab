@@ -390,6 +390,7 @@ services:
     container_name: searxng
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
     volumes:
       - ${CONFIG_PATH}/searxng:/etc/searxng:ro
     labels:
