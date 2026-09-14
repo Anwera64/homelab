@@ -181,6 +181,33 @@ class ChatSessionViewModelTest {
         assertEquals(com.homelab.household.domain.model.MessageStatus.SENT, userMessages[1].status)
     }
 
+    /**
+     * The ids only have to be unique, and "unique" cannot mean "the clock happened to tick between
+     * two sends". Sending a burst is how that difference shows: a clock-derived id collides here on
+     * a platform whose monotonic clock is coarser than the gap between two statements.
+     */
+    @Test
+    fun a_burst_of_sends_gives_every_message_its_own_id() = runTest(testDispatcher) {
+        val session = ConversationSession(id = "s-1", userId = "u-1")
+        everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+        viewModel.loadSession("s-1")
+        advanceUntilIdle()
+
+        every { streamChatTurnUseCase("s-1", any(), false) } returns flow {
+            emit(ChatStreamEvent.Done(messageId = "m-done", assistantContent = "Hi back", agentName = "Assistant"))
+        }
+
+        val sends = 50
+        repeat(sends) { viewModel.sendMessage("Message $it") }
+        advanceUntilIdle()
+
+        val ids = viewModel.uiState.value.messages
+            .filter { it.role == MessageRole.USER }
+            .map { it.id }
+        assertEquals(sends, ids.size)
+        assertEquals(sends, ids.toSet().size, "every send needs its own id; got ${sends - ids.toSet().size} collisions")
+    }
+
     @Test
     fun send_message_on_offline_failure_updates_user_message_status_to_failed_offline() = runTest(testDispatcher) {
         val session = ConversationSession(id = "s-1", userId = "u-1")
