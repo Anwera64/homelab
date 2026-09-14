@@ -1,0 +1,150 @@
+name: Household Hub client
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - apps/household-hub/client/**
+      - .github/workflows/household-hub-client.yml
+      - .github/actions/setup-client/**
+  # Plain pull_request on a public repo: fork code gets a read-only token and no secrets.
+  pull_request:
+    branches: [master]
+    paths:
+      - apps/household-hub/client/**
+      - .github/workflows/household-hub-client.yml
+      - .github/actions/setup-client/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded PR pushes are noise; every master run is kept.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: apps/household-hub/client
+
+# compile -> jvm-tests -> android-ui-tests: each stage only runs once the one before it passed.
+jobs:
+  compile:
+    name: Compile Android app and test APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      - name: Assemble
+        run: ./gradlew :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest :core:data:assembleAndroidDeviceTest
+
+      # setup-gradle only writes its cache from master, so hand this commit's build outputs to
+      # android-ui-tests directly; otherwise it recompiles the same APKs on pull requests.
+      - name: Save build cache for on-device tests
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.sha }}-${{ github.run_attempt }}
+
+      - name: Upload build reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compile-reports
+          path: apps/household-hub/client/**/build/reports/
+
+  jvm-tests:
+    name: Unit and Compose UI tests (JVM)
+    needs: compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      # The JVM target is only a test host: :composeApp:jvmTest is where the commonTest
+      # screen tests run, and :shared:jvmTest holds the architecture guards.
+      - name: Run tests
+        run: ./gradlew jvmTest --continue
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jvm-test-reports
+          path: apps/household-hub/client/**/build/reports/
+
+  android-ui-tests:
+    name: On-device tests (emulator, API 36)
+    # The emulator is the slow part; it only boots for a commit that builds and passes its JVM tests.
+    needs: jvm-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      - name: Restore build cache from compile
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.sha }}-${{ github.run_attempt }}
+          restore-keys: gradle-build-cache-${{ github.sha }}-
+
+      # Hardware acceleration; without it the x86_64 emulator is unusably slow.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Compile before the emulator boots so it doesn't idle through the build.
+      - name: Build app and test APKs
+        run: ./gradlew :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest :core:data:assembleAndroidDeviceTest
+
+      - name: Cache AVD
+        id: avd-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-36-google_apis-x86_64
+
+      # API 36 ships no "default" system image, only google_apis variants.
+      - name: Create AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Run on-device tests
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: apps/household-hub/client
+          script: ./gradlew :androidApp:connectedDebugAndroidTest :core:data:connectedAndroidDeviceTest --continue
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-ui-test-reports
+          path: apps/household-hub/client/**/build/reports/
