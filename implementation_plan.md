@@ -85,6 +85,29 @@ exception — app roots are not in its map, by the same rule that already exempt
 
 ## 5. TDD cycles
 
+**Outcome (13 September 2026).** All cycles landed. What the plan got wrong, recorded honestly:
+
+| Cycle | Commit | What actually happened |
+| :--- | :--- | :--- |
+| 0 Baseline | — | 151 tests green on the Mac |
+| 1 Use-case protocols | `cf351ed` | 8 of 36 had to stay plain interfaces — Kotlin forbids a default parameter value on a `fun interface`'s abstract method |
+| 2 Test port | `a632a9e` | Mokkery spells the count modes `VerifyMode.exactly(n)`, not the top-level `exactly(n)` of 2.x |
+| 3 iOS targets | `7481826` | `:composeApp`'s **tests** could not be part of this cycle — they depend on `:shared`, which had no iOS targets until cycle 5 |
+| 4 Keychain | `7224222` | A Kotlin/Native test binary cannot reach the Keychain at all (`errSecNotAvailable`) — proof deferred to cycle 7 |
+| 4b SSE dispatcher bug | `c50587e` | **Not in the plan.** A production defect that only iOS exposed |
+| 5 iOS `platformModule` | `6c0341c` | Went as written |
+| 6 Darwin SSE proof | `9d15ac6` | Tests belong in `:shared`, not `:core:data` — only there can they resolve the *real* engine from the production graph |
+| 7 `:iosApp` | `cd59332` | The deferred Keychain proof worked after all, as an XCTest hosted by the app bundle |
+| 8 UI tests on iOS | — | Free. 64 tests ran on the simulator with **no changes**; the Compose-resources risk did not materialise |
+| 9 Guards and docs | — | |
+
+Two things the plan asserted that turned out to be wrong, beyond the table: the new `usecase.impl`
+boundary rule could not fail before the refactor (it passes vacuously when the package does not
+exist), so it was proven by mutation instead; and cycle 7's Keychain XCUITest was specified as
+"sign in, relaunch, still signed in" without noticing that sign-in is slice 1 — an XCTest against
+the storage directly was the way through.
+
+
 Every cycle ends with `./gradlew jvmTest` green and — from cycle 3 on — the iOS compilation green.
 Android must stay green throughout: `./gradlew :androidApp:assembleDebug` at the end of each cycle
 that touches a shared file.
@@ -401,6 +424,15 @@ light and dark, tokens surviving a relaunch.
    `commonTest` is ported. Say if you want those moved too, for one framework across the repo.
 
 ## 10. Follow-ups (explicitly not in this slice)
+
+**The 409 path holds an HTTP response open while it polls** — deferred to slice 3 (Chatting), by
+decision. `SessionRepositoryImpl.streamChatTurn` collects `pollUntilFinished` *inside*
+`statement.execute { }`, so on a 409 the conflict response and its connection stay allocated for the
+whole recovery — up to the 60 s `maxWaitMs` budget — pinning a socket for no reason. The fix is a
+small restructure: record a flag inside `execute`, leave the block so the response is released, then
+poll outside it. Found by an independent review during slice 0's iOS work; not a correctness bug, so
+it waits for the slice that owns this code.
+
 
 Real-device run: an Apple developer account (or free provisioning's 7-day limit),
 `NSLocalNetworkUsageDescription` in `Info.plist` for the hub's `192.168.1.20` address on home Wi-Fi and

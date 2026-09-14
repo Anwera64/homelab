@@ -66,6 +66,13 @@ class CleanArchitectureBoundaryTest {
         )
     }
 
+    /**
+     * `java.`/`javax.` compile happily on the JVM and only break when someone finally builds for
+     * iOS, which is what makes a fast JVM-side rule worth having. `platform.` (the Kotlin/Native
+     * Apple frameworks) is the opposite: it does not resolve on the JVM at all, so the compiler
+     * rejects it here before this test can. It is listed anyway to state the intent in one place —
+     * but do not try to prove it by adding such an import, because the build fails first.
+     */
     @Test
     fun common_main_has_no_platform_imports() {
         val violations = commonMainDirs.flatMap {
@@ -75,6 +82,7 @@ class CleanArchitectureBoundaryTest {
                     "java.",
                     "javax.",
                     "android.",
+                    "platform.",
                     "io.ktor.client.engine.cio",
                     "io.ktor.client.engine.okhttp",
                     "io.ktor.client.engine.darwin"

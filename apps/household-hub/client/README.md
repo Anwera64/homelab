@@ -3,16 +3,18 @@
 Shared Kotlin Multiplatform (KMP) client for **Household Hub**: domain logic, Ktor networking,
 reactive ViewModels, dependency injection, and the Compose Multiplatform phone UI.
 
-Targets today: **JVM** (tests) and **Android**. iOS targets are added when the Mac is picked up —
-`commonMain` is kept free of JVM- and Android-only APIs, and a test enforces it.
+Targets: **JVM** (tests), **Android**, and **iOS** (`iosArm64`, `iosSimulatorArm64`). `commonMain`
+stays free of platform-only APIs, and a test enforces it.
 
 ---
 
 ## 🏗️ Architecture (`presentation -> domain <- data`)
 
 ```
-:androidApp ──► :composeApp (UI) ──► :core:presentation ──► :core:domain ◄── :core:data
-     │                                                                          ▲
+:androidApp ─┐
+             ├─► :composeApp (UI) ──► :core:presentation ──► :core:domain ◄── :core:data
+:iosApp ─────┘                                                                  ▲
+     │                                                                          │
      └────────► :shared (DI coordinator) ───────────────────────────────────────┘
 ```
 
@@ -24,8 +26,13 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
   * `ServerHealthMonitor`, `NetworkExceptionHelper` (`rethrowAsDomain` maps network failures to
     `ServerOfflineException`), repositories and mappers.
   * `HubConfig` — the one hub address, injected; no repository defaults it any more.
-  * Token storage: `FileTokenStorage` (JVM) and `KeystoreTokenStorage` (Android, AES-256-GCM key in
-    the Android Keystore, file in `noBackupFilesDir`, unreadable data reads as signed out).
+  * Token storage, one per platform, all with the same semantics — a `null` refresh token leaves the
+    stored one alone, anything unreadable reads as signed out, and nothing throws out of the four
+    methods: `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android, AES-256-GCM key in the
+    Android Keystore, file in `noBackupFilesDir`) and `KeychainTokenStorage` (iOS, a generic-password
+    item marked `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it never syncs to iCloud or
+    restores onto another device — the Apple equivalent of `noBackupFilesDir`. It keeps no cache;
+    only the read-modify-write in `saveTokens` needs the `NSLock`).
 * **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
   screen (`presentation/launch/`, `firstrun/`, `profilepicker/`, `pinentry/`), each holding that
   screen's `ViewModel`, its `UiState` and its `Event` — for example `LaunchViewModel` with
@@ -41,6 +48,18 @@ Targets today: **JVM** (tests) and **Android**. iOS targets are added when the M
   Android context), `MainActivity` (`installSplashScreen()`, then
   `setContent { App(AndroidExternalApps(this)) }`), the system splash (`Theme.HyggeHub.Starting`:
   the launch tile, `drawable/splash_tile`, on the canvas, day and night), and the on-device tests.
+* **`:iosApp`:** the iOS application, mirroring `:androidApp` — the only iOS-side module allowed to
+  depend on both `:composeApp` and `:shared`, so `MainViewController` (`ComposeUIViewController { App() }`)
+  can start Koin without `:composeApp` ever importing `sdk` or `di`. It produces the
+  `HouseholdHubKit` framework, and holds the Swift app and the Keychain XCTest.
+
+**Use cases are protocols.** `usecase/<Name>UseCase.kt` is the interface, `usecase/impl/<Name>UseCaseImpl.kt`
+the implementation, and `DomainModule` is the only place an implementation is ever named —
+`use_case_implementations_are_named_only_by_the_di_module` enforces that. It is what makes a
+ViewModel's collaborators mockable at all: a final class cannot be mocked by any library that builds
+its mocks at compile time, which every Native-capable one does. 8 of the 36 are plain `interface`
+rather than `fun interface`, because Kotlin forbids a default parameter value on a functional
+interface's abstract method.
 
 ---
 
@@ -102,9 +121,12 @@ test — that is the point, and it means copy is not what these tests are about.
 the wiring, so prove a change by mutating that instead: swap two resource keys, or render the
 wrong one, and the tests should fail.
 
-No MockK in `:composeApp` — only JVM artifacts exist, and one mock in `commonTest` would nail the
-UI suite to the JVM. `InMemoryTokenStorage` and hand-written fakes do the job and compile for
-iOS. MockK stays in the `:core:presentation` ViewModel tests.
+These tests run on **both** the JVM and the iOS simulator — the same 64, name for name — which is
+why `commonTest` holds no JVM-only library. The core modules mock with **Mokkery**, a compiler
+plugin rather than a bytecode rewriter, which is why it works on Native; MockK is gone from the
+client entirely. `:composeApp` still uses no mocking library at all, but the reason has changed:
+not that a mock would nail the suite to the JVM, but that `MockEngine` plus hand-written fakes is
+simply the better test for a screen wired to the real graph.
 
 ---
 
@@ -117,10 +139,13 @@ iOS. MockK stays in the `:core:presentation` ViewModel tests.
 | Navigation 3 | 1.1.1 |
 | AGP | 9.4.0 (needs Gradle ≥ 9.6) |
 | Gradle | 9.7.1 |
-| Ktor | 3.5.2 (OkHttp on Android, CIO on the JVM) |
+| Ktor | 3.5.2 (OkHttp on Android, CIO on the JVM, Darwin on iOS) |
 | Koin | 4.2.2 |
 | Lifecycle | 2.11.0 |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 26 |
+| iOS deployment target | 15.0 (the simulator SDK's own `RecommendedDeploymentTarget`) |
+| Xcode / XcodeGen | 26.6 / 2.46.0 |
+| Mocking | Mokkery 3.5.0 (compiler plugin; works on Native) |
 
 `compileSdk 37` is required by Material3 `1.5.0-alpha22`, which CMP 1.12.0 depends on.
 
@@ -137,6 +162,11 @@ cd apps\household-hub\client
 # Architecture and DI guards on their own (also run by the pre-commit hook)
 .\gradlew.bat :shared:jvmTest --tests "*CleanArchitectureBoundaryTest*" --tests "*KoinDependencyGraphTest*"
 
+# The same JVM tests with Ktor's dispatcher switch forced on, reproducing Native's semantics in
+# seconds. Emitting inside `statement.execute { }` silently dropped every SSE event on iOS; Ktor 4
+# makes that switch the default everywhere, so this is how Android stays fixed too.
+.\gradlew.bat :core:data:jvmEngineDispatcherTest
+
 # On-device tests (needs a running emulator or a phone)
 .\gradlew.bat :core:data:connectedAndroidTest      # Keystore token storage
 .\gradlew.bat :androidApp:connectedDebugAndroidTest # launch smoke test + SSE streaming proof
@@ -147,11 +177,25 @@ cd apps\household-hub\client
 # which Gradle starts and stops around these tasks on the fixed port 8749)
 cd apps/household-hub/client
 
+./gradlew iosSimulatorArm64Test           # everything on the simulator: core, shared, and the
+                                          # 64 Compose UI tests, which run here as well as on the JVM
 ./gradlew :shared:iosSimulatorArm64Test   # ~10s, includes the Darwin SSE lock-step proof
 
 # SLOW, >75s: the only thing guarding timeoutIntervalForRequest in PlatformModule.ios.kt.
 # Opt-in — `check` and `build` skip it, it runs only when named.
 ./gradlew :shared:iosSimulatorArm64SlowSseLongPauseTest
+```
+
+The Keychain is the one thing Gradle cannot test. A bare Kotlin/Native test binary is spawned
+outside the simulator's daemon environment, so every `SecItem*` call returns `errSecNotAvailable`
+(-25291). `KeychainTokenStorage` is covered instead by an XCTest bundle **hosted by the app**,
+which does have the entitlements — run it from Xcode, or:
+
+```bash
+cd apps/household-hub/client/iosApp
+xcodegen generate
+xcodebuild test -project HouseholdHub.xcodeproj -scheme HouseholdHub \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
 The two iOS SSE proofs drive the real `Flow<ChatStreamEvent>` the app collects — the Koin Darwin
@@ -162,7 +206,9 @@ deadlocks rather than passing by luck. `DarwinSseLongPauseTest` outlasts NSURLSe
 default `timeoutIntervalForRequest`, which is why it cannot be made cheap.
 
 The architecture tests enforce: domain has no outward dependencies; presentation never imports data;
-data never imports presentation; `commonMain` has no `java.`/`javax.`/`android.`/engine imports; the
+data never imports presentation; `commonMain` has no `java.`/`javax.`/`android.`/`platform.`/engine
+imports (though for `platform.` the compiler rejects it first — the rule is there to state intent); no
+module outside `:core:domain` names a use-case implementation; the
 UI module imports only presentation and domain; and every module's **production** Gradle
 dependencies point inward. Test source sets are exempt from that last one — the full-stack UI
 tests in `:composeApp` wire the real graph from `:shared`, while `composeApp/commonMain` still
@@ -181,6 +227,24 @@ assertion is free to name a real number.
 adb shell am start -n com.homelab.household/.MainActivity
 ```
 
+On iOS, generate the Xcode project first — `project.yml` is the source of truth, and both the
+`.xcodeproj` and the `Info.plist` it writes are generated and git-ignored:
+
+```bash
+cd apps/household-hub/client/iosApp
+xcodegen generate
+open HouseholdHub.xcodeproj   # then run on an iPhone simulator
+```
+
+Three things that wiring needs, none of which produce a useful error if missing:
+
+* **`CADisableMinimumFrameDurationOnPhone`** in the plist — Compose Multiplatform 1.12 throws from
+  `PlistSanityCheck` before drawing its first frame without it.
+* **The plist is written explicitly** by `project.yml`, because Xcode silently drops
+  `INFOPLIST_KEY_*` settings it does not recognise, and that key is one of them.
+* **`ENABLE_USER_SCRIPT_SANDBOXING: NO`** — on by default since Xcode 15, and it denies Gradle every
+  write outside DerivedData, so the framework build phase fails.
+
 ---
 
 ## 🌐 Network ingress
@@ -193,3 +257,8 @@ adb shell am start -n com.homelab.household/.MainActivity
   home, Tailscale MagicDNS and DuckDNS provide encrypted remote access.
 * The Android engine runs with **no read or call timeout**: a long answer pauses between tokens, and
   OkHttp's 10-second default would cut the stream. An on-device test holds that line.
+* The iOS engine needs the same fix in Apple's terms: NSURLSession's default
+  `timeoutIntervalForRequest` is 60 seconds and measures the gap *between bytes*, so it would cut a
+  pausing answer just the same. `PlatformModule.ios.kt` sets it to 3600 s, and
+  `timeoutIntervalForResource` to 86400 s. Unlike OkHttp, `0` does **not** mean "no timeout" there —
+  hence large finite values. `DarwinSseLongPauseTest` holds that line.
