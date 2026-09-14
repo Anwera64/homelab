@@ -1,0 +1,17 @@
+# Shared by every Household Hub client job, including the future macOS/iOS one,
+# so the JDK and Gradle setup cannot drift between platforms.
+name: Set up Household Hub client build
+description: JDK 21 (the daemon JVM gradle-daemon-jvm.properties asks for) and Gradle with caching.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 21
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      with:
+        distribution: temurin
+        java-version: 21
+
+    # Validates the wrapper checksum and only writes the cache from the default branch.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
