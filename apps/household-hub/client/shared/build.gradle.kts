@@ -16,6 +16,29 @@ kotlin {
     jvm {
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
+
+            // The architecture guards in jvmTest read files straight off disk rather than through
+            // the classpath — BrandAssetParityTest compares the brand artwork across Android
+            // resources, the iOS asset catalog, project.yml and the icon's SVG source, and
+            // DesignSystemTokenTest walks the UI sources. Gradle cannot infer any of that, so
+            // without these declarations the task stays "up to date" after the artwork changes and
+            // reports a stale green.
+            //
+            // That is the one failure a drift guard must not have, and it is not hypothetical: the
+            // pre-commit hook runs these tests by name, so a developer could edit an SVG and commit
+            // it on a cached pass. Caught by mutating hearth_app_icon.svg and watching the task
+            // skip in 557ms.
+            inputs.files(
+                rootProject.layout.projectDirectory.file("iosApp/project.yml"),
+                rootProject.layout.projectDirectory.file("tools/hearth_app_icon.svg")
+            ).withPathSensitivity(PathSensitivity.RELATIVE)
+                .withPropertyName("brandAssetSources")
+            inputs.dir(rootProject.layout.projectDirectory.dir("iosApp/HouseholdHub/Assets.xcassets"))
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+                .withPropertyName("iosAssetCatalog")
+            inputs.dir(rootProject.layout.projectDirectory.dir("androidApp/src/main/res"))
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+                .withPropertyName("androidResources")
         }
     }
 
