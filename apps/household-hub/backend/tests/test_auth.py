@@ -1,10 +1,11 @@
 import asyncio
 import pytest
 import httpx
+import jwt
 from unittest.mock import patch
 from app.core.security import verify_password
 
-from tests.auth_helpers import ADMIN_PIN, MEMBER_PIN, add_member, deactivate, register_admin, sign_in
+from tests.auth_helpers import ADMIN_PIN, MEMBER_PIN, add_member, bump_token_version, deactivate, register_admin, sign_in
 
 WRONG_PIN = "000000"
 
@@ -187,6 +188,24 @@ async def test_get_me_with_bearer_token(client: httpx.AsyncClient):
     assert resp.status_code == 200
     assert resp.json()["full_name"] == "Emma"
     assert resp.json()["personal_space_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a_token_carries_the_members_token_version(client: httpx.AsyncClient):
+    token, _ = await register_admin(client)
+
+    assert jwt.decode(token, options={"verify_signature": False})["ver"] == 0
+
+
+@pytest.mark.asyncio
+async def test_bumping_the_version_signs_out_existing_tokens(client: httpx.AsyncClient):
+    """The JWT can't be revoked as issued, so a newer version on the member refuses the old one."""
+    token, user_id = await register_admin(client)
+
+    await bump_token_version(user_id)
+
+    resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio

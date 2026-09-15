@@ -23,6 +23,7 @@ class UserModel(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     failed_pin_attempts = Column(Integer, default=0, nullable=False)
     pin_locked_until = Column(DateTime(timezone=True), nullable=True)
+    token_version = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 

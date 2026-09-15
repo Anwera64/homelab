@@ -63,6 +63,16 @@ async def add_signed_in_member(
     return await sign_in(client, member_id, pin), member_id
 
 
+async def bump_token_version(user_id: str) -> None:
+    """What changing a PIN or removing a member does to the tokens already out there."""
+    async with TestingSessionLocal() as session:
+        repo = _user_repo(session)
+        user = await repo.get_by_id(user_id)
+        user.token_version += 1
+        await repo.update(user)
+        await session.commit()
+
+
 async def deactivate(user_id: str) -> None:
     async with TestingSessionLocal() as session:
         repo = _user_repo(session)

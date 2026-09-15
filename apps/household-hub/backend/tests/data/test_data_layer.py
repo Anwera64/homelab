@@ -74,7 +74,8 @@ def test_security_hasher_and_token_service():
     assert hasher.verify("wrongpassword", hashed) is False
 
     token_svc = JwtTokenService(secret_key="a-very-long-secret-key-for-jwt-testing-32chars", algorithm="HS256")
-    token = token_svc.create_access_token(subject="user-123", is_admin=True)
+    token = token_svc.create_access_token(subject="user-123", is_admin=True, token_version=3)
     decoded = token_svc.decode_token(token)
     assert decoded["sub"] == "user-123"
     assert decoded["is_admin"] is True
+    assert decoded["ver"] == 3

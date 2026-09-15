@@ -40,6 +40,7 @@ class UserRepositoryImpl(IUserRepository):
             model.is_active = user.is_active
             model.failed_pin_attempts = user.failed_pin_attempts
             model.pin_locked_until = user.pin_locked_until
+            model.token_version = user.token_version
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
         else:
