@@ -4,6 +4,9 @@
     160dp circle is guaranteed to show, so the tile sits well inside it: an 80dp rounded square
     (24dp corners) in the Hearth primary, holding the 40dp household glyph in onPrimary.
     The glyph is drawn in its own 24-unit space and scaled up, so its 1.5 stroke scales with it.
+    The household glyph is a hand-copied version of HearthIcon.Household, drawn again in the
+    launcher icon and in the iOS launch tile SVGs. Change one and the others need the same change;
+    nothing checks that for you.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="240dp"
