@@ -19,17 +19,39 @@ import kotlin.test.assertEquals
 class AppNavHostTest {
 
     private val backStack = mutableStateListOf<NavKey>(Destination.Launch)
+    private val session = StubSession()
+
+    @Test
+    fun a_phone_the_hub_signs_out_starts_over_at_who_is_here() = runComposeUiTest {
+        backStack[0] = Destination.Home
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+
+        session.hubSignsThisPhoneOut()
+
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
+    }
+
+    @Test
+    fun the_session_is_renewed_once_when_the_app_opens() = runComposeUiTest {
+        backStack[0] = Destination.Home
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        waitForIdle()
+        assertEquals(1, session.renewals)
+    }
 
     @Test
     fun it_starts_on_launch() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.LAUNCH).assertIsDisplayed()
     }
 
     @Test
     fun launch_sends_the_user_to_sign_in() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
 
@@ -40,7 +62,7 @@ class AppNavHostTest {
 
     @Test
     fun launch_sends_the_user_to_first_run() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
 
@@ -50,7 +72,7 @@ class AppNavHostTest {
 
     @Test
     fun first_run_goes_home_once_the_household_exists() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
         onNodeWithText(StubScreens.CREATED).performClick()
@@ -62,7 +84,7 @@ class AppNavHostTest {
 
     @Test
     fun first_run_on_a_hub_already_set_up_goes_to_sign_in() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
         onNodeWithText(StubScreens.SIGN_IN_INSTEAD).performClick()
@@ -73,7 +95,7 @@ class AppNavHostTest {
 
     @Test
     fun tapping_a_face_opens_that_members_pin_over_the_picker() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
         onNodeWithText(StubScreens.PICK_EMMA).performClick()
@@ -84,7 +106,7 @@ class AppNavHostTest {
 
     @Test
     fun back_from_the_pin_returns_to_the_picker() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
         onNodeWithText(StubScreens.PICK_EMMA).performClick()
@@ -96,7 +118,7 @@ class AppNavHostTest {
 
     @Test
     fun the_right_pin_goes_home_and_leaves_sign_in_behind() = runComposeUiTest {
-        setContent { AppNavHost(screens = StubScreens(), backStack = backStack) }
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
 
         onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
         onNodeWithText(StubScreens.PICK_EMMA).performClick()

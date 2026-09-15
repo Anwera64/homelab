@@ -37,10 +37,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,7 +56,7 @@ class AuthRepositoryImpl(
 
     override fun observeSignedOut(): Flow<Unit> = signedOut.events.onEach { _currentUserFlow.value = null }
     private val refreshMutex = Mutex()
-    private var activeRefresh: Deferred<String>? = null
+    private var activeRefresh: CompletableDeferred<String>? = null
 
     override suspend fun login(memberId: String, pin: String): User = reachingHub {
         val response = client.post("$baseUrl/api/v1/auth/login") {
@@ -136,29 +133,39 @@ class AuthRepositoryImpl(
 
     override fun observeCurrentUser(): Flow<User?> = _currentUserFlow.asStateFlow()
 
+    /**
+     * One renewal at a time: callers who ask while one is on its way wait for its answer. A failure
+     * reaches every caller through the shared answer, without cancelling whoever started it.
+     */
     override suspend fun refreshToken(): String {
-        val deferred = refreshMutex.withLock {
-            activeRefresh ?: CoroutineScope(currentCoroutineContext()).async {
-                try {
-                    val token = tokenStorage.getRefreshToken() ?: tokenStorage.getAccessToken() ?: ""
-                    val response = client.post("$baseUrl/api/v1/auth/refresh") {
-                        contentType(ContentType.Application.Json)
-                        header(HttpHeaders.Authorization, "Bearer $token")
-                    }.body<TokenResponseDto>()
-
-                    tokenStorage.saveTokens(response.access_token)
-                    response.user?.let {
-                        _currentUserFlow.value = UserDataMapper.toDomain(it)
-                    }
-                    response.access_token
-                } finally {
-                    refreshMutex.withLock {
-                        activeRefresh = null
-                    }
-                }
-            }.also { activeRefresh = it }
+        val (renewal, startedHere) = refreshMutex.withLock {
+            activeRefresh?.let { it to false }
+                ?: CompletableDeferred<String>().also { activeRefresh = it }.let { it to true }
         }
-        return deferred.await()
+        if (startedHere) {
+            try {
+                renewal.complete(renew())
+            } catch (e: Throwable) {
+                renewal.completeExceptionally(e)
+            } finally {
+                refreshMutex.withLock { activeRefresh = null }
+            }
+        }
+        return renewal.await()
+    }
+
+    private suspend fun renew(): String = reachingHub {
+        // No separate refresh token: the hub re-issues one it still accepts.
+        val kept = tokenStorage.getAccessToken() ?: throw UnauthorizedException("Nobody is signed in on this phone")
+        val response = client.post("$baseUrl/api/v1/auth/refresh") {
+            header(HttpHeaders.Authorization, "Bearer $kept")
+        }
+        if (response.status == HttpStatusCode.Unauthorized) {
+            throw UnauthorizedException("The hub no longer accepts this token")
+        }
+        val fresh: TokenResponseDto = response.ensureJsonSuccess().body()
+        signedIn(fresh)
+        fresh.access_token
     }
 
     override fun getHubHost(): String = baseUrl.substringAfter("://").substringBefore("/")

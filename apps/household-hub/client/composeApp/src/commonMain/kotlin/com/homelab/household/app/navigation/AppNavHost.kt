@@ -1,6 +1,7 @@
 package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -9,6 +10,8 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.homelab.household.domain.usecase.HasStoredSessionUseCase
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
@@ -19,8 +22,17 @@ import org.koin.compose.koinInject
 fun AppNavHost(
     screens: AppScreens = RealAppScreens,
     backStack: SnapshotStateList<NavKey> = rememberAppBackStack(),
+    session: AppSession = rememberAppSession(),
     modifier: Modifier = Modifier
 ) {
+    LaunchedEffect(session) {
+        // Listening before renewing, so a token the hub refuses on the way sends the phone back too.
+        launch(start = CoroutineStart.UNDISPATCHED) {
+            session.signedOut.collect { backStack.startOver(Destination.SignIn) }
+        }
+        session.renew()
+    }
+
     NavDisplay(
         backStack = backStack,
         modifier = modifier,
@@ -66,8 +78,8 @@ fun AppNavHost(
 
 /**
  * Where the app starts, decided on the phone: home for a member still signed in here, launch for
- * everyone else. Asks the hub nothing — a token the hub no longer accepts is found out later.
- * Hoisted so a test can watch where it goes.
+ * everyone else. Waits for the hub on nothing — a token it no longer accepts signs the phone out
+ * when the session is renewed, or on the next call. Hoisted so a test can watch where it goes.
  */
 @Composable
 fun rememberAppBackStack(): SnapshotStateList<NavKey> {

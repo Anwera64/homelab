@@ -23,6 +23,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.concurrent.atomics.AtomicInt
@@ -228,33 +229,63 @@ class AuthRepositoryTest {
     }
 
     @Test
-    @OptIn(ExperimentalAtomicApi::class)
-    fun concurrent_401_requests_trigger_single_flight_refresh_mutex() = runTest {
-        val refreshCount = AtomicInt(0)
+    fun renewing_sends_the_kept_token_and_keeps_the_fresh_one() = runTest {
+        var sentWith: String? = null
+        val engine = MockEngine { request ->
+            if (request.url.encodedPath == "/api/v1/auth/refresh") {
+                sentWith = request.headers[HttpHeaders.Authorization]
+                respondJson("""{"access_token": "fresh-token", "token_type": "bearer", "user": $emmaJson}""")
+            } else {
+                respond("Not Found", HttpStatusCode.NotFound)
+            }
+        }
+        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val repo = repo(engine, tokenStorage)
 
+        assertEquals("fresh-token", repo.refreshToken())
+
+        assertEquals("Bearer kept-token", sentWith)
+        assertEquals("fresh-token", tokenStorage.getAccessToken())
+        assertEquals("emma", repo.observeCurrentUser().first()?.id)
+    }
+
+    @Test
+    @OptIn(ExperimentalAtomicApi::class)
+    fun renewals_asked_for_together_reach_the_hub_once() = runTest {
+        val refreshCount = AtomicInt(0)
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
                 "/api/v1/auth/refresh" -> {
                     refreshCount.addAndFetch(1)
-                    respondJson("""{"access_token": "new-jwt-token-456", "token_type": "bearer", "user": $emmaJson}""")
+                    respondJson("""{"access_token": "fresh-token", "token_type": "bearer", "user": $emmaJson}""")
                 }
                 else -> respond("Not Found", HttpStatusCode.NotFound)
             }
         }
-
-        val tokenStorage = InMemoryTokenStorage()
-        tokenStorage.saveTokens("expired-token", "refresh-token")
+        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
         val repo = repo(engine, tokenStorage)
 
-        // Launch 5 parallel refresh operations
-        val jobs = (1..5).map {
-            async { repo.refreshToken() }
-        }
-        val results = jobs.awaitAll()
+        val results = (1..5).map { async { repo.refreshToken() } }.awaitAll()
 
         assertEquals(5, results.size)
-        // Verify exactly 1 refresh HTTP call was dispatched across all 5 threads!
         assertEquals(1, refreshCount.load())
-        assertEquals("new-jwt-token-456", tokenStorage.getAccessToken())
+        assertEquals("fresh-token", tokenStorage.getAccessToken())
+    }
+
+    @Test
+    fun renewing_with_the_hub_unreachable_keeps_the_token() = runTest {
+        val engine = MockEngine { throw IOException("Connection refused") }
+        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+
+        assertFailsWith<ServerOfflineException> { repo(engine, tokenStorage).refreshToken() }
+        assertEquals("kept-token", tokenStorage.getAccessToken())
+    }
+
+    @Test
+    fun a_renewal_the_hub_refuses_is_unauthorized() = runTest {
+        val engine = MockEngine { respondJson("""{"detail": "Invalid or expired token."}""", HttpStatusCode.Unauthorized) }
+        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
+
+        assertFailsWith<UnauthorizedException> { repo(engine, tokenStorage).refreshToken() }
     }
 }
