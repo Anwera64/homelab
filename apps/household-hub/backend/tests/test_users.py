@@ -14,7 +14,7 @@ async def test_admin_delete_member_reassigns_agents_and_purges_personal_data(cli
     """
     # 1. Setup Admin and a member
     admin_token, admin_id = await register_admin(client)
-    member1_token, member1_id = await add_signed_in_member(client, full_name="Member 1")
+    member1_token, member1_id = await add_signed_in_member(client, admin_token, full_name="Member 1")
 
     # 2. Member creates a custom agent
     agent_resp = await client.post(
@@ -69,7 +69,7 @@ async def test_cannot_delete_sole_admin(client: httpx.AsyncClient):
 async def test_delete_admin_when_secondary_admin_exists(client: httpx.AsyncClient):
     """Deleting an admin is permitted if another admin exists; remaining admin inherits models."""
     admin1_token, admin1_id = await register_admin(client, full_name="Admin 1")
-    admin2_token, admin2_id = await add_signed_in_member(client, full_name="Admin 2", is_admin=True)
+    admin2_token, admin2_id = await add_signed_in_member(client, admin1_token, full_name="Admin 2", is_admin=True)
 
     # Admin 2 creates an agent
     agent_resp = await client.post(
@@ -98,7 +98,7 @@ async def test_delete_member_preserves_household_memories_and_purges_personal_me
     """
     # 1. Admin registers, member joins
     admin_token, admin_id = await register_admin(client)
-    member_token, member_id = await add_signed_in_member(client, full_name="Member 1")
+    member_token, member_id = await add_signed_in_member(client, admin_token, full_name="Member 1")
 
     # 2. Member creates a personal memory
     p_resp = await client.post(
@@ -136,8 +136,8 @@ async def test_delete_member_preserves_household_memories_and_purges_personal_me
 @pytest.mark.asyncio
 async def test_user_self_service_profile_update(client: httpx.AsyncClient):
     """A member changes their own name and colour via PATCH /api/v1/users/me — never their PIN."""
-    await register_admin(client)
-    member_token, member_id = await add_signed_in_member(client, full_name="Member 1")
+    admin_token, _ = await register_admin(client)
+    member_token, member_id = await add_signed_in_member(client, admin_token, full_name="Member 1")
 
     patch_resp = await client.patch(
         "/api/v1/users/me",

@@ -8,7 +8,7 @@ async def setup_environment(client: httpx.AsyncClient) -> tuple[str, str, str, s
     """Helper to setup admin, member, session, and return (admin_token, member_token, agent_id, session_id)."""
     # 1. Admin and member
     admin_token, _ = await register_admin(client, full_name="Admin User")
-    member_token, _ = await add_signed_in_member(client, full_name="Member User")
+    member_token, _ = await add_signed_in_member(client, admin_token, full_name="Member User")
 
     # 3. Get assistant agent
     agent_resp = await client.get("/api/v1/agents/assistant", headers={"Authorization": f"Bearer {member_token}"})
