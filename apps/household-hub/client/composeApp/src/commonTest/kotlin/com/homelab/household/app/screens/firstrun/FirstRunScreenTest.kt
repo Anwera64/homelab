@@ -107,6 +107,28 @@ class FirstRunScreenTest {
         assertEquals(1, signIn)
     }
 
+    /**
+     * On iOS, `KeyboardType.NumberPassword` draws a numeric keypad with no return key, so the
+     * PIN field's `ImeAction.Done` has no button to sit on. Tapping the form itself, away from
+     * any field, is the only dismissal path iOS offers — so it must clear focus.
+     */
+    @Test
+    fun tapping_the_form_background_clears_focus() {
+        val hub = FakeFirstRunHub()
+        hub.createsTheHousehold()
+
+        runScreenTest {
+            firstRunScreen(hub)
+
+            onFirstRun {
+                focusesTheName()
+                seesTheNameIsFocused()
+                tapsTheFormBackground()
+                seesTheNameIsNotFocused()
+            }
+        }
+    }
+
     /** Every previewed state draws: the form's own copy is on screen whatever state it's in. */
     @Test
     fun every_previewed_state_draws() {

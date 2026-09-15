@@ -3,7 +3,10 @@ package com.homelab.household.app.screens.firstrun
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.first_run_colour_swatch
@@ -18,6 +22,7 @@ import com.homelab.household.app.resources.first_run_create
 import com.homelab.household.app.resources.first_run_failed_already_set_up
 import com.homelab.household.app.resources.first_run_failed_unreachable
 import com.homelab.household.app.resources.first_run_name_missing
+import com.homelab.household.app.resources.first_run_overline
 import com.homelab.household.app.resources.first_run_pin_not_six_digits
 import com.homelab.household.app.resources.first_run_sign_in_instead
 import com.homelab.household.app.resources.first_run_title
@@ -72,6 +77,27 @@ class FirstRunRobot(private val test: ComposeUiTest) {
 
     fun stillSeesTheName(name: String) {
         test.onAllNodes(hasSetTextAction())[NAME_FIELD].assertTextContains(name)
+    }
+
+    /** Taps the name field itself, the way a person opening the form would. */
+    fun focusesTheName() {
+        test.onAllNodes(hasSetTextAction())[NAME_FIELD].performClick()
+    }
+
+    fun seesTheNameIsFocused() {
+        test.onAllNodes(hasSetTextAction())[NAME_FIELD].assertIsFocused()
+    }
+
+    fun seesTheNameIsNotFocused() {
+        test.onAllNodes(hasSetTextAction())[NAME_FIELD].assertIsNotFocused()
+    }
+
+    /**
+     * Taps the overline copy above the fields: not a field, not a button, not the colour picker —
+     * the "form background" iOS offers no keyboard-return-key path off of.
+     */
+    suspend fun tapsTheFormBackground() {
+        test.onNodeWithText(getString(Res.string.first_run_overline)).performTouchInput { click() }
     }
 
     private fun seesText(text: String) {
