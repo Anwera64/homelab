@@ -48,8 +48,8 @@ async def test_an_admin_can_invite_another_admin(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_a_member_cannot_invite(client: httpx.AsyncClient):
-    await register_admin(client)
-    member_token, _ = await add_signed_in_member(client)
+    token, _ = await register_admin(client)
+    member_token, _ = await add_signed_in_member(client, token)
 
     resp = await _invite(client, member_token, name="Noor")
 

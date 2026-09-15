@@ -103,9 +103,9 @@ async def test_a_name_is_between_1_and_128_characters(client: httpx.AsyncClient,
 @pytest.mark.asyncio
 async def test_the_profile_picker_lists_active_members_without_signing_in(client: httpx.AsyncClient):
     """Id, name and colour only, for active members, to anyone who can reach the hub."""
-    _, admin_id = await register_admin(client, full_name="Emma")
-    liam_id = await add_member(full_name="Liam")
-    gone_id = await add_member(full_name="Gone", pin="999999")
+    token, admin_id = await register_admin(client, full_name="Emma")
+    liam_id = await add_member(client, token, full_name="Liam")
+    gone_id = await add_member(client, token, full_name="Gone", pin="999999")
     await deactivate(gone_id)
 
     resp = await client.get("/api/v1/auth/members")
@@ -119,8 +119,8 @@ async def test_the_profile_picker_lists_active_members_without_signing_in(client
 
 @pytest.mark.asyncio
 async def test_signing_in_with_the_right_pin_returns_a_token(client: httpx.AsyncClient):
-    await register_admin(client)
-    member_id = await add_member(full_name="Liam")
+    token, _ = await register_admin(client)
+    member_id = await add_member(client, token, full_name="Liam")
 
     resp = await client.post("/api/v1/auth/login", json={"user_id": member_id, "pin": MEMBER_PIN})
 
@@ -168,8 +168,8 @@ async def test_a_right_pin_resets_the_count(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_an_inactive_member_cannot_sign_in(client: httpx.AsyncClient):
-    await register_admin(client)
-    member_id = await add_member()
+    token, _ = await register_admin(client)
+    member_id = await add_member(client, token)
     await deactivate(member_id)
 
     resp = await client.post("/api/v1/auth/login", json={"user_id": member_id, "pin": MEMBER_PIN})
@@ -268,8 +268,8 @@ async def test_an_expired_token_cannot_refresh(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_an_inactive_member_cannot_refresh(client: httpx.AsyncClient):
-    await register_admin(client)
-    token, member_id = await add_signed_in_member(client)
+    admin_token, _ = await register_admin(client)
+    token, member_id = await add_signed_in_member(client, admin_token)
     await deactivate(member_id)
 
     resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"})
@@ -301,7 +301,7 @@ async def test_members_are_no_longer_created_through_the_users_endpoint(client: 
 @pytest.mark.asyncio
 async def test_household_members_see_each_other(client: httpx.AsyncClient):
     admin_token, _ = await register_admin(client)
-    await add_member()
+    await add_member(client, admin_token)
 
     users_list = await client.get("/api/v1/users", headers={"Authorization": f"Bearer {admin_token}"})
 

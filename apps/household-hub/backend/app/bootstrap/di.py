@@ -67,6 +67,9 @@ from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCas
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 from app.domain.use_cases.auth.verify_member_pin import MemberPinLocks, VerifyMemberPinUseCase
 from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
+from app.domain.use_cases.auth.guard_code_guesses import CodeGuessLock, GuardCodeGuessesUseCase
+from app.domain.use_cases.auth.look_up_invite import LookUpInviteUseCase
+from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -74,6 +77,7 @@ from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 from app.domain.use_cases.users.create_invite import CreateInviteUseCase
+from app.domain.use_cases.users.create_member import CreateMemberUseCase
 
 from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
 from app.domain.use_cases.spaces.get_personal_space import GetPersonalSpaceUseCase
@@ -146,6 +150,7 @@ _jwt_token_service = JwtTokenService(
 )
 _dummy_pin_hash = _password_hasher.hash("dummy-constant-time-pin-hash")
 _pin_locks = MemberPinLocks()
+_code_guess_lock = CodeGuessLock()
 
 _user_mapper = UserDataMapper()
 _space_mapper = SpaceDataMapper()
@@ -203,6 +208,9 @@ def get_container(session: AsyncSession):
     invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
 
     uow = SqliteUnitOfWork(session)
+
+    guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
+    create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
 
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
@@ -333,6 +341,10 @@ def get_container(session: AsyncSession):
         pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(user_repo, _jwt_token_service),
         pres_deps.get_list_public_members_use_case: ListPublicMembersUseCase(user_repo),
         pres_deps.get_refresh_token_use_case: RefreshTokenUseCase(_jwt_token_service),
+        pres_deps.get_look_up_invite_use_case: LookUpInviteUseCase(invite_repo, user_repo, guard_code_guesses_uc),
+        pres_deps.get_redeem_invite_use_case: RedeemInviteUseCase(
+            invite_repo, user_repo, create_member_uc, _jwt_token_service, guard_code_guesses_uc
+        ),
 
         # Users
         pres_deps.get_list_members_use_case: ListMembersUseCase(user_repo),
@@ -447,6 +459,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_authenticate_token_use_case,
         pres_deps.get_list_public_members_use_case,
         pres_deps.get_refresh_token_use_case,
+        pres_deps.get_look_up_invite_use_case,
+        pres_deps.get_redeem_invite_use_case,
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,

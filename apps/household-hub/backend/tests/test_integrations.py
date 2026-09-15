@@ -187,7 +187,7 @@ async def test_tool_execution_server_authoritative_session_controls(client: http
     assert spoof_agent_resp.status_code == 403
 
     # 3. Create a second user and verify Zero-Leak cross-user session blocking
-    u2_token, _ = await add_signed_in_member(client, full_name="Member User")
+    u2_token, _ = await add_signed_in_member(client, token, full_name="Member User")
     u2_headers = {"Authorization": f"Bearer {u2_token}"}
 
     u2_sess = await client.post(
