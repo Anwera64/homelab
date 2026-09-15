@@ -220,6 +220,37 @@ decided, and no reading `DefaultSpacing` / `DefaultSizes` around the theme — `
 vectors are built outside composition, is the one listed exception. Test sources are exempt — an
 assertion is free to name a real number.
 
+### On CI
+
+`.github/workflows/household-hub-client.yml` runs the same tasks on every push and pull request that
+touches the client. Two lanes, started together:
+
+| Job | Runner | Runs |
+| :--- | :--- | :--- |
+| `compile` -> `jvm-tests` -> `android-ui-tests` | `ubuntu-latest` | The Android APKs, `jvmTest`, then the on-device tests on an API 36 emulator. Chained, so the emulator only boots for a commit that already builds and passes its JVM tests. |
+| `ios-simulator-tests` | `macos-26` | `iosSimulatorArm64Test`, then `:shared:iosSimulatorArm64SlowSseLongPauseTest`. |
+| `ios-app-tests` | `macos-26` | `xcodegen generate`, the app-hosted Keychain XCTest bundle, and `:iosApp:linkDebugFrameworkIosArm64`. |
+
+The two iOS jobs declare no `needs:`, so they start alongside `compile` rather than queueing behind
+the Android chain — a commit gets both answers in one wall clock. They cannot share the Linux jobs:
+the only iOS targets declared are `iosArm64` and `iosSimulatorArm64`, so no Linux or Intel image can
+build them, and `shared/src/iosTest` holds proofs about NSURLSession that have no JVM equivalent by
+construction. `macos-26` is pinned rather than `macos-latest` for that second reason.
+
+Two things CI does that a local run does not. The long-pause SSE proof is opt-in here but always-on
+there — it is the only guard on `timeoutIntervalForRequest`, and a runner is the right place to spend
+the 75 seconds. And `:iosApp:linkDebugFrameworkIosArm64` compiles the framework for a real phone,
+which nothing else covers: `xcodebuild` only ever builds the simulator slice.
+
+`ios-app-tests` picks its simulator by UDID out of `xcrun simctl list devices available`, never by
+device name. The runner image has shipped more than once with an Xcode whose paired simulator runtime
+was missing, and a named device fails hard in that window.
+
+`tests/ci-workflow.test.js` (run by `node --test` and the pre-commit hook) asserts all of the above
+about the workflow file itself — that the iOS jobs exist, run on macOS, declare no `needs:`, name
+those tasks, and select a simulator by UDID. Change the workflow and that test is what tells you
+whether you changed what you meant to.
+
 ## ▶️ Running the app
 
 ```powershell
