@@ -51,20 +51,7 @@ final class HearthColorAssetTests: XCTestCase {
             file: file,
             line: line
         )
-        return base.resolvedColor(with: traitCollection(for: style))
-    }
-
-    /// `UITraitCollection(userInterfaceStyle:)` is deprecated from iOS 17 in favour of the trait
-    /// builder closure, but the deployment target is iOS 15 — so the branch has to exist, and it
-    /// has to live in exactly one place rather than at every call site.
-    private func traitCollection(for style: UIUserInterfaceStyle) -> UITraitCollection {
-        if #available(iOS 17.0, *) {
-            return UITraitCollection { mutableTraits in
-                mutableTraits.userInterfaceStyle = style
-            }
-        } else {
-            return UITraitCollection(userInterfaceStyle: style)
-        }
+        return base.resolvedColor(with: hearthTraitCollection(for: style))
     }
 
     /// Compares `color` against an 8-bit-per-channel hex triple with a half-quantisation-step
