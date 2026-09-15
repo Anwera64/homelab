@@ -49,6 +49,22 @@ class BrandAssetParityTest {
         "iosApp/HouseholdHub/Assets.xcassets/HearthCanvas.colorset/Contents.json"
     )
 
+    /** The other half of the brand: the one drawing of the household glyph. */
+    private val hearthIconFile = File(
+        clientRootDir,
+        "composeApp/src/commonMain/kotlin/com/homelab/household/app/icons/HearthIcon.kt"
+    )
+
+    private val androidSplashTile = File(clientRootDir, "androidApp/src/main/res/drawable/splash_tile.xml")
+    private val androidLauncherGlyph =
+        File(clientRootDir, "androidApp/src/main/res/drawable/ic_launcher_foreground.xml")
+
+    private val iosLaunchTileDir =
+        File(clientRootDir, "iosApp/HouseholdHub/Assets.xcassets/HearthLaunchTile.imageset")
+    private val iosLaunchTileDay = File(iosLaunchTileDir, "hearth_launch_tile.svg")
+    private val iosLaunchTileNight = File(iosLaunchTileDir, "hearth_launch_tile_dark.svg")
+    private val iosLaunchTileManifest = File(iosLaunchTileDir, "Contents.json")
+
     private fun File.relative(): String = toRelativeString(clientRootDir)
 
     // ---------------------------------------------------------------------------------------
@@ -94,15 +110,46 @@ class BrandAssetParityTest {
     }
 
     /**
-     * `#F5F2EB`, `0xFFF5F2EB` and `f5f2eb` are the same colour written three ways, and which one
-     * a file uses is that file's convention, not a difference worth failing over. Alpha is
-     * dropped: nothing in the brand set is translucent, and the Android and iOS spellings carry
-     * it differently (`0xFF` prefix vs. a separate `"alpha"` component).
+     * `#F5F2EB`, `0xFFF5F2EB`, `f5f2eb` and the SVG shorthand `#FFF` are the same colours written
+     * four ways, and which one a file uses is that file's convention, not a difference worth
+     * failing over. Alpha is dropped: nothing in the brand set is translucent, and the spellings
+     * carry it differently (`0xFF` prefix vs. a separate `"alpha"` component vs. an SVG attribute).
      */
     private fun normaliseHex(raw: String): String {
         val digits = raw.trim().removePrefix("#").removePrefix("0x").removePrefix("0X").uppercase()
-        return if (digits.length == 8) digits.substring(2) else digits
+        return when (digits.length) {
+            8 -> digits.substring(2)
+            3 -> digits.map { "$it$it" }.joinToString("")
+            else -> digits
+        }
     }
+
+    /**
+     * SVG and Android vector path data are the same little language, and both let a reformatter
+     * move whitespace and commas around freely: `M3.6 10.4 12 3.8l8.4 6.6` and
+     * `M3.6,10.4 12,3.8 l8.4,6.6` are one path written twice. Separators collapse to a single
+     * space and every command letter gets one in front of it, which makes those two spellings
+     * identical without going anywhere near parsing the grammar.
+     *
+     * Case is deliberately preserved: `l` and `L` are relative and absolute, a real difference.
+     * Because the same transform is applied to both sides it can only ever make more spellings
+     * equal — it can never turn a changed coordinate green.
+     */
+    private fun normalisePath(raw: String): String = raw
+        .replace(Regex("""(?=[MmLlHhVvCcSsQqTtAaZz])"""), " ")
+        .replace(Regex("""[\s,]+"""), " ")
+        .trim()
+
+    /** `<path …>` / `<color …>` style elements, without caring how they are wrapped or indented. */
+    private fun elements(markup: String, tag: String): List<String> =
+        Regex("""<$tag\b[^>]*>""").findAll(markup).map { it.value }.toList()
+
+    /**
+     * One attribute off an element. Exact-name matching on purpose: `stroke` must not be answered
+     * by `stroke-width`, and `fill` must not be answered by `fill-rule`.
+     */
+    private fun attributeOf(element: String, name: String): String? =
+        Regex("""\b${Regex.escape(name)}\s*=\s*"([^"]*)"""").find(element)?.groupValues?.get(1)
 
     // ---------------------------------------------------------------------------------------
     // Android colour resources
@@ -223,25 +270,29 @@ class BrandAssetParityTest {
     private data class ColorSetEntry(val isDark: Boolean, val hex: String)
 
     /**
-     * Returns the substring inside the brackets of `"colors": [ … ]`, found by matching brackets
+     * Returns the substring inside the brackets of `"<key>": [ … ]`, found by matching brackets
      * rather than by reading lines, so pretty-printed and minified catalogs both work.
+     *
+     * One reader serves both catalog shapes on purpose: a colour set keeps its entries under
+     * `"colors"` and an image set under `"images"`, and past that one key the two files are the
+     * same thing — a flat array of appearance-tagged entries.
      */
-    private fun colorsArrayBody(json: String, file: File): String {
-        val key = Regex(""""colors"\s*:\s*\[""").find(json)
+    private fun arrayBody(json: String, file: File, key: String, kind: String): String {
+        val found = Regex("""["]$key["]\s*:\s*\[""").find(json)
             ?: fail(
-                "${file.relative()} has no \"colors\" array. An Xcode colour set is a JSON object " +
-                    "with a \"colors\" array of appearance entries; this file is not one."
+                "${file.relative()} has no \"$key\" array. An Xcode $kind is a JSON object with a " +
+                    "\"$key\" array of appearance entries; this file is not one."
             )
-        return sliceBalanced(json, key.range.last, file, "the \"colors\" array")
+        return sliceBalanced(json, found.range.last, file, "the \"$key\" array")
     }
 
-    /** Each `{ … }` directly inside the colours array. */
-    private fun entryBodies(arrayBody: String, file: File): List<String> {
+    /** Each `{ … }` directly inside an entry array. */
+    private fun entryBodies(arrayBody: String, file: File, entryLabel: String): List<String> {
         val bodies = mutableListOf<String>()
         var index = 0
         while (index < arrayBody.length) {
             if (arrayBody[index] == '{') {
-                val body = sliceBalanced(arrayBody, index, file, "a colour entry")
+                val body = sliceBalanced(arrayBody, index, file, entryLabel)
                 bodies += body
                 index += body.length + 2
             } else {
@@ -249,6 +300,23 @@ class BrandAssetParityTest {
             }
         }
         return bodies
+    }
+
+    /**
+     * Xcode tags a dark-mode entry with
+     * `"appearances": [{"appearance": "luminosity", "value": "dark"}]`, and an entry with no
+     * `"appearances"` at all is the universal one it falls back to. Colour sets and image sets
+     * spell this identically, so both readers ask the same question here.
+     *
+     * Both halves of the tag are required. `"value": "dark"` alone also appears under other
+     * appearance axes, and matching it loosely would let an entry tagged on the wrong axis pass
+     * as the dark one.
+     */
+    private fun hasDarkAppearance(entryBody: String): Boolean {
+        val appearances = Regex(""""appearances"\s*:\s*\[([\s\S]*?)]""")
+            .find(entryBody)?.groupValues?.get(1) ?: return false
+        return Regex(""""appearance"\s*:\s*"luminosity"""").containsMatchIn(appearances) &&
+            Regex(""""value"\s*:\s*"dark"""").containsMatchIn(appearances)
     }
 
     /**
@@ -306,10 +374,8 @@ class BrandAssetParityTest {
 
     private fun colorSetEntries(file: File): List<ColorSetEntry> {
         val json = file.readText()
-        return entryBodies(colorsArrayBody(json, file), file).map { body ->
-            val appearances = Regex(""""appearances"\s*:\s*\[([\s\S]*?)]""").find(body)?.groupValues?.get(1)
-            val isDark = appearances != null &&
-                Regex(""""value"\s*:\s*"dark"""").containsMatchIn(appearances)
+        return entryBodies(arrayBody(json, file, "colors", "colour set"), file, "a colour entry").map { body ->
+            val isDark = hasDarkAppearance(body)
 
             val channels = listOf("red", "green", "blue").map { channel ->
                 val match = Regex(""""$channel"\s*:\s*("[^"]*"|[0-9.]+)""").find(body)
@@ -384,5 +450,365 @@ class BrandAssetParityTest {
             "The iOS canvas colour set drifted from HearthColors.kt (${drifted.size}):\n" +
                 drifted.joinToString("\n")
         )
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // The household glyph
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The two path strings of `HearthIcon.Household`, which is the glyph every other copy is a
+     * copy of.
+     *
+     * The regex holds `strokes(...)` to parenthesis-free contents on purpose. Other icons in the
+     * set build their shapes from `rect(...)` and `circle(...)` helpers, and if `Household` ever
+     * became one of those, its drawing would no longer be two literal paths that a drawable can
+     * mirror — so this must fail loudly rather than quietly find nothing.
+     */
+    private fun canonicalGlyphPaths(): List<String> {
+        if (!hearthIconFile.exists()) {
+            fail<Nothing>(
+                "The canonical household glyph is expected at ${hearthIconFile.relative()}; it does " +
+                    "not exist. Every copy of the glyph asserted here is read from it, so this guard " +
+                    "cannot run without it."
+            )
+        }
+
+        val declaration =
+            Regex("""Household\s*\(\s*"household"\s*,\s*strokes\s*\(([^()]*)\)""").find(hearthIconFile.readText())
+                ?: fail(
+                    "${hearthIconFile.relative()} no longer declares " +
+                        "`Household(\"household\", strokes(\"…\", \"…\"))` — this guard reads those two " +
+                        "path strings as the source of truth for the glyph in splash_tile.xml, " +
+                        "ic_launcher_foreground.xml and the iOS launch tile SVGs. Either restore that " +
+                        "shape or teach this test the new one."
+                )
+
+        val literals = Regex(""""([^"]*)"""").findAll(declaration.groupValues[1])
+            .map { it.groupValues[1] }
+            .toList()
+
+        if (literals.size != 2) {
+            fail<Nothing>(
+                "`HearthIcon.Household` in ${hearthIconFile.relative()} is built from " +
+                    "${literals.size} path string(s); this guard expects the two the drawables and " +
+                    "SVGs copy. Adding or removing a stroke means every copy needs the same change, " +
+                    "which is what this failure is asking for."
+            )
+        }
+
+        return literals.map { normalisePath(it) }
+    }
+
+    /**
+     * The stroked paths of an Android vector drawable, in document order.
+     *
+     * Stroked, not "the last two": `splash_tile.xml` also draws the rounded-square tile body, and
+     * that path is a `fillColor` with no stroke. Selecting on `strokeColor` says what the rule
+     * actually means — the glyph is the drawing made of strokes — where counting from the end
+     * would quietly pick up the wrong path the day someone adds a shape below the group.
+     */
+    private fun androidStrokedPaths(file: File): List<String> {
+        if (!file.exists()) {
+            fail<Nothing>(
+                "${file.relative()} does not exist; it carries the hand-copied household glyph " +
+                    "from ${hearthIconFile.relative()}."
+            )
+        }
+
+        val stroked = elements(file.readText(), "path")
+            .filter { attributeOf(it, "android:strokeColor") != null }
+
+        if (stroked.isEmpty()) {
+            fail<Nothing>(
+                "${file.relative()} has no <path> with an android:strokeColor. The household glyph " +
+                    "is drawn as stroked paths, and this guard finds it by that; a glyph converted " +
+                    "to fills would leave the copy unguarded."
+            )
+        }
+
+        return stroked.map { element ->
+            attributeOf(element, "android:pathData") ?: fail(
+                "${file.relative()} has a stroked <path> with no android:pathData, so there is " +
+                    "nothing to compare with the canonical glyph."
+            )
+        }.map { normalisePath(it) }
+    }
+
+    private fun glyphDrift(file: File, actual: List<String>, canonical: List<String>): List<String> {
+        if (actual.size != canonical.size) {
+            return listOf(
+                "${file.relative()} draws ${actual.size} glyph path(s) but " +
+                    "HearthIcon.Household has ${canonical.size}"
+            )
+        }
+        return actual.zip(canonical).mapIndexedNotNull { index, (drawn, expected) ->
+            if (drawn == expected) null else {
+                "${file.relative()}: glyph path ${index + 1} is\n    $drawn\nbut " +
+                    "HearthIcon.Household in ${hearthIconFile.relative()} draws\n    $expected"
+            }
+        }
+    }
+
+    /**
+     * The splash is drawn by the system from this file, not by Compose, so the glyph on it is a
+     * hand-typed copy. A copy that drifts is a launch animation that morphs into a slightly
+     * different house.
+     */
+    @Test
+    fun the_android_splash_tile_draws_the_canonical_glyph() {
+        val drifted = glyphDrift(
+            androidSplashTile,
+            androidStrokedPaths(androidSplashTile),
+            canonicalGlyphPaths()
+        )
+
+        assertTrue(
+            drifted.isEmpty(),
+            "The splash tile drifted from HearthIcon.Household (${drifted.size}):\n" +
+                drifted.joinToString("\n")
+        )
+    }
+
+    /** The same drawing again, this time as the launcher's foreground and monochrome layer. */
+    @Test
+    fun the_launcher_foreground_draws_the_canonical_glyph() {
+        val drifted = glyphDrift(
+            androidLauncherGlyph,
+            androidStrokedPaths(androidLauncherGlyph),
+            canonicalGlyphPaths()
+        )
+
+        assertTrue(
+            drifted.isEmpty(),
+            "The launcher foreground drifted from HearthIcon.Household (${drifted.size}):\n" +
+                drifted.joinToString("\n")
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // The iOS launch tile
+    // ---------------------------------------------------------------------------------------
+
+    /** An SVG launch tile reduced to the three things this guard compares. */
+    private data class LaunchTile(
+        val glyphPaths: List<String>,
+        val glyphStrokes: List<String>,
+        val tileFills: List<String>
+    )
+
+    /**
+     * Splits a launch-tile SVG into its glyph and its tile body by the same rule as the Android
+     * drawables: a `stroke` is the glyph, a bare `fill` is the tile underneath it. The alternative
+     * — assuming the glyph is whatever comes last — would silently start comparing the wrong
+     * element as soon as the artwork gained a shape.
+     */
+    private fun parseLaunchTile(file: File): LaunchTile {
+        val paths = elements(file.readText(), "path")
+        val strokeOf = { element: String -> attributeOf(element, "stroke")?.takeIf { it != "none" } }
+
+        val stroked = paths.filter { strokeOf(it) != null }
+        val filled = paths.filter { strokeOf(it) == null && attributeOf(it, "fill") != null }
+
+        return LaunchTile(
+            glyphPaths = stroked.map { element ->
+                normalisePath(
+                    attributeOf(element, "d") ?: fail(
+                        "${file.relative()} has a stroked <path> with no `d`, so there is nothing " +
+                            "to compare with the canonical glyph."
+                    )
+                )
+            },
+            glyphStrokes = stroked.map { normaliseHex(strokeOf(it)!!) },
+            tileFills = filled.map { normaliseHex(attributeOf(it, "fill")!!) }
+        )
+    }
+
+    /**
+     * Asserts the tile exists, and says what it is for if it does not. Both SVGs are checked in
+     * one place so a report names every missing one rather than the first.
+     */
+    private fun missingTile(file: File, which: String): String? =
+        if (file.exists()) null else {
+            "${file.relative()} does not exist. It is the $which iOS launch tile — the artwork " +
+                "UIKit draws before any Kotlin runs — and is expected to be an SVG holding a " +
+                "filled rounded-square tile body plus the two stroked household glyph paths from " +
+                "${hearthIconFile.relative()}."
+        }
+
+    /**
+     * The iOS launch tile is the only copy of the glyph that no compiler, lint or simulator ever
+     * looks at on CI: `jvm-tests` runs on Linux. If it drifts, the first thing that notices is the
+     * App Store screenshot.
+     */
+    @Test
+    fun the_ios_launch_tiles_draw_the_canonical_glyph() {
+        val missing = listOfNotNull(
+            missingTile(iosLaunchTileDay, "day"),
+            missingTile(iosLaunchTileNight, "night")
+        )
+        assertTrue(
+            missing.isEmpty(),
+            "The iOS launch tile artwork is missing (${missing.size}):\n" + missing.joinToString("\n")
+        )
+
+        val canonical = canonicalGlyphPaths()
+        val drifted = listOf(iosLaunchTileDay, iosLaunchTileNight).flatMap { file ->
+            glyphDrift(file, parseLaunchTile(file).glyphPaths, canonical)
+        }
+
+        assertTrue(
+            drifted.isEmpty(),
+            "The iOS launch tiles drifted from HearthIcon.Household (${drifted.size}):\n" +
+                drifted.joinToString("\n")
+        )
+    }
+
+    /**
+     * The launch tile is the one asset whose day and night versions differ in *both* colours, and
+     * the night one is not the day one with a darker background: it is a dark glyph on a light
+     * green tile, because `NightColors.onPrimary` is the near-black canvas. Writing white-on-green
+     * for night is the obvious mistake, it looks fine in a light-mode simulator, and this is the
+     * assertion that catches it.
+     */
+    @Test
+    fun the_ios_launch_tiles_invert_between_the_day_and_night_palettes() {
+        val missing = listOfNotNull(
+            missingTile(iosLaunchTileDay, "day"),
+            missingTile(iosLaunchTileNight, "night")
+        )
+        assertTrue(
+            missing.isEmpty(),
+            "The iOS launch tile artwork is missing (${missing.size}):\n" + missing.joinToString("\n")
+        )
+
+        val drifted = listOf(
+            iosLaunchTileDay to "DayColors",
+            iosLaunchTileNight to "NightColors"
+        ).flatMap { (file, palette) ->
+            val tile = parseLaunchTile(file)
+            val expectedTile = canonicalHex(palette, "primary")
+            val expectedGlyph = canonicalHex(palette, "onPrimary")
+
+            buildList {
+                if (tile.tileFills.size != 1) {
+                    add(
+                        "${file.relative()} should have exactly one filled, unstroked <path> — the " +
+                            "rounded-square tile body — but it has ${tile.tileFills.size}"
+                    )
+                } else if (tile.tileFills.single() != expectedTile) {
+                    add(
+                        "${file.relative()}: the tile body fill is #${tile.tileFills.single()} but " +
+                            "$palette.primary in ${hearthColorsFile.relative()} is #$expectedTile"
+                    )
+                }
+
+                tile.glyphStrokes.distinct().filterNot { it == expectedGlyph }.forEach { stroke ->
+                    add(
+                        "${file.relative()}: the glyph stroke is #$stroke but $palette.onPrimary in " +
+                            "${hearthColorsFile.relative()} is #$expectedGlyph"
+                    )
+                }
+            }
+        }
+
+        assertTrue(
+            drifted.isEmpty(),
+            "The iOS launch tiles drifted from the Hearth palette (${drifted.size}):\n" +
+                drifted.joinToString("\n") +
+                "\n(The night tile inverts: NightColors.onPrimary is the near-black canvas, so it " +
+                "is a dark glyph on a light green tile — not the day artwork with a darker background.)"
+        )
+    }
+
+    /**
+     * The manifest is the half of the imageset that no eye ever checks. The artwork is obvious
+     * when it is wrong; a manifest that names a file that is not there, or forgets which entry is
+     * the dark one, produces a launch screen that is simply blank or simply light — and it does
+     * that only on a device, at a moment no test is watching.
+     *
+     * `jvm-tests` runs on Linux, so this guard is the only thing that reads it on CI at all: there
+     * is no actool to object, and the XCTest that would notice runs only on a Mac.
+     */
+    @Test
+    fun the_ios_launch_tile_manifest_names_both_svgs_and_keeps_them_vector() {
+        assertTrue(
+            iosLaunchTileManifest.exists(),
+            "${iosLaunchTileManifest.relative()} does not exist. It is the imageset manifest that " +
+                "tells Xcode which SVG is the day tile and which is the dark one; without it the " +
+                "two files next to it are not an asset at all and nothing can reference them."
+        )
+
+        val json = iosLaunchTileManifest.readText()
+        val entries = entryBodies(
+            arrayBody(json, iosLaunchTileManifest, "images", "image set"),
+            iosLaunchTileManifest,
+            "an image entry"
+        )
+
+        val problems = buildList {
+            if (entries.size != 2) {
+                add(
+                    "${iosLaunchTileManifest.relative()}: the \"images\" array has ${entries.size} " +
+                        "entr${if (entries.size == 1) "y" else "ies"}; expected two — the universal " +
+                        "one and the dark one"
+                )
+            }
+
+            val light = entries.filterNot { hasDarkAppearance(it) }
+            val dark = entries.filter { hasDarkAppearance(it) }
+
+            // The expected names are taken from the same File objects the artwork assertions use,
+            // so the manifest and the tiles cannot be checked against two different spellings.
+            add(filenameProblem(light, "universal", iosLaunchTileDay.name))
+            add(filenameProblem(dark, "dark", iosLaunchTileNight.name))
+
+            val properties = Regex("""["]properties["]\s*:\s*\{""").find(json)?.let {
+                sliceBalanced(json, it.range.last, iosLaunchTileManifest, "the \"properties\" object")
+            }
+            val preservesVector = properties != null &&
+                Regex(""""preserves-vector-representation"\s*:\s*true""").containsMatchIn(properties)
+            if (!preservesVector) {
+                add(
+                    "${iosLaunchTileManifest.relative()}: \"properties\" does not set " +
+                        "\"preserves-vector-representation\": true. Without it Xcode rasterises the " +
+                        "SVG at build time and the launch screen loses the vector scaling that is " +
+                        "the whole reason the tile ships as an SVG."
+                )
+            }
+        }.filterNotNull()
+
+        assertTrue(
+            problems.isEmpty(),
+            "The iOS launch tile manifest is wrong (${problems.size}):\n" + problems.joinToString("\n")
+        )
+    }
+
+    /**
+     * Checks that exactly one entry carries the given appearance and that it names the expected
+     * file. Returns null when it is right, so the caller can collect every problem at once rather
+     * than reporting the first.
+     */
+    private fun filenameProblem(entries: List<String>, which: String, expected: String): String? {
+        if (entries.size != 1) {
+            return "${iosLaunchTileManifest.relative()}: expected exactly one $which entry in " +
+                "\"images\" but found ${entries.size}" +
+                if (which == "dark") {
+                    " — the dark entry is the one tagged " +
+                        "\"appearances\": [{\"appearance\": \"luminosity\", \"value\": \"dark\"}], and " +
+                        "without it a night-mode launch shows the day tile"
+                } else {
+                    " — the universal entry is the one with no \"appearances\", and it is what iOS " +
+                        "falls back to"
+                }
+        }
+        val filename = Regex(""""filename"\s*:\s*"([^"]*)"""")
+            .find(entries.single())?.groupValues?.get(1)
+            ?: return "${iosLaunchTileManifest.relative()}: the $which entry has no \"filename\", " +
+                "so it names no artwork at all"
+        return if (filename == expected) null else {
+            "${iosLaunchTileManifest.relative()}: the $which entry names \"$filename\" but the " +
+                "$which tile this guard checks is \"$expected\""
+        }
     }
 }

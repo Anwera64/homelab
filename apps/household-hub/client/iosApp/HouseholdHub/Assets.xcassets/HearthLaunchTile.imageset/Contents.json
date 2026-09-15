@@ -1,0 +1,12 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "hearth_launch_tile.svg" },
+    {
+      "idiom" : "universal",
+      "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ],
+      "filename" : "hearth_launch_tile_dark.svg"
+    }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 },
+  "properties" : { "preserves-vector-representation" : true }
+}
