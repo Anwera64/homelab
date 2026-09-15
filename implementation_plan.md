@@ -31,7 +31,7 @@ keyboard, so the soft keyboard never opens during a hand-run.
 
 **Done when:** the simulator shows the HyggeHub icon, launches through a Hearth-canvas launch screen
 carrying the tile in both appearances, the slice-1 flows have been driven by hand, and the new
-XCTests and the drift guard are green in CI.
+XCTests are green in CI.
 
 ## 2. What was already ready
 
@@ -53,11 +53,9 @@ and the iOS asset come from one source." That was **not** done literally, and th
 making `splash_tile.xml` a build output. Either is a larger program than the two path strings it
 deduplicates.
 
-Instead the copies stay hand-typed and **`BrandAssetParityTest` makes divergence impossible to
-merge**: `HearthColors.kt` and `HearthIcon.Household` are canonical, and the Android resources, both
-launch-tile SVGs, the icon's SVG source, the iOS colour set, the imageset manifest, the appiconset
-manifest, the icon PNG and the `UILaunchScreen` declaration all answer to them. It runs on **Linux**
-in the existing `jvm-tests` job, which is the only thing that ever reads the iOS catalog on CI.
+Instead the copies stay hand-typed, and each file's comment names the others. A
+`BrandAssetParityTest` comparing them all was built during this slice and **removed before merge**
+— see §4 — so consistency is a matter of care, not enforcement.
 
 ### The app icon is a raster, from a vector source
 
@@ -65,9 +63,9 @@ Asset catalogs take SVG for image sets but not for `AppIcon`. The icon is theref
 1024² PNG, rasterised from `tools/hearth_app_icon.svg` by `tools/make_app_icon.sh`. **librsvg is a
 developer-machine dependency only**; CI never regenerates the PNG.
 
-Having a vector source is the point, not a convenience. The icon was nearly drawn with CoreGraphics
-path calls, which would have made it the one copy of the glyph the guard could never check — it
-compares path strings and cannot compare one to a sequence of `addArc` calls.
+Having a vector source is still worth it with the guard gone: the SVG carries the glyph's `d` values
+byte-identical to `HearthIcon.Household`, so the icon can be diffed against the other copies by eye.
+CoreGraphics path calls — the first approach — could not be.
 
 ### The smoke test is app-hosted, not XCUITest
 
@@ -85,9 +83,10 @@ pinned already-correct behaviour it was **mutation-checked** instead.
 | :-- | :--- | :--- | :--- |
 | 0 | Baseline on the branch | — | All four suites green before anything was touched |
 | 1 | The catalog and the Hearth canvas | `23caf99` | **Found the `AppIcon` trap** (below) |
+| — | The drift guard | *cut* | Built across cycles 1–5, removed before merge (below) |
 | 2 | The launch tile imageset | `e511517` | actool took the SVGs intact, `<g transform>` and strokes included |
 | 3–4 | `UILaunchScreen` + `NSLocalNetworkUsageDescription` | `4943723` | Landed as one commit; adjacent lines of one YAML block |
-| 5 | The app icon | `5041d47` | **Found a stale-green hole in the guards** (below) |
+| 5 | The app icon | `5041d47` | Rasterised from a vector source, not hand-drawn in CoreGraphics |
 | 6 | The launch smoke test | `b54dc33` | No natural red; mutation-proved |
 | 7 | The first-run keyboard | `165ea7f` | **Half the planned fix was unnecessary** (below) |
 | 8 | Docs and this plan | — | |
@@ -109,13 +108,21 @@ Verified by removing the stub and rebuilding. This broke the planned cycle order
 all have been unbuildable — so an unfilled `AppIcon.appiconset` slot shipped with cycle 1, and cycle
 5 filled it rather than creating it. Only building reveals this.
 
-### The guards could report a stale green
+### The drift guard was built, then cut
 
-`BrandAssetParityTest` reads files off disk rather than through the classpath, which Gradle cannot
-infer. A mutated `hearth_app_icon.svg` left `:shared:jvmTest` up to date and the task skipped in
-557 ms, reporting green. **The pre-commit hook runs these tests by name**, so a drifted asset could
-have been committed on a cached pass — the one failure a drift guard must not have. The files are now
-declared task inputs in `shared/build.gradle.kts`.
+`BrandAssetParityTest` grew to 14 tests and **1295 lines — guarding 93 lines of artwork**, and three
+times the size of every other architecture guard combined. It was removed before merge as overkill.
+
+Two things are worth keeping from having built it. Most of what it checked the iOS XCTests already
+cover on the macOS runners — the colour set resolving in both appearances, the tile's rendered
+colours, the launch-screen plist, the icon's corner — so the claim that it was the only CI coverage
+of the iOS catalog, repeated in several commit messages while building it, was **wrong**.
+
+And it exposed a real Gradle defect on the way out: because it read files off disk rather than
+through the classpath, a mutated `hearth_app_icon.svg` left `:shared:jvmTest` up to date and the task
+skipped in 557 ms, reporting green. The pre-commit hook runs these tests by name, so a stale pass was
+reachable. That mattered only for this test and left with it, but any future guard that reads files
+directly needs its inputs declared or it will do the same.
 
 ### `ImeAction.Next` was never broken
 
@@ -132,11 +139,10 @@ dropped rather than added as speculative API. Only tap-outside-to-dismiss shippe
 `HearthLaunchTile.imageset` + 2 SVGs, `AppIcon.appiconset` + the 1024 PNG) ·
 `iosApp/HouseholdHubTests/{HearthColorAsset,HearthLaunchTile,LaunchScreenPlist,PrivacyDeclaration,AppIcon,LaunchSmoke}Tests.swift`
 and `{HearthTraitCollection,PixelSampling}.swift` · `tools/hearth_app_icon.svg` ·
-`tools/make_app_icon.sh` · `shared/src/jvmTest/.../architecture/BrandAssetParityTest.kt`
+`tools/make_app_icon.sh`
 
-**Modified** — `iosApp/project.yml` · `shared/build.gradle.kts` (declared guard inputs) ·
-`composeApp/.../screens/firstrun/FirstRunContent.kt` + its tests · the two Android drawables
-(comments only) · `.githooks/pre-commit` · `client/README.md` · `docs/STAGE_5_PLAN.md`
+**Modified** — `iosApp/project.yml` · `composeApp/.../screens/firstrun/FirstRunContent.kt` + its
+tests · the two Android drawables (comments only) · `client/README.md` · `docs/STAGE_5_PLAN.md`
 
 **Untouched by design** — `.github/workflows/household-hub-client.yml` and `tests/ci-workflow.test.js`.
 New XCTests and catalog files need no workflow change.
@@ -145,7 +151,7 @@ New XCTests and catalog files need no workflow change.
 
 ```bash
 cd apps/household-hub/client
-./gradlew jvmTest                    # 29 in :shared (incl. 14 BrandAssetParityTest), 104 in :composeApp
+./gradlew jvmTest                    # 15 in :shared, 104 in :composeApp
 ./gradlew iosSimulatorArm64Test      # the same 104, natively
 ./gradlew :androidApp:assembleDebug  # Android unbroken
 (cd iosApp && xcodegen generate)

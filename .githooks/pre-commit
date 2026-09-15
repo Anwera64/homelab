@@ -51,13 +51,12 @@ if [ -d "apps/household-hub/backend" ]; then
   fi
 fi
 
-# 4. Validate Household Hub client (KMP) boundaries, DI graph, design tokens, brand-asset parity
-#    and coroutine safety
+# 4. Validate Household Hub client (KMP) boundaries, DI graph, design tokens and coroutine safety
 if git diff --cached --name-only | grep -q '^apps/household-hub/client/'; then
-  echo "  [+] Validating client Clean Architecture boundaries, Koin graph, design tokens, brand-asset parity and coroutine safety..."
+  echo "  [+] Validating client Clean Architecture boundaries, Koin graph, design tokens and coroutine safety..."
   (cd apps/household-hub/client && ./gradlew :shared:jvmTest \
     --tests "*CleanArchitectureBoundaryTest*" --tests "*KoinDependencyGraphTest*" \
-    --tests "*DesignSystemTokenTest*" --tests "*BrandAssetParityTest*" --tests "*CoroutineSafetyTest*" -q --console=plain)
+    --tests "*DesignSystemTokenTest*" --tests "*CoroutineSafetyTest*" -q --console=plain)
   CLIENT_EXIT_CODE=$?
   if [ $CLIENT_EXIT_CODE -ne 0 ]; then
     echo ""

@@ -164,12 +164,17 @@ night), and `tools/hearth_app_icon.svg` itself. An SVG → Android-vector → as
 was considered and rejected — it would be a larger program than the two path strings it would
 deduplicate.
 
-`BrandAssetParityTest` (`shared/src/jvmTest/.../architecture/`) is what keeps those copies honest:
-it reads every file as text against `HearthColors.kt` and `HearthIcon.kt` and fails the moment one
-drifts, so divergence cannot be merged. It runs on Linux, in the existing `jvm-tests` CI job, which
-matters more than it sounds — `jvm-tests` is the *only* thing on CI that ever looks at the iOS
-asset catalog. The two iOS jobs build and test the app, but no Xcode runs on that Linux box to
-notice a `.colorset` or `.imageset` quietly drifting; this test is what would catch it.
+**Nothing enforces that the copies agree.** A guard comparing them all was written and then removed
+as overkill: 1295 lines to protect 93 lines of artwork that changes almost never, and most of what
+it checked the iOS XCTests already cover on the macOS CI runners — the colour set resolving, the
+tile's day and night colours, the launch-screen plist, the icon's corner. Change the glyph or a
+palette colour and it is on you to change every copy; the comments in each file name the others.
+
+Two gaps the XCTests genuinely cannot see, worth knowing when editing artwork by hand. An app icon
+PNG carrying an alpha channel is rejected by Apple outright, even a fully opaque one — rasterising
+through a bitmap context hides that, so only the file's own PNG header tells you; `make_app_icon.sh`
+checks it. And dropping `preserves-vector-representation` from `HearthLaunchTile.imageset`'s
+`Contents.json` makes Xcode silently rasterise the SVG, which nothing detects at all.
 
 Regenerating the app icon's PNG needs `tools/make_app_icon.sh`, which rasterises
 `tools/hearth_app_icon.svg` with `rsvg-convert` and refuses to leave behind a PNG carrying an alpha

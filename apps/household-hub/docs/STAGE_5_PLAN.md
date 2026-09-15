@@ -99,8 +99,8 @@ one source would have meant writing an SVG → Android-vector converter — `<g 
 `<group translateX/scaleX>`, stroke mapping, the `@color/` indirection no SVG has — or making
 `splash_tile.xml` a build output, which would hide the artwork from review diffs and break Android
 Studio's resource preview. That is a larger program than the two path strings it would deduplicate.
-The copies stay hand-typed, and `BrandAssetParityTest` makes divergence impossible to merge instead.
-The instruction's intent is met; its letter is not.
+The copies stay hand-typed, and each file's comment names the others so whoever edits one knows
+where the rest are.
 
 Two things were not obvious going in. First, an asset catalog takes SVG for an ordinary image set —
 `HearthLaunchTile.imageset` does, with `preserves-vector-representation` — but not for an app icon,
@@ -119,11 +119,13 @@ The night launch tile also turned out not to be the day artwork on a darker back
 green fill (`NightColors.primary`, `#7FB894`) with a near-black glyph (`NightColors.onPrimary`,
 `#100F0E`) — both halves invert together, not just the background.
 
-`BrandAssetParityTest` grew to cover all of it: the launch tile's two SVGs, the app icon's SVG
-source, and the launch-screen declaration in `project.yml` are all compared, as text, against
-`HearthColors.kt` and `HearthIcon.kt`. It runs on Linux in the `jvm-tests` CI job, which is the only
-job that ever looks at the iOS catalog — no Xcode runs on that runner to notice a drift any other
-way.
+A `BrandAssetParityTest` comparing every copy as text was written during this slice and then
+removed before merge, as overkill: 1295 lines guarding 93 lines of artwork that changes almost
+never, three times the size of every other architecture guard combined. Most of what it checked the
+iOS XCTests already cover on the macOS runners — the colour set resolving in both appearances, the
+tile's rendered colours, the launch-screen plist, the icon's corner pixel — so the claim that it was
+the only CI coverage of the iOS catalog, made while building it, was wrong. Consistency across the
+copies is now a matter of care and the comments in each file.
 
 ### 3.2 iOS findings (done 13 September 2026)
 
