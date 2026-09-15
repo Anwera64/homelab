@@ -18,6 +18,7 @@ from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.create_invite import CreateInviteUseCase
 
 from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
 from app.domain.use_cases.spaces.get_personal_space import GetPersonalSpaceUseCase
@@ -120,6 +121,9 @@ def get_change_pin_use_case() -> ChangePinUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_delete_member_use_case() -> DeleteMemberUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_create_invite_use_case() -> CreateInviteUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_shared_space_use_case() -> GetSharedSpaceUseCase:

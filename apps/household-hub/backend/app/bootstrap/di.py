@@ -21,6 +21,7 @@ from app.data.datasources.system_setting_data_source import SqliteSystemSettingD
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.gossip_data_source import SqliteGossipDataSource
+from app.data.datasources.invite_data_source import SqliteInviteDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -32,6 +33,7 @@ from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.gossip_data_mapper import GossipDataMapper
+from app.data.mappers.invite_data_mapper import InviteDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -43,6 +45,7 @@ from app.data.repositories.system_setting_repository_impl import SystemSettingRe
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
 from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
+from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
 
 # Connectors
 from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
@@ -70,6 +73,7 @@ from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.create_invite import CreateInviteUseCase
 
 from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
 from app.domain.use_cases.spaces.get_personal_space import GetPersonalSpaceUseCase
@@ -152,6 +156,7 @@ _system_setting_mapper = SystemSettingDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
 _document_mapper = DocumentDataMapper()
 _gossip_mapper = GossipDataMapper()
+_invite_mapper = InviteDataMapper()
 
 _secret_cipher = SecretCipherImpl(secret_key=settings.SECRET_KEY)
 _searxng_connector = SearXNGSearchConnector(
@@ -184,6 +189,7 @@ def get_container(session: AsyncSession):
     calendar_cred_ds = SqliteCalendarCredentialDataSource(session)
     document_ds = SqliteDocumentDataSource(session)
     gossip_ds = SqliteGossipDataSource(session)
+    invite_ds = SqliteInviteDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
@@ -194,6 +200,7 @@ def get_container(session: AsyncSession):
     calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
     gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
+    invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
 
     uow = SqliteUnitOfWork(session)
 
@@ -339,6 +346,7 @@ def get_container(session: AsyncSession):
             _jwt_token_service,
         ),
         pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
+        pres_deps.get_create_invite_use_case: CreateInviteUseCase(user_repo, invite_repo, uow),
 
         # Spaces
         pres_deps.get_shared_space_use_case: GetSharedSpaceUseCase(space_repo, uow),
@@ -444,6 +452,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_update_profile_use_case,
         pres_deps.get_change_pin_use_case,
         pres_deps.get_delete_member_use_case,
+        pres_deps.get_create_invite_use_case,
         pres_deps.get_shared_space_use_case,
         pres_deps.get_personal_space_use_case,
         pres_deps.get_space_by_id_use_case,

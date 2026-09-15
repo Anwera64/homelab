@@ -9,6 +9,7 @@ from app.domain.entities.memory import AgentMemory
 from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
 from app.domain.exceptions import (
     AuthenticationException,
+    NameTakenException,
     SoleAdminDeletionException,
     InvalidOperationException,
     SecretModeViolationException,
@@ -243,7 +244,7 @@ async def test_a_new_member_cannot_take_an_active_members_name():
     ])
     use_case = CreateMemberUseCase(user_repo, FakeSpaceRepository(), FakePasswordHasher(), FakeUnitOfWork())
 
-    with pytest.raises(InvalidOperationException):
+    with pytest.raises(NameTakenException):
         await use_case.execute(full_name="EMMA", pin="246801")
 
     liam = await use_case.execute(full_name="Liam", pin="246801")
