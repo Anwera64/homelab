@@ -4,7 +4,7 @@
 - **No Direct Coding without Approval:** Never write, modify, delete files, or execute modifying commands without first creating an implementation plan and receiving explicit approval from the user.
 - **Mandatory Lifecycle:**
   1. **Research & Inspect:** Use read-only tools to investigate codebase state, configuration files, and root causes without modifying anything.
-  2. **Create Implementation Plan:** Create or update `implementation_plan.md` outlining the problem, architecture, exact file-by-file diffs, open questions, and verification steps.
+  2. **Create Implementation Plan:** Present the plan through the agent's plan mode, outlining the problem, architecture, file-by-file changes, open questions, and verification steps. Don't write plan files into the repository.
   3. **Wait for Approval:** Stop and present the plan to the user for review and refinement.
   4. **Execute Only When Approved:** Only after the user explicitly approves the plan, proceed to development, file modifications, and testing.
 - **Universal Scope:** This rule applies unconditionally to all tasks, tweaks, bug fixes, or refactors, regardless of perceived simplicity.
@@ -24,3 +24,8 @@
   4. **`bootstrap` is the DI Coordinator:** Sits at the application root (equivalent to an Android `:app` module). It is the sole layer permitted to wire DataSources $\rightarrow$ Repositories $\rightarrow$ Use Cases $\rightarrow$ FastAPI dependencies.
 - **Inter-Layer Mappers:** Always use dedicated mappers between layers (`presentation.mappers` for HTTP schemas $\leftrightarrow$ domain, and `data.mappers` for ORM models $\leftrightarrow$ domain) to prevent model changes from leaking across boundaries.
 - **Automated Boundary Enforcement:** All architecture boundary rules must be covered by automated AST-based tests and executed on every test run and Git pre-commit hook. Cross-module violations must immediately fail the build.
+
+## 4. Sub-Agent Rule: Keep Token Cost Down
+- **Delegate what doesn't need the main model's judgement:** **Sonnet** for simple, well-specified tasks, **Haiku** for the most basic ones (lookups, boilerplate, doc checkboxes).
+- **The main agent keeps design decisions** and reviews every delegated diff before it is committed.
+- **Hand-offs are complete:** a sub-agent starts cold, so give it the tests, specs and file paths it needs.

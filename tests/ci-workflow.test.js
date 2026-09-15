@@ -11,8 +11,10 @@ const GRADLEW_PATH = 'apps/household-hub/client/gradlew';
 const GRADLE_PROPERTIES_PATH = path.join(ROOT_DIR, 'apps/household-hub/client/gradle.properties');
 
 // Missing files read as empty so each check fails with its own message instead of aborting the suite.
+// Line endings are normalised: a Windows checkout with core.autocrlf hands the YAML over as CRLF, and
+// the block regexes below end a block at the first blank line that isn't a bare "\n".
 function readIfExists(filePath) {
-  return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n') : '';
 }
 
 // Text of a top-level YAML key's block, up to the next top-level key.
