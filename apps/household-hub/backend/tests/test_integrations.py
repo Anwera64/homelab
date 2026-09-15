@@ -438,7 +438,7 @@ async def test_integration_input_max_length_validation(client: httpx.AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_calendar_events_corrupted_secret_returns_401(client: httpx.AsyncClient, db_session):
+async def test_calendar_events_corrupted_secret_returns_409(client: httpx.AsyncClient, db_session):
     from sqlalchemy import update
     from app.data.models.calendar_credential_model import CalendarCredentialModel
 
@@ -464,13 +464,14 @@ async def test_calendar_events_corrupted_secret_returns_401(client: httpx.AsyncC
     )
     await db_session.commit()
 
-    # Calling fetch events should return 401 Unauthorized (not 500)
+    # Calling fetch events should return 409 Conflict (not 500, and not 401 -- the token itself is fine)
     resp = await client.get(
         "/api/v1/integrations/calendars/events",
         headers=headers,
         params={"start_time": "2026-09-08T00:00:00Z", "end_time": "2026-09-09T00:00:00Z"},
     )
-    assert resp.status_code == 401
+    assert resp.status_code == 409
     assert "decrypted" in resp.json()["detail"].lower()
+    assert resp.json()["code"] == "calendar_unreadable"
 
 

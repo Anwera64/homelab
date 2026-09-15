@@ -55,13 +55,14 @@ async def test_cannot_delete_sole_admin(client: httpx.AsyncClient):
     """The hub must refuse to delete the only administrator account."""
     admin_token, admin_id = await register_admin(client)
 
-    # Attempt to delete the only admin -> 400 Bad Request
+    # Attempt to delete the only admin -> 409 Conflict
     del_resp = await client.delete(
         f"/api/v1/users/{admin_id}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    assert del_resp.status_code == 400
+    assert del_resp.status_code == 409
     assert "administrator" in del_resp.json()["detail"].lower()
+    assert del_resp.json()["code"] == "sole_admin"
 
 
 @pytest.mark.asyncio
