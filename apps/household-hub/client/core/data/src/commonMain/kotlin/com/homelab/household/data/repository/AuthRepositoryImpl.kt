@@ -10,6 +10,7 @@ import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.remote.SignedOutSignal
 import com.homelab.household.domain.exception.HubAlreadySetUpException
 import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.PinLockedException
@@ -43,16 +44,20 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class AuthRepositoryImpl(
     private val client: HttpClient,
     private val tokenStorage: TokenStorage,
-    private val baseUrl: String
+    private val baseUrl: String,
+    private val signedOut: SignedOutSignal = SignedOutSignal()
 ) : AuthRepository {
 
     private val _currentUserFlow = MutableStateFlow<User?>(null)
+
+    override fun observeSignedOut(): Flow<Unit> = signedOut.events.onEach { _currentUserFlow.value = null }
     private val refreshMutex = Mutex()
     private var activeRefresh: Deferred<String>? = null
 

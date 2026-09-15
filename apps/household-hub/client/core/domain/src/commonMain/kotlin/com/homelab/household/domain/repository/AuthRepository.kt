@@ -16,6 +16,11 @@ interface AuthRepository {
     fun hasStoredSession(): Boolean
     suspend fun logout()
     fun observeCurrentUser(): Flow<User?>
+
+    /** Emits when the hub stopped accepting this phone's token; the token is already forgotten. */
+    fun observeSignedOut(): Flow<Unit>
+
+    /** A fresh token for a member still signed in, replacing the one kept. */
     suspend fun refreshToken(): String
     fun getHubHost(): String
 }

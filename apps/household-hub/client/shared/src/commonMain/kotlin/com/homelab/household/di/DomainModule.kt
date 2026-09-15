@@ -28,6 +28,8 @@ import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.ObserveCurrentUserUseCase
 import com.homelab.household.domain.usecase.ObserveMessagesUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
+import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
+import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
@@ -66,6 +68,8 @@ import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
@@ -101,6 +105,8 @@ val domainModule = module {
     factory<ObserveCurrentUserUseCase> { ObserveCurrentUserUseCaseImpl(get()) }
     factory<GetHubHostUseCase> { GetHubHostUseCaseImpl(get()) }
     factory<HasStoredSessionUseCase> { HasStoredSessionUseCaseImpl(get()) }
+    factory<ObserveSignedOutUseCase> { ObserveSignedOutUseCaseImpl(get()) }
+    factory<RenewSessionUseCase> { RenewSessionUseCaseImpl(get()) }
 
     // Server status use cases
     factory<ObserveServerStatusUseCase> { ObserveServerStatusUseCaseImpl(get()) }

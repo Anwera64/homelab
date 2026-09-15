@@ -3,7 +3,10 @@ package com.homelab.household.data.di
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.remote.DefensiveSseStreamReader
 import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.remote.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
+import com.homelab.household.data.remote.SignedOutSignal
+import com.homelab.household.data.remote.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
@@ -63,22 +66,18 @@ val dataModule = module {
                             null
                         }
                     }
-                    sendWithoutRequest { request ->
-                        val url = request.url.buildString()
-                        !url.contains("/auth/login") &&
-                            !url.contains("/auth/register-initial") &&
-                            !url.contains("/auth/members") &&
-                            !url.contains("/auth/status") &&
-                            !url.contains("/health")
-                    }
+                    sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
             }
+            val signedOut: SignedOutSignal = get()
+            signOutOnUnauthorized(tokenStorage) { signedOut.raise() }
         }
     }
+    single { SignedOutSignal() }
     single { DefensiveSseStreamReader(get()) }
     single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl, get()) }
     single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
     single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }
