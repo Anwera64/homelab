@@ -85,14 +85,45 @@ No features; everything after this builds on it.
 
 **iOS prerequisite:** the owner's Mac with Xcode. An Apple developer account is needed to keep the app on a real iPhone beyond free provisioning's 7-day limit — check when iOS is picked up.
 
-**iOS launch screen — still to do.** The iOS app module exists now (§3.2 below), but `Info.plist`'s
-`UILaunchScreen` is still the empty placeholder that fixes the letterboxing (`project.yml`'s
-`UILaunchScreen: {}`); the real artwork is unbuilt:
-- Declare `UILaunchScreen` in `Info.plist`: `UIColorName` set to a colour asset (e.g. `HearthCanvas` — Any `#F5F2EB`, Dark `#100F0E`), `UIImageName` set to an image asset of the launch tile, and `UIImageRespectsSafeAreaInsets` true.
-- The tile asset is a vector (PDF or SVG) with Any and Dark appearances: tile `#3C6E4E` by day, `#7FB894` by night, with the household glyph.
-- Export the tile once as SVG, so Android's vector drawable and the iOS asset come from one source.
-- App icon: an `AppIcon` asset (1024×1024, no transparency) with the same artwork as Android's launcher icon — full-bleed Hearth green `#3C6E4E` with the white household glyph centred. iOS applies its own corner mask.
-- The launch screen is static and disappears when the app draws its first frame. The animated waiting, routing and offline screens are already Compose in `commonMain`, so nothing else is iOS-specific.
+**iOS launch screen — built (15 September 2026).** `project.yml`'s `UILaunchScreen` now names real
+assets instead of the empty placeholder that only fixed the letterboxing: `UIColorName: HearthCanvas`,
+`UIImageName: HearthLaunchTile`, `UIImageRespectsSafeAreaInsets: true`. `NSLocalNetworkUsageDescription`
+landed alongside it — the hub's address resolves to a LAN address on home Wi-Fi, and iOS has required
+that declaration, shown verbatim in its prompt, since iOS 14. The launch screen is static, as
+planned: it disappears on the app's first frame, and the animated waiting, routing and offline
+screens needed nothing iOS-specific because they were already Compose in `commonMain`.
+
+The plan said to export the tile once as SVG "so Android's vector drawable and the iOS asset come
+from one source". That was not done literally, and deliberately: Android cannot consume an SVG, so
+one source would have meant writing an SVG → Android-vector converter — `<g transform>` to
+`<group translateX/scaleX>`, stroke mapping, the `@color/` indirection no SVG has — or making
+`splash_tile.xml` a build output, which would hide the artwork from review diffs and break Android
+Studio's resource preview. That is a larger program than the two path strings it would deduplicate.
+The copies stay hand-typed, and `BrandAssetParityTest` makes divergence impossible to merge instead.
+The instruction's intent is met; its letter is not.
+
+Two things were not obvious going in. First, an asset catalog takes SVG for an ordinary image set —
+`HearthLaunchTile.imageset` does, with `preserves-vector-representation` — but not for an app icon,
+which actool insists on as a raster; hence a checked-in `AppIcon-1024.png`, rasterised from the
+vector source `tools/hearth_app_icon.svg` by `tools/make_app_icon.sh`, rather than the SVG itself.
+Second, an `AppIcon` set turns out to be mandatory the moment *any* asset catalog exists at all, not
+just once real icon artwork is ready: XcodeGen's iOS-application preset injects
+`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` unconditionally, and actool hard-fails the build —
+"None of the input catalogs contained a matching stickers icon set, app icon set, or icon stack
+named AppIcon" — the instant a catalog exists without one. A stub `AppIcon.appiconset` (a single
+unfilled 1024×1024 slot) had to land with the very first asset catalog, four commits before the
+real artwork, for exactly that reason. It was found the only way it can be: by building.
+
+The night launch tile also turned out not to be the day artwork on a darker backdrop. Night's
+`onPrimary` is the palette's near-black canvas colour, not white, so the night tile pairs a light
+green fill (`NightColors.primary`, `#7FB894`) with a near-black glyph (`NightColors.onPrimary`,
+`#100F0E`) — both halves invert together, not just the background.
+
+`BrandAssetParityTest` grew to cover all of it: the launch tile's two SVGs, the app icon's SVG
+source, and the launch-screen declaration in `project.yml` are all compared, as text, against
+`HearthColors.kt` and `HearthIcon.kt`. It runs on Linux in the `jvm-tests` CI job, which is the only
+job that ever looks at the iOS catalog — no Xcode runs on that runner to notice a drift any other
+way.
 
 ### 3.2 iOS findings (done 13 September 2026)
 
@@ -136,7 +167,7 @@ run, signing, and the local-network permission for the hub's LAN address remain 
 
 Canvas bands are named as on the design canvas; backend and client items refer to design notes §5.
 
-**Slice 1 — built (13 September 2026).** Backend: PIN sign-in with a lockout of five free tries, then 30 s doubling to 15 min; `GET /auth/members`; username, email and password removed; `POST /users` removed until invites. Client: first run, "Who's here?", the PIN pad, and launch; offline counts down to asking again and opens Tailscale. One ViewModel per screen replaced the planned `AuthViewModel`. A follow-up reworked launch: a phone that is signed in opens on Home without calling the hub; signed out, launch is a splash while it checks; every failure uses the offline layout with its own wording and retries by itself; and Android shows a system splash of the launch tile (`core-splashscreen`). Left for slice 2 as designed there: "I have an invite code" and "Forgotten it?". Not drawn: the hub latency pill. The offline screen's Tailscale status line was dropped from the design, because Android can tell a VPN is on but not that it is Tailscale.
+**Slice 1 — built (13 September 2026).** Backend: PIN sign-in with a lockout of five free tries, then 30 s doubling to 15 min; `GET /auth/members`; username, email and password removed; `POST /users` removed until invites. Client: first run, "Who's here?", the PIN pad, and launch; offline counts down to asking again and opens Tailscale. One ViewModel per screen replaced the planned `AuthViewModel`. A follow-up reworked launch: a phone that is signed in opens on Home without calling the hub; signed out, launch is a splash while it checks; every failure uses the offline layout with its own wording and retries by itself; and Android shows a system splash of the launch tile (`core-splashscreen`). Left for slice 2 as designed there: "I have an invite code" and "Forgotten it?". Not drawn: the hub latency pill. The offline screen's Tailscale status line was dropped from the design, because Android can tell a VPN is on but not that it is Tailscale. **Brought to parity on iOS (15 September 2026):** the Compose screens were already shared and already passing on the simulator; what iOS still needed was the native shell around them — the asset catalog, the launch screen and app icon, the LAN-use declaration — and the XCTests proving each (§3.1 above).
 
 | # | Slice | Screens | Backend | Client core | Done when |
 | :--- | :--- | :--- | :--- | :--- | :--- |

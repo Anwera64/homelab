@@ -1,441 +1,214 @@
-# Implementation Plan — Stage 5 · Slice 0 (iOS): the foundation on Apple
+# Implementation Plan — Stage 5 · Slice 1 (iOS): the native shell on Apple
 
-> Supersedes the Android slice-0 plan of the same name (kept in git history). Slice 0 was built on
-> Windows for Android; this plan takes the **same** slice to iOS. Slice 1 gets its own plan after this
-> one lands.
+> Supersedes the slice-0 (iOS) plan of the same name, kept in git history. Slice 0 took the platform
+> foundation to Apple; this plan takes **slice 1** — onboarding — there. Written before the work and
+> updated with outcomes as each cycle landed, in the shape the slice-0 plan established.
+
+**Status:** ✅ Built, 15 September 2026, on branch `stage5/slice1-ios`.
 
 ## 1. Problem
 
-`STAGE_5_PLAN.md` §3 says slice 0 ships the platform foundation on Android **and** iOS, with iOS
-"compiled and checked later on the owner's Mac". That machine is now the machine we are on. Today:
+Slice 1's *screens* were already at parity, and that was measured rather than assumed: all four live
+in `composeApp/src/commonMain` as Compose Multiplatform, and
+`composeApp/build/test-results/iosSimulatorArm64Test/` recorded 22 suites and 0 failures with every
+case name carrying an `[iosSimulatorArm64]` suffix — `FirstRunScreenTest`, `LaunchScreenTest`,
+`PinEntryScreenTest`, `ProfilePickerScreenTest` among them. CI already ran them: `ios-simulator-tests`
+invokes `./gradlew iosSimulatorArm64Test` unqualified, which sweeps in `:composeApp`.
 
-- Every client module targets **JVM + Android only**. `settings.gradle.kts` has no iOS module.
-- `platformModule` (`:shared`) has `actual`s for JVM (CIO + `FileTokenStorage`) and Android (OkHttp +
-  `KeystoreTokenStorage`). There is no Darwin engine and no Keychain storage.
-- **The blocker nobody has hit yet:** all 19 test files in `core/*/src/commonTest` use JUnit 5, and 10
-  of them use MockK. Both are JVM-only. The moment an iOS target is added to those modules,
-  `commonTest` is compiled for iOS too and the build stops. This must be fixed *before* any target is
-  added, not after.
-- **A second blocker behind the first:** the 36 use cases are final classes, so a ViewModel's
-  collaborators cannot be mocked by any library that builds its mocks at compile time — which every
-  Native-capable one does. MockK hides this today by rewriting bytecode, which is exactly the trick
-  that does not exist on iOS.
-- There is no iOS entry point: nothing calls `HouseholdHubSdk.init` or hosts `App()` in a
-  `UIViewController`, and there is no Xcode project.
-- SSE is proven token-by-token on Android (`SseStreamingDeviceTest`). Darwin — the engine the plan
-  flags as most likely to buffer — is unproven.
+What had no iOS twin was the **native shell around those screens**, and its proofs. Android's slice 1
+landed two commits with nothing on the other side:
 
-**Done when:** the app opens on an iPhone simulator, calls `GET /auth/status`, shows ready / first
-run / unreachable, follows the system theme, keeps its tokens in the Keychain, streams SSE
-token-by-token through a long pause — and the Android app and every JVM suite are untouched and green.
+| Commit | Android artefact | iOS before this slice |
+| :--- | :--- | :--- |
+| `ada68f3` | `splash_tile.xml`, `Theme.HyggeHub.Starting`, `installSplashScreen()`, `SplashThemeTest` | `UILaunchScreen: {}` — the empty dict that only defeats letterboxing. No asset catalog existed anywhere under `iosApp/` |
+| `f9f7fbc` | `ic_launcher_foreground.xml`, the adaptive `ic_launcher`, `launcher_colors.xml`, two `LaunchSmokeTest` assertions | the blank default iOS icon, and no smoke test at all |
 
-## 2. What is already iOS-ready (checked today)
+A third problem surfaced during planning: **the first-run form's keyboard could not be dismissed on
+iOS.** Its PIN field is `KeyboardType.NumberPassword`, which iOS draws as a numeric keypad with no
+return key, so `ImeAction.Done` had no button to sit on, and nothing in the repo offered
+tap-outside-to-dismiss. It went unnoticed because the Android emulator uses the host hardware
+keyboard, so the soft keyboard never opens during a hand-run.
 
-The discipline held; this is why the slice is tractable:
+**Done when:** the simulator shows the HyggeHub icon, launches through a Hearth-canvas launch screen
+carrying the tile in both appearances, the slice-1 flows have been driven by hand, and the new
+XCTests and the drift guard are green in CI.
+
+## 2. What was already ready
 
 | Checked | Result |
 | :--- | :--- |
-| `commonMain` imports across all five modules | Zero `java.`/`javax.`/`android.`/engine imports. Only coroutines, serialization, Ktor, Koin, Compose, Nav3, `androidx.lifecycle` — all multiplatform |
-| `Dispatchers.IO`, `System.*`, `UUID`, `String.format`, `Locale`, `@Synchronized` in `commonMain` | None |
-| Time handling | `kotlin.time.TimeSource` / `Duration` — multiplatform |
-| `:composeApp` UI tests | Already MockK-free in `commonTest` by an explicit earlier decision (`client/README.md`), using `runComposeUiTest`, `InMemoryTokenStorage` and hand-written fakes. They compile for iOS as they stand |
-| Library versions | Lifecycle 2.11.0, Nav3 1.1.1, Koin 4.2.2, Ktor 3.5.2, CMP 1.12.0 all publish iOS artifacts |
+| The four slice-1 screens | 100% `commonMain`; no `expect`/`actual`, no platform branch |
+| iOS simulator run | 22 suites / 104 tests / 0 failures, natively |
+| Tailscale hand-off | `IosExternalApps` + `LSApplicationQueriesSchemes`, from slice 0 |
+| XCTest bundle | app-hosted (`TEST_HOST` = `HouseholdHub.app`), so `Bundle.main` **is** the app — which is all the bundle, icon and plist assertions need |
+| CI | `ios-app-tests` already runs `xcodegen generate` + `xcodebuild test -scheme HouseholdHub`, so new `.swift` files in the bundle run with **no workflow change** |
 
-So the work is: the test frameworks, the targets, two platform `actual`s, an app module, and proof.
+## 3. Architecture
 
-## 3. Prerequisites on this Mac (re-checked 13 September 2026)
+### One source for the glyph and the colours
 
-| # | What | Status | Note |
+The plan of record for slice 0 instructed: "export the tile once as SVG, so Android's vector drawable
+and the iOS asset come from one source." That was **not** done literally, and the reasoning is in
+`STAGE_5_PLAN.md` §3.1: Android cannot consume an SVG, so one source means writing a converter or
+making `splash_tile.xml` a build output. Either is a larger program than the two path strings it
+deduplicates.
+
+Instead the copies stay hand-typed and **`BrandAssetParityTest` makes divergence impossible to
+merge**: `HearthColors.kt` and `HearthIcon.Household` are canonical, and the Android resources, both
+launch-tile SVGs, the icon's SVG source, the iOS colour set, the imageset manifest, the appiconset
+manifest, the icon PNG and the `UILaunchScreen` declaration all answer to them. It runs on **Linux**
+in the existing `jvm-tests` job, which is the only thing that ever reads the iOS catalog on CI.
+
+### The app icon is a raster, from a vector source
+
+Asset catalogs take SVG for image sets but not for `AppIcon`. The icon is therefore a committed
+1024² PNG, rasterised from `tools/hearth_app_icon.svg` by `tools/make_app_icon.sh`. **librsvg is a
+developer-machine dependency only**; CI never regenerates the PNG.
+
+Having a vector source is the point, not a convenience. The icon was nearly drawn with CoreGraphics
+path calls, which would have made it the one copy of the glyph the guard could never check — it
+compares path strings and cannot compare one to a sequence of `addArc` calls.
+
+### The smoke test is app-hosted, not XCUITest
+
+An XCUITest twin of `LaunchSmokeTest` would need a `bundle.ui-testing` target that does not exist: a
+new target, two scheme entries, a `tests/ci-workflow.test.js` assertion, and a slower job. It would
+also not help, because the launch screen is drawn by a system process before app code runs, so no
+automated test can see it. Its proof is the plist and asset assertions plus hand verification.
+
+## 4. TDD cycles, and what each found
+
+Each cycle ran red → green → refactor, with the red verified before any implementation. Where a test
+pinned already-correct behaviour it was **mutation-checked** instead.
+
+| # | Cycle | Commit | Outcome |
 | :-- | :--- | :--- | :--- |
-| 1 | **JDK 21** | ✅ Temurin 21.0.12.1, `JAVA_HOME` set | |
-| 2 | **Full Xcode active** | ⚠️ `Xcode.app` is installed, but `xcode-select -p` still returns `/Library/Developer/CommandLineTools` | Needs `sudo xcode-select -s /Applications/Xcode.app`, then `sudo xcodebuild -license accept` and `sudo xcodebuild -runFirstLaunch`. Kotlin/Native cannot build for iOS until this points at Xcode |
-| 3 | **iOS simulator runtime** | ❓ unverifiable until 2 is done (`simctl` is not on PATH) | Check with `xcrun simctl list runtimes`; install from Xcode → Settings → Components if the list is empty |
-| 4 | **Android SDK** | ✅ platforms 36 + 37.0, build-tools 36.0.0, `client/local.properties` written | **Verified**: `./gradlew projects` configures the whole build, AGP KMP plugin and all |
-| 5 | **`gradlew` executable** | ✅ `100755` on disk and in the git index | |
+| 0 | Baseline on the branch | — | All four suites green before anything was touched |
+| 1 | The catalog and the Hearth canvas | `23caf99` | **Found the `AppIcon` trap** (below) |
+| 2 | The launch tile imageset | `e511517` | actool took the SVGs intact, `<g transform>` and strokes included |
+| 3–4 | `UILaunchScreen` + `NSLocalNetworkUsageDescription` | `4943723` | Landed as one commit; adjacent lines of one YAML block |
+| 5 | The app icon | `5041d47` | **Found a stale-green hole in the guards** (below) |
+| 6 | The launch smoke test | `b54dc33` | No natural red; mutation-proved |
+| 7 | The first-run keyboard | `165ea7f` | **Half the planned fix was unnecessary** (below) |
+| 8 | Docs and this plan | — | |
+| 9 | The hand-run | — | See §6 |
 
-First native build also downloads the Kotlin/Native toolchain (~1 GB, once).
+### An `AppIcon` set is mandatory the moment any catalog exists
 
-## 4. Architecture
+Not once real artwork is ready — the moment a `.xcassets` folder exists at all. XcodeGen's
+iOS-application preset injects `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` unconditionally, and
+actool hard-fails:
 
 ```
-:androidApp ─┐                                                   Android app (unchanged)
-             ├─► :composeApp (UI) ─► :core:presentation ─► :core:domain ◄─ :core:data
-:iosApp ─────┘                                                                ▲
-     │                                                                        │
-     └──────► :shared (DI coordinator) ──────────────────────────────────────┘
+error: None of the input catalogs contained a matching stickers icon set,
+app icon set, or icon stack named "AppIcon".
+** BUILD FAILED **
 ```
 
-`:iosApp` mirrors `:androidApp` exactly: it is the only iOS-side module that may see both `:composeApp`
-and `:shared`, so `MainViewController` can start Koin and host `App()` without `:composeApp` ever
-importing `sdk`/`di`. `CleanArchitectureBoundaryTest.module_dependencies_point_inward` needs no
-exception — app roots are not in its map, by the same rule that already exempts `:androidApp`.
+Verified by removing the stub and rebuilding. This broke the planned cycle order — cycles 1–4 would
+all have been unbuildable — so an unfilled `AppIcon.appiconset` slot shipped with cycle 1, and cycle
+5 filled it rather than creating it. Only building reveals this.
 
-**Decisions taken** (from the questions asked before this plan):
+### The guards could report a stale green
 
-1. All 19 core test files are ported to `kotlin.test` + **Mokkery**, so they run on the iOS simulator
-   as well as the JVM. MockK leaves the client entirely. No new module and no hand-written fakes.
-2. **Use cases move behind protocols** (cycle 1), the way repositories already are. A unit test should
-   exercise one class and mock the rest; that is impossible while a ViewModel's dependencies are final
-   classes, and it stays impossible under Mokkery, which builds its mocks at compile time. An
-   interface per use case fixes the cause rather than working around it, and leaves `:core:presentation`
-   depending on domain *protocols* only — which is what the layer rule meant all along.
-3. `:iosApp` is a new Kotlin module; the Xcode project sits beside it.
-4. Targets `iosArm64` + `iosSimulatorArm64`; verification on the simulator. Real device, signing and
-   the local-network permission are a follow-up.
+`BrandAssetParityTest` reads files off disk rather than through the classpath, which Gradle cannot
+infer. A mutated `hearth_app_icon.svg` left `:shared:jvmTest` up to date and the task skipped in
+557 ms, reporting green. **The pre-commit hook runs these tests by name**, so a drifted asset could
+have been committed on a cached pass — the one failure a drift guard must not have. The files are now
+declared task inputs in `shared/build.gradle.kts`.
 
-## 5. TDD cycles
+### `ImeAction.Next` was never broken
 
-**Outcome (13 September 2026).** All cycles landed. What the plan got wrong, recorded honestly:
+The plan asserted the name field's `ImeAction.Next` had no focus target and needed a `keyboardActions`
+parameter on `HearthTextField`. It did not: Compose Foundation's `KeyboardActionRunner` falls through
+to `defaultKeyboardActionWithResult`, which for `ImeAction.Next` is
+`focusManager.moveFocus(FocusDirection.Next)` with no app code required. The test for it passed before
+any change, so it was deleted rather than kept as a test that proves nothing, and the parameter was
+dropped rather than added as speculative API. Only tap-outside-to-dismiss shipped.
 
-| Cycle | Commit | What actually happened |
-| :--- | :--- | :--- |
-| 0 Baseline | — | 151 tests green on the Mac |
-| 1 Use-case protocols | `cf351ed` | 8 of 36 had to stay plain interfaces — Kotlin forbids a default parameter value on a `fun interface`'s abstract method |
-| 2 Test port | `a632a9e` | Mokkery spells the count modes `VerifyMode.exactly(n)`, not the top-level `exactly(n)` of 2.x |
-| 3 iOS targets | `7481826` | `:composeApp`'s **tests** could not be part of this cycle — they depend on `:shared`, which had no iOS targets until cycle 5 |
-| 4 Keychain | `7224222` | A Kotlin/Native test binary cannot reach the Keychain at all (`errSecNotAvailable`) — proof deferred to cycle 7 |
-| 4b SSE dispatcher bug | `c50587e` | **Not in the plan.** A production defect that only iOS exposed |
-| 5 iOS `platformModule` | `6c0341c` | Went as written |
-| 6 Darwin SSE proof | `9d15ac6` | Tests belong in `:shared`, not `:core:data` — only there can they resolve the *real* engine from the production graph |
-| 7 `:iosApp` | `cd59332` | The deferred Keychain proof worked after all, as an XCTest hosted by the app bundle |
-| 8 UI tests on iOS | — | Free. 64 tests ran on the simulator with **no changes**; the Compose-resources risk did not materialise |
-| 9 Guards and docs | — | |
+## 5. Files touched
 
-Two things the plan asserted that turned out to be wrong, beyond the table: the new `usecase.impl`
-boundary rule could not fail before the refactor (it passes vacuously when the package does not
-exist), so it was proven by mutation instead; and cycle 7's Keychain XCUITest was specified as
-"sign in, relaunch, still signed in" without noticing that sign-in is slice 1 — an XCTest against
-the storage directly was the way through.
+**Created** — `iosApp/HouseholdHub/Assets.xcassets/` (`HearthCanvas.colorset`,
+`HearthLaunchTile.imageset` + 2 SVGs, `AppIcon.appiconset` + the 1024 PNG) ·
+`iosApp/HouseholdHubTests/{HearthColorAsset,HearthLaunchTile,LaunchScreenPlist,PrivacyDeclaration,AppIcon,LaunchSmoke}Tests.swift`
+and `{HearthTraitCollection,PixelSampling}.swift` · `tools/hearth_app_icon.svg` ·
+`tools/make_app_icon.sh` · `shared/src/jvmTest/.../architecture/BrandAssetParityTest.kt`
 
+**Modified** — `iosApp/project.yml` · `shared/build.gradle.kts` (declared guard inputs) ·
+`composeApp/.../screens/firstrun/FirstRunContent.kt` + its tests · the two Android drawables
+(comments only) · `.githooks/pre-commit` · `client/README.md` · `docs/STAGE_5_PLAN.md`
 
-Every cycle ends with `./gradlew jvmTest` green and — from cycle 3 on — the iOS compilation green.
-Android must stay green throughout: `./gradlew :androidApp:assembleDebug` at the end of each cycle
-that touches a shared file.
+**Untouched by design** — `.github/workflows/household-hub-client.yml` and `tests/ci-workflow.test.js`.
+New XCTests and catalog files need no workflow change.
 
-### Cycle 0 — Baseline on the Mac (no production change)
-
-- **Red/Green:** none. Record a green `./gradlew jvmTest` on macOS *before* anything changes, so a
-  later failure is attributable. Fix only what the platform move breaks (path separators, the `gradlew`
-  bit).
-- **Verify:** `./gradlew jvmTest` and `./gradlew :androidApp:assembleDebug` both green on this machine.
-
-### Cycle 1 — Use cases behind protocols (production refactor)
-
-A unit test should drive one class and mock the rest. `:core:presentation` cannot: a ViewModel's
-collaborators are **final classes**, and no compile-time mocking library can stand in for one —
-Mokkery's documented workaround is the all-open plugin, which opens those classes in the production
-source set. Rather than open production code to suit tests, give a use case the shape a repository
-already has: a protocol in the domain, an implementation behind it.
-
-- **Red:** extend `CleanArchitectureBoundaryTest` first with the rule this cycle creates — nothing
-  outside `:core:domain` and `DomainModule` may import `com.homelab.household.domain.usecase.impl`.
-  It fails while the implementations are still the public names.
-- **Green:** for each of the **36** use cases:
-  - `usecase/<Name>UseCase.kt` becomes a `fun interface` carrying today's signature:
-    `fun interface CheckAuthStatusUseCase { suspend operator fun invoke(): AuthStatus }`. A
-    `fun interface` costs nothing over a plain one and lets a test that needs no verification pass a
-    lambda instead of a mock.
-  - the current class moves to `usecase/impl/<Name>UseCaseImpl.kt` with its body untouched:
-    `class CheckAuthStatusUseCaseImpl(private val authRepository: AuthRepository) : CheckAuthStatusUseCase`.
-    Protocols stay in `usecase/`, implementations in `usecase/impl/` — the same separation the
-    repository protocols have from `…RepositoryImpl`, and it keeps the package everyone imports at 36
-    files rather than 72.
-  - `DomainModule` binds the protocol:
-    `factory<CheckAuthStatusUseCase> { CheckAuthStatusUseCaseImpl(get()) }` — 36 lines, and the only
-    place an implementation is named.
-  - the 6 domain test files construct `…UseCaseImpl`; they were testing the implementation all along.
-- **Verify:** `./gradlew jvmTest` green with every test unchanged apart from the `Impl` suffix, and
-  `:shared:jvmTest` for the Koin graph, which resolves by protocol and should not notice.
-- **Scope:** all 36, not only the 15 a ViewModel touches today — a half-converted package is worse
-  than either shape, and slices 1–11 consume most of the rest. Say the word to cut it to the 15.
-
-### Cycle 2 — The core tests leave JUnit 5 and MockK (tests only, no production change)
-
-The largest cycle (~1,900 lines touched) and pure refactor: **the assertions must not change**, only
-the framework under them.
-
-**Mokkery 3.5.0** (published 7 September 2026) replaces MockK. It supports Kotlin 2.4.0–2.4.20 — our
-exact compiler — and is compiler-plugin driven rather than reflective, which is why it works on
-Native. Its vocabulary is MockK's: `mock<T>()`, `every { }`, `everySuspend { }`,
-`verifySuspend(exactly(1)) { }`.
-
-- **Red:** none — this cycle rewrites tests, so its own proof is the mutation check below.
-- **Green:** port file by file, running `jvmTest` after each:
-  - Framework swap everywhere: `org.junit.jupiter.api.Test` → `kotlin.test.Test`;
-    `@BeforeEach`/`@AfterEach` → `@BeforeTest`/`@AfterTest`; `Assertions.assertX` →
-    `kotlin.test.assertX`.
-  - `:core:data` (7 files) — JUnit only, no mocks at all: just the swap. They keep `MockEngine`, which
-    is multiplatform.
-  - `:core:domain` (6 files) — these mock repository **protocols**, which Mokkery handles directly:
-    `mockk<AuthRepository>()` → `mock<AuthRepository>()`, `coEvery { } returns` →
-    `everySuspend { } returns`, `coVerify(exactly = 1) { }` → `verifySuspend(exactly(1)) { }`. Close
-    to a find-and-replace.
-  - `:core:presentation` (4 files) — cycle 1 turned the 15 use cases they mock into protocols, so
-    these are the same find-and-replace as the domain ones: `mockk<CheckAuthStatusUseCase>()` →
-    `mock<CheckAuthStatusUseCase>()`. Each ViewModel test still drives one class and mocks exactly
-    the collaborators that class declares; nothing else about them changes.
-  - Gradle: `dev.mokkery` 3.5.0 as a catalog plugin alias, applied to `:core:domain` and
-    `:core:presentation` (the plugin wires its own test dependencies). `junit-jupiter` +
-    `junit-platform-launcher` move from `commonTest` to `jvmTest` in all three modules; `mockk` and
-    `assertj` leave the catalog (`assertj` is declared but imported nowhere). `kotlin-test` joins every
-    `commonTest`; the Kotlin plugin resolves it to the JUnit 5 variant because `useJUnitPlatform()` is
-    configured — the pattern `:composeApp` already uses.
-- **Refactor:** lift the two duplicate `assertThrowsSuspend` helpers onto `kotlin.test.assertFailsWith`
-  and delete them.
-- **Prove the port didn't hollow the tests out:** mutate one production line per module (flip a
-  comparison in `LoginUseCaseImpl`, drop the `ServerOfflineException` mapping in `NetworkExceptionHelper`,
-  return `HubStatus.Ready` unconditionally in `LaunchViewModel`) and confirm the suite fails each time,
-  then revert.
-- **Verify:** `./gradlew jvmTest` — same test count, all green, and `grep -r "io.mockk\|org.junit" core/`
-  returns nothing outside `jvmTest`/`androidDeviceTest`.
-- **Note:** `:composeApp`'s UI tests keep using no mocking library at all. `client/README.md` explains
-  why (a mock in `commonTest` would have nailed the UI suite to the JVM); Mokkery would lift that
-  constraint, but `MockEngine` plus hand-written fakes is the better test for a full-stack screen
-  test, so that decision stands and only its *reason* needs rewording in cycle 9.
-
-### Cycle 3 — iOS targets on the five modules
-
-- **Red:** `./gradlew compileKotlinIosSimulatorArm64` — no such task.
-- **Green:** add `iosArm64()` and `iosSimulatorArm64()` to `:core:domain`, `:core:testing`,
-  `:core:data`, `:core:presentation` and `:composeApp`. `:shared` comes last because it needs the
-  `actual` from cycles 4–5. Move `compose-ui-tooling` out of `composeApp`'s `commonMain` and into
-  `androidMain` if its iOS klib turns out not to be published — `ui-tooling-preview`, which
-  `DayNightPreviews` actually imports, is multiplatform and stays.
-- **Verify:** `./gradlew compileKotlinIosSimulatorArm64 compileTestKotlinIosSimulatorArm64` green for
-  every module except `:shared`; `jvmTest` still green.
-- **Correction, found while doing it:** `:composeApp`'s *test* compilation cannot be part of this
-  cycle. Its `commonTest` depends on `:shared` by design — the UI tests wire the real Koin graph — so
-  it cannot compile for iOS until `:shared` has iOS targets in cycle 5. This cycle takes
-  `:composeApp`'s `commonMain` only; its tests are verified in cycle 8, where they were going to be
-  run anyway.
-- **What actually broke** (both invisible to an import grep, which is why the compiler had to be the
-  judge): `Charsets.UTF_8` in `DefensiveSseStreamReaderTest` — JVM-only and default-imported, so it
-  needs no `import` line to find — replaced with `encodeToByteArray()`; and
-  `org.jetbrains.compose.ui:ui-tooling`, which has no iOS klib and moved to `androidMain` as
-  predicted.
-
-### Cycle 4 — `KeychainTokenStorage` (iOS)
-
-- **Red:** `core/data/src/iosTest/…/KeychainTokenStorageTest.kt`, the Android
-  `KeystoreTokenStorageTest` said in Apple terms: saving then reading returns the tokens; a second
-  instance reads what the first wrote; `clear()` empties it; a corrupt item reads as signed out rather
-  than throwing; a refresh token of `null` leaves the stored one alone.
-- **Green:** `core/data/src/iosMain/…/KeychainTokenStorage.kt` — `kSecClassGenericPassword`, service
-  `com.homelab.household.tokens`, account `auth_tokens`, holding the same `TokenDiskPayload` JSON as
-  the other two. `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: not synced to iCloud and not
-  restored onto a new device, which is what `noBackupFilesDir` buys on Android. `SecItemCopyMatching`
-  → `SecItemUpdate`/`SecItemAdd` → `SecItemDelete`; anything unreadable is deleted and reads as signed
-  out. The Keychain is itself thread-safe, so there is no lock and no cached copy to go stale.
-- **Verify:** ~~`./gradlew :core:data:iosSimulatorArm64Test`~~ — **not possible, and this is the
-  cycle's real finding.** Every `SecItem*` call from a Kotlin/Native test binary returns
-  `errSecNotAvailable` (-25291): Gradle spawns the binary with `simctl spawn --standalone`, outside
-  the booted simulator's daemon environment, so `securityd` is unreachable. It is not the
-  `errSecMissingEntitlement` (-34018) the plan half-expected, but the same family of problem.
-  `kSecUseDataProtectionKeychain` changes nothing (it is a macOS-side switch), and running
-  non-standalone against a booted device hangs with no output. Both knobs are one-liners if anyone
-  wants to revisit.
-- **Decided:** the tests that cannot run are deleted rather than left red or faked against a seam.
-  `KeychainTokenStorage` is proven at the app level in cycle 7, where the real app bundle has the
-  entitlements a bare test binary lacks. Until then the implementation is **unverified by any
-  automated test** — reviewed by eye only, and that is the trade this decision accepts.
-- The class therefore ships without the `accessibility()` helper and the accessibility constant
-  accessor, which existed only for the deleted tests.
-
-### Cycle 4b — The chat stream survives a dispatcher switch (production bug, found in cycle 4)
-
-**Not in the original plan.** Three `SessionRepositoryTest` cases pass on the JVM and fail on iOS.
-The diagnosis is a production defect, not a test artifact, and it is the exact class of bug this
-stage's iOS work exists to find.
-
-**What is wrong.** `SessionRepositoryImpl.streamChatTurn` calls `emit()` from inside
-`statement.execute { }`. Ktor 3.5.2 switches dispatchers there on Native — `useEngineDispatcher` is
-unconditionally `true` off the JVM — so the block runs on the engine's `Dispatchers.IO` while the
-`flow { }` collector runs on the caller's dispatcher, and every `emit` violates the flow-context
-invariant. On the JVM the flag is off, which is why it has never shown: the Android path is
-*accidentally* safe, and Ktor 4.0 turns the switch on everywhere.
-
-Proved by setting `-Dio.ktor.client.statement.useEngineDispatcher=true` on the JVM test task, which
-reproduces all three failures on the JVM with the same MockEngine and the same `runTest`.
-
-**Why it is silent.** `DefensiveSseStreamReader.readEvents` holds its `emit` calls inside a
-`catch (_: Exception)` meant for malformed JSON. The invariant `IllegalStateException` is an
-`Exception`, so every event is swallowed as a "malformed line" and the flow completes normally with
-nothing emitted. On the 409 path the same violation is discarded by `catch (e: Throwable)`, so
-polling never completes and burns its whole 60 s budget.
-
-**What a user would see on iOS:** an assistant reply that never arrives, with no error — and a 409
-recovery that always times out even when the server answered immediately.
-
-- **Red:** a JVM test task running with `useEngineDispatcher=true`, reproducing the three failures in
-  seconds without a simulator. It stays as a permanent guard, and it pre-qualifies the codebase for
-  Ktor 4.0.
-- **Green:**
-  1. Hoist emission out of `execute`: `channelFlow { … send(event) … }`, whose `send` is safe from
-     any context — in `streamChatTurn` and in `pollUntilFinished`. **Not** `flowOn`, which would move
-     the whole upstream instead of fixing the boundary.
-  2. Narrow `DefensiveSseStreamReader`'s `catch (_: Exception)` to the JSON parse it was written for,
-     so a collector error can never again be mistaken for a malformed line.
-- **Refactor:** `SessionRepositoryImpl.pollDelayMs` is declared, passed by the test as `10`, and never
-  read — `pollUntilFinished` hardcodes `500L`. Wire it up; it is why the 409 test spends real seconds.
-- **Verify:** `jvmTest` green both with and without the flag; `:core:data:iosSimulatorArm64Test` green.
-- **Note for cycle 6:** `androidApp`'s `SseStreamingDeviceTest` collects inside `execute` with a plain
-  lambda rather than emitting through a `flow {}`, so it could never have caught this. Cycle 6's
-  Darwin proof must drive the real `Flow<ChatStreamEvent>` boundary the app uses, and assert on event
-  count and content — "no exception thrown" would have passed throughout this bug.
-
-### Cycle 5 — The iOS `platformModule`
-
-- **Red:** `shared/src/iosTest/…/IosPlatformModuleTest.kt` — `HouseholdHubSdk.init()` binds a Darwin
-  engine and a `KeychainTokenStorage`; plus an iOS twin of `KoinDependencyGraphTest` resolving every
-  repository, use case and ViewModel. (The JVM graph test stays where it is: `:shared`'s `commonTest`
-  can't hold it, because the Android unit-test compilation would try to run it without a context.)
-- **Green:** `ktor-client-darwin` in the catalog and in `shared`'s `iosMain`; `platformModule.ios.kt`
-  binding `Darwin.create { … }` and `KeychainTokenStorage()`. NSURLSession's default 60-second
-  `timeoutIntervalForRequest` is the Apple equivalent of the OkHttp read timeout the Android module
-  had to zero out — a long answer pausing between tokens would trip it — so
-  `timeoutIntervalForRequest = 3600.0` and `timeoutIntervalForResource = 86_400.0`, with the comment
-  explaining why, as on Android.
-- **Verify:** `./gradlew :shared:iosSimulatorArm64Test :shared:jvmTest`.
-
-### Cycle 6 — Proof that Darwin doesn't buffer
-
-The claim to prove is the Android one: deltas arrive **one at a time**, and the stream survives a pause
-longer than the engine's default timeout.
-
-- **Red:** `core/data/src/iosTest/…/DarwinSseStreamingTest.kt` against a fixture SSE server on
-  `127.0.0.1` (loopback is exempt from ATS) that refuses to write delta *n+1* until delta *n* has been
-  read, and inserts one 15-second gap. A buffering engine deadlocks; a timing-out engine drops. The
-  fixture is a small Python script under `client/tools/`, started and stopped by the Gradle test task
-  on a fixed port — the same trick the Android test plays with an in-process `ServerSocket`, which
-  Kotlin/Native has no equivalent of.
-- **Green:** whatever the Darwin config needs — expected to be the timeouts from cycle 5 and nothing
-  more.
-- **Fallback if the fixture proves flaky in CI-less local runs:** keep the test, and additionally prove
-  it by hand against the real hub with a long answer, recorded in the baseline document. The proof is
-  not optional; only its harness is negotiable.
-- **Verify:** `./gradlew :core:data:iosSimulatorArm64Test`.
-
-### Cycle 7 — `:iosApp`, and the app on a simulator
-
-- **Red:** nothing automated yet — the gate is the app launching.
-- **Green:**
-  - `client/iosApp/build.gradle.kts`: `kotlin-multiplatform` + `compose-multiplatform` +
-    `kotlin-compose`, `iosArm64`/`iosSimulatorArm64`, `binaries.framework { baseName =
-    "HouseholdHubKit"; isStatic = true }`, depending on `:composeApp` and `:shared`.
-  - `src/iosMain/…/MainViewController.kt`: `fun MainViewController() = ComposeUIViewController { App() }`,
-    and a `startHouseholdHub()` that calls `HouseholdHubSdk.init()` once — the iOS twin of
-    `HouseholdHubApplication`.
-  - `client/iosApp/project.yml` — the XcodeGen spec, checked in; `xcodegen generate` produces
-    `HouseholdHub.xcodeproj`, which is git-ignored. Swift sources under `client/iosApp/HouseholdHub/`:
-    a SwiftUI `App` and a `UIViewControllerRepresentable` wrapping `MainViewController()`, with
-    `.ignoresSafeArea(.keyboard)` so the composer behaves the way `adjustResize` does on Android.
-    Bundle id `com.homelab.household`, display name **HyggeHub**, deployment target **iOS 15**. The
-    spec declares a pre-build script phase running
-    `./gradlew :iosApp:embedAndSignAppleFrameworkForXcode`, plus `FRAMEWORK_SEARCH_PATHS` and
-    `LD_RUNPATH_SEARCH_PATHS` for the built framework.
-  - `.gitignore`: `*.xcodeproj/`, `xcuserdata/`, `*.xcworkspace/xcuserdata/`, `DerivedData/`.
-  - An **XCUITest target** in `project.yml`, carrying cycle 4's debt: it drives the real app bundle,
-    which has the entitlements a bare Kotlin/Native test binary lacks, and proves
-    `KeychainTokenStorage` end to end — sign in, terminate the app, relaunch, still signed in; sign
-    out, relaunch, signed out. This is the only automated cover `KeychainTokenStorage` gets.
-- **Verify:** build and run on an iPhone 17 simulator; the launch screen names the hub, calls
-  `GET /auth/status` and shows ready / first run; airplane-mode the hub (point `HubConfig` at an unused
-  host) and the offline state appears; toggle the simulator to dark and the theme follows; and the
-  Keychain XCUITest passes.
-
-### Cycle 8 — The UI tests on the simulator
-
-- **Red:** `./gradlew :composeApp:iosSimulatorArm64Test` — the existing `LaunchScreenTest`,
-  `AppNavHostTest` and the component tests, unchanged, on Apple.
-- **Green:** expected to be free: they are already MockK-free and engine-agnostic. The one known risk
-  is Compose resources (`strings.xml`, the fonts) inside a Native test binary; if `getString` can't find
-  the bundle, `LaunchRobot` is the only thing that needs adapting.
-- **Fallback:** if resource loading in Native test binaries is broken in CMP 1.12, the tests keep
-  compiling for iOS (which is the regression guard that matters) and only their *execution* stays on
-  the JVM. Write down which it was.
-
-### Cycle 9 — Guards and documentation
-
-- **Red:** extend `CleanArchitectureBoundaryTest`: `platform.` (the Kotlin/Native Apple frameworks)
-  joins `java.`/`javax.`/`android.` in the `commonMain` forbidden list, and `io.ktor.client.engine.darwin`
-  is already there. Add `:iosApp` to nothing — app roots stay out of the dependency map, as
-  `:androidApp` does. Prove the new rule by importing `platform.Foundation.NSDate` in a `commonMain`
-  file and watching it fail.
-- **Green:** the rule passes.
-- **Docs:** `client/README.md` — targets line, the Ktor engine table (Darwin), Keychain beside
-  Keystore, macOS commands beside the PowerShell ones, how a screen is tested on iOS, the use-case
-  protocol convention (`usecase/` vs `usecase/impl/`, bound by protocol in `DomainModule`), and
-  Mokkery in place of MockK.
-  `STAGE_5_PLAN.md` §3 — iOS is no longer "later"; record the versions and the Apple-side findings the
-  way §3.1 records the Android ones. `.githooks/pre-commit` stays JVM-only: simulator tests are far too
-  slow for a commit hook, and the boundary test already catches the mistake that would break iOS.
-
-## 6. Files touched
-
-| Area | Files |
-| :--- | :--- |
-| New module | `client/iosApp/` (build file, `MainViewController.kt`, Swift app, `project.yml`) |
-| Gradle | `settings.gradle.kts`, `gradle/libs.versions.toml` (add `ktor-client-darwin` and the `dev.mokkery` plugin; drop `mockk`, `assertj`), the 5 module build files (+ iOS targets, Mokkery, test-dep moves) |
-| New iOS source | `core/data/src/iosMain/…/KeychainTokenStorage.kt`, `shared/src/iosMain/…/PlatformModule.ios.kt` |
-| New iOS tests | `core/data/src/iosTest/` (Keychain, Darwin SSE), `shared/src/iosTest/` (platform module, Koin graph) |
-| Domain refactor | 36 use-case protocols in `usecase/`, 36 implementations moved to `usecase/impl/`, `DomainModule` rebound to the protocols |
-| Ported tests | 19 files under `core/*/src/commonTest` |
-| Guards | `shared/src/jvmTest/…/CleanArchitectureBoundaryTest.kt` |
-| Docs | `client/README.md`, `apps/household-hub/docs/STAGE_5_PLAN.md`, `.gitignore` |
-| Untouched | Every `commonMain` production file, `:androidApp`, the backend |
-
-## 7. Verification (the whole slice)
+## 6. Verification
 
 ```bash
 cd apps/household-hub/client
-./gradlew jvmTest                                   # every JVM suite, as before
-./gradlew :shared:jvmTest --tests "*CleanArchitectureBoundaryTest*" \
-    --tests "*KoinDependencyGraphTest*" --tests "*DesignSystemTokenTest*"
-./gradlew iosSimulatorArm64Test                     # core, shared and the UI tests on Apple
-./gradlew :androidApp:assembleDebug                 # Android unbroken
+./gradlew jvmTest                    # 29 in :shared (incl. 14 BrandAssetParityTest), 104 in :composeApp
+./gradlew iosSimulatorArm64Test      # the same 104, natively
+./gradlew :androidApp:assembleDebug  # Android unbroken
+(cd iosApp && xcodegen generate)
+xcodebuild test -project iosApp/HouseholdHub.xcodeproj -scheme HouseholdHub \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'   # 22 XCTests
 ```
-Then by hand: the app on an iPhone simulator against the real hub — ready / first run / unreachable,
-light and dark, tokens surviving a relaunch.
 
-## 8. Risks
+All green as of this commit.
 
-| Risk | Mitigation |
+### Hand-verified on the simulator
+
+> **Uninstall first**: `xcrun simctl uninstall booted com.homelab.household`. iOS caches the
+> launch-screen snapshot and the home-screen icon per install.
+
+| Check | Result |
 | :--- | :--- |
-| `KeychainTokenStorage` is unverified until cycle 7 | Accepted deliberately (cycle 4). The blast radius is "the app forgets you are signed in", which the first manual run on a simulator would expose immediately; the XCUITest then holds the line |
-| The 36-use-case split is a wide diff mid-stage | It is mechanical and guarded: every domain test and the Koin graph test must pass unchanged, and it lands as its own commit before any iOS work, so a bisect separates it cleanly |
-| The test port quietly weakens assertions | Every ported file is mutation-checked against a deliberate production bug before the cycle closes |
-| Mokkery is a compiler plugin, so it is pinned to the Kotlin version | 3.5.0 covers 2.4.0–2.4.20 and shipped six days after we picked 2.4.20, so the project is tracking it closely. A future Kotlin bump waits for a Mokkery release — the same coupling the Compose compiler plugin already imposes |
-| `compose-ui-tooling` has no iOS klib | Caught at cycle 3's first compile; it moves to `androidMain`, where it was only ever used from |
-| Compose resources unavailable in Native test binaries | Cycle 8's fallback: compile on iOS, execute on the JVM, and say so in the docs |
-| Darwin buffers SSE despite the timeouts | Cycle 6 is deliberately before the app module, so this is known before any chat screen depends on it |
-| Xcode project drift (a hand-edited `.pbxproj` is unreviewable) | See open question 1 |
-| The Mac can't build Android at all without an SDK | Prerequisite 4; nothing else can be verified until it's done |
+| Launch screen, light | Hearth canvas fills the screen, tile centred, no letterbox |
+| Launch screen, dark | Near-black canvas, light-green tile, **near-black glyph** — the inversion is right |
+| Hand-off to Compose | No colour jump; the canvas is continuous |
+| Home-screen icon | Green, white glyph, iOS's own corner mask, labelled HyggeHub |
+| Offline — no route | Title, "No route" chip, hub address, "Retrying in Ns" ticking, both buttons, safe areas respected |
 
-## 9. Open questions
+### Not hand-verified, and why
 
-1. ~~How the Xcode project gets created~~ — **decided: XcodeGen** (2.46.0, installed 13 September
-   2026). `client/iosApp/project.yml` is checked in and generates `HouseholdHub.xcodeproj`, which is
-   **git-ignored** — the YAML is the reviewable source of truth, and `xcodegen generate` is a
-   documented step in `client/README.md` for anyone cloning the repo.
-2. **Bundle identifier.** `com.homelab.household` matches Android. Confirm — it is awkward to change
-   once anything is installed on a device.
-3. **Where the port stops.** `:core:data`'s `FileTokenStorageTest` (jvmTest) and the Android
-   `KeystoreTokenStorageTest` stay on JUnit — they are platform tests in platform source sets. Only
-   `commonTest` is ported. Say if you want those moved too, for one framework across the repo.
+The hub's backend was down throughout (Caddy answered 502; `hub.spicy-llama.duckdns.org` resolves to
+`192.168.1.20`). **First run, "Who's here?", the PIN pad, the wrong-PIN lockout backoff, and the
+signed-in-opens-on-Home path could not be exercised.** They are covered by the 104 Compose UI tests on
+both runtimes, but slice 1's own done-criterion #4 asks for a hand-run, and for those five flows it
+remains outstanding until the hub is up.
 
-## 10. Follow-ups (explicitly not in this slice)
+Note that 502 correctly shows the **no-route** wording, not "HTTP 502":
+`AuthRepositoryImpl.ensureJsonSuccess` maps 502–504 to `ServerOfflineException` deliberately — a
+proxy answering 502 means the hub behind it is down, which to the user is "can't reach your hub".
 
-**The 409 path holds an HTTP response open while it polls** — deferred to slice 3 (Chatting), by
-decision. `SessionRepositoryImpl.streamChatTurn` collects `pollUntilFinished` *inside*
-`statement.execute { }`, so on a 409 the conflict response and its connection stay allocated for the
-whole recovery — up to the 60 s `maxWaitMs` budget — pinning a socket for no reason. The fix is a
-small restructure: record a flag inside `execute`, leave the block so the response is released, then
-poll outside it. Found by an independent review during slice 0's iOS work; not a correctness bug, so
-it waits for the slice that owns this code.
+## 7. Risks, as they turned out
 
+| Risk | Outcome |
+| :--- | :--- |
+| actool mis-renders the SVG's `<g transform>` or strokes | Did not happen; accepted intact, vector preserved |
+| The launch-screen renderer ignores a vector imageset | Did not happen; verified by eye in both appearances |
+| Simulator caches the launch snapshot and icon | Real; the uninstall step is documented in the README |
+| `AppIcon` declared `ios-marketing` only | Guarded from Linux before a Mac is involved |
+| The keyboard fix regresses Android | Did not; 104 green on both runtimes, Android still assembles |
 
-Real-device run: an Apple developer account (or free provisioning's 7-day limit),
-`NSLocalNetworkUsageDescription` in `Info.plist` for the hub's `192.168.1.20` address on home Wi-Fi and
-the permission prompt that comes with it, and a signing team in the Xcode project. Also: an iOS
-smoke test equivalent to `LaunchSmokeTest`, and iOS in CI (GitHub's macOS runners are billable —
-worth a decision when Stage 6 touches deployment).
+## 8. Open questions
+
+1. **iOS 18+ dark and tinted app-icon variants** — the twin of Android's `monochrome` layer, which
+   already exists. Out of scope here.
+2. **`TARGETED_DEVICE_FAMILY "1,2"`** ships an iPad build with no iPad orientations declared, while
+   the design is phone portrait. Left alone by decision.
+3. **Portrait lock** — neither platform locks it, though the design says phone portrait.
+
+## 9. Follow-ups (explicitly not in this slice)
+
+- **The five hand-run flows above**, once the hub is back up.
+- **Signing and a real device** — a `DEVELOPMENT_TEAM`, an Apple developer account, and the one thing
+  the simulator cannot answer: whether `openTailscale()` reaches the real app via `tailscale://`. The
+  local-network prompt is declared but only appears on hardware.
+- **An XCUITest target**, if slice 2 needs cross-screen journeys.
+- **iOS has no edge-swipe back** — `ComposeUIViewController` is hosted bare in a SwiftUI `WindowGroup`.
+  Only the PIN pad has a back affordance in slice 1 and it is a visible button, so nothing is
+  unreachable; revisit when a deeper stack appears.
+- **`HearthScaffoldTest` asserts against synthetic insets**, never real device ones. The notch and home
+  indicator stay eyeball-verified until there is a UI-test target.
+- **The 409 path holds an HTTP response open while it polls** — carried forward from slice 0,
+  deferred to slice 3, which owns that code.

@@ -121,7 +121,7 @@ test — that is the point, and it means copy is not what these tests are about.
 the wiring, so prove a change by mutating that instead: swap two resource keys, or render the
 wrong one, and the tests should fail.
 
-These tests run on **both** the JVM and the iOS simulator — the same 64, name for name — which is
+These tests run on **both** the JVM and the iOS simulator — the same 104, name for name — which is
 why `commonTest` holds no JVM-only library. The core modules mock with **Mokkery**, a compiler
 plugin rather than a bytecode rewriter, which is why it works on Native; MockK is gone from the
 client entirely. `:composeApp` still uses no mocking library at all, but the reason has changed:
@@ -148,6 +148,40 @@ simply the better test for a screen wired to the real graph.
 | Mocking | Mokkery 3.5.0 (compiler plugin; works on Native) |
 
 `compileSdk 37` is required by Material3 `1.5.0-alpha22`, which CMP 1.12.0 depends on.
+
+---
+
+## 🎨 Brand assets
+
+Three files are canonical, and everything else is a copy of them.
+`app/theme/HearthColors.kt` decides every colour in the palette; `app/icons/HearthIcon.kt`'s
+`HearthIcon.Household` decides the household glyph's path data; `tools/hearth_app_icon.svg` is the
+icon artwork's vector source, its `<path>` `d` values kept byte-identical to `HearthIcon.Household`'s.
+
+The glyph is hand-copied into five further places: Android's `drawable/splash_tile.xml` and
+`drawable/ic_launcher_foreground.xml`, the two `HearthLaunchTile.imageset` SVGs on iOS (day and
+night), and `tools/hearth_app_icon.svg` itself. An SVG → Android-vector → asset-catalog generator
+was considered and rejected — it would be a larger program than the two path strings it would
+deduplicate.
+
+`BrandAssetParityTest` (`shared/src/jvmTest/.../architecture/`) is what keeps those copies honest:
+it reads every file as text against `HearthColors.kt` and `HearthIcon.kt` and fails the moment one
+drifts, so divergence cannot be merged. It runs on Linux, in the existing `jvm-tests` CI job, which
+matters more than it sounds — `jvm-tests` is the *only* thing on CI that ever looks at the iOS
+asset catalog. The two iOS jobs build and test the app, but no Xcode runs on that Linux box to
+notice a `.colorset` or `.imageset` quietly drifting; this test is what would catch it.
+
+Regenerating the app icon's PNG needs `tools/make_app_icon.sh`, which rasterises
+`tools/hearth_app_icon.svg` with `rsvg-convert` and refuses to leave behind a PNG carrying an alpha
+channel — Apple rejects an app icon that has one outright, even a fully opaque one. That script
+needs librsvg (`brew install librsvg`), but this is a **developer-machine dependency only**:
+`AppIcon-1024.png` is committed, CI never regenerates it, and nobody cloning the repo needs librsvg
+installed to build or test anything.
+
+**Re-checking the launch screen or the icon on a simulator:** run
+`xcrun simctl uninstall booted com.homelab.household` before reinstalling. iOS caches the
+launch-screen snapshot and the home-screen icon per install, so without the uninstall you're
+looking at the previous artwork and will chase a phantom.
 
 ---
 
@@ -178,7 +212,7 @@ cd apps\household-hub\client
 cd apps/household-hub/client
 
 ./gradlew iosSimulatorArm64Test           # everything on the simulator: core, shared, and the
-                                          # 64 Compose UI tests, which run here as well as on the JVM
+                                          # 104 Compose UI tests, which run here as well as on the JVM
 ./gradlew :shared:iosSimulatorArm64Test   # ~10s, includes the Darwin SSE lock-step proof
 
 # SLOW, >75s: the only thing guarding timeoutIntervalForRequest in PlatformModule.ios.kt.
