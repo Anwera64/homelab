@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.io.File
+import javax.imageio.ImageIO
 import kotlin.math.roundToInt
 
 /**
@@ -65,6 +66,16 @@ class BrandAssetParityTest {
     private val iosLaunchTileDay = File(iosLaunchTileDir, "hearth_launch_tile.svg")
     private val iosLaunchTileNight = File(iosLaunchTileDir, "hearth_launch_tile_dark.svg")
     private val iosLaunchTileManifest = File(iosLaunchTileDir, "Contents.json")
+
+    private val iosAppIconSet = File(iosAssetCatalog, "AppIcon.appiconset")
+    private val iosAppIconManifest = File(iosAppIconSet, "Contents.json")
+
+    /**
+     * The icon's vector source. The catalog can only hold the raster, so this is the only copy of
+     * the icon artwork that states the glyph as text — and therefore the only one this guard can
+     * compare with the others.
+     */
+    private val iosAppIconSource = File(clientRootDir, "tools/hearth_app_icon.svg")
 
     /** The XcodeGen spec. `HouseholdHub/Info.plist` is generated from it, and git-ignored. */
     private val iosProjectSpec = File(clientRootDir, "iosApp/project.yml")
@@ -984,6 +995,301 @@ class BrandAssetParityTest {
             problems.isEmpty(),
             "The iOS launch screen declaration is wrong (${problems.size}):\n" +
                 problems.joinToString("\n") + "\n" + fixInTheSpec
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // The iOS app icon
+    // ---------------------------------------------------------------------------------------
+
+    /** One JSON string value off an entry body, without caring about key order or formatting. */
+    private fun jsonString(body: String, key: String): String? =
+        Regex("""["]$key["]\s*:\s*"([^"]*)"""").find(body)?.groupValues?.get(1)
+
+    /**
+     * The single entry of the app icon set.
+     *
+     * The set itself is never absent, and that is not a sign of health: actool hard-fails any build
+     * where the catalog has no set matching ASSETCATALOG_COMPILER_APPICON_NAME, so an empty stub is
+     * the shape that keeps the build alive while the app ships the blank default icon. Everything
+     * below therefore checks what the set *says*, not merely that it is there.
+     */
+    private fun appIconEntry(): String {
+        if (!iosAppIconManifest.exists()) {
+            fail<Nothing>(
+                "${iosAppIconManifest.relative()} does not exist. It is the app icon set manifest; " +
+                    "without it actool fails the whole build, because XcodeGen's iOS application " +
+                    "preset always sets ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon."
+            )
+        }
+
+        val entries = entryBodies(
+            arrayBody(iosAppIconManifest.readText(), iosAppIconManifest, "images", "app icon set"),
+            iosAppIconManifest,
+            "an app icon entry"
+        )
+
+        return entries.singleOrNull() ?: fail(
+            "${iosAppIconManifest.relative()}: the \"images\" array has ${entries.size} entries; a " +
+                "modern iOS app icon is one 1024x1024 universal slot that the system downscales " +
+                "for every other size."
+        )
+    }
+
+    /**
+     * The PNG the manifest names, resolved from the declared filename rather than from a name
+     * written out here — so a manifest pointing at artwork that is not on disk is caught as the
+     * half-finished change it is.
+     */
+    private fun appIconPng(): File {
+        val filename = jsonString(appIconEntry(), "filename") ?: fail(
+            "${iosAppIconManifest.relative()} declares no \"filename\", so the app icon slot names " +
+                "no artwork and the app ships the blank default iOS icon. The set exists only " +
+                "because actool refuses to build a catalog without it."
+        )
+
+        val png = File(iosAppIconSet, filename)
+        if (!png.isFile) {
+            fail<Nothing>(
+                "${iosAppIconManifest.relative()} names `$filename`, but ${png.relative()} does not " +
+                    "exist — the app icon slot points at artwork that is not there, and the app " +
+                    "ships the blank default iOS icon."
+            )
+        }
+        return png
+    }
+
+    /**
+     * The app icon set has to declare a universal iOS slot, and the reason this is a test rather
+     * than a glance is the `platform` key.
+     *
+     * An entry written the old way — `idiom: ios-marketing`, no `platform` — is accepted by Xcode,
+     * builds clean, and uploads to App Store Connect without a word of complaint. What it produces
+     * is a home screen with no icon at all. Nothing on a Linux PR would otherwise read this file,
+     * and the symptom appears only once the app is installed on a device.
+     */
+    @Test
+    fun the_ios_app_icon_declares_one_universal_ios_slot() {
+        val entry = appIconEntry()
+
+        val problems = buildList {
+            val idiom = jsonString(entry, "idiom")
+            val platform = jsonString(entry, "platform")
+            if (idiom != "universal" || platform != "ios") {
+                add(
+                    "${iosAppIconManifest.relative()}: the slot is declared as " +
+                        "`idiom: ${idiom ?: "(absent)"}`" +
+                        (platform?.let { ", `platform: $it`" } ?: ", with no `platform` key") +
+                        "; it must be `idiom: universal` with `platform: ios`. This is the mistake " +
+                        "worth catching from Linux: the legacy `ios-marketing` idiom with no " +
+                        "`platform` is accepted by Xcode and ships to App Store Connect without " +
+                        "complaint, and leaves the home screen with no icon at all."
+                )
+            }
+
+            val size = jsonString(entry, "size")
+            if (size != "1024x1024") {
+                add(
+                    "${iosAppIconManifest.relative()}: the slot declares " +
+                        "`size: ${size ?: "(absent)"}`; a modern iOS app icon is a single " +
+                        "1024x1024 image that the system downscales for every other size."
+                )
+            }
+
+            if (jsonString(entry, "filename") == null) {
+                add(
+                    "${iosAppIconManifest.relative()}: the slot declares no \"filename\", so it " +
+                        "names no artwork and the app ships the blank default iOS icon. The set " +
+                        "exists only because actool refuses to build a catalog without it."
+                )
+            }
+        }
+
+        assertTrue(
+            problems.isEmpty(),
+            "The iOS app icon set is wrong (${problems.size}):\n" + problems.joinToString("\n")
+        )
+    }
+
+    /** The PNG colour types, by the numbers the IHDR chunk actually stores. */
+    private fun colourTypeName(type: Int): String = when (type) {
+        0 -> "greyscale"
+        2 -> "truecolour, no alpha"
+        3 -> "indexed colour"
+        4 -> "greyscale with alpha"
+        6 -> "truecolour with alpha"
+        else -> "unrecognised"
+    }
+
+    /**
+     * Reads the icon's IHDR chunk straight out of the file.
+     *
+     * A PNG opens with an 8-byte signature, then the IHDR chunk: 4 bytes of length, the literal
+     * `IHDR`, then width and height as big-endian uint32s at offsets 16 and 20, the bit depth at
+     * 24 and the colour type at 25. The signature and the chunk name are verified before any of
+     * those offsets are trusted, so a file that is not a PNG says so instead of reporting a
+     * nonsense size.
+     */
+    @Test
+    fun the_ios_app_icon_png_is_a_1024_square_with_no_alpha_channel() {
+        val png = appIconPng()
+        val bytes = png.readBytes()
+
+        val signature = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)
+        if (bytes.size < 26 || !bytes.copyOfRange(0, 8).contentEquals(signature)) {
+            fail<Nothing>(
+                "${png.relative()} is not a PNG: it does not start with the PNG signature. The app " +
+                    "icon slot names it, so whatever it is, it is what would be shipped."
+            )
+        }
+        if (String(bytes, 12, 4, Charsets.US_ASCII) != "IHDR") {
+            fail<Nothing>(
+                "${png.relative()} is a PNG whose first chunk is not IHDR, so its header cannot be " +
+                    "read. Every PNG must open with IHDR."
+            )
+        }
+
+        fun uint32At(offset: Int): Int = (0 until 4).fold(0) { value, index ->
+            (value shl 8) or (bytes[offset + index].toInt() and 0xFF)
+        }
+
+        val width = uint32At(16)
+        val height = uint32At(20)
+        val colourType = bytes[25].toInt() and 0xFF
+
+        val problems = buildList {
+            if (width != 1024 || height != 1024) {
+                add(
+                    "${png.relative()} is ${width}x${height}; the single universal slot must be " +
+                        "1024x1024, because every smaller icon iOS shows is downscaled from it."
+                )
+            }
+            if (colourType != 2) {
+                add(
+                    "${png.relative()} has PNG colour type $colourType (${colourTypeName(colourType)}); " +
+                        "it must be 2 (truecolour, no alpha). Apple rejects an app icon carrying an " +
+                        "alpha channel outright, and a fully opaque alpha channel is not good " +
+                        "enough — the channel's presence is what the check looks at. Caught here it " +
+                        "is a re-export; caught at submission it is months later."
+                )
+            }
+        }
+
+        assertTrue(
+            problems.isEmpty(),
+            "The iOS app icon artwork is wrong (${problems.size}):\n" + problems.joinToString("\n")
+        )
+    }
+
+    /**
+     * The icon is a full-bleed Hearth green square: iOS applies its own mask, so the artwork must
+     * carry colour all the way into the corners or the rounded edge shows through as white.
+     *
+     * The day green in every appearance, on purpose — an app icon is the app's mark, not part of
+     * its UI, the same rationale already written into `launcher_colors.xml`. There is no night
+     * variant to look for and none is missing.
+     *
+     * Corners, not the centre: the centre holds the glyph. They are sampled a few pixels in, far
+     * outside the glyph but off the outermost row, so an encoder's edge artefact cannot red this.
+     */
+    @Test
+    fun the_ios_app_icon_is_full_bleed_hearth_green() {
+        val png = appIconPng()
+        val image = ImageIO.read(png) ?: fail(
+            "${png.relative()} could not be decoded as an image, so its colours cannot be checked."
+        )
+
+        val inset = 8
+        val corners = listOf(
+            "top-left" to (inset to inset),
+            "top-right" to (image.width - 1 - inset to inset),
+            "bottom-left" to (inset to image.height - 1 - inset),
+            "bottom-right" to (image.width - 1 - inset to image.height - 1 - inset)
+        )
+
+        val expected = canonicalHex("DayColors", "primary")
+        val drifted = corners.mapNotNull { (name, point) ->
+            val (x, y) = point
+            val pixel = image.getRGB(x, y)
+            val hex = "%02X%02X%02X".format(
+                (pixel shr 16) and 0xFF,
+                (pixel shr 8) and 0xFF,
+                pixel and 0xFF
+            )
+            if (hex == expected) null else {
+                "${png.relative()}: the $name corner is #$hex but DayColors.primary in " +
+                    "${hearthColorsFile.relative()} is #$expected"
+            }
+        }
+
+        assertTrue(
+            drifted.isEmpty(),
+            "The iOS app icon is not full-bleed Hearth green (${drifted.size}):\n" +
+                drifted.joinToString("\n") +
+                "\n(By design the app icon carries the day green in every appearance — it is the " +
+                "app's mark, not part of its UI — so there is no night variant to add.)"
+        )
+    }
+
+    /**
+     * The house on the app icon is the same house as everywhere else.
+     *
+     * This is the copy that nearly escaped the net. The catalog can only hold a raster, and the
+     * assertions above it check that raster thoroughly — 1024 square, no alpha channel, Hearth
+     * green into all four corners — but a PNG cannot be compared with a path string, so none of
+     * them can tell whether the glyph on it is the household glyph or some other drawing
+     * altogether. Rasterising from a checked-in SVG is what makes the icon answerable to
+     * `HearthIcon.Household` like the other four copies, and this is the assertion that collects
+     * on it.
+     *
+     * The background is a `<rect>` here rather than the launch tile's rounded `<path>`, because
+     * iOS masks the corners itself and the artwork must run edge to edge underneath that mask.
+     */
+    @Test
+    fun the_ios_app_icon_source_draws_the_canonical_glyph_on_hearth_green() {
+        assertTrue(
+            iosAppIconSource.exists(),
+            "${iosAppIconSource.relative()} does not exist. It is the vector source the committed " +
+                "app icon PNG is rasterised from (tools/make_app_icon.sh), and the only copy of " +
+                "the icon artwork that spells the glyph out as text — without it the icon is a " +
+                "raster nothing can check against ${hearthIconFile.relative()}."
+        )
+
+        val icon = parseLaunchTile(iosAppIconSource)
+        val problems = buildList {
+            addAll(glyphDrift(iosAppIconSource, icon.glyphPaths, canonicalGlyphPaths()))
+
+            val expectedGlyph = canonicalHex("DayColors", "onPrimary")
+            icon.glyphStrokes.distinct().filterNot { it == expectedGlyph }.forEach { stroke ->
+                add(
+                    "${iosAppIconSource.relative()}: the glyph stroke is #$stroke but " +
+                        "DayColors.onPrimary in ${hearthColorsFile.relative()} is #$expectedGlyph"
+                )
+            }
+
+            val expectedGreen = canonicalHex("DayColors", "primary")
+            val fills = elements(iosAppIconSource.readText(), "rect")
+                .mapNotNull { attributeOf(it, "fill") }
+                .map { normaliseHex(it) }
+            when {
+                fills.isEmpty() -> add(
+                    "${iosAppIconSource.relative()} has no filled <rect>. The icon must be " +
+                        "full-bleed: iOS applies its own rounded mask, so artwork that stops short " +
+                        "of the edge shows white through the corners."
+                )
+                fills.any { it != expectedGreen } -> add(
+                    "${iosAppIconSource.relative()}: the background fill is " +
+                        "#${fills.first { it != expectedGreen }} but DayColors.primary in " +
+                        "${hearthColorsFile.relative()} is #$expectedGreen"
+                )
+            }
+        }
+
+        assertTrue(
+            problems.isEmpty(),
+            "The iOS app icon source drifted (${problems.size}):\n" + problems.joinToString("\n") +
+                "\n(Regenerate the PNG with tools/make_app_icon.sh after fixing the SVG — the " +
+                "raster is committed and does not rebuild itself.)"
         )
     }
 }
