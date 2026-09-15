@@ -68,6 +68,7 @@ from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
+from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 
 from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
@@ -330,6 +331,13 @@ def get_container(session: AsyncSession):
         pres_deps.get_list_members_use_case: ListMembersUseCase(user_repo),
         pres_deps.get_member_use_case: GetMemberUseCase(user_repo),
         pres_deps.get_update_profile_use_case: UpdateProfileUseCase(user_repo, uow),
+        pres_deps.get_change_pin_use_case: ChangePinUseCase(
+            VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
+            user_repo,
+            _password_hasher,
+            uow,
+            _jwt_token_service,
+        ),
         pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
 
         # Spaces
@@ -434,6 +442,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,
+        pres_deps.get_change_pin_use_case,
         pres_deps.get_delete_member_use_case,
         pres_deps.get_shared_space_use_case,
         pres_deps.get_personal_space_use_case,

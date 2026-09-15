@@ -2,8 +2,12 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 
 from app.domain.entities.user import User
+from app.presentation.schemas.account_schemas import ChangePinRequest
+from app.presentation.schemas.auth_schemas import Token
 from app.presentation.schemas.user_schemas import UserRead, UserUpdate
+from app.presentation.mappers.auth_presentation_mapper import AuthPresentationMapper
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
+from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
@@ -11,6 +15,7 @@ from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 from app.presentation.api.deps import (
     get_current_user,
     get_current_admin_user,
+    get_change_pin_use_case,
     get_list_members_use_case,
     get_member_use_case,
     get_update_profile_use_case,
@@ -43,6 +48,24 @@ async def update_my_profile(
         avatar_color=payload.avatar_color,
     )
     return UserPresentationMapper.to_response(updated)
+
+
+@router.post("/me/pin", response_model=Token)
+async def change_my_pin(
+    payload: ChangePinRequest,
+    use_case: ChangePinUseCase = Depends(get_change_pin_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Change your PIN. Every other device is signed out; this one gets the token in the answer.
+    A wrong current PIN answers 403 with `attempts_left`, and 429 once it locks, as sign-in does.
+    """
+    token_dict = await use_case.execute(
+        user_id=current_user.id,
+        current_pin=payload.current_pin,
+        new_pin=payload.new_pin,
+    )
+    return AuthPresentationMapper.to_token_response(token_dict)
 
 
 @router.get("/{user_id}", response_model=UserRead)
