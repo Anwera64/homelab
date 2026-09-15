@@ -11,6 +11,7 @@ from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdmi
 from app.domain.use_cases.auth.login import LoginUseCase
 from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
+from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -100,6 +101,9 @@ def get_authenticate_token_use_case() -> AuthenticateTokenUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_list_public_members_use_case() -> ListPublicMembersUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_refresh_token_use_case() -> RefreshTokenUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_list_members_use_case() -> ListMembersUseCase:

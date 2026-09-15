@@ -63,6 +63,7 @@ from app.domain.use_cases.auth.login import LoginUseCase
 from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 from app.domain.use_cases.auth.verify_member_pin import MemberPinLocks, VerifyMemberPinUseCase
+from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -323,6 +324,7 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(user_repo, _jwt_token_service),
         pres_deps.get_list_public_members_use_case: ListPublicMembersUseCase(user_repo),
+        pres_deps.get_refresh_token_use_case: RefreshTokenUseCase(_jwt_token_service),
 
         # Users
         pres_deps.get_list_members_use_case: ListMembersUseCase(user_repo),
@@ -428,6 +430,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_login_use_case,
         pres_deps.get_authenticate_token_use_case,
         pres_deps.get_list_public_members_use_case,
+        pres_deps.get_refresh_token_use_case,
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,

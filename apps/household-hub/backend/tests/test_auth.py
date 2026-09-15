@@ -2,10 +2,22 @@ import asyncio
 import pytest
 import httpx
 import jwt
+from datetime import timedelta
 from unittest.mock import patch
+from app.core.config import settings
 from app.core.security import verify_password
+from app.data.security.jwt_token_service import JwtTokenService
 
-from tests.auth_helpers import ADMIN_PIN, MEMBER_PIN, add_member, bump_token_version, deactivate, register_admin, sign_in
+from tests.auth_helpers import (
+    ADMIN_PIN,
+    MEMBER_PIN,
+    add_member,
+    add_signed_in_member,
+    bump_token_version,
+    deactivate,
+    register_admin,
+    sign_in,
+)
 
 WRONG_PIN = "000000"
 
@@ -205,6 +217,70 @@ async def test_bumping_the_version_signs_out_existing_tokens(client: httpx.Async
     await bump_token_version(user_id)
 
     resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def _token_for(user_id: str, token_version: int = 0, lasts: timedelta = timedelta(minutes=5)) -> str:
+    """A token signed like the hub's, with a lifetime the test chooses."""
+    service = JwtTokenService(secret_key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return service.create_access_token(subject=user_id, is_admin=True, token_version=token_version, expires_delta=lasts)
+
+
+def _claims(token: str) -> dict:
+    return jwt.decode(token, options={"verify_signature": False})
+
+
+@pytest.mark.asyncio
+async def test_refreshing_gives_a_token_that_lasts_longer_with_the_same_version(client: httpx.AsyncClient):
+    _, user_id = await register_admin(client)
+    old = _token_for(user_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {old}"})
+
+    assert resp.status_code == 200, resp.text
+    new = resp.json()["access_token"]
+    assert _claims(new)["exp"] > _claims(old)["exp"]
+    assert _claims(new)["ver"] == 0
+    assert resp.json()["user"]["id"] == user_id
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new}"})
+    assert me.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_token_from_before_the_version_changed_cannot_refresh(client: httpx.AsyncClient):
+    token, user_id = await register_admin(client)
+    await bump_token_version(user_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_an_expired_token_cannot_refresh(client: httpx.AsyncClient):
+    _, user_id = await register_admin(client)
+    expired = _token_for(user_id, lasts=timedelta(seconds=-1))
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {expired}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_an_inactive_member_cannot_refresh(client: httpx.AsyncClient):
+    await register_admin(client)
+    token, member_id = await add_signed_in_member(client)
+    await deactivate(member_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refreshing_needs_a_token(client: httpx.AsyncClient):
+    resp = await client.post("/api/v1/auth/refresh")
+
     assert resp.status_code == 401
 
 
