@@ -29,6 +29,8 @@ defaults:
     working-directory: apps/household-hub/client
 
 # compile -> jvm-tests -> android-ui-tests: each stage only runs once the one before it passed.
+# ios-simulator-tests and ios-app-tests wait for nothing and start alongside compile, so a commit
+# gets its Android and its iOS answer in the same wall clock instead of one after the other.
 jobs:
   compile:
     name: Compile Android app and test APKs
@@ -147,4 +149,121 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-ui-test-reports
+          path: apps/household-hub/client/**/build/reports/
+
+  ios-simulator-tests:
+    name: Kotlin/Native tests (iOS simulator)
+    # Pinned to Apple Silicon rather than macos-latest: the only iOS targets declared are iosArm64
+    # and iosSimulatorArm64, so an Intel image has nothing here it can build.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      # The Kotlin/Native compiler and the Apple platform libraries are a multi-gigabyte first-run
+      # download; the key tracks the Kotlin version, which is what decides the toolchain.
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.konan
+          key: konan-macos-${{ hashFiles('apps/household-hub/client/gradle/libs.versions.toml') }}
+          restore-keys: konan-macos-
+
+      # The SSE tests need a server Kotlin/Native cannot host in-process; :shared's build starts and
+      # stops the Python fixture around these tasks itself.
+      - name: Run simulator tests
+        run: ./gradlew iosSimulatorArm64Test --continue
+
+      # Its own invocation because the task's onlyIf demands to be named on the command line, and it
+      # runs even after a failure above because it is the only guard on the NSURLSession timeout.
+      - name: Run the long-pause SSE proof
+        if: '!cancelled()'
+        run: ./gradlew :shared:iosSimulatorArm64SlowSseLongPauseTest
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-simulator-test-reports
+          path: apps/household-hub/client/**/build/reports/
+
+  ios-app-tests:
+    name: App-hosted tests (iOS simulator)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.konan
+          key: konan-macos-${{ hashFiles('apps/household-hub/client/gradle/libs.versions.toml') }}
+          restore-keys: konan-macos-
+
+      # XcodeGen is not on the image, and the .xcodeproj is not committed, so without this there is
+      # no project to build.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        working-directory: apps/household-hub/client/iosApp
+        run: xcodegen generate
+
+      # The image has shipped more than once with an Xcode whose paired simulator runtime was
+      # missing, so take whichever iPhone is actually installed instead of naming a device that may
+      # not exist that week. Booting it here rather than letting xcodebuild do it keeps a slow or
+      # flaky CoreSimulator start out of the test timeout.
+      - name: Boot a simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json | /usr/bin/python3 -c '
+          import json, sys
+
+          def ios_version(runtime):
+              return [int(part) for part in runtime.rsplit(".", 1)[-1].split("-")[1:]]
+
+          newest = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if "SimRuntime.iOS-" not in runtime:
+                  continue
+              for device in devices:
+                  if device["name"].startswith("iPhone"):
+                      if newest is None or ios_version(runtime) > newest[0]:
+                          newest = (ios_version(runtime), device["udid"])
+          if newest is None:
+              sys.exit("This image has no installed iPhone simulator.")
+          print(newest[1])
+          ')
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+      # The Keychain is why this is xcodebuild and not Gradle: SecItem* answers only inside an
+      # app-hosted bundle, which a bare Kotlin/Native test binary is not.
+      - name: Run app-hosted tests
+        working-directory: apps/household-hub/client/iosApp
+        run: |
+          xcodebuild test \
+            -project HouseholdHub.xcodeproj \
+            -scheme HouseholdHub \
+            -destination "id=$SIMULATOR_UDID" \
+            -resultBundlePath build/reports/ios-app-tests.xcresult
+
+      # xcodebuild only ever builds the simulator slice, so this is the one thing in CI that proves
+      # the framework still links for a real phone. Independent of the tests above, so a red test
+      # does not hide a broken device build.
+      - name: Link the device framework
+        if: '!cancelled()'
+        run: ./gradlew :iosApp:linkDebugFrameworkIosArm64
+
+      # The .xcresult bundle is written under build/reports/ so it rides along with Gradle's own.
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-app-test-reports
           path: apps/household-hub/client/**/build/reports/

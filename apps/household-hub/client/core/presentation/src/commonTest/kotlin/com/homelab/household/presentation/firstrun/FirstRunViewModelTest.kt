@@ -5,9 +5,19 @@ import com.homelab.household.domain.exception.HubAlreadySetUpException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.answering.throws
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
+import dev.mokkery.verify.VerifyMode
+import dev.mokkery.verifySuspend
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,12 +25,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 
 /**
  * First run takes a name, a PIN and a colour. The button is never disabled: tapping it with
@@ -30,16 +34,16 @@ import org.junit.jupiter.api.Test
 class FirstRunViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
-    private val onboard = mockk<FirstRunOnboardUseCase>()
+    private val onboard = mock<FirstRunOnboardUseCase>()
 
     private val emma = User(id = "emma", fullName = "Emma", isAdmin = true, isActive = true)
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
     }
 
-    @AfterEach
+    @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
@@ -76,7 +80,7 @@ class FirstRunViewModelTest {
 
         assertEquals(NameError.Missing, viewModel.uiState.value.nameError)
         assertEquals(PinError.NotSixDigits, viewModel.uiState.value.pinError)
-        coVerify(exactly = 0) { onboard(any(), any(), any()) }
+        verifySuspend(VerifyMode.exactly(0)) { onboard(any(), any(), any()) }
     }
 
     @Test
@@ -102,7 +106,7 @@ class FirstRunViewModelTest {
 
     @Test
     fun creating_sends_the_name_pin_and_colour_and_goes_home() = runTest(testDispatcher) {
-        coEvery { onboard("Emma", "482913", "#C05638") } returns emma
+        everySuspend { onboard("Emma", "482913", "#C05638") } returns emma
         val viewModel = filledIn().apply { onColourSelect("#C05638") }
 
         viewModel.events.test {
@@ -116,7 +120,7 @@ class FirstRunViewModelTest {
 
     @Test
     fun an_unreachable_hub_is_reported_and_nothing_typed_is_cleared() = runTest(testDispatcher) {
-        coEvery { onboard(any(), any(), any()) } throws ServerOfflineException()
+        everySuspend { onboard(any(), any(), any()) } throws ServerOfflineException()
         val viewModel = filledIn()
 
         viewModel.create()
@@ -131,7 +135,7 @@ class FirstRunViewModelTest {
 
     @Test
     fun a_hub_someone_else_already_set_up_says_so() = runTest(testDispatcher) {
-        coEvery { onboard(any(), any(), any()) } throws HubAlreadySetUpException()
+        everySuspend { onboard(any(), any(), any()) } throws HubAlreadySetUpException()
         val viewModel = filledIn()
 
         viewModel.create()
@@ -142,7 +146,7 @@ class FirstRunViewModelTest {
 
     @Test
     fun anything_else_is_an_unknown_failure() = runTest(testDispatcher) {
-        coEvery { onboard(any(), any(), any()) } throws IllegalStateException("odd")
+        everySuspend { onboard(any(), any(), any()) } throws IllegalStateException("odd")
         val viewModel = filledIn()
 
         viewModel.create()

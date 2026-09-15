@@ -12,8 +12,8 @@ import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class DataMappersTest {
 

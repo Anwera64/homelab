@@ -1,6 +1,6 @@
 # Household Hub: Stage 5 Plan — Compose Multiplatform UI
 
-**Status:** ✅ Approved — Android first, iOS verified later
+**Status:** ✅ Approved — Android first, iOS verified later. **Slice 0 is done on both.**
 **Target:** new `:composeApp` and `:androidApp` (Android now, iOS later), `:core:*` and `:shared` (new targets, ViewModel changes), `backend` (the changes the designs depend on)
 **Date:** September 2026
 
@@ -30,7 +30,7 @@ Every slice is done when:
 1. Its backend changes have tests, and the full backend suite and AST boundary check pass.
 2. Its use cases and ViewModels have KMP tests (Turbine for flows), and the Koin graph check passes.
 3. Its screens match the canvas, follow the rules in design notes §2, and have Compose UI tests for the main path and each drawn error state.
-4. It has been run by hand on an Android phone or emulator. iOS is checked in batches on the Mac once Android is working.
+4. It has been run by hand on an Android phone or emulator, and on an iPhone simulator.
 
 Rules that apply across slices:
 
@@ -46,9 +46,9 @@ At the end: `STAGE_5_BASELINE.md` in the shape of the earlier baselines, and `SY
 
 No features; everything after this builds on it.
 
-- **Targets.** Every client module builds for the JVM only today. Add the Android target to `:core:domain`, `:core:data`, `:core:presentation` and `:shared` now, and the iOS targets when iOS is picked up; keep the JVM target for tests.
-- **Networking.** `DataModule` hard-codes `HttpClient(CIO)` in `commonMain`. Move the engine behind a platform seam: OkHttp on Android, CIO on the JVM, Darwin on iOS later. Prove token-by-token SSE streaming on Android in this slice, and on iOS first thing when it's picked up — Darwin is the engine most likely to buffer.
-- **Token storage.** `FileTokenStorage` is an `expect` class with only a JVM `actual`, created as `FileTokenStorage()` in `DataModule`. Android: Keystore-backed storage in the app's private files. iOS: Keychain, later.
+- **Targets.** ✅ Done. Every client module builds for the JVM, Android, `iosArm64` and `iosSimulatorArm64`.
+- **Networking.** ✅ Done. The engine sits behind a platform seam: OkHttp on Android, CIO on the JVM, Darwin on iOS. Token-by-token SSE is proven on both — on iOS by a lock-step test that a buffering engine cannot pass.
+- **Token storage.** ✅ Done. `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android), `KeychainTokenStorage` (iOS).
 - **Hub address.** `DEFAULT_BASE_URL` is hard-coded to `https://hub.spicy-llama.duckdns.org` in `DataModule`, and also defaulted inside several repositories. Keep it for now; make it one value.
 - **`:composeApp`.** A Kotlin Multiplatform library with the screens, theme and navigation, wired to Koin through `HouseholdHubSdk`.
 - **`:androidApp`.** The Android application module: `MainActivity`, SDK initialisation, `setContent { App() }`.
@@ -85,12 +85,50 @@ No features; everything after this builds on it.
 
 **iOS prerequisite:** the owner's Mac with Xcode. An Apple developer account is needed to keep the app on a real iPhone beyond free provisioning's 7-day limit — check when iOS is picked up.
 
-**iOS launch screen**, when the iOS app module is created on the Mac:
+**iOS launch screen — still to do.** The iOS app module exists now (§3.2 below), but `Info.plist`'s
+`UILaunchScreen` is still the empty placeholder that fixes the letterboxing (`project.yml`'s
+`UILaunchScreen: {}`); the real artwork is unbuilt:
 - Declare `UILaunchScreen` in `Info.plist`: `UIColorName` set to a colour asset (e.g. `HearthCanvas` — Any `#F5F2EB`, Dark `#100F0E`), `UIImageName` set to an image asset of the launch tile, and `UIImageRespectsSafeAreaInsets` true.
 - The tile asset is a vector (PDF or SVG) with Any and Dark appearances: tile `#3C6E4E` by day, `#7FB894` by night, with the household glyph.
 - Export the tile once as SVG, so Android's vector drawable and the iOS asset come from one source.
 - App icon: an `AppIcon` asset (1024×1024, no transparency) with the same artwork as Android's launcher icon — full-bleed Hearth green `#3C6E4E` with the white household glyph centred. iOS applies its own corner mask.
 - The launch screen is static and disappears when the app draws its first frame. The animated waiting, routing and offline screens are already Compose in `commonMain`, so nothing else is iOS-specific.
+
+### 3.2 iOS findings (done 13 September 2026)
+
+The port cost almost nothing where it was expected to, and a great deal where it was not.
+
+**Environment:** Xcode 26.6, iOS 26.5 simulator, deployment target **15.0** (the simulator SDK's own
+`RecommendedDeploymentTarget`), XcodeGen 2.46.0 generating the Xcode project from a checked-in
+`project.yml`. The `.xcodeproj` and its `Info.plist` are generated and git-ignored.
+
+**`commonMain` was already clean.** Across 247 Kotlin files the compiler found exactly two
+violations: `Charsets.UTF_8` in a test — JVM-only, and default-imported, so no import grep could ever
+have found it — and `compose ui-tooling`, which publishes no iOS klib and moved to `androidMain`.
+The rule had been held on faith since the Android slice; it held.
+
+**What the port actually cost** was not the targets. It was that all 19 core test files used JUnit 5
+and MockK, and that the 36 use cases were final classes. No compile-time mocking library — which is
+every library that works on Native — can mock a final class, so the use cases went behind protocols
+first and the tests moved to `kotlin.test` + Mokkery. That was two cycles of work before a single
+iOS target could be added.
+
+**One production bug that only iOS could expose.** `streamChatTurn` emitted from inside Ktor's
+`statement.execute { }`, which switches dispatchers on every non-JVM target, so every `emit` violated
+the flow-context invariant — and `DefensiveSseStreamReader`'s catch swallowed the resulting exception
+as if it were a malformed line. The stream completed normally having emitted nothing: on an iPhone, a
+reply that never arrives and no error to explain it. Android is only *accidentally* safe, because the
+JVM flag defaults off; Ktor 4 turns it on everywhere. A `jvmEngineDispatcherTest` task now reproduces
+Native's semantics on the JVM in seconds and guards it.
+
+**Risk table, settled.** "SSE buffering on iOS" was a real risk and is now proven absent, by a
+lock-step fixture that refuses to send delta N+1 until the client acks delta N — a buffering engine
+deadlocks rather than passing by luck. "iOS drifts while Android leads" cost the two violations above
+and nothing more.
+
+**Still open:** `KeychainTokenStorage` is covered by an XCTest hosted by the app bundle, because a
+bare Kotlin/Native test binary cannot reach the Keychain at all (`errSecNotAvailable`). A real device
+run, signing, and the local-network permission for the hub's LAN address remain untried.
 
 ---
 
@@ -113,6 +151,11 @@ Canvas bands are named as on the design canvas; backend and client items refer t
 | 9 | **PDFs and notes** | PDFs; Notes; empty notes | Session documents, PDF tool reading from the store, attached-document context, removal, no page limit, password detection, pages without text; note attribution and the create-overwrite bug (§5.8–5.9) | File picker (Android and iOS), share sheet for notes | Every drawn PDF state reproduces with a real file; a note shows its source chat and shares as Markdown |
 | 10 | **Offline reading** | Offline | — | A multiplatform client database (e.g. SQLDelight) caching sessions, messages, members, spaces and events, with a written-at time per record; secret content never cached (§5.10) | Signed in with the hub off, the app opens on cached data with an "as of" banner; every write is disabled with a reason |
 | 11 | **Morning briefing** | To design first; then Household and "Your day" in My Space | A briefing endpoint (to be designed) | — | Designed on the canvas, then built |
+
+**Carried into slice 3 from slice 0's iOS work:** `streamChatTurn` collects `pollUntilFinished`
+inside Ktor's `statement.execute { }`, so a 409 keeps that response and its connection open for the
+whole polling recovery (up to 60 s). Restructure it to leave `execute` before polling. Noted during
+the iOS port; deferred here deliberately.
 
 **Why this order.** Sign-in gates everything. Chat is the core loop and the first thing worth using daily. Tools come before secret chats because secret chats lock write tools and rely on the tool events being handled. Profile follows secret chats because the memory screen's Secret Mode promise depends on slice 5. Calendar comes before the briefing, which is built on events. Offline reading is last before the briefing because it caches what the other slices produce.
 

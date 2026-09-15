@@ -42,6 +42,9 @@ kotlin {
         }
     }
 
+    iosArm64()
+    iosSimulatorArm64()
+
     sourceSets {
         commonMain {
             kotlin.srcDir(generateBuildConfig)
@@ -58,13 +61,14 @@ kotlin {
             }
         }
         commonTest.dependencies {
+            implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.client.mock)
+            implementation(libs.turbine)
+        }
+        jvmTest.dependencies {
             implementation(libs.junit.jupiter)
             implementation(libs.junit.platform.launcher)
-            implementation(libs.mockk)
-            implementation(libs.assertj)
-            implementation(libs.turbine)
         }
         getByName("androidDeviceTest").dependencies {
             implementation(libs.androidx.test.runner)
@@ -72,4 +76,24 @@ kotlin {
             implementation(libs.androidx.test.ext.junit)
         }
     }
+}
+
+/**
+ * Mirror of [jvmTest] that forces Ktor's `HttpStatement.execute` to run its block on the engine's
+ * dispatcher, as it does unconditionally on every non-JVM target (and will do everywhere in Ktor 4).
+ * This makes the flow-context invariant observable on the JVM, guarding against re-introducing an
+ * `emit` that crosses the `execute` dispatcher boundary.
+ */
+val jvmEngineDispatcherTest = tasks.register<Test>("jvmEngineDispatcherTest") {
+    val jvmTestCompilation = kotlin.jvm().compilations.getByName("test")
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs the JVM tests with io.ktor.client.statement.useEngineDispatcher=true."
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    useJUnitPlatform()
+    systemProperty("io.ktor.client.statement.useEngineDispatcher", "true")
+}
+
+tasks.named("check") {
+    dependsOn(jvmEngineDispatcherTest)
 }

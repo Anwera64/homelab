@@ -1,7 +1,8 @@
 package com.homelab.household.domain.usecase
 
-import com.homelab.household.domain.repository.SessionRepository
+import com.homelab.household.domain.model.ChatStreamEvent
+import kotlinx.coroutines.flow.Flow
 
-class RetryMessageUseCase(private val sessionRepository: SessionRepository) {
-    suspend operator fun invoke(messageId: String) = sessionRepository.retryMessage(messageId)
+fun interface RetryMessageUseCase {
+    suspend operator fun invoke(messageId: String): Flow<ChatStreamEvent>
 }

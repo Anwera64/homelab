@@ -20,6 +20,9 @@ kotlin {
         }
     }
 
+    iosArm64()
+    iosSimulatorArm64()
+
     sourceSets {
         commonMain.dependencies {
             implementation(project(":core:domain"))
@@ -30,11 +33,15 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)
-            implementation(libs.compose.ui.tooling)
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(libs.jetbrains.lifecycle.runtime.compose)
             implementation(libs.navigation3.ui)
             implementation(libs.koin.compose.viewmodel)
+        }
+        androidMain.dependencies {
+            // The preview renderer is Android- and desktop-only; commonMain keeps
+            // ui-tooling-preview, which is where @Preview itself comes from.
+            implementation(libs.compose.ui.tooling)
         }
         commonTest.dependencies {
             // The UI tests run the real graph over a faked hub, so they need the DI coordinator.

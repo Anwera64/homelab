@@ -4,9 +4,9 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DefensiveSseStreamReaderTest {
 
@@ -25,7 +25,7 @@ class DefensiveSseStreamReaderTest {
 
         """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.toByteArray(Charsets.UTF_8))
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
         val events = reader.readEvents(channel).toList()
 
         assertEquals(3, events.size)
@@ -46,7 +46,7 @@ class DefensiveSseStreamReaderTest {
 
         """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.toByteArray(Charsets.UTF_8))
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
         val events = reader.readEvents(channel).toList()
 
         assertEquals(1, events.size)
@@ -54,5 +54,32 @@ class DefensiveSseStreamReaderTest {
         assertTrue(!delta.content.contains("<|im_start|>"))
         assertTrue(!delta.content.contains("###"))
         assertTrue(delta.content.contains("Filtered content"))
+    }
+
+    /**
+     * A line can be valid JSON and still be shaped wrongly — `"type"` arriving as an object rather
+     * than a string. `JsonElement.jsonPrimitive` reports that with `error(...)`, i.e. an
+     * IllegalStateException, not the IllegalArgumentException that a syntax error raises. The
+     * reader must skip such a line and keep streaming, or one odd event kills the whole answer.
+     */
+    @Test
+    fun an_unexpectedly_shaped_event_is_skipped_and_the_stream_continues() = runTest {
+        val ssePayload = """
+            data: {"type": "delta", "content": "before"}
+
+            data: {"type": {"unexpected": "shape"}, "content": "ignored"}
+
+            data: {"type": "delta", "content": "after"}
+
+            data: [DONE]
+
+        """.trimIndent()
+
+        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+        val events = reader.readEvents(channel).toList()
+
+        assertEquals(2, events.size, "The malformed line should be skipped, not end the stream")
+        assertEquals("before", (events[0] as ChatStreamEvent.Delta).content)
+        assertEquals("after", (events[1] as ChatStreamEvent.Delta).content)
     }
 }

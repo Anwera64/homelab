@@ -31,10 +31,13 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.channelFlow
 
 class SessionRepositoryImpl(
     private val client: HttpClient,
@@ -127,25 +130,29 @@ class SessionRepositoryImpl(
         sessionId: String,
         content: String,
         autoApproveWrites: Boolean
-    ): Flow<ChatStreamEvent> = flow {
+    ): Flow<ChatStreamEvent> = channelFlow {
         try {
             val statement = client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
                 contentType(ContentType.Application.Json)
                 setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
             }
 
+            // `statement.execute` runs its block on the engine's dispatcher on every non-JVM target
+            // (Ktor's `useEngineDispatcher` is unconditionally true there, and becomes so everywhere
+            // in Ktor 4). `Flow.emit` may not cross a dispatcher boundary, so the producer is a
+            // `channelFlow` and events leave the block via `send`, which is context-agnostic.
             statement.execute { response ->
                 when (response.status) {
                     HttpStatusCode.OK -> {
                         val channel = response.bodyAsChannel()
                         sseStreamReader.readEvents(channel).collect { event ->
-                            emit(event)
+                            send(event)
                         }
                     }
                     HttpStatusCode.Conflict -> {
                         // 409 Conflict: Background worker is busy or session locked -> self-healing polling
                         pollUntilFinished(sessionId).collect { event ->
-                            emit(event)
+                            send(event)
                         }
                     }
                     else -> {
@@ -153,18 +160,22 @@ class SessionRepositoryImpl(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             NetworkExceptionHelper.rethrowAsDomain(e)
         }
-    }
+        // RENDEZVOUS keeps the lock-step back pressure the previous `flow { emit(...) }` had.
+    }.buffer(Channel.RENDEZVOUS)
 
-    private fun pollUntilFinished(sessionId: String): Flow<ChatStreamEvent> = flow {
-        var delayMs = 500L
+    private fun pollUntilFinished(sessionId: String): Flow<ChatStreamEvent> = channelFlow {
+        var delayMs = pollDelayMs
         var elapsedMs = 0L
         val maxWaitMs = 60_000L
         var completed = false
 
         while (!completed && elapsedMs < maxWaitMs) {
+            var doneEvent: ChatStreamEvent.Done? = null
             delay(delayMs)
             elapsedMs += delayMs
             delayMs = (delayMs * 1.5).toLong()
@@ -175,26 +186,28 @@ class SessionRepositoryImpl(
                 val messages = sessionDetail.messages
                 val lastAssistant = messages.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
                 if (lastAssistant != null) {
-                    emit(
-                        ChatStreamEvent.Done(
-                            messageId = lastAssistant.id,
-                            assistantContent = lastAssistant.content,
-                            agentName = "Assistant"
-                        )
+                    doneEvent = ChatStreamEvent.Done(
+                        messageId = lastAssistant.id,
+                        assistantContent = lastAssistant.content,
+                        agentName = "Assistant"
                     )
                     completed = true
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 if (NetworkExceptionHelper.isNetworkOfflineException(e)) {
                     throw ServerOfflineException(message = "Server connection lost while polling", cause = e)
                 }
             }
+
+            doneEvent?.let { send(it) }
         }
 
         if (!completed) {
             throw DomainException("Session inference recovery timed out after 60s")
         }
-    }
+    }.buffer(Channel.RENDEZVOUS)
 
     override suspend fun approveToolProposal(
         sessionId: String,

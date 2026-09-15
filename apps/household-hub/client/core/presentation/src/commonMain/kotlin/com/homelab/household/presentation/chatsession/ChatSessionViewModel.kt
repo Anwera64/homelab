@@ -12,7 +12,6 @@ import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
-import kotlin.time.TimeSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +28,17 @@ class ChatSessionViewModel(
 
     private val _uiState = MutableStateFlow(ChatSessionUiState())
     val uiState: StateFlow<ChatSessionUiState> = _uiState.asStateFlow()
+
+    /**
+     * Numbers the placeholder ids a send carries until the hub answers with a real one.
+     *
+     * This used to be a clock reading, which is not an identity: two sends close enough together
+     * read the same instant, and the pair then shares an id. Both the `Done` and the failure paths
+     * find their message by `id`, so a collision lets one answer rewrite the status of every
+     * message it collided with. A counter is unique by construction rather than by timing. Reads
+     * and writes stay on the main dispatcher, the same one `viewModelScope` and every caller use.
+     */
+    private var nextTempMessageNumber = 0L
 
     fun loadSession(sessionId: String) {
         viewModelScope.launch {
@@ -56,7 +66,7 @@ class ChatSessionViewModel(
 
     fun sendMessage(content: String, autoApproveWrites: Boolean = false) {
         val currentSession = _uiState.value.session ?: return
-        val tempMessageId = "temp-user-${currentSession.id}-${TimeSource.Monotonic.markNow().elapsedNow().inWholeNanoseconds}"
+        val tempMessageId = "temp-user-${currentSession.id}-${nextTempMessageNumber++}"
         val userMsg = ChatMessage(
             id = tempMessageId,
             sessionId = currentSession.id,

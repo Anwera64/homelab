@@ -8,10 +8,17 @@ import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.mockk
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.mock
+import dev.mokkery.verifySuspend
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -20,38 +27,32 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private val observeServerStatusUseCase = mockk<ObserveServerStatusUseCase>()
-    private val listRecentSessionsUseCase = mockk<ListSessionsUseCase>()
-    private val listHouseholdMilestonesUseCase = mockk<ListHouseholdMilestonesUseCase>()
-    private val getCurrentUserUseCase = mockk<GetCurrentUserUseCase>()
-    private val logoutUseCase = mockk<LogoutUseCase>()
+    private val observeServerStatusUseCase = mock<ObserveServerStatusUseCase>()
+    private val listRecentSessionsUseCase = mock<ListSessionsUseCase>()
+    private val listHouseholdMilestonesUseCase = mock<ListHouseholdMilestonesUseCase>()
+    private val getCurrentUserUseCase = mock<GetCurrentUserUseCase>()
+    private val logoutUseCase = mock<LogoutUseCase>()
 
     private lateinit var viewModel: DashboardViewModel
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { observeServerStatusUseCase() } returns flowOf(ServerStatus.Online(latencyMs = 25))
-        coEvery { getCurrentUserUseCase() } returns User(
+        everySuspend { getCurrentUserUseCase() } returns User(
             id = "u-1",
             fullName = "Alice Doe",
             isAdmin = true,
             isActive = true
         )
-        coEvery { listRecentSessionsUseCase() } returns emptyList()
-        coEvery { listHouseholdMilestonesUseCase() } returns listOf(
+        everySuspend { listRecentSessionsUseCase() } returns emptyList()
+        everySuspend { listHouseholdMilestonesUseCase() } returns listOf(
             HouseholdMilestone(
                 id = "m-1",
                 sourceUserId = "u-1",
@@ -70,7 +71,7 @@ class DashboardViewModelTest {
         )
     }
 
-    @AfterEach
+    @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
@@ -89,12 +90,12 @@ class DashboardViewModelTest {
 
     @Test
     fun logout_invokes_usecase_and_clears_user() = runTest(testDispatcher) {
-        coEvery { logoutUseCase() } returns Unit
+        everySuspend { logoutUseCase() } returns Unit
 
         viewModel.logout()
         advanceUntilIdle()
 
-        coVerify { logoutUseCase() }
+        verifySuspend { logoutUseCase() }
         assertNull(viewModel.uiState.value.currentUser)
     }
 }
