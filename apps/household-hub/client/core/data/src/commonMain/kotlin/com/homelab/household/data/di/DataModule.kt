@@ -3,6 +3,7 @@ package com.homelab.household.data.di
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.remote.DefensiveSseStreamReader
 import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.remote.KermitKtorLogger
 import com.homelab.household.data.remote.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.remote.SignedOutSignal
@@ -56,6 +57,7 @@ val dataModule = module {
                 json(jsonSerializer)
             }
             install(Logging) {
+                logger = KermitKtorLogger()
                 level = if (hubConfig.isDebug) {
                     LogLevel.ALL
                 } else {

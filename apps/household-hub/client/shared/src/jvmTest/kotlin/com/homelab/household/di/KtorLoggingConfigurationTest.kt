@@ -14,6 +14,7 @@ import io.ktor.client.plugins.plugin
 import io.ktor.http.HttpStatusCode
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
@@ -41,6 +42,7 @@ class KtorLoggingConfigurationTest : KoinTest {
 
         val client = get<HttpClient>()
         assertEquals(LogLevel.ALL, client.loggingLevel())
+        assertTrue(client.logger() is com.homelab.household.data.remote.KermitKtorLogger)
     }
 
     @Test
@@ -56,12 +58,16 @@ class KtorLoggingConfigurationTest : KoinTest {
 
         val client = get<HttpClient>()
         assertEquals(LogLevel.INFO, client.loggingLevel())
+        assertTrue(client.logger() is com.homelab.household.data.remote.KermitKtorLogger)
     }
 
-    private fun HttpClient.loggingLevel(): LogLevel {
+    private fun HttpClient.loggingLevel(): LogLevel = loggingConfig().level
+
+    private fun HttpClient.logger(): io.ktor.client.plugins.logging.Logger = loggingConfig().logger
+
+    private fun HttpClient.loggingConfig(): io.ktor.client.plugins.logging.LoggingConfig {
         val plugin = plugin(Logging)
         val levelField = plugin::class.java.getDeclaredField("config").apply { isAccessible = true }
-        val config = levelField.get(plugin) as io.ktor.client.plugins.logging.LoggingConfig
-        return config.level
+        return levelField.get(plugin) as io.ktor.client.plugins.logging.LoggingConfig
     }
 }
