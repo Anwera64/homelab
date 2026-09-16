@@ -11,6 +11,7 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.pin_attempts_left
 import com.homelab.household.app.resources.pin_back
+import com.homelab.household.app.resources.pin_forgotten
 import com.homelab.household.app.resources.pin_delete
 import com.homelab.household.app.resources.pin_entered
 import com.homelab.household.app.resources.pin_locked
@@ -35,6 +36,10 @@ class PinEntryRobot(private val test: ComposeUiTest) {
 
     suspend fun tapsDelete() {
         test.onNodeWithContentDescription(getString(Res.string.pin_delete)).performClick()
+    }
+
+    suspend fun tapsForgotten() {
+        test.onNodeWithText(getString(Res.string.pin_forgotten)).performClick()
     }
 
     suspend fun tapsBack() {
@@ -76,11 +81,17 @@ fun ComposeUiTest.pinEntryScreen(
     hub: FakeSignInHub,
     member: Member,
     onSignedIn: () -> Unit = {},
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onForgotten: () -> Unit = {}
 ) {
     setContent {
         TestApp(hub.engine) {
-            PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack)
+            PinEntryScreen(
+                member = member,
+                onSignedIn = onSignedIn,
+                onBack = onBack,
+                onForgotten = onForgotten
+            )
         }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.picker_hint
+import com.homelab.household.app.resources.picker_invite_code
 import com.homelab.household.app.resources.picker_member_count
 import com.homelab.household.app.resources.picker_retry
 import com.homelab.household.app.resources.picker_title
@@ -32,6 +33,10 @@ class ProfilePickerRobot(private val test: ComposeUiTest) {
 
     fun tapsTheFaceOf(name: String) {
         test.onNodeWithText(name).performClick()
+    }
+
+    suspend fun tapsInviteCode() {
+        test.onNodeWithText(getString(Res.string.picker_invite_code)).performClick()
     }
 
     suspend fun seesTheHubDidNotAnswer() {
@@ -60,10 +65,14 @@ suspend fun ComposeUiTest.onProfilePicker(block: suspend ProfilePickerRobot.() -
 
 /** "Who's here?" over a hub that answers however the test says. */
 @OptIn(ExperimentalTestApi::class)
-fun ComposeUiTest.profilePickerScreen(hub: FakeSignInHub, onMemberSelected: (Member) -> Unit = {}) {
+fun ComposeUiTest.profilePickerScreen(
+    hub: FakeSignInHub,
+    onMemberSelected: (Member) -> Unit = {},
+    onInviteCode: () -> Unit = {}
+) {
     setContent {
         TestApp(hub.engine) {
-            ProfilePickerScreen(onMemberSelected = onMemberSelected)
+            ProfilePickerScreen(onMemberSelected = onMemberSelected, onInviteCode = onInviteCode)
         }
     }
 }

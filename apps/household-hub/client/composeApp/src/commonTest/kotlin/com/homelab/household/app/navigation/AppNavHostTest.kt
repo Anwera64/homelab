@@ -127,4 +127,118 @@ class AppNavHostTest {
         onNodeWithText(StubScreens.HOME).assertIsDisplayed()
         assertEquals(listOf(Destination.Home), backStack.toList())
     }
+
+    @Test
+    fun someone_with_an_invite_types_the_code_and_joins() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.HAVE_AN_INVITE).performClick()
+        onNodeWithText(StubScreens.CODE_ACCEPTED).performClick()
+
+        onNodeWithText(StubScreens.joinOf(StubScreens.INVITE)).assertIsDisplayed()
+        onNodeWithText(StubScreens.JOINED).performClick()
+
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+        assertEquals(listOf(Destination.Home), backStack.toList())
+    }
+
+    @Test
+    fun a_code_that_has_gone_sends_them_back_to_typing_one() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.HAVE_AN_INVITE).performClick()
+        onNodeWithText(StubScreens.CODE_ACCEPTED).performClick()
+        onNodeWithText(StubScreens.CODE_EXPIRED).performClick()
+
+        onNodeWithText(StubScreens.INVITE_CODE).assertIsDisplayed()
+        assertEquals(listOf(Destination.InviteCode), backStack.toList())
+    }
+
+    @Test
+    fun a_forgotten_pin_goes_through_a_reset_code_to_a_new_one() = runComposeUiTest {
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+        onNodeWithText(StubScreens.PICK_EMMA).performClick()
+        onNodeWithText(StubScreens.FORGOTTEN).performClick()
+        onNodeWithText(StubScreens.forgotOf(StubScreens.EMMA)).assertIsDisplayed()
+
+        onNodeWithText(StubScreens.HAVE_A_RESET_CODE).performClick()
+        onNodeWithText(StubScreens.RESET_CODE_TYPED).performClick()
+        onNodeWithText(StubScreens.newPinFor("P4XN7T")).assertIsDisplayed()
+        onNodeWithText(StubScreens.SIGNED_IN).performClick()
+
+        onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+        assertEquals(listOf(Destination.Home), backStack.toList())
+    }
+
+    @Test
+    fun the_profile_opens_from_home_and_leads_to_members() = runComposeUiTest {
+        backStack[0] = Destination.Home
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_PROFILE).performClick()
+        onNodeWithText(StubScreens.GO_TO_MEMBERS).performClick()
+
+        onNodeWithText(StubScreens.MEMBERS).assertIsDisplayed()
+        assertEquals(listOf(Destination.Home, Destination.Profile, Destination.Members), backStack.toList())
+    }
+
+    @Test
+    fun members_leads_to_inviting_approving_and_removing() = runComposeUiTest {
+        backStack[0] = Destination.Members
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_INVITE).performClick()
+        onNodeWithText(StubScreens.INVITE_CREATE).assertIsDisplayed()
+        onNodeWithText(StubScreens.BACK).performClick()
+
+        onNodeWithText(StubScreens.RESET_LIAMS_PIN).performClick()
+        onNodeWithText(StubScreens.approveOf(StubScreens.LIAM)).assertIsDisplayed()
+        onNodeWithText(StubScreens.BACK).performClick()
+
+        onNodeWithText(StubScreens.REMOVE_LIAM).performClick()
+        onNodeWithText(StubScreens.removeOf(StubScreens.LIAM)).assertIsDisplayed()
+        onNodeWithText(StubScreens.REMOVED).performClick()
+
+        onNodeWithText(StubScreens.MEMBERS).assertIsDisplayed()
+        assertEquals(listOf(Destination.Members), backStack.toList())
+    }
+
+    @Test
+    fun leaving_the_household_ends_at_who_is_here() = runComposeUiTest {
+        backStack[0] = Destination.Profile
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_LEAVE).performClick()
+        onNodeWithText(StubScreens.LEFT).performClick()
+
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
+    }
+
+    @Test
+    fun signing_out_ends_at_who_is_here() = runComposeUiTest {
+        backStack[0] = Destination.Profile
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.SIGNED_OUT).performClick()
+
+        onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
+        assertEquals(listOf(Destination.SignIn), backStack.toList())
+    }
+
+    @Test
+    fun a_changed_pin_returns_to_the_profile() = runComposeUiTest {
+        backStack[0] = Destination.Profile
+        setContent { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) }
+
+        onNodeWithText(StubScreens.GO_TO_CHANGE_PIN).performClick()
+        onNodeWithText(StubScreens.PIN_CHANGED).performClick()
+
+        onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
+        assertEquals(listOf(Destination.Profile), backStack.toList())
+    }
 }

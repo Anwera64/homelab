@@ -205,6 +205,7 @@
     <string name="reset_code_title">Enter your reset code</string>
     <string name="reset_code_detail">Whoever approved it has it on their screen right now.</string>
     <string name="reset_code_field">Reset code</string>
+    <string name="reset_code_invalid">That reset code isn’t valid any more. Ask for a fresh one.</string>
     <string name="new_pin_title">Choose a new PIN</string>
     <string name="new_pin_detail">Six digits, and only you will know them.</string>
     <string name="new_pin_label">New PIN</string>
