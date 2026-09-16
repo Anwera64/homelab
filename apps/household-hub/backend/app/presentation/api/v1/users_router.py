@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 
 from app.domain.entities.user import User
-from app.presentation.schemas.account_schemas import ChangePinRequest
+from app.presentation.schemas.account_schemas import ChangePinRequest, LeaveHouseholdRequest
 from app.presentation.schemas.pin_reset_schemas import PinResetApprove, PinResetRead
 from app.presentation.schemas.auth_schemas import Token
 from app.presentation.schemas.user_schemas import UserRead, UserUpdate
@@ -10,6 +10,7 @@ from app.presentation.mappers.auth_presentation_mapper import AuthPresentationMa
 from app.presentation.mappers.pin_reset_presentation_mapper import PinResetPresentationMapper
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
+from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -19,6 +20,7 @@ from app.presentation.api.deps import (
     get_current_user,
     get_current_admin_user,
     get_change_pin_use_case,
+    get_leave_household_use_case,
     get_approve_pin_reset_use_case,
     get_list_members_use_case,
     get_member_use_case,
@@ -70,6 +72,21 @@ async def change_my_pin(
         new_pin=payload.new_pin,
     )
     return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.delete("/me")
+async def leave_household(
+    payload: LeaveHouseholdRequest,
+    use_case: LeaveHouseholdUseCase = Depends(get_leave_household_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Leave the household for good, confirming with your own PIN. Everything private to you is erased
+    and what you shared keeps your name on it, exactly as when someone is removed. The only admin
+    can't leave, because nothing can promote anyone in their place.
+    """
+    await use_case.execute(member=current_user, pin=payload.pin)
+    return {"message": "You have left the household"}
 
 
 @router.post("/{user_id}/pin-resets", response_model=PinResetRead, status_code=status.HTTP_201_CREATED)

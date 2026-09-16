@@ -80,6 +80,7 @@ from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
+from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.create_invite import CreateInviteUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.create_member import CreateMemberUseCase
@@ -219,6 +220,16 @@ def get_container(session: AsyncSession):
 
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
+    deactivate_member_uc = DeactivateMemberUseCase(
+        user_repo,
+        space_repo,
+        agent_repo,
+        memory_repo,
+        session_repo,
+        document_repo,
+        calendar_cred_repo,
+        uow,
+    )
 
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
@@ -368,16 +379,12 @@ def get_container(session: AsyncSession):
             uow,
             _jwt_token_service,
         ),
-        pres_deps.get_remove_member_use_case: DeactivateMemberUseCase(
+        pres_deps.get_leave_household_use_case: LeaveHouseholdUseCase(
             user_repo,
-            space_repo,
-            agent_repo,
-            memory_repo,
-            session_repo,
-            document_repo,
-            calendar_cred_repo,
-            uow,
+            VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
+            deactivate_member_uc,
         ),
+        pres_deps.get_remove_member_use_case: deactivate_member_uc,
         pres_deps.get_create_invite_use_case: CreateInviteUseCase(user_repo, invite_repo, uow),
         pres_deps.get_approve_pin_reset_use_case: ApprovePinResetUseCase(
             user_repo,
@@ -494,6 +501,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_update_profile_use_case,
         pres_deps.get_change_pin_use_case,
         pres_deps.get_remove_member_use_case,
+        pres_deps.get_leave_household_use_case,
         pres_deps.get_create_invite_use_case,
         pres_deps.get_shared_space_use_case,
         pres_deps.get_personal_space_use_case,
