@@ -234,6 +234,7 @@ def get_container(session: AsyncSession):
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
         gossip_repo=gossip_repo,
+        user_repo=user_repo,
         max_context_tokens=settings.MAX_CONTEXT_TOKENS,
     )
 
