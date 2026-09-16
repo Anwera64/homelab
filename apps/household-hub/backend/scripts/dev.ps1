@@ -1,9 +1,9 @@
 # dev.ps1
 # Boots and stops the Household Hub backend for local development.
-# Usage: .\scripts\dev.ps1 start|stop|status|logs
+# Usage: .\scripts\dev.ps1 start|stop|status|logs|wipe
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("start", "stop", "status", "logs")]
+    [ValidateSet("start", "stop", "status", "logs", "wipe")]
     [string]$Command
 )
 
@@ -133,4 +133,5 @@ switch ($Command) {
     "stop"   { Stop-Server }
     "status" { Show-Status }
     "logs"   { Show-Logs }
+    "wipe"   { & (Join-Path $PSScriptRoot "wipe-db.ps1") }
 }

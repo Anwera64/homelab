@@ -69,12 +69,33 @@ pip install -r requirements.txt
 
 ### 2. Start Application Server
 ```powershell
+# Using the dev control script:
+.\scripts\dev.ps1 start
+
+# Or directly with uvicorn:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 3050
 ```
 
 * **Interactive API Documentation:** [http://localhost:3050/docs](http://localhost:3050/docs)
 * **OpenAPI Specification:** [http://localhost:3050/api/v1/openapi.json](http://localhost:3050/api/v1/openapi.json)
 * **Health Check:** [http://localhost:3050/api/v1/health](http://localhost:3050/api/v1/health)
+
+### 3. Developer Helper Scripts
+```powershell
+# Check server status
+.\scripts\dev.ps1 status
+
+# Stream server logs
+.\scripts\dev.ps1 logs
+
+# Stop the backend server
+.\scripts\dev.ps1 stop
+
+# Wipe SQLite database and restart backend from scratch
+.\wipe-db.ps1
+# Or via dev script:
+.\scripts\dev.ps1 wipe
+```
 
 ---
 
