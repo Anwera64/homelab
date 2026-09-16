@@ -35,6 +35,8 @@ async def test_the_admin_gets_a_six_character_code_for_15_minutes(client: httpx.
     assert body["is_admin"] is False
     lasts = datetime.fromisoformat(body["expires_at"]) - datetime.now(timezone.utc)
     assert timedelta(minutes=14) < lasts <= timedelta(minutes=15)
+    # The phone counts down from seconds, because its clock may differ from the hub's.
+    assert 14 * 60 < body["expires_in_seconds"] <= 15 * 60
 
 
 @pytest.mark.asyncio

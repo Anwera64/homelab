@@ -12,6 +12,8 @@ class PinResetApprove(BaseModel):
 class PinResetRead(BaseModel):
     code: str
     expires_at: datetime
+    # The phone counts down from this rather than from expires_at: its clock may differ from the hub's.
+    expires_in_seconds: int
 
 
 class PinResetRedeem(BaseModel):

@@ -1,5 +1,12 @@
+import math
+from datetime import datetime, timezone
+
 from app.domain.entities.invite import Invite, InvitePreview
 from app.presentation.schemas.invite_schemas import InvitePreviewRead, InviteRead
+
+
+def _seconds_left(expires_at: datetime) -> int:
+    return max(math.ceil((expires_at - datetime.now(timezone.utc)).total_seconds()), 0)
 
 
 class InvitePresentationMapper:
@@ -10,6 +17,7 @@ class InvitePresentationMapper:
             invited_name=entity.invited_name,
             is_admin=entity.is_admin,
             expires_at=entity.expires_at,
+            expires_in_seconds=_seconds_left(entity.expires_at),
         )
 
     @staticmethod

@@ -16,6 +16,8 @@ class InviteRead(BaseModel):
     invited_name: str
     is_admin: bool
     expires_at: datetime
+    # The phone counts down from this rather than from expires_at: its clock may differ from the hub's.
+    expires_in_seconds: int
 
     model_config = ConfigDict(from_attributes=True)
 

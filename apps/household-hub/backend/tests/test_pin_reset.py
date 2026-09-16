@@ -40,6 +40,7 @@ async def test_a_member_approves_a_reset_with_their_own_pin(client: httpx.AsyncC
     assert resp.status_code == 201, resp.text
     assert len(resp.json()["code"]) == 6
     assert resp.json()["expires_at"]
+    assert 14 * 60 < resp.json()["expires_in_seconds"] <= 15 * 60
 
 
 @pytest.mark.asyncio
