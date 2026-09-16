@@ -21,6 +21,11 @@ COPY app/ app/
 # Create data directory for SQLite persistence
 RUN mkdir -p /data
 
+# `hub reset-pin "Emma"` from inside the container: the last resort for a forgotten PIN.
+RUN printf '#!/bin/sh
+exec python -m app.cli "$@"
+' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub
+
 EXPOSE 3050
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
