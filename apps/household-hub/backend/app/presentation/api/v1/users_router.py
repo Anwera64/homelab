@@ -3,11 +3,14 @@ from fastapi import APIRouter, Depends, status
 
 from app.domain.entities.user import User
 from app.presentation.schemas.account_schemas import ChangePinRequest
+from app.presentation.schemas.pin_reset_schemas import PinResetApprove, PinResetRead
 from app.presentation.schemas.auth_schemas import Token
 from app.presentation.schemas.user_schemas import UserRead, UserUpdate
 from app.presentation.mappers.auth_presentation_mapper import AuthPresentationMapper
+from app.presentation.mappers.pin_reset_presentation_mapper import PinResetPresentationMapper
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
+from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
@@ -16,6 +19,7 @@ from app.presentation.api.deps import (
     get_current_user,
     get_current_admin_user,
     get_change_pin_use_case,
+    get_approve_pin_reset_use_case,
     get_list_members_use_case,
     get_member_use_case,
     get_update_profile_use_case,
@@ -66,6 +70,22 @@ async def change_my_pin(
         new_pin=payload.new_pin,
     )
     return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.post("/{user_id}/pin-resets", response_model=PinResetRead, status_code=status.HTTP_201_CREATED)
+async def approve_pin_reset(
+    user_id: str,
+    payload: PinResetApprove,
+    use_case: ApprovePinResetUseCase = Depends(get_approve_pin_reset_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Vouch for a member who has forgotten their PIN: confirm with your own, then read out the code.
+    Any member can vouch for any other - there is no mail server, and "the admin resets it" would
+    strand the admin. A wrong PIN of your own answers 403, and 429 once it locks.
+    """
+    reset = await use_case.execute(approver=current_user, target_user_id=user_id, pin=payload.pin)
+    return PinResetPresentationMapper.to_response(reset)
 
 
 @router.get("/{user_id}", response_model=UserRead)

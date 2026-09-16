@@ -22,6 +22,7 @@ from app.data.datasources.calendar_credential_data_source import SqliteCalendarC
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.gossip_data_source import SqliteGossipDataSource
 from app.data.datasources.invite_data_source import SqliteInviteDataSource
+from app.data.datasources.pin_reset_data_source import SqlitePinResetDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -34,6 +35,7 @@ from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialD
 from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.gossip_data_mapper import GossipDataMapper
 from app.data.mappers.invite_data_mapper import InviteDataMapper
+from app.data.mappers.pin_reset_data_mapper import PinResetDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -46,6 +48,7 @@ from app.data.repositories.calendar_credential_repository_impl import CalendarCr
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
 from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
 from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
+from app.data.repositories.pin_reset_repository_impl import PinResetRepositoryImpl
 
 # Connectors
 from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
@@ -70,6 +73,7 @@ from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
 from app.domain.use_cases.auth.guard_code_guesses import CodeGuessLock, GuardCodeGuessesUseCase
 from app.domain.use_cases.auth.look_up_invite import LookUpInviteUseCase
 from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
+from app.domain.use_cases.auth.redeem_pin_reset import RedeemPinResetUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -77,6 +81,7 @@ from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
 from app.domain.use_cases.users.create_invite import CreateInviteUseCase
+from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.create_member import CreateMemberUseCase
 
 from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
@@ -162,6 +167,7 @@ _calendar_cred_mapper = CalendarCredentialDataMapper()
 _document_mapper = DocumentDataMapper()
 _gossip_mapper = GossipDataMapper()
 _invite_mapper = InviteDataMapper()
+_pin_reset_mapper = PinResetDataMapper()
 
 _secret_cipher = SecretCipherImpl(secret_key=settings.SECRET_KEY)
 _searxng_connector = SearXNGSearchConnector(
@@ -195,6 +201,7 @@ def get_container(session: AsyncSession):
     document_ds = SqliteDocumentDataSource(session)
     gossip_ds = SqliteGossipDataSource(session)
     invite_ds = SqliteInviteDataSource(session)
+    pin_reset_ds = SqlitePinResetDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
@@ -206,6 +213,7 @@ def get_container(session: AsyncSession):
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
     gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
     invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
+    pin_reset_repo = PinResetRepositoryImpl(pin_reset_ds, _pin_reset_mapper)
 
     uow = SqliteUnitOfWork(session)
 
@@ -342,6 +350,9 @@ def get_container(session: AsyncSession):
         pres_deps.get_list_public_members_use_case: ListPublicMembersUseCase(user_repo),
         pres_deps.get_refresh_token_use_case: RefreshTokenUseCase(_jwt_token_service),
         pres_deps.get_look_up_invite_use_case: LookUpInviteUseCase(invite_repo, user_repo, guard_code_guesses_uc),
+        pres_deps.get_redeem_pin_reset_use_case: RedeemPinResetUseCase(
+            pin_reset_repo, user_repo, _password_hasher, uow, _jwt_token_service, guard_code_guesses_uc
+        ),
         pres_deps.get_redeem_invite_use_case: RedeemInviteUseCase(
             invite_repo, user_repo, create_member_uc, _jwt_token_service, guard_code_guesses_uc
         ),
@@ -359,6 +370,12 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
         pres_deps.get_create_invite_use_case: CreateInviteUseCase(user_repo, invite_repo, uow),
+        pres_deps.get_approve_pin_reset_use_case: ApprovePinResetUseCase(
+            user_repo,
+            pin_reset_repo,
+            VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
+            uow,
+        ),
 
         # Spaces
         pres_deps.get_shared_space_use_case: GetSharedSpaceUseCase(space_repo, uow),
@@ -461,6 +478,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_refresh_token_use_case,
         pres_deps.get_look_up_invite_use_case,
         pres_deps.get_redeem_invite_use_case,
+        pres_deps.get_approve_pin_reset_use_case,
+        pres_deps.get_redeem_pin_reset_use_case,
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,
