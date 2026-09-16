@@ -232,8 +232,8 @@ Picked up in later clean sessions. 7.1 comes before slice 3 starts; 7.2 can foll
 
 ### 7.3 Smaller items
 
-- **A token the hub no longer accepts.** A signed-in phone opens on Home without calling the hub, so a revoked or expired token only shows when Home makes a call. Slice 2 needs 401 handling anyway — changing a PIN signs out other devices — so route a 401 back to sign-in there.
-- **No `/auth/refresh` on the backend.** The client's `AuthRepository.refreshToken()` calls it; tokens last 30 days. Decide in slice 2 whether to add the endpoint or drop the client code.
+- ~~**A token the hub no longer accepts.**~~ Done in slice 2: a 401 to any call that carries a token forgets the token and sends the phone back to "Who's here?", and the app renews its token when it opens. Sign-in's own 401 is a wrong PIN, and a wrong PIN while signed in answers 403, so neither signs anyone out.
+- ~~**No `/auth/refresh` on the backend.**~~ Decided in slice 2: the endpoint was added. It re-issues a token that the hub still accepts — no separate refresh token — and the app renews once per start, so a phone in use never reaches the end of its 30 days.
 - **Dead backend code.** `backend/app/api`, `app/models` and `app/schemas` are a legacy layer nothing mounts; they still speak username and password. Delete or migrate.
 - **Icon sheet leftovers** (Hearth icon set artefact): section 04's intro still says "the twenty-six above", and section 02's "Shared set — chosen" option shows a stray `biometricUnlock` cell beside `memory`.
 - **First-run swatches.** Two of the five match other meanings: `#6B655F` is the Secret Mode ghost and `#A33B2A` is the error red. Built as drawn; revisit on the canvas if they read wrong.

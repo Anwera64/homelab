@@ -91,4 +91,177 @@
 
     <!-- Chat -->
     <string name="send_message">Send</string>
+
+    <!-- Slice 2 · the way in: an invite code -->
+    <string name="picker_invite_code">I have an invite code</string>
+    <string name="pin_forgotten">Forgotten it?</string>
+    <string name="invite_code_back">Back to Who’s here</string>
+    <string name="invite_code_title">Enter your invite code</string>
+    <string name="invite_code_detail">Whoever invited you has it on their screen right now. Six characters, letters and numbers.</string>
+    <string name="invite_code_field">Invite code</string>
+    <string name="invite_code_paste">Paste</string>
+    <string name="invite_code_note">Codes last 15 minutes and work once. If it’s expired, ask for a fresh one.</string>
+    <string name="invite_code_continue">Continue</string>
+    <string name="invite_code_incomplete">An invite code is six characters.</string>
+    <string name="invite_code_invalid">That code isn’t valid any more. Ask for a fresh one.</string>
+    <string name="invite_code_locked">Too many wrong codes. Try again in %1$d seconds.</string>
+    <string name="invite_code_unreachable">Can’t reach your hub. Check the connection and try again.</string>
+    <string name="invite_code_failed">Your hub didn’t answer properly. Try again.</string>
+
+    <!-- Slice 2 · joining -->
+    <string name="join_invited_by">%1$s invited you</string>
+    <string name="join_title">Join the household</string>
+    <string name="join_detail">You’ll get your own private space, and a shared one with %1$s.</string>
+    <string name="join_name_label">Your name</string>
+    <string name="join_name_helper">Change it if %1$s spelled it wrong.</string>
+    <string name="join_name_missing">Your name is needed.</string>
+    <string name="join_name_too_long">That name is too long.</string>
+    <string name="join_name_taken">Someone in the household already has that name.</string>
+    <string name="join_pin_label">Choose a PIN</string>
+    <string name="join_pin_helper">6 digits · only you will know it</string>
+    <string name="join_pin_not_six_digits">Your PIN needs exactly 6 digits.</string>
+    <string name="join_colour_label">Your colour</string>
+    <string name="join_colour_helper">Colours someone already wears can’t be chosen.</string>
+    <string name="join_colour_swatch">Colour %1$d of %2$d</string>
+    <string name="join_submit">Join household</string>
+    <string name="join_privacy">%1$s won’t see your PIN, your private space, or your secret chats.</string>
+    <string name="join_expired">That code expired while you were typing. Ask for a fresh one.</string>
+
+    <!-- Slice 2 · profile -->
+    <string name="profile_open">Your profile</string>
+    <string name="profile_back">Back</string>
+    <string name="profile_admin">Household admin</string>
+    <string name="profile_members">Members</string>
+    <string name="profile_change_pin">Change PIN</string>
+    <string name="profile_delete_account">Delete my account</string>
+    <string name="profile_delete_blocked">Not while you’re the only admin</string>
+    <string name="profile_sign_out">Sign out</string>
+
+    <!-- Slice 2 · members -->
+    <string name="members_back">Back to your profile</string>
+    <string name="members_title">Members</string>
+    <string name="members_detail">Everyone who lives on this hub. Only you can add or remove people.</string>
+    <string name="members_you">you</string>
+    <string name="members_admin">Admin</string>
+    <string name="members_member">Member</string>
+    <string name="members_reset_pin">Reset PIN</string>
+    <string name="members_remove">Remove</string>
+    <string name="members_invite">Invite someone</string>
+    <string name="members_unreachable">Can’t reach your hub.</string>
+    <string name="members_failed">Your hub didn’t answer properly.</string>
+    <string name="members_retry">Try again</string>
+
+    <!-- Slice 2 · inviting someone -->
+    <string name="invite_create_back">Back to Members</string>
+    <string name="invite_create_title">Add a member</string>
+    <string name="invite_create_name_label">Who are you inviting?</string>
+    <string name="invite_create_name_helper">They’ll confirm this and pick their own PIN.</string>
+    <string name="invite_create_name_missing">Give the person a name.</string>
+    <string name="invite_create_admin_label">Household admin</string>
+    <string name="invite_create_admin_caption">Can add members and manage agents.</string>
+    <string name="invite_create_code_label">INVITE CODE</string>
+    <string name="invite_create_expires">Expires in %1$s</string>
+    <string name="invite_create_expired">Expired</string>
+    <string name="invite_create_instruction">Have %1$s open HyggeHub on their phone and enter this code.</string>
+    <string name="invite_create_copy">Copy</string>
+    <string name="invite_create_new_code">New code</string>
+    <string name="invite_create_footnote">The code works once, on this hub only. Nothing is emailed — you’re standing next to each other.</string>
+
+    <!-- Slice 2 · changing a PIN -->
+    <string name="change_pin_back">Back to your profile</string>
+    <string name="change_pin_title">Change your PIN</string>
+    <string name="change_pin_detail">It opens the hub and your private conversations, on every device you use.</string>
+    <string name="change_pin_current">Current PIN</string>
+    <string name="change_pin_new">New PIN</string>
+    <string name="change_pin_new_helper">6 digits. Avoid anything someone here could guess.</string>
+    <string name="change_pin_again">New PIN again</string>
+    <string name="change_pin_again_placeholder">Type it once more</string>
+    <string name="change_pin_not_six_digits">A PIN is exactly 6 digits.</string>
+    <string name="change_pin_mismatch">Those two PINs are different.</string>
+    <string name="change_pin_wrong">That isn’t your current PIN. %1$d tries left.</string>
+    <string name="change_pin_locked">Too many wrong PINs. Try again in %1$d seconds.</string>
+    <string name="change_pin_warning">Signs out your other devices</string>
+    <string name="change_pin_warning_detail">In case the old PIN was seen. You’ll stay signed in here; everywhere else asks for the new one.</string>
+    <string name="change_pin_submit">Change PIN</string>
+    <string name="change_pin_unreachable">Can’t reach your hub. Nothing was changed.</string>
+
+    <!-- Slice 2 · a forgotten PIN -->
+    <string name="forgot_back">Back to the PIN pad</string>
+    <string name="forgot_title">Forgotten your PIN</string>
+    <string name="forgot_detail">There’s no email to send a reset to — that’s the point of a hub that lives in your house. So someone here has to vouch for you.</string>
+    <string name="forgot_ask">Ask %1$s</string>
+    <string name="forgot_ask_detail">They’ll approve it on their phone</string>
+    <string name="forgot_step_one">%1$s opens HyggeHub and taps your face</string>
+    <string name="forgot_step_two">They confirm with their own PIN and read out a code</string>
+    <string name="forgot_step_three">You enter it here and choose a new PIN</string>
+    <string name="forgot_have_code">I have a reset code</string>
+    <string name="forgot_alone_title">If you’ve both forgotten</string>
+    <string name="forgot_alone_detail">Someone with access to the hub itself can reset any PIN from the server. That’s the real backstop, and it can’t be taken away from you by losing a phone.</string>
+    <string name="forgot_alone_command">hub reset-pin %1$s</string>
+    <string name="forgot_footnote">A new PIN gets you back into everything, including private conversations.</string>
+
+    <!-- Slice 2 · redeeming a reset code -->
+    <string name="reset_code_back">Back</string>
+    <string name="reset_code_title">Enter your reset code</string>
+    <string name="reset_code_detail">Whoever approved it has it on their screen right now.</string>
+    <string name="reset_code_field">Reset code</string>
+    <string name="new_pin_title">Choose a new PIN</string>
+    <string name="new_pin_detail">Six digits, and only you will know them.</string>
+    <string name="new_pin_label">New PIN</string>
+    <string name="new_pin_again">New PIN again</string>
+    <string name="new_pin_submit">Set my PIN</string>
+
+    <!-- Slice 2 · approving someone else’s reset -->
+    <string name="approve_back">Back to Members</string>
+    <string name="approve_title">Give %1$s a new PIN?</string>
+    <string name="approve_detail">They’ll be able to sign in and choose one. Only do this if they’re actually standing here.</string>
+    <string name="approve_agree_label">WHAT YOU ARE AGREEING TO</string>
+    <string name="approve_agree_access">They get back into their own account, private conversations included. You’re handing back their door key, not copying it.</string>
+    <string name="approve_agree_limit">You don’t get access to their private space, chats or memories.</string>
+    <string name="approve_pin_label">Confirm with your own PIN</string>
+    <string name="approve_generate">Generate reset code</string>
+    <string name="approve_cancel">Cancel</string>
+    <string name="approve_code_label">RESET CODE</string>
+    <string name="approve_code_instruction">Read this out to %1$s. It works once.</string>
+    <string name="approve_wrong_pin">That isn’t your PIN. %1$d tries left.</string>
+    <string name="approve_locked">Too many wrong PINs. Try again in %1$d seconds.</string>
+    <string name="approve_unreachable">Can’t reach your hub. Nothing was changed.</string>
+
+    <!-- Slice 2 · removing a member -->
+    <string name="remove_back">Back to Members</string>
+    <string name="remove_title">Remove %1$s from the hub?</string>
+    <string name="remove_detail">This can’t be undone — not from the app, and not from the hub.</string>
+    <string name="remove_erased_title">ERASED FOR GOOD</string>
+    <string name="remove_erased_chats">Every conversation they’ve had, private ones included</string>
+    <string name="remove_erased_space">Their private space and what agents know about them</string>
+    <string name="remove_erased_calendar">Their calendar connection and documents</string>
+    <string name="remove_stays_title">STAYS IN THE HOUSEHOLD</string>
+    <string name="remove_stays_shared">Things they shared keep their name on them</string>
+    <string name="remove_stays_agents">Agents they created pass to you</string>
+    <string name="remove_agents_note">Agents will know they’ve left, so they won’t plan around them.</string>
+    <string name="remove_confirm_label">Type %1$s to confirm</string>
+    <string name="remove_confirm_mismatch">That isn’t their name.</string>
+    <string name="remove_submit">Remove %1$s</string>
+    <string name="remove_keep">Keep them</string>
+    <string name="remove_unreachable">Can’t reach your hub. Nobody was removed.</string>
+
+    <!-- Slice 2 · leaving the household -->
+    <string name="leave_back">Back to your profile</string>
+    <string name="leave_title">Delete your account</string>
+    <string name="leave_detail">You’ll leave the household for good. This can’t be undone.</string>
+    <string name="leave_erased_title">ERASED FOR GOOD</string>
+    <string name="leave_erased_chats">All your conversations, private ones included</string>
+    <string name="leave_erased_space">Your private space and what agents know about you</string>
+    <string name="leave_erased_calendar">Your calendar connection and documents</string>
+    <string name="leave_stays_title">STAYS IN THE HOUSEHOLD</string>
+    <string name="leave_stays_shared">Things you shared keep your name on them</string>
+    <string name="leave_stays_agents">Agents you created pass to the admin</string>
+    <string name="leave_shared_note">Rather take something back first? Remove it from Shared with the household before you go.</string>
+    <string name="leave_pin_label">Confirm with your PIN</string>
+    <string name="leave_submit">Delete my account</string>
+    <string name="leave_cancel">Cancel</string>
+    <string name="leave_sole_admin">You’re the only admin, so the household can’t lose you.</string>
+    <string name="leave_wrong_pin">That isn’t your PIN. %1$d tries left.</string>
+    <string name="leave_locked">Too many wrong PINs. Try again in %1$d seconds.</string>
+    <string name="leave_unreachable">Can’t reach your hub. Nothing was changed.</string>
 </resources>
