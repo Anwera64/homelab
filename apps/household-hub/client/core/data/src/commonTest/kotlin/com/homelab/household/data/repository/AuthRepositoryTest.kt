@@ -2,7 +2,10 @@ package com.homelab.household.data.repository
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.local.InMemoryTokenStorage
+import com.homelab.household.domain.exception.CodeGuessesLockedException
 import com.homelab.household.domain.exception.HubAlreadySetUpException
+import com.homelab.household.domain.exception.InviteInvalidException
+import com.homelab.household.domain.exception.NameTakenException
 import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.PinLockedException
 import com.homelab.household.domain.exception.ServerOfflineException
@@ -287,5 +290,152 @@ class AuthRepositoryTest {
         val tokenStorage = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
 
         assertFailsWith<UnauthorizedException> { repo(engine, tokenStorage).refreshToken() }
+    }
+
+    @Test
+    fun looking_up_an_invite_returns_who_invited_whom() = runTest {
+        val engine = MockEngine { request ->
+            if (request.url.encodedPath == "/api/v1/invites/482913") {
+                respondJson(
+                    """{"invited_name": "Liam", "inviter_name": "Emma", "inviter_avatar_color": "#3C6E4E"}"""
+                )
+            } else {
+                respond("Not Found", HttpStatusCode.NotFound)
+            }
+        }
+
+        val preview = repo(engine).lookUpInvite("482913")
+
+        assertEquals("Liam", preview.invitedName)
+        assertEquals("Emma", preview.inviterName)
+        assertEquals("#3C6E4E", preview.inviterAvatarColor)
+    }
+
+    @Test
+    fun looking_up_an_invalid_invite_says_so() = runTest {
+        val engine = MockEngine { respondJson("""{"detail": "That code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
+
+        assertFailsWith<InviteInvalidException> { repo(engine).lookUpInvite("bad-code") }
+    }
+
+    @Test
+    fun looking_up_an_invite_when_guesses_are_locked_says_how_long_to_wait() = runTest {
+        val engine = MockEngine {
+            respondJson(
+                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 60}""",
+                HttpStatusCode.TooManyRequests
+            )
+        }
+
+        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).lookUpInvite("482913") }
+        assertEquals(60, e.retryAfterSeconds)
+    }
+
+    @Test
+    fun looking_up_an_invite_with_the_hub_unreachable_throws_server_offline() = runTest {
+        val engine = MockEngine { throw IOException("Connection refused") }
+
+        assertFailsWith<ServerOfflineException> { repo(engine).lookUpInvite("482913") }
+    }
+
+    @Test
+    fun joining_a_household_sends_the_name_pin_and_colour_and_keeps_the_token() = runTest {
+        var sent: String? = null
+        val engine = MockEngine { request ->
+            if (request.url.encodedPath == "/api/v1/invites/482913/redeem") {
+                sent = (request.body as TextContent).text
+                respondJson("""{"access_token": "joined-token", "token_type": "bearer", "user": $emmaJson}""", HttpStatusCode.Created)
+            } else {
+                respond("Not Found", HttpStatusCode.NotFound)
+            }
+        }
+        val tokenStorage = InMemoryTokenStorage()
+
+        val user = repo(engine, tokenStorage).joinHousehold("482913", "Emma", "482913", "#C05638")
+
+        assertEquals("emma", user.id)
+        assertEquals("joined-token", tokenStorage.getAccessToken())
+        assertSameJson("""{"full_name": "Emma", "pin": "482913", "avatar_color": "#C05638"}""", sent)
+    }
+
+    @Test
+    fun joining_with_an_invalid_code_says_so() = runTest {
+        val engine = MockEngine { respondJson("""{"detail": "That code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
+
+        assertFailsWith<InviteInvalidException> { repo(engine).joinHousehold("bad-code", "Emma", "482913", "#C05638") }
+    }
+
+    @Test
+    fun joining_with_a_name_already_taken_says_so() = runTest {
+        val engine = MockEngine { respondJson("""{"detail": "That name is taken.", "code": "name_taken"}""", HttpStatusCode.Conflict) }
+
+        assertFailsWith<NameTakenException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
+    }
+
+    @Test
+    fun joining_when_guesses_are_locked_says_how_long_to_wait() = runTest {
+        val engine = MockEngine {
+            respondJson(
+                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 45}""",
+                HttpStatusCode.TooManyRequests
+            )
+        }
+
+        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
+        assertEquals(45, e.retryAfterSeconds)
+    }
+
+    @Test
+    fun joining_with_the_hub_unreachable_throws_server_offline() = runTest {
+        val engine = MockEngine { throw IOException("Connection refused") }
+
+        assertFailsWith<ServerOfflineException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
+    }
+
+    @Test
+    fun redeeming_a_pin_reset_sends_the_pin_and_keeps_the_token() = runTest {
+        var sent: String? = null
+        val engine = MockEngine { request ->
+            if (request.url.encodedPath == "/api/v1/auth/pin-resets/738291/redeem") {
+                sent = (request.body as TextContent).text
+                respondJson("""{"access_token": "reset-token", "token_type": "bearer", "user": $emmaJson}""")
+            } else {
+                respond("Not Found", HttpStatusCode.NotFound)
+            }
+        }
+        val tokenStorage = InMemoryTokenStorage()
+
+        val user = repo(engine, tokenStorage).redeemPinReset("738291", "111111")
+
+        assertEquals("emma", user.id)
+        assertEquals("reset-token", tokenStorage.getAccessToken())
+        assertSameJson("""{"pin": "111111"}""", sent)
+    }
+
+    @Test
+    fun redeeming_an_invalid_pin_reset_code_says_so() = runTest {
+        val engine = MockEngine { respondJson("""{"detail": "That reset code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
+
+        assertFailsWith<InviteInvalidException> { repo(engine).redeemPinReset("bad-code", "111111") }
+    }
+
+    @Test
+    fun redeeming_a_pin_reset_when_guesses_are_locked_says_how_long_to_wait() = runTest {
+        val engine = MockEngine {
+            respondJson(
+                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 30}""",
+                HttpStatusCode.TooManyRequests
+            )
+        }
+
+        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).redeemPinReset("738291", "111111") }
+        assertEquals(30, e.retryAfterSeconds)
+    }
+
+    @Test
+    fun redeeming_a_pin_reset_with_the_hub_unreachable_throws_server_offline() = runTest {
+        val engine = MockEngine { throw IOException("Connection refused") }
+
+        assertFailsWith<ServerOfflineException> { repo(engine).redeemPinReset("738291", "111111") }
     }
 }

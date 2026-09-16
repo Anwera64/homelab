@@ -2,10 +2,13 @@ package com.homelab.household.di
 
 import com.homelab.household.domain.usecase.ArchiveSessionUseCase
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
+import com.homelab.household.domain.usecase.ApprovePinResetUseCase
 import com.homelab.household.domain.usecase.AuditMemoriesUseCase
+import com.homelab.household.domain.usecase.ChangePinUseCase
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.CheckServerHealthUseCase
 import com.homelab.household.domain.usecase.CreateAgentUseCase
+import com.homelab.household.domain.usecase.CreateInviteUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.DeleteAgentUseCase
 import com.homelab.household.domain.usecase.DeleteSessionUseCase
@@ -17,7 +20,10 @@ import com.homelab.household.domain.usecase.HasStoredSessionUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.JoinHouseholdUseCase
+import com.homelab.household.domain.usecase.LeaveHouseholdUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
+import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
 import com.homelab.household.domain.usecase.ListUserAuditMilestonesUseCase
@@ -25,10 +31,13 @@ import com.homelab.household.domain.usecase.ListMembersUseCase
 import com.homelab.household.domain.usecase.LockSecretSessionsUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
+import com.homelab.household.domain.usecase.LookUpInviteUseCase
 import com.homelab.household.domain.usecase.ObserveCurrentUserUseCase
 import com.homelab.household.domain.usecase.ObserveMessagesUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
 import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
+import com.homelab.household.domain.usecase.RedeemPinResetUseCase
+import com.homelab.household.domain.usecase.RemoveMemberUseCase
 import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
@@ -41,11 +50,14 @@ import com.homelab.household.domain.usecase.UpdateAgentUseCase
 import com.homelab.household.domain.usecase.UpdateMemoryUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
 import com.homelab.household.domain.usecase.impl.ApproveToolProposalUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ApprovePinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ChangePinUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckAuthStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.CreateInviteUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
@@ -57,7 +69,10 @@ import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.HasStoredSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.JoinHouseholdUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LeaveHouseholdUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListAgentsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ListHouseholdMembersUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListHouseholdMilestonesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListMembersUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListSessionsUseCaseImpl
@@ -65,10 +80,13 @@ import com.homelab.household.domain.usecase.impl.ListUserAuditMilestonesUseCaseI
 import com.homelab.household.domain.usecase.impl.LockSecretSessionsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LoginUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
+import com.homelab.household.domain.usecase.impl.LookUpInviteUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RedeemPinResetUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RemoveMemberUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
@@ -107,6 +125,17 @@ val domainModule = module {
     factory<HasStoredSessionUseCase> { HasStoredSessionUseCaseImpl(get()) }
     factory<ObserveSignedOutUseCase> { ObserveSignedOutUseCaseImpl(get()) }
     factory<RenewSessionUseCase> { RenewSessionUseCaseImpl(get()) }
+    factory<LookUpInviteUseCase> { LookUpInviteUseCaseImpl(get()) }
+    factory<JoinHouseholdUseCase> { JoinHouseholdUseCaseImpl(get()) }
+    factory<RedeemPinResetUseCase> { RedeemPinResetUseCaseImpl(get()) }
+
+    // Household member use cases
+    factory<ListHouseholdMembersUseCase> { ListHouseholdMembersUseCaseImpl(get()) }
+    factory<CreateInviteUseCase> { CreateInviteUseCaseImpl(get()) }
+    factory<ApprovePinResetUseCase> { ApprovePinResetUseCaseImpl(get()) }
+    factory<ChangePinUseCase> { ChangePinUseCaseImpl(get()) }
+    factory<RemoveMemberUseCase> { RemoveMemberUseCaseImpl(get()) }
+    factory<LeaveHouseholdUseCase> { LeaveHouseholdUseCaseImpl(get()) }
 
     // Server status use cases
     factory<ObserveServerStatusUseCase> { ObserveServerStatusUseCaseImpl(get()) }

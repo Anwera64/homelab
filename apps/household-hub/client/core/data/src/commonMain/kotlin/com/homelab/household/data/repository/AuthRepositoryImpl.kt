@@ -1,17 +1,23 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.dto.AuthStatusDto
+import com.homelab.household.data.dto.InviteRedeemRequestDto
 import com.homelab.household.data.dto.MemberProfileDto
 import com.homelab.household.data.dto.PinRefusalDto
+import com.homelab.household.data.dto.PinResetRedeemRequestDto
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.dto.UserLoginRequestDto
 import com.homelab.household.data.dto.UserOnboardRequestDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.remote.NetworkExceptionHelper
 import com.homelab.household.data.remote.SignedOutSignal
+import com.homelab.household.domain.exception.CodeGuessesLockedException
 import com.homelab.household.domain.exception.HubAlreadySetUpException
+import com.homelab.household.domain.exception.InviteInvalidException
+import com.homelab.household.domain.exception.NameTakenException
 import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.PinLockedException
 import com.homelab.household.domain.exception.ServerOfflineException
@@ -21,6 +27,7 @@ import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.exception.WrongPinException
 import com.homelab.household.domain.model.AuthStatus
+import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
@@ -86,6 +93,40 @@ class AuthRepositoryImpl(
         when (response.status) {
             HttpStatusCode.BadRequest -> throw HubAlreadySetUpException()
             HttpStatusCode.UnprocessableEntity -> throw ValidationException("The hub refused that name or PIN")
+        }
+        signedIn(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun lookUpInvite(code: String): InvitePreview = reachingHub {
+        val response = client.get("$baseUrl/api/v1/invites/$code")
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+        }
+        InviteDataMapper.toPreview(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): User = reachingHub {
+        val response = client.post("$baseUrl/api/v1/invites/$code/redeem") {
+            contentType(ContentType.Application.Json)
+            setBody(InviteRedeemRequestDto(fullName = fullName, pin = pin, avatarColor = avatarColor))
+        }
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.Conflict -> throw NameTakenException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+        }
+        signedIn(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun redeemPinReset(code: String, pin: String): User = reachingHub {
+        val response = client.post("$baseUrl/api/v1/auth/pin-resets/$code/redeem") {
+            contentType(ContentType.Application.Json)
+            setBody(PinResetRedeemRequestDto(pin = pin))
+        }
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
         }
         signedIn(response.ensureJsonSuccess().body())
     }
@@ -187,6 +228,13 @@ class AuthRepositoryImpl(
         }
 
     private suspend fun HttpResponse.refusal(): PinRefusalDto? = runCatchingSafe { body<PinRefusalDto>() }.getOrNull()
+
+    private suspend fun codeGuessesLockedException(response: HttpResponse): CodeGuessesLockedException {
+        val seconds = response.refusal()?.retry_after_seconds
+            ?: response.headers[HttpHeaders.RetryAfter]?.toIntOrNull()
+            ?: throw UpstreamGatewayException(statusCode = response.status.value)
+        return CodeGuessesLockedException(seconds)
+    }
 
     /**
      * 502–504 is a proxy saying the hub is down or starting; 404 means the address is wrong; any
