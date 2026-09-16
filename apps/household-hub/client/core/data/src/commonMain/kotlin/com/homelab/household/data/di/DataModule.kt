@@ -50,12 +50,17 @@ val dataModule = module {
     single {
         val tokenStorage: TokenStorage = get()
         val jsonSerializer: Json = get()
+        val hubConfig: HubConfig = get()
         HttpClient(get<HttpClientEngine>()) {
             install(ContentNegotiation) {
                 json(jsonSerializer)
             }
             install(Logging) {
-                level = LogLevel.INFO
+                level = if (hubConfig.isDebug) {
+                    LogLevel.ALL
+                } else {
+                    LogLevel.INFO
+                }
             }
             install(Auth) {
                 bearer {

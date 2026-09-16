@@ -1,4 +1,7 @@
 package com.homelab.household.data.remote
 
-/** The one hub address every repository talks to. */
-data class HubConfig(val baseUrl: String)
+/** The one hub address every repository talks to, along with environment flags. */
+data class HubConfig(
+    val baseUrl: String,
+    val isDebug: Boolean = false,
+)
