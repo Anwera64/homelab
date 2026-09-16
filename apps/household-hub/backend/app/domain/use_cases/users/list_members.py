@@ -8,4 +8,4 @@ class ListMembersUseCase:
         self.user_repo = user_repo
 
     async def execute(self) -> List[User]:
-        return await self.user_repo.list_all()
+        return await self.user_repo.list_active()

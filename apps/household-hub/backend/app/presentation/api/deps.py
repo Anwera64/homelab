@@ -19,7 +19,7 @@ from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
-from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
 from app.domain.use_cases.users.create_invite import CreateInviteUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.auth.redeem_pin_reset import RedeemPinResetUseCase
@@ -130,7 +130,7 @@ def get_update_profile_use_case() -> UpdateProfileUseCase:
 def get_change_pin_use_case() -> ChangePinUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
-def get_delete_member_use_case() -> DeleteMemberUseCase:
+def get_remove_member_use_case() -> DeactivateMemberUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_create_invite_use_case() -> CreateInviteUseCase:

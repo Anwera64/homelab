@@ -79,7 +79,7 @@ from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
-from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
 from app.domain.use_cases.users.create_invite import CreateInviteUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.create_member import CreateMemberUseCase
@@ -368,7 +368,16 @@ def get_container(session: AsyncSession):
             uow,
             _jwt_token_service,
         ),
-        pres_deps.get_delete_member_use_case: DeleteMemberUseCase(user_repo, space_repo, agent_repo, memory_repo, uow, gossip_repo=gossip_repo),
+        pres_deps.get_remove_member_use_case: DeactivateMemberUseCase(
+            user_repo,
+            space_repo,
+            agent_repo,
+            memory_repo,
+            session_repo,
+            document_repo,
+            calendar_cred_repo,
+            uow,
+        ),
         pres_deps.get_create_invite_use_case: CreateInviteUseCase(user_repo, invite_repo, uow),
         pres_deps.get_approve_pin_reset_use_case: ApprovePinResetUseCase(
             user_repo,
@@ -484,7 +493,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,
         pres_deps.get_change_pin_use_case,
-        pres_deps.get_delete_member_use_case,
+        pres_deps.get_remove_member_use_case,
         pres_deps.get_create_invite_use_case,
         pres_deps.get_shared_space_use_case,
         pres_deps.get_personal_space_use_case,

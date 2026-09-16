@@ -17,7 +17,7 @@ from app.domain.exceptions import (
 )
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.users.create_member import CreateMemberUseCase
-from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 
 
@@ -169,6 +169,46 @@ class FakeSessionRepository:
     async def get_by_id(self, session_id: str):
         return self.sessions.get(session_id)
 
+    async def list_by_user_id(self, user_id: str):
+        return [s for s in self.sessions.values() if s.user_id == user_id]
+
+    async def delete(self, session_id: str) -> None:
+        self.sessions.pop(session_id, None)
+
+
+class FakeDocumentRepository:
+    def __init__(self, documents=None):
+        self.documents = {d.id: d for d in (documents or [])}
+
+    async def list_by_user(self, user_id: str, space_id=None):
+        return [d for d in self.documents.values() if d.user_id == user_id]
+
+    async def delete(self, document_id: str) -> bool:
+        return self.documents.pop(document_id, None) is not None
+
+
+class FakeCalendarCredentialRepository:
+    def __init__(self, user_ids=None):
+        self.user_ids = set(user_ids or [])
+
+    async def delete_by_user_id(self, user_id: str) -> bool:
+        had = user_id in self.user_ids
+        self.user_ids.discard(user_id)
+        return had
+
+
+def deactivator(user_repo, space_repo=None, agent_repo=None, memory_repo=None, session_repo=None):
+    return DeactivateMemberUseCase(
+        user_repo,
+        space_repo or FakeSpaceRepository(),
+        agent_repo or FakeAgentRepository(),
+        memory_repo or FakeMemoryRepository(),
+        session_repo or FakeSessionRepository(),
+        FakeDocumentRepository(),
+        FakeCalendarCredentialRepository(),
+        FakeUnitOfWork(),
+    )
+
 
 class FakePasswordHasher:
     def hash(self, password: str) -> str:
@@ -252,18 +292,37 @@ async def test_a_new_member_cannot_take_an_active_members_name():
 
 
 @pytest.mark.asyncio
-async def test_delete_sole_admin_is_prevented():
+async def test_the_household_cannot_lose_its_only_admin():
     admin = User(id="admin-1", full_name="Admin", hashed_pin="h", is_admin=True)
-    user_repo = FakeUserRepository([admin])
-    space_repo = FakeSpaceRepository()
-    agent_repo = FakeAgentRepository()
-    mem_repo = FakeMemoryRepository()
-    uow = FakeUnitOfWork()
-
-    use_case = DeleteMemberUseCase(user_repo, space_repo, agent_repo, mem_repo, uow)
+    use_case = deactivator(FakeUserRepository([admin]))
 
     with pytest.raises(SoleAdminDeletionException):
-        await use_case.execute(user_id_to_delete="admin-1", current_admin=admin)
+        await use_case.remove(admin, inheriting_admin=None)
+
+
+@pytest.mark.asyncio
+async def test_an_admin_removes_someone_else_and_leaves_by_their_own_door():
+    """Removing yourself is not the same act as leaving, which asks for your PIN."""
+    admin = User(id="admin-1", full_name="Admin", hashed_pin="h", is_admin=True)
+    use_case = deactivator(FakeUserRepository([admin]))
+
+    with pytest.raises(InvalidOperationException):
+        await use_case.execute(user_id_to_remove="admin-1", current_admin=admin)
+
+
+@pytest.mark.asyncio
+async def test_removing_a_member_switches_them_off_and_moves_their_token_version_on():
+    admin = User(id="admin-1", full_name="Admin", hashed_pin="h", is_admin=True)
+    liam = User(id="liam", full_name="Liam", hashed_pin="hashed_246801", token_version=2)
+    user_repo = FakeUserRepository([admin, liam])
+
+    await deactivator(user_repo).execute(user_id_to_remove="liam", current_admin=admin)
+
+    removed = user_repo.users["liam"]
+    assert removed.full_name == "Liam"
+    assert removed.is_active is False
+    assert removed.hashed_pin == ""
+    assert removed.token_version == 3
 
 
 @pytest.mark.asyncio

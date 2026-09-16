@@ -14,7 +14,7 @@ from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
-from app.domain.use_cases.users.delete_member import DeleteMemberUseCase
+from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
 from app.presentation.api.deps import (
     get_current_user,
     get_current_admin_user,
@@ -23,7 +23,7 @@ from app.presentation.api.deps import (
     get_list_members_use_case,
     get_member_use_case,
     get_update_profile_use_case,
-    get_delete_member_use_case,
+    get_remove_member_use_case,
 )
 
 router = APIRouter(prefix="/users", tags=["Household Members"])
@@ -100,16 +100,16 @@ async def get_member(
 
 
 @router.delete("/{user_id}")
-async def delete_member(
+async def remove_member(
     user_id: str,
-    use_case: DeleteMemberUseCase = Depends(get_delete_member_use_case),
+    use_case: DeactivateMemberUseCase = Depends(get_remove_member_use_case),
     current_admin: User = Depends(get_current_admin_user),
 ):
     """
-    Household Admin can delete a member account.
-    - Member's personal space and personal memories are permanently purged (Strict Zero-Leak).
-    - Authored custom agents are reassigned to an active Household Admin.
-    - Cannot delete the only administrator account.
+    The admin removes someone else from the household. The account is switched off rather than
+    deleted: their name and colour stay, so what they shared keeps their name on it, while their
+    chats, personal memories, space, calendar connection, notes and PIN are erased. Agents they made
+    pass to the admin, and the phone they are holding stops working.
     """
-    await use_case.execute(user_id_to_delete=user_id, current_admin=current_admin)
-    return {"message": "Member account deleted successfully"}
+    await use_case.execute(user_id_to_remove=user_id, current_admin=current_admin)
+    return {"message": "Member removed from the household"}
