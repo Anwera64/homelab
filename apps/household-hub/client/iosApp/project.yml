@@ -52,9 +52,22 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         UIApplicationSupportsIndirectInputEvents: true
         # Without a launch screen iOS runs the app in a letterboxed compatibility window and
-        # Compose draws into a small box in the middle of the screen. An empty UILaunchScreen dict
-        # is the modern way to say "full size, no artwork".
-        UILaunchScreen: {}
+        # Compose draws into a small box in the middle of the screen. HearthCanvas and
+        # HearthLaunchTile are asset-catalog entries in HouseholdHub/Assets.xcassets, each with a
+        # light and a dark appearance; this is the iOS counterpart of Android's
+        # Theme.HyggeHub.Starting splash theme.
+        UILaunchScreen:
+          UIColorName: HearthCanvas
+          UIImageName: HearthLaunchTile
+          UIImageRespectsSafeAreaInsets: true
+        # The hub is at https://hub.spicy-llama.duckdns.org, which on home Wi-Fi resolves to a
+        # private LAN address. Since iOS 14 touching any local-network address needs this
+        # declaration, and iOS shows the string verbatim in the prompt; without the key the prompt
+        # cannot be shown at all and the connection simply fails — which reads like a DNS or
+        # network bug rather than a missing plist key. No NSAppTransportSecurity exception is
+        # needed, because the hub is HTTPS; only a move to cleartext on the LAN would want
+        # NSAllowsLocalNetworking.
+        NSLocalNetworkUsageDescription: Connects to your home hub on the local network.
         # `canOpenURL` answers honestly only for schemes declared here; without the entry it
         # returns false even when Tailscale is installed, and IosExternalApps would always fall
         # through to the store page. The counterpart of the Android manifest's <queries> block.
