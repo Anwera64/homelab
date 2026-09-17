@@ -45,6 +45,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
+            implementation(libs.ktor.client.logging)
             implementation(libs.turbine)
         }
         jvmTest.dependencies {

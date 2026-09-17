@@ -19,7 +19,11 @@ The backend is structured into decoupled architectural layers strictly enforced 
   * **Distributed Mutex Onboarding:** Atomic `SystemSetting` mutex (`set_if_not_exists`) guarantees that concurrent onboarding requests across multiple workers cannot create duplicate administrators.
   * **Profile Picker + PIN:** No username, email or password. `GET /auth/members` lists active members (id, name, colour) without signing in; `POST /auth/login` takes a member id and their 6-digit PIN, hashed with salted `bcrypt`, and issues a signed JWT. Works 100% offline with zero external identity provider dependencies.
   * **PIN Lockout:** Five free tries, then a wait of 30 s that doubles with each further miss, up to 15 min; a right PIN clears it. A wrong PIN answers `401` with `attempts_left`, a locked member `429` with `retry_after_seconds`, and while locked the PIN isn't checked at all. Guesses for one member are serialized, and unknown members are checked against a dummy hash.
-  * **Member Management:** No endpoint adds a member yet — invites (Stage 5, slice 2) replace the admin creating accounts. Names are unique among active members.
+  * **Invites:** An admin names who is joining and gets a one-time six-character code, good for 15 minutes and one use; `GET /invites/{code}` shows the joiner who invited them, and `POST /invites/{code}/redeem` takes the name, PIN and colour they chose and signs them in. Whether they join as an admin comes from the stored invite, never the payload, and the code is claimed in one conditional write, so two joins at once make one member.
+  * **PIN Recovery Without Email:** Any member can vouch for any other: `POST /users/{id}/pin-resets` checks the approver's own PIN and answers with a code the member redeems at `POST /auth/pin-resets/{code}/redeem`, which forgives the misses that locked them out. `hub reset-pin "Emma"` issues the same code from the server itself — the backstop that cannot be lost with a phone.
+  * **Guessing Codes:** Invite and reset codes share one hub-wide guard on the PIN lockout's schedule, because a guessed code names no member to key a lockout on. Unknown, used and expired codes answer alike.
+  * **Changing a PIN:** `POST /users/me/pin` checks the current one under sign-in's lockout and moves the member's `token_version` on, so every other device has to sign in again while this one gets a fresh token. Every token records the version it was issued at; `POST /auth/refresh` re-issues one that is still accepted.
+  * **Leaving and Removing:** `DELETE /users/{id}` (admin) and `DELETE /users/me` (with your PIN) deactivate rather than delete: name and colour stay, so household memories and milestones keep their real source, while chats, personal memories, the personal space, the calendar credential, notes and the PIN hash are erased and agents pass to an admin. The only admin can't go. Context assembly then names them in the past. Names are unique among active members.
 * **Strict Zero-Leak Spaces Engine:**
   * **Shared Household Hub (`/spaces/shared`):** Singleton collaborative space containing shared Bento widget configurations (household schedules, AI assistant launchers).
   * **Personal Spaces (`/spaces/personal`):** Strictly private workspaces auto-provisioned for each user.
@@ -65,12 +69,33 @@ pip install -r requirements.txt
 
 ### 2. Start Application Server
 ```powershell
+# Using the dev control script:
+.\scripts\dev.ps1 start
+
+# Or directly with uvicorn:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 3050
 ```
 
 * **Interactive API Documentation:** [http://localhost:3050/docs](http://localhost:3050/docs)
 * **OpenAPI Specification:** [http://localhost:3050/api/v1/openapi.json](http://localhost:3050/api/v1/openapi.json)
 * **Health Check:** [http://localhost:3050/api/v1/health](http://localhost:3050/api/v1/health)
+
+### 3. Developer Helper Scripts
+```powershell
+# Check server status
+.\scripts\dev.ps1 status
+
+# Stream server logs
+.\scripts\dev.ps1 logs
+
+# Stop the backend server
+.\scripts\dev.ps1 stop
+
+# Wipe SQLite database and restart backend from scratch
+.\wipe-db.ps1
+# Or via dev script:
+.\scripts\dev.ps1 wipe
+```
 
 ---
 
@@ -81,15 +106,18 @@ cd apps\household-hub\backend
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-The 193 automated tests (100% passing) cover:
+The 291 automated tests (100% passing) cover:
 * `tests/architecture/test_architecture_boundaries.py`: AST static analysis verifying strict layer boundaries and coroutine DI providers.
 * `tests/test_auth.py`: First-run onboarding with a name and PIN, atomic concurrent registration mutex, the public profile list, PIN sign-in, lockout responses and JWT verification. `tests/auth_helpers.py` signs people in for every HTTP test.
-* `tests/domain/test_pin_lockout.py`: The lockout schedule, waits expiring, and concurrent guesses checked one at a time.
+* `tests/domain/test_pin_lockout.py`, `tests/domain/test_code_guesses.py`: The lockout schedule, waits expiring, and concurrent guesses checked one at a time — for a member's PIN, and hub-wide for codes.
 * `tests/test_spaces.py`: Shared singleton space, Bento widgets layout, and strict Zero-Leak 403 enforcement.
 * `tests/test_agents.py`: Builtin models seeding, custom model creation, soft-delete, 7-day restore, slug reuse, cascading trash purge, and inactive suspension.
 * `tests/test_sessions.py`: Session thread management, tool approval execution (`POST /tools/approve`), cascading session archival (`POST /archive`), secret mode toggle, private history isolation, cursor pagination, 409 stream lock, agent provenance, and LLM 502/504 mapping.
 * `tests/test_memories.py`: Agent memory personal/household scoping, Zero-Leak 403 isolation, edit/delete audit, and secret mode block.
-* `tests/test_users.py`: User lifecycle, member deletion with knowledge inheritance, and profile updates.
+* `tests/test_users.py`: Removing a member — deactivation, what is erased, what keeps their name, agents passing to the admin — and profile updates.
+* `tests/test_invites.py`, `tests/test_joining.py`: Creating invites, looking one up, joining, single use and expiry, `is_admin` coming from the invite, and the guard on guessing.
+* `tests/test_pin_reset.py`, `tests/test_cli.py`: Approving a reset with your own PIN, redeeming it, and the `hub reset-pin` command.
+* `tests/test_account.py`, `tests/test_leaving.py`: Changing a PIN and signing out other devices; leaving the household, and the sole admin who can't.
 * `tests/test_integrations.py`: CalDAV calendar integration, SearXNG search client with LRU caching, PDF reader with chunked validation, and document store CRUD.
 * `tests/test_cors.py`: DuckDNS origin whitelist, subdomain regex matching, and unauthorized origin rejection.
 * `tests/test_stage3_e2e.py`: Full SSE streaming chat turns, tool execution loops, memory reflection, and gossip bus milestone lifecycle.

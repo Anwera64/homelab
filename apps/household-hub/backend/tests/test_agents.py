@@ -8,7 +8,7 @@ from tests.auth_helpers import add_signed_in_member, register_admin
 async def setup_users(client: httpx.AsyncClient) -> tuple[str, str]:
     """Helper to setup admin and a regular member, returning (admin_token, member_token)."""
     admin_token, _ = await register_admin(client, full_name="Admin User")
-    member_token, _ = await add_signed_in_member(client, full_name="Member User")
+    member_token, _ = await add_signed_in_member(client, admin_token, full_name="Member User")
     return admin_token, member_token
 
 

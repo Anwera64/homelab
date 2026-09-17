@@ -10,7 +10,7 @@ async def create_user(client: httpx.AsyncClient, name: str, is_admin: bool = Fal
     if admin_token is None:
         token, _ = await register_admin(client, full_name=name)
     else:
-        token, _ = await add_signed_in_member(client, full_name=name, is_admin=is_admin)
+        token, _ = await add_signed_in_member(client, admin_token, full_name=name, is_admin=is_admin)
     me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["personal_space_id"]
 

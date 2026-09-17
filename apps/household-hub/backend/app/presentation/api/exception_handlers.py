@@ -6,7 +6,12 @@ from app.domain.exceptions import (
     EntityNotFoundException,
     AuthenticationException,
     WrongPinException,
+    WrongConfirmationPinException,
     PinLockedException,
+    CodeGuessesLockedException,
+    InviteInvalidException,
+    NameTakenException,
+    OwnPinResetException,
     ZeroLeakViolationException,
     SoleAdminDeletionException,
     SlugConflictException,
@@ -37,16 +42,57 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def wrong_pin_handler(request: Request, exc: WrongPinException):
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"detail": str(exc), "attempts_left": exc.attempts_left},
+            content={"detail": str(exc), "code": "wrong_pin", "attempts_left": exc.attempts_left},
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    @app.exception_handler(WrongConfirmationPinException)
+    async def wrong_confirmation_pin_handler(request: Request, exc: WrongConfirmationPinException):
+        # 403, not 401: the member is already signed in, so this must not look like a rejected token.
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"detail": str(exc), "code": "wrong_pin", "attempts_left": exc.attempts_left},
         )
 
     @app.exception_handler(PinLockedException)
     async def pin_locked_handler(request: Request, exc: PinLockedException):
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": str(exc), "retry_after_seconds": exc.retry_after_seconds},
+            content={"detail": str(exc), "code": "pin_locked", "retry_after_seconds": exc.retry_after_seconds},
             headers={"Retry-After": str(exc.retry_after_seconds)},
+        )
+
+    @app.exception_handler(CodeGuessesLockedException)
+    async def code_guesses_locked_handler(request: Request, exc: CodeGuessesLockedException):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": str(exc),
+                "code": "code_guesses_locked",
+                "retry_after_seconds": exc.retry_after_seconds,
+            },
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        )
+
+    @app.exception_handler(InviteInvalidException)
+    async def invite_invalid_handler(request: Request, exc: InviteInvalidException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc), "code": "invite_invalid"},
+        )
+
+    @app.exception_handler(NameTakenException)
+    async def name_taken_handler(request: Request, exc: NameTakenException):
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc), "code": "name_taken"},
+        )
+
+    @app.exception_handler(OwnPinResetException)
+    async def own_pin_reset_handler(request: Request, exc: OwnPinResetException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc), "code": "own_pin_reset"},
         )
 
     @app.exception_handler(EntityNotFoundException)
@@ -73,8 +119,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SoleAdminDeletionException)
     async def sole_admin_deletion_handler(request: Request, exc: SoleAdminDeletionException):
         return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc), "code": "sole_admin"},
         )
 
     @app.exception_handler(SlugConflictException)
@@ -143,8 +189,11 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SecretDecryptionException)
     async def secret_decryption_handler(request: Request, exc: SecretDecryptionException):
         return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"detail": "Stored credentials could not be decrypted. Please reconfigure your calendar."},
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": "Stored credentials could not be decrypted. Please reconfigure your calendar.",
+                "code": "calendar_unreadable",
+            },
         )
 
     @app.exception_handler(LLMInferenceException)

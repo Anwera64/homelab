@@ -20,6 +20,8 @@ class User:
     is_active: bool = True
     failed_pin_attempts: int = 0
     pin_locked_until: datetime | None = None
+    # Stamped into every token as `ver`. Bumping it refuses the tokens already issued.
+    token_version: int = 0
     personal_space_id: str | None = None
     created_at: datetime = field(default_factory=get_utc_now)
     updated_at: datetime = field(default_factory=get_utc_now)

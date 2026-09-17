@@ -6,13 +6,11 @@ from app.domain.repositories.user_repository import IUserRepository
 from app.domain.repositories.space_repository import ISpaceRepository
 from app.domain.repositories.security_service import IPasswordHasher
 from app.domain.repositories.unit_of_work import IUnitOfWork
-from app.domain.exceptions import InvalidOperationException
+from app.domain.use_cases.users.member_names import raise_if_name_taken
 
 
 class CreateMemberUseCase:
-    """
-    Adds a member with the PIN they chose. No endpoint calls it yet: redeeming an invite will.
-    """
+    """Adds a member with the PIN they chose. Redeeming an invite calls it."""
 
     def __init__(
         self,
@@ -33,10 +31,7 @@ class CreateMemberUseCase:
         avatar_color: Optional[str] = None,
         is_admin: bool = False,
     ) -> User:
-        # The profile picker tells members apart by name alone.
-        active = await self.user_repo.list_active()
-        if any(m.full_name.casefold() == full_name.casefold() for m in active):
-            raise InvalidOperationException("Someone in the household already has that name.")
+        await raise_if_name_taken(self.user_repo, full_name)
 
         async with self.uow:
             user = User(

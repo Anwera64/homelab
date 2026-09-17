@@ -35,6 +35,7 @@ import com.homelab.household.app.resources.pin_back
 import com.homelab.household.app.resources.pin_delete
 import com.homelab.household.app.resources.pin_entered
 import com.homelab.household.app.resources.pin_failed
+import com.homelab.household.app.resources.pin_forgotten
 import com.homelab.household.app.resources.pin_locked
 import com.homelab.household.app.resources.pin_locked_countdown
 import com.homelab.household.app.resources.pin_title
@@ -61,6 +62,7 @@ fun PinEntryContent(
     onDigit: (Char) -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
+    onForgotten: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     HearthScaffold(
@@ -68,12 +70,24 @@ fun PinEntryContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.pin_back)) },
         gutter = HearthTheme.spacing.none
     ) { padding ->
-        PinPad(state = state, onDigit = onDigit, onDelete = onDelete, modifier = Modifier.fillMaxSize().padding(padding))
+        PinPad(
+            state = state,
+            onDigit = onDigit,
+            onDelete = onDelete,
+            onForgotten = onForgotten,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        )
     }
 }
 
 @Composable
-private fun PinPad(state: PinEntryUiState, onDigit: (Char) -> Unit, onDelete: () -> Unit, modifier: Modifier) {
+private fun PinPad(
+    state: PinEntryUiState,
+    onDigit: (Char) -> Unit,
+    onDelete: () -> Unit,
+    onForgotten: () -> Unit,
+    modifier: Modifier
+) {
     val colors = HearthTheme.colors
     val spacing = HearthTheme.spacing
 
@@ -110,6 +124,18 @@ private fun PinPad(state: PinEntryUiState, onDigit: (Char) -> Unit, onDelete: ()
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = spacing.xxl)
+        )
+
+        // Recovery is social, and it starts here: there is no email to send a reset to.
+        Text(
+            text = stringResource(Res.string.pin_forgotten),
+            style = HearthTheme.typography.bodyStrong,
+            color = colors.primary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clickable(onClick = onForgotten)
+                .padding(horizontal = spacing.md, vertical = spacing.sm)
         )
 
         Keypad(
@@ -239,6 +265,6 @@ private fun PinEntryContentPreview(
     @PreviewParameter(PinEntryUiStateProvider::class) state: PinEntryUiState
 ) {
     HearthTheme {
-        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {})
+        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForgotten = {})
     }
 }

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.domain.entities.user import User
 from app.presentation.schemas.auth_schemas import AuthStatus, FirstRunRegister, LoginRequest, MemberProfile, Token
+from app.presentation.schemas.pin_reset_schemas import PinResetRedeem
 from app.presentation.schemas.user_schemas import UserRead
 from app.presentation.mappers.auth_presentation_mapper import AuthPresentationMapper
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
@@ -11,11 +12,15 @@ from app.domain.use_cases.auth.get_auth_status import GetAuthStatusUseCase
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.auth.login import LoginUseCase
+from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
+from app.domain.use_cases.auth.redeem_pin_reset import RedeemPinResetUseCase
 from app.presentation.api.deps import (
     get_auth_status_use_case,
     get_list_public_members_use_case,
     get_register_initial_admin_use_case,
     get_login_use_case,
+    get_refresh_token_use_case,
+    get_redeem_pin_reset_use_case,
     get_current_user,
 )
 
@@ -66,6 +71,33 @@ async def login(
     `attempts_left`; after five, 429 with `retry_after_seconds` until the wait is over.
     """
     token_dict = await use_case.execute(user_id=payload.user_id, pin=payload.pin)
+    return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh(
+    use_case: RefreshTokenUseCase = Depends(get_refresh_token_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    A fresh token for a member still signed in. The token sent must still be accepted: expired,
+    issued before the member's token version changed, or for an inactive member answers 401.
+    """
+    token_dict = await use_case.execute(current_user)
+    return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.post("/pin-resets/{code}/redeem", response_model=Token)
+async def redeem_pin_reset(
+    code: str,
+    payload: PinResetRedeem,
+    use_case: RedeemPinResetUseCase = Depends(get_redeem_pin_reset_use_case),
+):
+    """
+    Public: whoever forgot their PIN has no token. The code was read out by the member who approved
+    it, or issued from the hub itself. It works once, and signs them in with the PIN they choose.
+    """
+    token_dict = await use_case.execute(code=code, pin=payload.pin)
     return AuthPresentationMapper.to_token_response(token_dict)
 
 

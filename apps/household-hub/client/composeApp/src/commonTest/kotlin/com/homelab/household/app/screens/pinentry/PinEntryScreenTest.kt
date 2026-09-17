@@ -130,12 +130,25 @@ class PinEntryScreenTest {
             runComposeUiTest {
                 setContent {
                     HearthTheme(darkTheme = false) {
-                        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {})
+                        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForgotten = {})
                     }
                 }
 
                 onNodeWithText(getString(Res.string.pin_title, state.member.name)).assertIsDisplayed()
             }
+        }
+    }
+
+    @Test
+    fun forgotten_it_leads_to_getting_a_new_pin() {
+        val hub = FakeSignInHub()
+        var forgotten = 0
+
+        runScreenTest {
+            pinEntryScreen(hub, emma, onForgotten = { forgotten++ })
+
+            onPinPad { tapsForgotten() }
+            waitUntil(timeoutMillis = WAIT_MILLIS) { forgotten == 1 }
         }
     }
 

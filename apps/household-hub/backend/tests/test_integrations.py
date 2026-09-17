@@ -187,7 +187,7 @@ async def test_tool_execution_server_authoritative_session_controls(client: http
     assert spoof_agent_resp.status_code == 403
 
     # 3. Create a second user and verify Zero-Leak cross-user session blocking
-    u2_token, _ = await add_signed_in_member(client, full_name="Member User")
+    u2_token, _ = await add_signed_in_member(client, token, full_name="Member User")
     u2_headers = {"Authorization": f"Bearer {u2_token}"}
 
     u2_sess = await client.post(
@@ -438,7 +438,7 @@ async def test_integration_input_max_length_validation(client: httpx.AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_calendar_events_corrupted_secret_returns_401(client: httpx.AsyncClient, db_session):
+async def test_calendar_events_corrupted_secret_returns_409(client: httpx.AsyncClient, db_session):
     from sqlalchemy import update
     from app.data.models.calendar_credential_model import CalendarCredentialModel
 
@@ -464,13 +464,14 @@ async def test_calendar_events_corrupted_secret_returns_401(client: httpx.AsyncC
     )
     await db_session.commit()
 
-    # Calling fetch events should return 401 Unauthorized (not 500)
+    # Calling fetch events should return 409 Conflict (not 500, and not 401 -- the token itself is fine)
     resp = await client.get(
         "/api/v1/integrations/calendars/events",
         headers=headers,
         params={"start_time": "2026-09-08T00:00:00Z", "end_time": "2026-09-09T00:00:00Z"},
     )
-    assert resp.status_code == 401
+    assert resp.status_code == 409
     assert "decrypted" in resp.json()["detail"].lower()
+    assert resp.json()["code"] == "calendar_unreadable"
 
 

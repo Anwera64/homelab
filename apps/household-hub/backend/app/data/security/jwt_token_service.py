@@ -12,7 +12,13 @@ class JwtTokenService(ITokenService):
         self.algorithm = algorithm
         self.expire_minutes = expire_minutes
 
-    def create_access_token(self, subject: str, is_admin: bool, expires_delta: Optional[timedelta] = None) -> str:
+    def create_access_token(
+        self,
+        subject: str,
+        is_admin: bool,
+        token_version: int,
+        expires_delta: Optional[timedelta] = None,
+    ) -> str:
         now = datetime.now(timezone.utc)
         if expires_delta:
             expire = now + expires_delta
@@ -22,6 +28,7 @@ class JwtTokenService(ITokenService):
         to_encode: Dict[str, Any] = {
             "sub": str(subject),
             "is_admin": is_admin,
+            "ver": token_version,
             "exp": expire,
             "iat": now,
         }

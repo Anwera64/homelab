@@ -8,6 +8,7 @@ from app.domain.entities.session import ChatMessage
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.gossip_repository import IGossipRepository
+from app.domain.repositories.user_repository import IUserRepository
 
 
 def _sanitize_prompt_snippet(text: str, max_length: int = 500) -> str:
@@ -35,11 +36,19 @@ class AssembleAgentContextUseCase:
         self,
         memory_repo: IMemoryRepository,
         gossip_repo: IGossipRepository,
+        user_repo: Optional[IUserRepository] = None,
         max_context_tokens: int = 8192,
     ):
         self.memory_repo = memory_repo
         self.gossip_repo = gossip_repo
+        self.user_repo = user_repo
         self.max_context_tokens = max_context_tokens
+
+    async def _active_member_ids(self) -> Optional[set]:
+        """Who is still here, or None when nobody asked us to tell the difference."""
+        if not self.user_repo:
+            return None
+        return {member.id for member in await self.user_repo.list_active()}
 
     async def execute(
         self,
@@ -100,10 +109,15 @@ class AssembleAgentContextUseCase:
 
         # Household milestones with provenance attribution and anti-echo tags
         if household_milestones:
+            # A member who has left is named in the past, so agents stop planning around them while
+            # what they shared keeps their name on it.
+            who_is_still_here = await self._active_member_ids()
             recency_lines.append("[Injected Household Context - Do Not Re-Extract]:")
             for gm in household_milestones:
                 reporting = _sanitize_prompt_snippet(gm.reporting_agent_name, max_length=50) or "an agent"
                 source = _sanitize_prompt_snippet(gm.source_username, max_length=50) or "A member"
+                if who_is_still_here is not None and gm.source_user_id not in who_is_still_here:
+                    source = f"{source}, who's no longer in the household,"
                 safe_summary = _sanitize_prompt_snippet(gm.summary)
                 recency_lines.append(f"- {source} mentioned to the {reporting}: {safe_summary}")
 

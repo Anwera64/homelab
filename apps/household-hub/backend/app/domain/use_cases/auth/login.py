@@ -11,7 +11,9 @@ class LoginUseCase:
 
     async def execute(self, user_id: str, pin: str) -> dict:
         user = await self.verify_pin.execute(user_id, pin)
-        token = self.token_service.create_access_token(subject=user.id, is_admin=user.is_admin)
+        token = self.token_service.create_access_token(
+            subject=user.id, is_admin=user.is_admin, token_version=user.token_version
+        )
         return {
             "access_token": token,
             "token_type": "bearer",

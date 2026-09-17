@@ -2,6 +2,7 @@ package com.homelab.household.app.screens.profilepicker
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -23,10 +24,12 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.picker_failed
 import com.homelab.household.app.resources.picker_hint
+import com.homelab.household.app.resources.picker_invite_code
 import com.homelab.household.app.resources.picker_member_count
 import com.homelab.household.app.resources.picker_member_description
 import com.homelab.household.app.resources.picker_retry
@@ -52,13 +55,26 @@ fun ProfilePickerContent(
     state: ProfilePickerUiState,
     onMemberSelected: (Member) -> Unit,
     onRetry: () -> Unit,
+    onInviteCode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val status = state.status
 
-    HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.xxl) { padding ->
+    HearthScaffold(
+        modifier = modifier,
+        gutter = HearthTheme.spacing.xxl,
+        bottomBar = {
+            // A new member opening the app is not on the picker: this is their door.
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                contentAlignment = Alignment.Center
+            ) {
+                SecondaryButton(text = stringResource(Res.string.picker_invite_code), onClick = onInviteCode)
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -172,6 +188,6 @@ private fun ProfilePickerContentPreview(
     @PreviewParameter(ProfilePickerUiStateProvider::class) state: ProfilePickerUiState
 ) {
     HearthTheme {
-        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {})
+        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
     }
 }
