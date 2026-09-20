@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
 import com.homelab.household.data.dto.GossipMilestoneDto
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub

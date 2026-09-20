@@ -1,11 +1,10 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.domain.model.ServerStatus
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.everySuspend
-import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList

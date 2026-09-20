@@ -3,7 +3,7 @@ package com.homelab.household.data.repository
 import app.cash.turbine.test
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.dto.AuthStatusDto
 import com.homelab.household.data.dto.InvitePreviewReadDto
 import com.homelab.household.data.dto.MemberProfileDto
@@ -21,7 +21,6 @@ import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.everySuspend
-import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifyNoMoreCalls

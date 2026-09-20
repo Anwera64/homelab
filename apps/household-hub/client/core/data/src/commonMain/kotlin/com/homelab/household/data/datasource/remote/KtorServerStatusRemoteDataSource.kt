@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.data.dto.HealthCheckDto
 import com.homelab.household.domain.model.ServerStatus
 import io.ktor.client.HttpClient

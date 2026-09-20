@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.dto.ChangePinRequestDto
 import com.homelab.household.data.dto.InviteCreateRequestDto
 import com.homelab.household.data.dto.InviteReadDto

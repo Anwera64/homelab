@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.Space

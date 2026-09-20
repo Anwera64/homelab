@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.SpaceUpdateDto
 import com.homelab.household.data.network.ensureJsonSuccess

@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.MemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
 import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.MemoryUpdateDto
 import com.homelab.household.domain.exception.ServerOfflineException

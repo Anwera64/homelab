@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.GossipRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
 import com.homelab.household.data.mapper.GossipDataMapper
 import com.homelab.household.domain.model.HouseholdMilestone
 import com.homelab.household.domain.repository.GossipRepository

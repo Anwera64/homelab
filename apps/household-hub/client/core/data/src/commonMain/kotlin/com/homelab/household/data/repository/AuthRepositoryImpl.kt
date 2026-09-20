@@ -2,7 +2,7 @@ package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
 import com.homelab.household.data.datasource.local.TokenLocalDataSource
-import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper

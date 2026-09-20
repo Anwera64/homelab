@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
 import com.homelab.household.data.dto.AgentCreateDto
 import com.homelab.household.data.dto.AgentReadDto
 import com.homelab.household.data.dto.AgentUpdateDto

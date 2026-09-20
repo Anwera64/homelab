@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.domain.model.ServerStatus
 import com.homelab.household.domain.repository.ServerStatusRepository
 import kotlinx.coroutines.flow.Flow

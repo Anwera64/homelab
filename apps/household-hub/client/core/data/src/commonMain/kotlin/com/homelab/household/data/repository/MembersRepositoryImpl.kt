@@ -1,7 +1,7 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.TokenLocalDataSource
-import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.PinResetDataMapper
 import com.homelab.household.data.mapper.UserDataMapper

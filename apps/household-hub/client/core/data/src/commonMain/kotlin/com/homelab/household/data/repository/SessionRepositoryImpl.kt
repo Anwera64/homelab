@@ -1,7 +1,7 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
-import com.homelab.household.data.datasource.remote.SessionRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.mapper.ChatMessageDataMapper
 import com.homelab.household.data.mapper.SessionDataMapper
 import com.homelab.household.domain.exception.DomainException

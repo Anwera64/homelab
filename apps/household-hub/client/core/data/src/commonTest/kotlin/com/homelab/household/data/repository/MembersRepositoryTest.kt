@@ -1,7 +1,7 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.dto.InviteReadDto
 import com.homelab.household.data.dto.PinResetReadDto
 import com.homelab.household.data.dto.TokenResponseDto

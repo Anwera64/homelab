@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.AgentRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
 import com.homelab.household.data.mapper.AgentDataMapper
 import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.repository.AgentRepository

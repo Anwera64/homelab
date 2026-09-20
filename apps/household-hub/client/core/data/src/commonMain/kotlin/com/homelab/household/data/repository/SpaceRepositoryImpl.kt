@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
 import com.homelab.household.data.mapper.SpaceDataMapper
 import com.homelab.household.domain.model.Space
 import com.homelab.household.domain.repository.SpaceRepository

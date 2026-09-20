@@ -1,4 +1,4 @@
-package com.homelab.household.data.datasource.remote
+package com.homelab.household.data.datasource.remote.`interface`
 
 import com.homelab.household.data.dto.GossipMilestoneDto
 

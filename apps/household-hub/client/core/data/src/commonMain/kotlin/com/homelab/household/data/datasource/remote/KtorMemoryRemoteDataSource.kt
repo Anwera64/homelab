@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
+import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
 import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.MemoryUpdateDto
 import com.homelab.household.data.network.ensureJsonSuccess
