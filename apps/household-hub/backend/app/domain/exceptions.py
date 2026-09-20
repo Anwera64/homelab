@@ -22,11 +22,39 @@ class WrongPinException(AuthenticationException):
         self.attempts_left = attempts_left
 
 
+class WrongConfirmationPinException(WrongPinException):
+    """Raised when a signed-in member confirms an action with the wrong PIN. Unlike WrongPinException,
+    the member is already authenticated, so this must not read as a sign-out-worthy 401."""
+    pass
+
+
 class PinLockedException(DomainException):
     """Raised while a member has to wait before trying their PIN again."""
     def __init__(self, retry_after_seconds: int):
         super().__init__("Too many wrong PINs. Wait before trying again.")
         self.retry_after_seconds = retry_after_seconds
+
+
+class CodeGuessesLockedException(DomainException):
+    """Raised while the hub has to wait before accepting another invite/reset code guess, hub-wide."""
+    def __init__(self, retry_after_seconds: int):
+        super().__init__("Too many wrong codes. Wait before trying again.")
+        self.retry_after_seconds = retry_after_seconds
+
+
+class InviteInvalidException(DomainException):
+    """Raised for an invite or reset code that is unknown, already used, or expired."""
+    pass
+
+
+class NameTakenException(DomainException):
+    """Raised when a chosen name is already in use."""
+    pass
+
+
+class OwnPinResetException(DomainException):
+    """Raised when a member tries to approve their own PIN reset request."""
+    pass
 
 
 class ZeroLeakViolationException(DomainException):

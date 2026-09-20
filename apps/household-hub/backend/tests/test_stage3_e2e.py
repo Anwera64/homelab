@@ -13,8 +13,8 @@ from tests.auth_helpers import add_signed_in_member, register_admin
 async def setup_stage3_environment(client: httpx.AsyncClient) -> tuple[str, str, str, str, str]:
     """Helper to setup admin, member1, member2, and return tokens + agent_id."""
     admin_token, _ = await register_admin(client, full_name="Admin User")
-    member1_token, _ = await add_signed_in_member(client, full_name="Alex")
-    member2_token, _ = await add_signed_in_member(client, full_name="Maria")
+    member1_token, _ = await add_signed_in_member(client, admin_token, full_name="Alex")
+    member2_token, _ = await add_signed_in_member(client, admin_token, full_name="Maria")
 
     # Get assistant agent
     agent_resp = await client.get("/api/v1/agents/assistant", headers={"Authorization": f"Bearer {member1_token}"})

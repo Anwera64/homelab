@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -36,6 +37,7 @@ fun HearthTextField(
     label: String,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
+    contentDescription: String? = null,
     helper: String? = null,
     error: String? = null,
     singleLine: Boolean = true,
@@ -56,7 +58,10 @@ fun HearthTextField(
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { if (error != null) error(error) },
+                .semantics {
+                    if (error != null) error(error)
+                    if (contentDescription != null) this.contentDescription = contentDescription
+                },
             textStyle = fieldStyle.copy(color = colors.textPrimary),
             singleLine = singleLine,
             minLines = minLines,

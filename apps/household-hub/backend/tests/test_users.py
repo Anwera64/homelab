@@ -1,152 +1,220 @@
+"""
+Removing someone from the household. They are deactivated, not deleted: their name and colour stay,
+so what they shared keeps their name on it, and everything private to them is erased.
+"""
+import uuid
+
 import pytest
 import httpx
+from sqlalchemy import text
 
-from tests.auth_helpers import MEMBER_PIN, add_signed_in_member, register_admin, sign_in
+from tests.auth_helpers import ADMIN_PIN, MEMBER_PIN, add_signed_in_member, register_admin, sign_in
+from tests.conftest import TestingSessionLocal
 
 
-@pytest.mark.asyncio
-async def test_admin_delete_member_reassigns_agents_and_purges_personal_data(client: httpx.AsyncClient):
-    """
-    When an admin deletes a member:
-    1. Member's authored custom agents are reassigned to the Admin.
-    2. Member's personal space and account are removed (Zero-Leak).
-    3. Non-admin cannot delete members (403 Forbidden).
-    """
-    # 1. Setup Admin and a member
-    admin_token, admin_id = await register_admin(client)
-    member1_token, member1_id = await add_signed_in_member(client, full_name="Member 1")
+def _bearer(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
 
-    # 2. Member creates a custom agent
-    agent_resp = await client.post(
-        "/api/v1/agents",
-        json={"slug": "member_bot", "name": "Member Bot", "system_prompt": "I am a bot"},
-        headers={"Authorization": f"Bearer {member1_token}"},
+
+async def _rows(table: str, user_column: str, user_id: str) -> int:
+    async with TestingSessionLocal() as session:
+        res = await session.execute(
+            text(f"SELECT COUNT(*) FROM {table} WHERE {user_column} = :user_id"), {"user_id": user_id}
+        )
+        return res.scalar() or 0
+
+
+async def _give_liam_something_of_his_own(client: httpx.AsyncClient, liam_token: str, liam_id: str) -> str:
+    """A chat with a message in it, a private memory, a calendar connection and a note. Returns the session id."""
+    agent = await client.get("/api/v1/agents/assistant", headers=_bearer(liam_token))
+    session_resp = await client.post(
+        "/api/v1/sessions",
+        json={"agent_id": agent.json()["id"], "title": "Liam's chat"},
+        headers=_bearer(liam_token),
     )
-    agent_id = agent_resp.json()["id"]
-    assert agent_resp.json()["owner_id"] == member1_id
-
-    # 3. Non-admin attempts to delete -> 403 Forbidden
-    forbidden_del = await client.delete(
-        f"/api/v1/users/{member1_id}",
-        headers={"Authorization": f"Bearer {member1_token}"},
+    session_id = session_resp.json()["id"]
+    await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "user", "content": "Something I said"},
+        headers=_bearer(liam_token),
     )
-    assert forbidden_del.status_code == 403
-
-    # 4. Admin deletes member
-    del_resp = await client.delete(
-        f"/api/v1/users/{member1_id}",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert del_resp.status_code == 200
-    assert "deleted" in del_resp.json()["message"].lower()
-
-    # Verify member is gone
-    get_mem = await client.get(f"/api/v1/users/{member1_id}", headers={"Authorization": f"Bearer {admin_token}"})
-    assert get_mem.status_code == 404
-
-    # Verify custom agent's owner was reassigned to the Admin!
-    get_agent = await client.get(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {admin_token}"})
-    assert get_agent.status_code == 200
-    assert get_agent.json()["owner_id"] == admin_id
-
-
-@pytest.mark.asyncio
-async def test_cannot_delete_sole_admin(client: httpx.AsyncClient):
-    """The hub must refuse to delete the only administrator account."""
-    admin_token, admin_id = await register_admin(client)
-
-    # Attempt to delete the only admin -> 400 Bad Request
-    del_resp = await client.delete(
-        f"/api/v1/users/{admin_id}",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert del_resp.status_code == 400
-    assert "administrator" in del_resp.json()["detail"].lower()
-
-
-@pytest.mark.asyncio
-async def test_delete_admin_when_secondary_admin_exists(client: httpx.AsyncClient):
-    """Deleting an admin is permitted if another admin exists; remaining admin inherits models."""
-    admin1_token, admin1_id = await register_admin(client, full_name="Admin 1")
-    admin2_token, admin2_id = await add_signed_in_member(client, full_name="Admin 2", is_admin=True)
-
-    # Admin 2 creates an agent
-    agent_resp = await client.post(
-        "/api/v1/agents",
-        json={"slug": "admin2_bot", "name": "Admin 2 Bot", "system_prompt": "Prompt"},
-        headers={"Authorization": f"Bearer {admin2_token}"},
-    )
-    agent_id = agent_resp.json()["id"]
-
-    # Admin 1 deletes Admin 2
-    del_resp = await client.delete(f"/api/v1/users/{admin2_id}", headers={"Authorization": f"Bearer {admin1_token}"})
-    assert del_resp.status_code == 200
-
-    # Agent is inherited by Admin 1
-    get_agent = await client.get(f"/api/v1/agents/{agent_id}", headers={"Authorization": f"Bearer {admin1_token}"})
-    assert get_agent.status_code == 200
-    assert get_agent.json()["owner_id"] == admin1_id
-
-
-@pytest.mark.asyncio
-async def test_delete_member_preserves_household_memories_and_purges_personal_memories(client: httpx.AsyncClient):
-    """
-    When an admin deletes a member:
-    1. Member's personal memories are permanently purged (Strict Zero-Leak).
-    2. Shared household memories are preserved and reassigned to the Admin.
-    """
-    # 1. Admin registers, member joins
-    admin_token, admin_id = await register_admin(client)
-    member_token, member_id = await add_signed_in_member(client, full_name="Member 1")
-
-    # 2. Member creates a personal memory
-    p_resp = await client.post(
+    await client.post(
         "/api/v1/memories",
-        json={"scope": "personal", "content": "My private secret note", "category": "preference"},
-        headers={"Authorization": f"Bearer {member_token}"},
+        json={"scope": "personal", "content": "Liam takes his coffee black", "category": "preference"},
+        headers=_bearer(liam_token),
     )
-    assert p_resp.status_code == 201
-    personal_mem_id = p_resp.json()["id"]
+    async with TestingSessionLocal() as session:
+        await session.execute(
+            text(
+                "INSERT INTO calendar_credentials (id, user_id, provider, url, username, encrypted_secret,"
+                " calendar_name, is_active, created_at, updated_at)"
+                " VALUES (:id, :user_id, 'caldav', 'https://caldav.icloud.com', 'liam@icloud.com', 'encrypted',"
+                " 'Default', 1, datetime('now'), datetime('now'))"
+            ),
+            {"id": str(uuid.uuid4()), "user_id": liam_id},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO app_documents (id, user_id, title, content, format, version, created_at, updated_at)"
+                " VALUES (:id, :user_id, 'Sourdough', 'Feed it daily', 'markdown', 1, datetime('now'), datetime('now'))"
+            ),
+            {"id": str(uuid.uuid4()), "user_id": liam_id},
+        )
+        await session.commit()
+    return session_id
 
-    # 3. Member creates a household memory
-    h_resp = await client.post(
-        "/api/v1/memories",
-        json={"scope": "household", "content": "Household Wi-Fi is Homelab-5G", "category": "fact"},
-        headers={"Authorization": f"Bearer {member_token}"},
-    )
-    assert h_resp.status_code == 201
-    household_mem_id = h_resp.json()["id"]
 
-    # 4. Admin deletes member
-    del_resp = await client.delete(f"/api/v1/users/{member_id}", headers={"Authorization": f"Bearer {admin_token}"})
-    assert del_resp.status_code == 200
-
-    # 5. Personal memory must be purged (Zero-Leak)
-    get_p = await client.get(f"/api/v1/memories/{personal_mem_id}", headers={"Authorization": f"Bearer {admin_token}"})
-    assert get_p.status_code == 404
-
-    # 6. Household memory must be preserved and reassigned to Admin
-    get_h = await client.get(f"/api/v1/memories/{household_mem_id}", headers={"Authorization": f"Bearer {admin_token}"})
-    assert get_h.status_code == 200
-    assert get_h.json()["user_id"] == admin_id
-    assert get_h.json()["content"] == "Household Wi-Fi is Homelab-5G"
+async def _household(client: httpx.AsyncClient) -> tuple[str, str, str, str]:
+    """Emma the admin and Liam the member. Returns (emma_token, emma_id, liam_token, liam_id)."""
+    emma_token, emma_id = await register_admin(client, full_name="Emma")
+    liam_token, liam_id = await add_signed_in_member(client, emma_token, full_name="Liam")
+    return emma_token, emma_id, liam_token, liam_id
 
 
 @pytest.mark.asyncio
-async def test_user_self_service_profile_update(client: httpx.AsyncClient):
-    """A member changes their own name and colour via PATCH /api/v1/users/me — never their PIN."""
-    await register_admin(client)
-    member_token, member_id = await add_signed_in_member(client, full_name="Member 1")
+async def test_removing_a_member_keeps_their_name_and_colour(client: httpx.AsyncClient):
+    """Deactivated, not deleted, so the facts they shared keep their real source."""
+    emma_token, _, _, liam_id = await _household(client)
+
+    resp = await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    assert resp.status_code == 200
+    liam = await client.get(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+    assert liam.status_code == 200
+    assert liam.json()["full_name"] == "Liam"
+    assert liam.json()["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_removed_member_leaves_the_picker_and_cannot_sign_in(client: httpx.AsyncClient):
+    emma_token, _, _, liam_id = await _household(client)
+
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    picker = await client.get("/api/v1/auth/members")
+    assert [m["full_name"] for m in picker.json()] == ["Emma"]
+    assert (await client.post("/api/v1/auth/login", json={"user_id": liam_id, "pin": MEMBER_PIN})).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_a_removed_members_phone_stops_working(client: httpx.AsyncClient):
+    emma_token, _, liam_token, liam_id = await _household(client)
+
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    assert (await client.get("/api/v1/auth/me", headers=_bearer(liam_token))).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_removing_erases_their_chats_private_memories_space_calendar_and_notes(client: httpx.AsyncClient):
+    emma_token, _, liam_token, liam_id = await _household(client)
+    session_id = await _give_liam_something_of_his_own(client, liam_token, liam_id)
+
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    assert await _rows("conversation_sessions", "user_id", liam_id) == 0
+    assert await _rows("chat_messages", "session_id", session_id) == 0
+    assert await _rows("agent_memories", "user_id", liam_id) == 0
+    assert await _rows("spaces", "owner_id", liam_id) == 0
+    assert await _rows("calendar_credentials", "user_id", liam_id) == 0
+    assert await _rows("app_documents", "user_id", liam_id) == 0
+
+
+@pytest.mark.asyncio
+async def test_what_they_shared_keeps_their_name(client: httpx.AsyncClient):
+    """The attributed bus exists so nothing is re-attributed to the admin."""
+    emma_token, _, liam_token, liam_id = await _household(client)
+    shared = await client.post(
+        "/api/v1/memories",
+        json={"scope": "household", "content": "The boiler is serviced in October", "category": "fact"},
+        headers=_bearer(liam_token),
+    )
+    async with TestingSessionLocal() as session:
+        await session.execute(
+            text(
+                "INSERT INTO gossip_milestones (id, source_user_id, source_username, reporting_agent_name,"
+                " target_scope, category, summary, details_json, is_active, created_at, updated_at)"
+                " VALUES (:id, :user_id, 'Liam', 'Home Coordinator', 'household', 'milestone',"
+                " 'Liam is back by seven', '{}', 1, datetime('now'), datetime('now'))"
+            ),
+            {"id": str(uuid.uuid4()), "user_id": liam_id},
+        )
+        await session.commit()
+
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    kept = await client.get(f"/api/v1/memories/{shared.json()['id']}", headers=_bearer(emma_token))
+    assert kept.status_code == 200
+    assert kept.json()["user_id"] == liam_id
+    assert await _rows("gossip_milestones", "source_user_id", liam_id) == 1
+
+
+@pytest.mark.asyncio
+async def test_their_agents_pass_to_the_admin(client: httpx.AsyncClient):
+    """Ownership, not attribution: an agent needs a living owner to stay editable."""
+    emma_token, emma_id, liam_token, liam_id = await _household(client)
+    agent = await client.post(
+        "/api/v1/agents",
+        json={"slug": "liam_bot", "name": "Liam Bot", "system_prompt": "I am a bot"},
+        headers=_bearer(liam_token),
+    )
+
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    passed_on = await client.get(f"/api/v1/agents/{agent.json()['id']}", headers=_bearer(emma_token))
+    assert passed_on.json()["owner_id"] == emma_id
+
+
+@pytest.mark.asyncio
+async def test_their_name_is_free_for_someone_new(client: httpx.AsyncClient):
+    emma_token, _, _, liam_id = await _household(client)
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    invite = await client.post("/api/v1/invites", json={"invited_name": "Liam"}, headers=_bearer(emma_token))
+
+    assert invite.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_a_member_cannot_remove_anyone(client: httpx.AsyncClient):
+    emma_token, emma_id, liam_token, _ = await _household(client)
+
+    resp = await client.delete(f"/api/v1/users/{emma_id}", headers=_bearer(liam_token))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_the_admin_leaves_rather_than_removing_themselves(client: httpx.AsyncClient):
+    emma_token, emma_id, _, _ = await _household(client)
+
+    resp = await client.delete(f"/api/v1/users/{emma_id}", headers=_bearer(emma_token))
+
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_the_members_list_shows_active_members_only(client: httpx.AsyncClient):
+    emma_token, _, _, liam_id = await _household(client)
+    await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
+
+    members = await client.get("/api/v1/users", headers=_bearer(emma_token))
+
+    assert [m["full_name"] for m in members.json()] == ["Emma"]
+
+
+@pytest.mark.asyncio
+async def test_a_member_changes_their_own_name_and_colour_but_never_their_pin_here(client: httpx.AsyncClient):
+    emma_token, _ = await register_admin(client)
+    member_token, member_id = await add_signed_in_member(client, emma_token, full_name="Member 1")
 
     patch_resp = await client.patch(
         "/api/v1/users/me",
         json={"full_name": "Updated Member Name", "avatar_color": "#C05638", "pin": "999999"},
-        headers={"Authorization": f"Bearer {member_token}"},
+        headers=_bearer(member_token),
     )
-    assert patch_resp.status_code == 200
-    updated_data = patch_resp.json()
-    assert updated_data["full_name"] == "Updated Member Name"
-    assert updated_data["avatar_color"] == "#C05638"
 
-    # The PIN in the body was ignored: the old one still signs in
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["full_name"] == "Updated Member Name"
+    assert patch_resp.json()["avatar_color"] == "#C05638"
     await sign_in(client, member_id, MEMBER_PIN)

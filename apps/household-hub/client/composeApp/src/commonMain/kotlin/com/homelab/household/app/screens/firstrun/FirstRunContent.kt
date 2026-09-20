@@ -38,7 +38,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import com.homelab.household.app.components.ColourSwatches
 import com.homelab.household.app.components.HearthScaffold
+import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.HearthTextField
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
@@ -59,6 +61,7 @@ import com.homelab.household.app.resources.first_run_name_label
 import com.homelab.household.app.resources.first_run_name_missing
 import com.homelab.household.app.resources.first_run_name_too_long
 import com.homelab.household.app.resources.first_run_overline
+import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.resources.first_run_pin_helper
 import com.homelab.household.app.resources.first_run_pin_label
 import com.homelab.household.app.resources.first_run_pin_not_six_digits
@@ -133,15 +136,12 @@ fun FirstRunContent(
                 )
             )
 
-            HearthTextField(
+            PinField(
                 value = state.pin,
                 onValueChange = onPinChange,
                 label = stringResource(Res.string.first_run_pin_label),
                 helper = if (state.pinError == null) stringResource(Res.string.first_run_pin_helper) else null,
-                error = state.pinError?.let { pinErrorText(it) },
-                textStyle = type.monoLg,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-                visualTransformation = PasswordVisualTransformation()
+                error = state.pinError?.let { pinErrorText(it) }
             )
 
             ColourPicker(selected = state.colour, onSelect = onColourSelect)
@@ -157,37 +157,16 @@ private fun ColourPicker(selected: String, onSelect: (String) -> Unit) {
 
     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
         Text(stringResource(Res.string.first_run_colour_label), style = type.labelStrong, color = colors.textMuted)
-        Row(
-            modifier = Modifier.selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)
-        ) {
-            AvatarPalette.swatches.forEachIndexed { index, hex ->
-                val isSelected = hex == selected
-                val swatch = hexColor(hex, fallback = colors.primary)
-                val description = stringResource(Res.string.first_run_colour_swatch, index + 1, count)
-                // The tap target is the full 48dp; the chosen swatch wears a ring in the gap around it.
-                Box(
-                    modifier = Modifier
-                        .size(HearthTheme.size.touchTarget)
-                        .clip(CircleShape)
-                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(hex) })
-                        .semantics { contentDescription = description }
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(HearthTheme.size.emphasis, swatch, CircleShape)
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(Modifier.size(HearthTheme.size.swatch).background(swatch, CircleShape))
-                }
-            }
-        }
+        ColourSwatches(
+            swatches = AvatarPalette.swatches,
+            selected = selected,
+            onSelect = onSelect,
+            swatchDescription = { index -> stringResource(Res.string.first_run_colour_swatch, index + 1, count) }
+        )
         Text(stringResource(Res.string.first_run_colour_helper), style = type.caption, color = colors.textMuted)
     }
 }
+
 
 @Composable
 private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn: () -> Unit) {
@@ -244,6 +223,8 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
 private fun nameErrorText(error: NameError): String = when (error) {
     NameError.Missing -> stringResource(Res.string.first_run_name_missing)
     NameError.TooLong -> stringResource(Res.string.first_run_name_too_long, MemberName.MAX_LENGTH)
+    // First run has nobody to clash with, so the hub never reports a taken name here.
+    NameError.Taken -> stringResource(Res.string.join_name_taken)
 }
 
 @Composable

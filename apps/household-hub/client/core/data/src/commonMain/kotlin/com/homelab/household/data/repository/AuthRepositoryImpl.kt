@@ -1,16 +1,23 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.dto.AuthStatusDto
+import com.homelab.household.data.dto.InviteRedeemRequestDto
 import com.homelab.household.data.dto.MemberProfileDto
 import com.homelab.household.data.dto.PinRefusalDto
+import com.homelab.household.data.dto.PinResetRedeemRequestDto
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.dto.UserLoginRequestDto
 import com.homelab.household.data.dto.UserOnboardRequestDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.remote.SignedOutSignal
+import com.homelab.household.domain.exception.CodeGuessesLockedException
 import com.homelab.household.domain.exception.HubAlreadySetUpException
+import com.homelab.household.domain.exception.InviteInvalidException
+import com.homelab.household.domain.exception.NameTakenException
 import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.PinLockedException
 import com.homelab.household.domain.exception.ServerOfflineException
@@ -20,6 +27,7 @@ import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.exception.WrongPinException
 import com.homelab.household.domain.model.AuthStatus
+import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
@@ -36,25 +44,26 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class AuthRepositoryImpl(
     private val client: HttpClient,
     private val tokenStorage: TokenStorage,
-    private val baseUrl: String
+    private val baseUrl: String,
+    private val signedOut: SignedOutSignal = SignedOutSignal()
 ) : AuthRepository {
 
     private val _currentUserFlow = MutableStateFlow<User?>(null)
+
+    override fun observeSignedOut(): Flow<Unit> = signedOut.events.onEach { _currentUserFlow.value = null }
     private val refreshMutex = Mutex()
-    private var activeRefresh: Deferred<String>? = null
+    private var activeRefresh: CompletableDeferred<String>? = null
 
     override suspend fun login(memberId: String, pin: String): User = reachingHub {
         val response = client.post("$baseUrl/api/v1/auth/login") {
@@ -84,6 +93,40 @@ class AuthRepositoryImpl(
         when (response.status) {
             HttpStatusCode.BadRequest -> throw HubAlreadySetUpException()
             HttpStatusCode.UnprocessableEntity -> throw ValidationException("The hub refused that name or PIN")
+        }
+        signedIn(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun lookUpInvite(code: String): InvitePreview = reachingHub {
+        val response = client.get("$baseUrl/api/v1/invites/$code")
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+        }
+        InviteDataMapper.toPreview(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): User = reachingHub {
+        val response = client.post("$baseUrl/api/v1/invites/$code/redeem") {
+            contentType(ContentType.Application.Json)
+            setBody(InviteRedeemRequestDto(fullName = fullName, pin = pin, avatarColor = avatarColor))
+        }
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.Conflict -> throw NameTakenException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+        }
+        signedIn(response.ensureJsonSuccess().body())
+    }
+
+    override suspend fun redeemPinReset(code: String, pin: String): User = reachingHub {
+        val response = client.post("$baseUrl/api/v1/auth/pin-resets/$code/redeem") {
+            contentType(ContentType.Application.Json)
+            setBody(PinResetRedeemRequestDto(pin = pin))
+        }
+        when (response.status) {
+            HttpStatusCode.BadRequest -> throw InviteInvalidException()
+            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
         }
         signedIn(response.ensureJsonSuccess().body())
     }
@@ -131,29 +174,39 @@ class AuthRepositoryImpl(
 
     override fun observeCurrentUser(): Flow<User?> = _currentUserFlow.asStateFlow()
 
+    /**
+     * One renewal at a time: callers who ask while one is on its way wait for its answer. A failure
+     * reaches every caller through the shared answer, without cancelling whoever started it.
+     */
     override suspend fun refreshToken(): String {
-        val deferred = refreshMutex.withLock {
-            activeRefresh ?: CoroutineScope(currentCoroutineContext()).async {
-                try {
-                    val token = tokenStorage.getRefreshToken() ?: tokenStorage.getAccessToken() ?: ""
-                    val response = client.post("$baseUrl/api/v1/auth/refresh") {
-                        contentType(ContentType.Application.Json)
-                        header(HttpHeaders.Authorization, "Bearer $token")
-                    }.body<TokenResponseDto>()
-
-                    tokenStorage.saveTokens(response.access_token)
-                    response.user?.let {
-                        _currentUserFlow.value = UserDataMapper.toDomain(it)
-                    }
-                    response.access_token
-                } finally {
-                    refreshMutex.withLock {
-                        activeRefresh = null
-                    }
-                }
-            }.also { activeRefresh = it }
+        val (renewal, startedHere) = refreshMutex.withLock {
+            activeRefresh?.let { it to false }
+                ?: CompletableDeferred<String>().also { activeRefresh = it }.let { it to true }
         }
-        return deferred.await()
+        if (startedHere) {
+            try {
+                renewal.complete(renew())
+            } catch (e: Throwable) {
+                renewal.completeExceptionally(e)
+            } finally {
+                refreshMutex.withLock { activeRefresh = null }
+            }
+        }
+        return renewal.await()
+    }
+
+    private suspend fun renew(): String = reachingHub {
+        // No separate refresh token: the hub re-issues one it still accepts.
+        val kept = tokenStorage.getAccessToken() ?: throw UnauthorizedException("Nobody is signed in on this phone")
+        val response = client.post("$baseUrl/api/v1/auth/refresh") {
+            header(HttpHeaders.Authorization, "Bearer $kept")
+        }
+        if (response.status == HttpStatusCode.Unauthorized) {
+            throw UnauthorizedException("The hub no longer accepts this token")
+        }
+        val fresh: TokenResponseDto = response.ensureJsonSuccess().body()
+        signedIn(fresh)
+        fresh.access_token
     }
 
     override fun getHubHost(): String = baseUrl.substringAfter("://").substringBefore("/")
@@ -175,6 +228,13 @@ class AuthRepositoryImpl(
         }
 
     private suspend fun HttpResponse.refusal(): PinRefusalDto? = runCatchingSafe { body<PinRefusalDto>() }.getOrNull()
+
+    private suspend fun codeGuessesLockedException(response: HttpResponse): CodeGuessesLockedException {
+        val seconds = response.refusal()?.retry_after_seconds
+            ?: response.headers[HttpHeaders.RetryAfter]?.toIntOrNull()
+            ?: throw UpstreamGatewayException(statusCode = response.status.value)
+        return CodeGuessesLockedException(seconds)
+    }
 
     /**
      * 502–504 is a proxy saying the hub is down or starting; 404 means the address is wrong; any

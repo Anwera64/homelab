@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 
 /**
@@ -23,19 +24,21 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun SignIn(onMemberSelected: (Member) -> Unit) {
+    override fun SignIn(onMemberSelected: (Member) -> Unit, onInviteCode: () -> Unit) {
         Column {
             Text(SIGN_IN)
             Text(PICK_EMMA, modifier = Modifier.clickable { onMemberSelected(EMMA) })
+            Text(HAVE_AN_INVITE, modifier = Modifier.clickable { onInviteCode() })
         }
     }
 
     @Composable
-    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit) {
+    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit, onForgotten: () -> Unit) {
         Column {
             Text(pinOf(member))
             Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
+            Text(FORGOTTEN, modifier = Modifier.clickable { onForgotten() })
         }
     }
 
@@ -49,8 +52,132 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun Home() {
-        Text(HOME)
+    override fun InviteCode(onBack: () -> Unit, onInvite: (InvitePreview, String) -> Unit) {
+        Column {
+            Text(INVITE_CODE)
+            Text(CODE_ACCEPTED, modifier = Modifier.clickable { onInvite(INVITE, "K7M2QP") })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun Join(preview: InvitePreview, code: String, onJoined: () -> Unit, onExpired: () -> Unit) {
+        Column {
+            Text(joinOf(preview))
+            Text(JOINED, modifier = Modifier.clickable { onJoined() })
+            Text(CODE_EXPIRED, modifier = Modifier.clickable { onExpired() })
+        }
+    }
+
+    @Composable
+    override fun PinForgot(member: Member, onBack: () -> Unit, onHaveCode: () -> Unit) {
+        Column {
+            Text(forgotOf(member))
+            Text(HAVE_A_RESET_CODE, modifier = Modifier.clickable { onHaveCode() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun ResetCode(onBack: () -> Unit, onCode: (String) -> Unit) {
+        Column {
+            Text(RESET_CODE)
+            Text(RESET_CODE_TYPED, modifier = Modifier.clickable { onCode("P4XN7T") })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun NewPin(code: String, onSignedIn: () -> Unit) {
+        Column {
+            Text(newPinFor(code))
+            Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
+        }
+    }
+
+    @Composable
+    override fun Home(onProfile: () -> Unit) {
+        Column {
+            Text(HOME)
+            Text(GO_TO_PROFILE, modifier = Modifier.clickable { onProfile() })
+        }
+    }
+
+    @Composable
+    override fun Profile(
+        onBack: () -> Unit,
+        onMembers: () -> Unit,
+        onChangePin: () -> Unit,
+        onLeave: () -> Unit,
+        onSignedOut: () -> Unit
+    ) {
+        Column {
+            Text(PROFILE)
+            Text(GO_TO_MEMBERS, modifier = Modifier.clickable { onMembers() })
+            Text(GO_TO_CHANGE_PIN, modifier = Modifier.clickable { onChangePin() })
+            Text(GO_TO_LEAVE, modifier = Modifier.clickable { onLeave() })
+            Text(SIGNED_OUT, modifier = Modifier.clickable { onSignedOut() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun Members(
+        onBack: () -> Unit,
+        onInvite: () -> Unit,
+        onResetPin: (Member) -> Unit,
+        onRemove: (Member) -> Unit
+    ) {
+        Column {
+            Text(MEMBERS)
+            Text(GO_TO_INVITE, modifier = Modifier.clickable { onInvite() })
+            Text(RESET_LIAMS_PIN, modifier = Modifier.clickable { onResetPin(LIAM) })
+            Text(REMOVE_LIAM, modifier = Modifier.clickable { onRemove(LIAM) })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun InviteCreate(onBack: () -> Unit) {
+        Column {
+            Text(INVITE_CREATE)
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun PinApprove(member: Member, onBack: () -> Unit) {
+        Column {
+            Text(approveOf(member))
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun RemoveMember(member: Member, onBack: () -> Unit, onRemoved: () -> Unit) {
+        Column {
+            Text(removeOf(member))
+            Text(REMOVED, modifier = Modifier.clickable { onRemoved() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun LeaveHousehold(onBack: () -> Unit, onLeft: () -> Unit) {
+        Column {
+            Text(LEAVE)
+            Text(LEFT, modifier = Modifier.clickable { onLeft() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun ChangePin(onBack: () -> Unit, onChanged: () -> Unit) {
+        Column {
+            Text(CHANGE_PIN)
+            Text(PIN_CHANGED, modifier = Modifier.clickable { onChanged() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
     }
 
     companion object {
@@ -58,16 +185,48 @@ class StubScreens : AppScreens {
         const val SIGN_IN = "sign in screen"
         const val FIRST_RUN = "first run screen"
         const val HOME = "home screen"
+        const val INVITE_CODE = "invite code screen"
+        const val RESET_CODE = "reset code screen"
+        const val PROFILE = "profile screen"
+        const val MEMBERS = "members screen"
+        const val INVITE_CREATE = "invite create screen"
+        const val LEAVE = "leave household screen"
+        const val CHANGE_PIN = "change pin screen"
         const val GO_TO_SIGN_IN = "go to sign in"
         const val GO_TO_FIRST_RUN = "go to first run"
+        const val GO_TO_PROFILE = "go to profile"
+        const val GO_TO_MEMBERS = "go to members"
+        const val GO_TO_INVITE = "go to invite"
+        const val GO_TO_CHANGE_PIN = "go to change pin"
+        const val GO_TO_LEAVE = "go to leave"
         const val CREATED = "household created"
         const val SIGN_IN_INSTEAD = "sign in instead"
         const val PICK_EMMA = "pick emma"
+        const val HAVE_AN_INVITE = "have an invite code"
+        const val CODE_ACCEPTED = "code accepted"
+        const val CODE_EXPIRED = "code expired"
+        const val JOINED = "joined the household"
+        const val FORGOTTEN = "forgotten the pin"
+        const val HAVE_A_RESET_CODE = "have a reset code"
+        const val RESET_CODE_TYPED = "reset code typed"
+        const val RESET_LIAMS_PIN = "reset liam pin"
+        const val REMOVE_LIAM = "remove liam"
+        const val REMOVED = "member removed"
+        const val LEFT = "left the household"
+        const val PIN_CHANGED = "pin changed"
         const val SIGNED_IN = "signed in"
+        const val SIGNED_OUT = "signed out"
         const val BACK = "back"
 
         val EMMA = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
+        val LIAM = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
+        val INVITE = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E")
 
         fun pinOf(member: Member) = "pin pad of ${member.name}"
+        fun forgotOf(member: Member) = "forgotten pin of ${member.name}"
+        fun approveOf(member: Member) = "approve reset for ${member.name}"
+        fun removeOf(member: Member) = "remove ${member.name}"
+        fun joinOf(preview: InvitePreview) = "join as ${preview.invitedName}"
+        fun newPinFor(code: String) = "new pin for $code"
     }
 }

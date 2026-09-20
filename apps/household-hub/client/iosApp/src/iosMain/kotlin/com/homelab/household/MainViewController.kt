@@ -2,8 +2,11 @@ package com.homelab.household
 
 import androidx.compose.ui.window.ComposeUIViewController
 import com.homelab.household.app.App
+import com.homelab.household.data.di.DEFAULT_BASE_URL
+import com.homelab.household.data.remote.HubConfig
 import com.homelab.household.sdk.HouseholdHubSdk
 import platform.UIKit.UIViewController
+import kotlin.experimental.ExperimentalNativeApi
 
 /**
  * The iOS entry point, and the twin of `HouseholdHubApplication` + `MainActivity` on Android.
@@ -16,9 +19,18 @@ import platform.UIKit.UIViewController
  * `KoinAppAlreadyStartedException` is unreachable no matter what the Swift side does.
  *
  * The hub address comes from the default in [HouseholdHubSdk.init] — the same constant the
- * `BuildConfig.BASE_URL` on the Android side is generated from — so there is nothing to pass in.
+ * `BuildConfig.BASE_URL` on the Android side is generated from — with debug logging determined
+ * by [Platform.isDebugBinary].
  */
-private val koin by lazy { HouseholdHubSdk.init() }
+@OptIn(ExperimentalNativeApi::class)
+private val koin by lazy {
+    HouseholdHubSdk.init(
+        hubConfig = HubConfig(
+            baseUrl = DEFAULT_BASE_URL,
+            isDebug = Platform.isDebugBinary
+        )
+    )
+}
 
 /**
  * Starts the DI graph if it is not already running. Idempotent; safe from any thread.

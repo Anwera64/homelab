@@ -10,7 +10,7 @@ class IPasswordHasher(Protocol):
 
 
 class ITokenService(Protocol):
-    def create_access_token(self, subject: str, is_admin: bool) -> str:
+    def create_access_token(self, subject: str, is_admin: bool, token_version: int) -> str:
         ...
 
     def decode_token(self, token: str) -> Dict[str, Any]:

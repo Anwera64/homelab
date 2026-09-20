@@ -1,10 +1,23 @@
 import asyncio
 import pytest
 import httpx
+import jwt
+from datetime import timedelta
 from unittest.mock import patch
+from app.core.config import settings
 from app.core.security import verify_password
+from app.data.security.jwt_token_service import JwtTokenService
 
-from tests.auth_helpers import ADMIN_PIN, MEMBER_PIN, add_member, deactivate, register_admin, sign_in
+from tests.auth_helpers import (
+    ADMIN_PIN,
+    MEMBER_PIN,
+    add_member,
+    add_signed_in_member,
+    bump_token_version,
+    deactivate,
+    register_admin,
+    sign_in,
+)
 
 WRONG_PIN = "000000"
 
@@ -90,9 +103,9 @@ async def test_a_name_is_between_1_and_128_characters(client: httpx.AsyncClient,
 @pytest.mark.asyncio
 async def test_the_profile_picker_lists_active_members_without_signing_in(client: httpx.AsyncClient):
     """Id, name and colour only, for active members, to anyone who can reach the hub."""
-    _, admin_id = await register_admin(client, full_name="Emma")
-    liam_id = await add_member(full_name="Liam")
-    gone_id = await add_member(full_name="Gone", pin="999999")
+    token, admin_id = await register_admin(client, full_name="Emma")
+    liam_id = await add_member(client, token, full_name="Liam")
+    gone_id = await add_member(client, token, full_name="Gone", pin="999999")
     await deactivate(gone_id)
 
     resp = await client.get("/api/v1/auth/members")
@@ -106,8 +119,8 @@ async def test_the_profile_picker_lists_active_members_without_signing_in(client
 
 @pytest.mark.asyncio
 async def test_signing_in_with_the_right_pin_returns_a_token(client: httpx.AsyncClient):
-    await register_admin(client)
-    member_id = await add_member(full_name="Liam")
+    token, _ = await register_admin(client)
+    member_id = await add_member(client, token, full_name="Liam")
 
     resp = await client.post("/api/v1/auth/login", json={"user_id": member_id, "pin": MEMBER_PIN})
 
@@ -155,8 +168,8 @@ async def test_a_right_pin_resets_the_count(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_an_inactive_member_cannot_sign_in(client: httpx.AsyncClient):
-    await register_admin(client)
-    member_id = await add_member()
+    token, _ = await register_admin(client)
+    member_id = await add_member(client, token)
     await deactivate(member_id)
 
     resp = await client.post("/api/v1/auth/login", json={"user_id": member_id, "pin": MEMBER_PIN})
@@ -190,6 +203,88 @@ async def test_get_me_with_bearer_token(client: httpx.AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_a_token_carries_the_members_token_version(client: httpx.AsyncClient):
+    token, _ = await register_admin(client)
+
+    assert jwt.decode(token, options={"verify_signature": False})["ver"] == 0
+
+
+@pytest.mark.asyncio
+async def test_bumping_the_version_signs_out_existing_tokens(client: httpx.AsyncClient):
+    """The JWT can't be revoked as issued, so a newer version on the member refuses the old one."""
+    token, user_id = await register_admin(client)
+
+    await bump_token_version(user_id)
+
+    resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def _token_for(user_id: str, token_version: int = 0, lasts: timedelta = timedelta(minutes=5)) -> str:
+    """A token signed like the hub's, with a lifetime the test chooses."""
+    service = JwtTokenService(secret_key=settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return service.create_access_token(subject=user_id, is_admin=True, token_version=token_version, expires_delta=lasts)
+
+
+def _claims(token: str) -> dict:
+    return jwt.decode(token, options={"verify_signature": False})
+
+
+@pytest.mark.asyncio
+async def test_refreshing_gives_a_token_that_lasts_longer_with_the_same_version(client: httpx.AsyncClient):
+    _, user_id = await register_admin(client)
+    old = _token_for(user_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {old}"})
+
+    assert resp.status_code == 200, resp.text
+    new = resp.json()["access_token"]
+    assert _claims(new)["exp"] > _claims(old)["exp"]
+    assert _claims(new)["ver"] == 0
+    assert resp.json()["user"]["id"] == user_id
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new}"})
+    assert me.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_token_from_before_the_version_changed_cannot_refresh(client: httpx.AsyncClient):
+    token, user_id = await register_admin(client)
+    await bump_token_version(user_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_an_expired_token_cannot_refresh(client: httpx.AsyncClient):
+    _, user_id = await register_admin(client)
+    expired = _token_for(user_id, lasts=timedelta(seconds=-1))
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {expired}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_an_inactive_member_cannot_refresh(client: httpx.AsyncClient):
+    admin_token, _ = await register_admin(client)
+    token, member_id = await add_signed_in_member(client, admin_token)
+    await deactivate(member_id)
+
+    resp = await client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refreshing_needs_a_token(client: httpx.AsyncClient):
+    resp = await client.post("/api/v1/auth/refresh")
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_members_are_no_longer_created_through_the_users_endpoint(client: httpx.AsyncClient):
     """The admin inventing someone's credential is gone; invites replace it."""
     token, _ = await register_admin(client)
@@ -206,7 +301,7 @@ async def test_members_are_no_longer_created_through_the_users_endpoint(client: 
 @pytest.mark.asyncio
 async def test_household_members_see_each_other(client: httpx.AsyncClient):
     admin_token, _ = await register_admin(client)
-    await add_member()
+    await add_member(client, admin_token)
 
     users_list = await client.get("/api/v1/users", headers={"Authorization": f"Bearer {admin_token}"})
 

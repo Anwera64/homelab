@@ -1,7 +1,7 @@
 from app.domain.entities.user import User
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.repositories.security_service import ITokenService
-from app.domain.exceptions import InvalidOperationException, EntityNotFoundException
+from app.domain.exceptions import AuthenticationException, InvalidOperationException, EntityNotFoundException
 
 
 class AuthenticateTokenUseCase:
@@ -20,5 +20,8 @@ class AuthenticateTokenUseCase:
             raise EntityNotFoundException("User not found")
         if not user.is_active:
             raise InvalidOperationException("Inactive user")
+        # A token issued before the member's PIN changed, or before they were removed.
+        if payload.get("ver") != user.token_version:
+            raise AuthenticationException("Token no longer accepted")
 
         return user

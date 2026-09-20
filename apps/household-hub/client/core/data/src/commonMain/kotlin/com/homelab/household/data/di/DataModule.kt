@@ -3,10 +3,15 @@ package com.homelab.household.data.di
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.remote.DefensiveSseStreamReader
 import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.remote.KermitKtorLogger
+import com.homelab.household.data.remote.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
+import com.homelab.household.data.remote.SignedOutSignal
+import com.homelab.household.data.remote.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
+import com.homelab.household.data.repository.MembersRepositoryImpl
 import com.homelab.household.data.repository.MemoryRepositoryImpl
 import com.homelab.household.data.repository.ServerStatusRepositoryImpl
 import com.homelab.household.data.repository.SessionRepositoryImpl
@@ -14,6 +19,7 @@ import com.homelab.household.data.repository.SpaceRepositoryImpl
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.GossipRepository
+import com.homelab.household.domain.repository.MembersRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
@@ -45,12 +51,18 @@ val dataModule = module {
     single {
         val tokenStorage: TokenStorage = get()
         val jsonSerializer: Json = get()
+        val hubConfig: HubConfig = get()
         HttpClient(get<HttpClientEngine>()) {
             install(ContentNegotiation) {
                 json(jsonSerializer)
             }
             install(Logging) {
-                level = LogLevel.INFO
+                logger = KermitKtorLogger()
+                level = if (hubConfig.isDebug) {
+                    LogLevel.ALL
+                } else {
+                    LogLevel.INFO
+                }
             }
             install(Auth) {
                 bearer {
@@ -63,22 +75,19 @@ val dataModule = module {
                             null
                         }
                     }
-                    sendWithoutRequest { request ->
-                        val url = request.url.buildString()
-                        !url.contains("/auth/login") &&
-                            !url.contains("/auth/register-initial") &&
-                            !url.contains("/auth/members") &&
-                            !url.contains("/auth/status") &&
-                            !url.contains("/health")
-                    }
+                    sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
             }
+            val signedOut: SignedOutSignal = get()
+            signOutOnUnauthorized(tokenStorage) { signedOut.raise() }
         }
     }
+    single { SignedOutSignal() }
     single { DefensiveSseStreamReader(get()) }
     single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl, get()) }
+    single<MembersRepository> { MembersRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
     single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
     single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }

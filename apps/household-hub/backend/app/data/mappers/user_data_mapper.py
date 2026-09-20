@@ -28,6 +28,7 @@ class UserDataMapper:
             is_active=model.is_active,
             failed_pin_attempts=model.failed_pin_attempts or 0,
             pin_locked_until=_as_utc(model.pin_locked_until),
+            token_version=model.token_version or 0,
             personal_space_id=personal_space_id,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -44,6 +45,7 @@ class UserDataMapper:
             is_active=entity.is_active,
             failed_pin_attempts=entity.failed_pin_attempts,
             pin_locked_until=entity.pin_locked_until,
+            token_version=entity.token_version,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

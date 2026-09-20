@@ -71,6 +71,20 @@ class ProfilePickerScreenTest {
     }
 
     @Test
+    fun someone_who_is_not_on_the_picker_can_say_they_have_an_invite() {
+        val hub = FakeSignInHub()
+        hub.lists(emma)
+        var invite = 0
+
+        runScreenTest {
+            profilePickerScreen(hub, onInviteCode = { invite++ })
+
+            onProfilePicker { tapsInviteCode() }
+            waitUntil(timeoutMillis = 5_000L) { invite == 1 }
+        }
+    }
+
+    @Test
     fun every_previewed_state_draws() {
         val states = ProfilePickerUiStateProvider().values.toList()
         assertEquals(4, states.size)
@@ -79,7 +93,7 @@ class ProfilePickerScreenTest {
             runComposeUiTest {
                 setContent {
                     HearthTheme(darkTheme = false) {
-                        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {})
+                        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
                     }
                 }
 
