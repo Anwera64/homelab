@@ -9,6 +9,8 @@ import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
 import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -86,11 +88,12 @@ val dataModule = module {
     }
     single { AuthSessionLocalDataSource() }
     single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
     single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
     single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
-    single<MembersRepository> { MembersRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
+    single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
     single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
     single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }
