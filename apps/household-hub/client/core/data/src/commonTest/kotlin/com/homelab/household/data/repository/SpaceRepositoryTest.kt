@@ -92,7 +92,7 @@ class SpaceRepositoryTest {
     // ---- updateSpaceSettings -----------------------------------------------
 
     @Test
-    fun `GIVEN settings with numbers, booleans and nulls WHEN they are saved THEN they reach the data source as strings`() = runTest {
+    fun `GIVEN settings holding numbers and booleans and nulls WHEN they are saved THEN they reach the data source as strings`() = runTest {
         // GIVEN
         val remote = mock<SpaceRemoteDataSource>()
         val expectedWire = mapOf("theme" to "dark", "quiet_hours" to "22", "notify" to "true", "note" to "")
