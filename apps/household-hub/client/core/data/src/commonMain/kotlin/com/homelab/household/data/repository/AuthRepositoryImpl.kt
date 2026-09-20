@@ -1,160 +1,89 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.dto.AuthStatusDto
-import com.homelab.household.data.dto.InviteRedeemRequestDto
-import com.homelab.household.data.dto.MemberProfileDto
-import com.homelab.household.data.dto.PinResetRedeemRequestDto
+import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
 import com.homelab.household.data.dto.TokenResponseDto
-import com.homelab.household.data.dto.UserLoginRequestDto
-import com.homelab.household.data.dto.UserOnboardRequestDto
-import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
-import com.homelab.household.data.network.codeGuessesLocked
-import com.homelab.household.data.network.ensureJsonSuccess
-import com.homelab.household.data.network.reachingHub
-import com.homelab.household.data.network.throwIfSignInRefused
-import com.homelab.household.data.remote.SignedOutSignal
-import com.homelab.household.domain.exception.HubAlreadySetUpException
-import com.homelab.household.domain.exception.InviteInvalidException
-import com.homelab.household.domain.exception.NameTakenException
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.domain.exception.UnauthorizedException
 import com.homelab.household.domain.exception.UpstreamGatewayException
-import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
+import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * Orchestration and mapping. Every call goes out through [remote], every DTO becomes a domain model
+ * here, and what this phone keeps lives in [tokenStorage] and [session]. Nothing in this file knows
+ * that the hub speaks HTTP.
+ */
 class AuthRepositoryImpl(
-    private val client: HttpClient,
+    private val remote: AuthRemoteDataSource,
     private val tokenStorage: TokenStorage,
-    private val baseUrl: String,
-    private val signedOut: SignedOutSignal = SignedOutSignal()
+    private val session: AuthSessionLocalDataSource,
+    private val hubConfig: HubConfig,
 ) : AuthRepository {
 
-    private val _currentUserFlow = MutableStateFlow<User?>(null)
-
-    override fun observeSignedOut(): Flow<Unit> = signedOut.events.onEach { _currentUserFlow.value = null }
     private val refreshMutex = Mutex()
     private var activeRefresh: CompletableDeferred<String>? = null
 
-    override suspend fun login(memberId: String, pin: String): User = reachingHub {
-        val response = client.post("$baseUrl/api/v1/auth/login") {
-            contentType(ContentType.Application.Json)
-            setBody(UserLoginRequestDto(userId = memberId, pin = pin))
-        }
-        response.throwIfSignInRefused()
-        signedIn(response.ensureJsonSuccess().body())
-    }
+    override suspend fun login(memberId: String, pin: String): User =
+        signedIn(remote.login(memberId, pin))
 
-    override suspend fun onboard(name: String, pin: String, avatarColor: String): User = reachingHub {
-        val response = client.post("$baseUrl/api/v1/auth/register-initial") {
-            contentType(ContentType.Application.Json)
-            setBody(UserOnboardRequestDto(fullName = name, pin = pin, avatarColor = avatarColor))
-        }
-        when (response.status) {
-            HttpStatusCode.BadRequest -> throw HubAlreadySetUpException()
-            HttpStatusCode.UnprocessableEntity -> throw ValidationException("The hub refused that name or PIN")
-        }
-        signedIn(response.ensureJsonSuccess().body())
-    }
+    override suspend fun onboard(name: String, pin: String, avatarColor: String): User =
+        signedIn(remote.onboard(name, pin, avatarColor))
 
-    override suspend fun lookUpInvite(code: String): InvitePreview = reachingHub {
-        val response = client.get("$baseUrl/api/v1/invites/$code")
-        when (response.status) {
-            HttpStatusCode.BadRequest -> throw InviteInvalidException()
-            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
-        }
-        InviteDataMapper.toPreview(response.ensureJsonSuccess().body())
-    }
+    override suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): User =
+        signedIn(remote.joinHousehold(code, fullName, pin, avatarColor))
 
-    override suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): User = reachingHub {
-        val response = client.post("$baseUrl/api/v1/invites/$code/redeem") {
-            contentType(ContentType.Application.Json)
-            setBody(InviteRedeemRequestDto(fullName = fullName, pin = pin, avatarColor = avatarColor))
-        }
-        when (response.status) {
-            HttpStatusCode.BadRequest -> throw InviteInvalidException()
-            HttpStatusCode.Conflict -> throw NameTakenException()
-            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
-        }
-        signedIn(response.ensureJsonSuccess().body())
-    }
+    override suspend fun redeemPinReset(code: String, pin: String): User =
+        signedIn(remote.redeemPinReset(code, pin))
 
-    override suspend fun redeemPinReset(code: String, pin: String): User = reachingHub {
-        val response = client.post("$baseUrl/api/v1/auth/pin-resets/$code/redeem") {
-            contentType(ContentType.Application.Json)
-            setBody(PinResetRedeemRequestDto(pin = pin))
-        }
-        when (response.status) {
-            HttpStatusCode.BadRequest -> throw InviteInvalidException()
-            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
-        }
-        signedIn(response.ensureJsonSuccess().body())
-    }
+    override suspend fun lookUpInvite(code: String): InvitePreview =
+        InviteDataMapper.toPreview(remote.lookUpInvite(code))
 
-    override suspend fun listMembers(): List<Member> = reachingHub {
-        client.get("$baseUrl/api/v1/auth/members")
-            .ensureJsonSuccess()
-            .body<List<MemberProfileDto>>()
-            .map(UserDataMapper::toMember)
-    }
+    override suspend fun listMembers(): List<Member> =
+        remote.listMembers().map(UserDataMapper::toMember)
 
-    override suspend fun checkStatus(): AuthStatus {
-        val dto = reachingHub {
-            client.get("$baseUrl/api/v1/auth/status").ensureJsonSuccess().body<AuthStatusDto>()
-        }
-        return AuthStatus(
-            isInitialized = dto.is_initialized,
-            memberCount = dto.member_count
-        )
-    }
+    override suspend fun checkStatus(): AuthStatus =
+        remote.checkStatus().let { AuthStatus(isInitialized = it.is_initialized, memberCount = it.member_count) }
 
+    /**
+     * Whoever is signed in, asked of the hub only when this phone does not already know and has a
+     * token worth asking with. A hub that will not answer means nobody is signed in rather than an
+     * error, because every caller of this is deciding which screen to open.
+     */
     override suspend fun getCurrentUser(): User? {
-        val cached = _currentUserFlow.value
-        if (cached != null) return cached
+        session.currentUser()?.let { return UserDataMapper.toDomain(it) }
+        if (tokenStorage.getAccessToken() == null) return null
 
-        val token = tokenStorage.getAccessToken() ?: return null
-        return try {
-            val dto = client.get("$baseUrl/api/v1/auth/me") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }.body<UserReadDto>()
-            val user = UserDataMapper.toDomain(dto)
-            _currentUserFlow.value = user
-            user
-        } catch (_: Exception) {
-            null
-        }
+        return runCatchingSafe {
+            val dto = remote.fetchCurrentUser()
+            session.cacheCurrentUser(dto)
+            UserDataMapper.toDomain(dto)
+        }.getOrNull()
     }
 
     override fun hasStoredSession(): Boolean = tokenStorage.getAccessToken() != null
 
     override suspend fun logout() {
         tokenStorage.clear()
-        _currentUserFlow.value = null
+        session.forgetCurrentUser()
     }
 
-    override fun observeCurrentUser(): Flow<User?> = _currentUserFlow.asStateFlow()
+    override fun observeCurrentUser(): Flow<User?> =
+        session.observeCurrentUser().map { it?.let(UserDataMapper::toDomain) }
+
+    override fun observeSignedOut(): Flow<Unit> = session.observeSignedOut()
 
     /**
      * One renewal at a time: callers who ask while one is on its way wait for its answer. A failure
@@ -177,27 +106,23 @@ class AuthRepositoryImpl(
         return renewal.await()
     }
 
-    private suspend fun renew(): String = reachingHub {
-        // No separate refresh token: the hub re-issues one it still accepts.
-        val kept = tokenStorage.getAccessToken() ?: throw UnauthorizedException("Nobody is signed in on this phone")
-        val response = client.post("$baseUrl/api/v1/auth/refresh") {
-            header(HttpHeaders.Authorization, "Bearer $kept")
-        }
-        if (response.status == HttpStatusCode.Unauthorized) {
-            throw UnauthorizedException("The hub no longer accepts this token")
-        }
-        val fresh: TokenResponseDto = response.ensureJsonSuccess().body()
+    private suspend fun renew(): String {
+        val kept = tokenStorage.getAccessToken()
+            ?: throw UnauthorizedException("Nobody is signed in on this phone")
+        val fresh = remote.renew(kept)
         signedIn(fresh)
-        fresh.access_token
+        return fresh.access_token
     }
 
-    override fun getHubHost(): String = baseUrl.substringAfter("://").substringBefore("/")
+    override fun getHubHost(): String =
+        hubConfig.baseUrl.substringAfter("://").substringBefore("/")
 
-    private suspend fun signedIn(response: TokenResponseDto): User {
+    /** Keeps the token and remembers who it belongs to, for every way of signing in. */
+    private fun signedIn(response: TokenResponseDto): User {
         tokenStorage.saveTokens(response.access_token)
-        val user = response.user?.let(UserDataMapper::toDomain)
-            ?: throw UpstreamGatewayException(statusCode = HttpStatusCode.OK.value, message = "The hub signed in without saying who")
-        _currentUserFlow.value = user
-        return user
+        val user = response.user
+            ?: throw UpstreamGatewayException(statusCode = 200, message = "The hub signed in without saying who")
+        session.cacheCurrentUser(user)
+        return UserDataMapper.toDomain(user)
     }
 }

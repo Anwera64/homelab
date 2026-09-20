@@ -6,7 +6,9 @@ import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
-import com.homelab.household.data.remote.SignedOutSignal
+import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
 import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -78,15 +80,16 @@ val dataModule = module {
                     sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
             }
-            val signedOut: SignedOutSignal = get()
-            signOutOnUnauthorized(tokenStorage) { signedOut.raise() }
+            val session: AuthSessionLocalDataSource = get()
+            signOutOnUnauthorized(tokenStorage) { session.raiseSignedOut() }
         }
     }
-    single { SignedOutSignal() }
+    single { AuthSessionLocalDataSource() }
+    single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
     single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl, get()) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
     single<MembersRepository> { MembersRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
     single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }

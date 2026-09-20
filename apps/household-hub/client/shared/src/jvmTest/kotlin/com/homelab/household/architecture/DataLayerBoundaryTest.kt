@@ -32,7 +32,6 @@ class DataLayerBoundaryTest {
      */
     private val stillToConvert = setOf(
         "AgentRepositoryImpl.kt",       // slice 4
-        "AuthRepositoryImpl.kt",        // slice 2
         "GossipRepositoryImpl.kt",      // slice 4
         "MembersRepositoryImpl.kt",     // slice 3
         "MemoryRepositoryImpl.kt",      // slice 4

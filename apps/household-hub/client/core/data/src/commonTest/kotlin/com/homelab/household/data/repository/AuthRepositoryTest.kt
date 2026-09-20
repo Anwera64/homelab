@@ -1,441 +1,471 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.di.DEFAULT_BASE_URL
+import app.cash.turbine.test
+import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
+import com.homelab.household.data.dto.AuthStatusDto
+import com.homelab.household.data.dto.InvitePreviewReadDto
+import com.homelab.household.data.dto.MemberProfileDto
+import com.homelab.household.data.dto.TokenResponseDto
+import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.InMemoryTokenStorage
-import com.homelab.household.domain.exception.CodeGuessesLockedException
-import com.homelab.household.domain.exception.HubAlreadySetUpException
-import com.homelab.household.domain.exception.InviteInvalidException
-import com.homelab.household.domain.exception.NameTakenException
-import com.homelab.household.domain.exception.NotFoundException
-import com.homelab.household.domain.exception.PinLockedException
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UnauthorizedException
+import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.exception.WrongPinException
 import com.homelab.household.domain.model.Member
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockRequestHandleScope
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.HttpResponseData
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.headersOf
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.errors.IOException
+import com.homelab.household.domain.util.runCatchingSafe
+import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
+import dev.mokkery.answering.returns
+import dev.mokkery.answering.throws
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
+import dev.mokkery.verify.VerifyMode
+import dev.mokkery.verifyNoMoreCalls
+import dev.mokkery.verifySuspend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
+/**
+ * What the repository is, now that it does not do the call: it maps DTOs to domain models, decides
+ * what is kept on the phone, and is the single-flight around renewal. The hub is a mock — so there
+ * is no engine, no HTTP and nothing to race, and `runTest`'s clock is the only clock.
+ */
 class AuthRepositoryTest {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val emmaDto = UserReadDto(
+        id = "emma",
+        full_name = "Emma",
+        is_admin = true,
+        is_active = true,
+        personal_space_id = "sp-1",
+        avatar_color = "#3C6E4E",
+        created_at = "2026-09-13T00:00:00Z",
+    )
 
-    private val emmaJson = """{
-        "id": "emma",
-        "full_name": "Emma",
-        "avatar_color": "#3C6E4E",
-        "is_admin": true,
-        "is_active": true,
-        "personal_space_id": "sp-1",
-        "created_at": "2026-09-13T00:00:00Z"
-    }"""
+    private fun signedIn(token: String = "jwt-token-123", user: UserReadDto? = emmaDto) =
+        TokenResponseDto(access_token = token, token_type = "bearer", user = user)
 
-    private fun MockRequestHandleScope.respondJson(content: String, status: HttpStatusCode = HttpStatusCode.OK): HttpResponseData =
-        respond(content, status, headersOf(HttpHeaders.ContentType, "application/json"))
+    private fun repository(
+        remote: AuthRemoteDataSource,
+        tokens: InMemoryTokenStorage = InMemoryTokenStorage(),
+        session: AuthSessionLocalDataSource = AuthSessionLocalDataSource(),
+    ) = AuthRepositoryImpl(
+        remote = remote,
+        tokenStorage = tokens,
+        session = session,
+        hubConfig = HubConfig(baseUrl = "https://hub.test.local:8443"),
+    )
 
-    private fun repo(engine: MockEngine, tokenStorage: InMemoryTokenStorage = InMemoryTokenStorage()) =
-        AuthRepositoryImpl(
-            HttpClient(engine) { install(ContentNegotiation) { json(json) } },
-            tokenStorage,
-            baseUrl = DEFAULT_BASE_URL
-        )
-
-    private fun assertSameJson(expected: String, actual: String?) =
-        assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
+    // ---- signing in --------------------------------------------------------
 
     @Test
-    fun signing_in_sends_the_member_and_pin_and_keeps_the_token() = runTest {
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/auth/login") {
-                sent = (request.body as TextContent).text
-                respondJson("""{"access_token": "jwt-token-123", "token_type": "bearer", "user": $emmaJson}""")
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-        val tokenStorage = InMemoryTokenStorage()
+    fun `GIVEN a hub that accepts the PIN WHEN signing in THEN the member comes back and the token is kept`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn()
+        val tokens = InMemoryTokenStorage()
 
-        val user = repo(engine, tokenStorage).login("emma", "482913")
+        // WHEN
+        val user = repository(remote, tokens).login("emma", "482913")
 
+        // THEN
         assertEquals("emma", user.id)
         assertEquals("Emma", user.fullName)
-        assertEquals("jwt-token-123", tokenStorage.getAccessToken())
-        assertSameJson("""{"user_id": "emma", "pin": "482913"}""", sent)
+        assertEquals("jwt-token-123", tokens.getAccessToken())
     }
 
     @Test
-    fun a_wrong_pin_says_how_many_attempts_are_left_and_keeps_no_token() = runTest {
-        val engine = MockEngine {
-            respondJson("""{"detail": "Wrong PIN", "attempts_left": 3}""", HttpStatusCode.Unauthorized)
-        }
-        val tokenStorage = InMemoryTokenStorage()
+    fun `GIVEN the hub refuses the PIN WHEN signing in THEN the refusal reaches the caller and no token is kept`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "000000") } throws WrongPinException(attemptsLeft = 3)
+        val tokens = InMemoryTokenStorage()
 
-        val e = assertFailsWith<WrongPinException> { repo(engine, tokenStorage).login("emma", "000000") }
-        assertEquals(3, e.attemptsLeft)
-        assertNull(tokenStorage.getAccessToken())
+        // WHEN
+        val thrown = assertFailsWith<WrongPinException> { repository(remote, tokens).login("emma", "000000") }
+
+        // THEN
+        assertEquals(3, thrown.attemptsLeft)
+        assertNull(tokens.getAccessToken())
     }
 
     @Test
-    fun a_locked_member_says_how_long_to_wait() = runTest {
-        val engine = MockEngine {
-            respondJson("""{"detail": "Too many wrong PINs", "retry_after_seconds": 30}""", HttpStatusCode.TooManyRequests)
-        }
+    fun `GIVEN a hub that hands back a token without saying who signed in WHEN signing in THEN it is a bad answer from upstream`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn(user = null)
 
-        val e = assertFailsWith<PinLockedException> { repo(engine).login("emma", "000000") }
-        assertEquals(30, e.retryAfterSeconds)
+        // WHEN / THEN
+        assertFailsWith<UpstreamGatewayException> { repository(remote).login("emma", "482913") }
     }
 
     @Test
-    fun a_refusal_without_attempts_is_plain_unauthorized() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "Wrong PIN"}""", HttpStatusCode.Unauthorized) }
+    fun `GIVEN a member who has just signed in WHEN the current member is observed THEN it is them`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn()
+        val repository = repository(remote)
 
-        assertFailsWith<UnauthorizedException> { repo(engine).login("gone", "482913") }
+        // WHEN
+        repository.login("emma", "482913")
+
+        // THEN
+        assertEquals("emma", repository.observeCurrentUser().first()?.id)
     }
 
-    @Test
-    fun signing_in_with_the_hub_unreachable_throws_server_offline() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
-
-        assertFailsWith<ServerOfflineException> { repo(engine).login("emma", "482913") }
-    }
+    // ---- first run ---------------------------------------------------------
 
     @Test
-    fun first_run_posts_the_name_pin_and_colour_and_keeps_the_token() = runTest {
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/auth/register-initial") {
-                sent = (request.body as TextContent).text
-                respondJson("""{"access_token": "first-token", "user": $emmaJson}""", HttpStatusCode.Created)
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-        val tokenStorage = InMemoryTokenStorage()
+    fun `GIVEN an empty hub WHEN the first member onboards THEN they come back and the token is kept`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.onboard("Emma", "482913", "#C05638") } returns signedIn(token = "first-token")
+        val tokens = InMemoryTokenStorage()
 
-        val user = repo(engine, tokenStorage).onboard("Emma", "482913", "#C05638")
+        // WHEN
+        val user = repository(remote, tokens).onboard("Emma", "482913", "#C05638")
 
+        // THEN
         assertEquals("emma", user.id)
-        assertEquals("first-token", tokenStorage.getAccessToken())
-        assertSameJson("""{"full_name": "Emma", "pin": "482913", "avatar_color": "#C05638"}""", sent)
+        assertEquals("first-token", tokens.getAccessToken())
+    }
+
+    // ---- joining and PIN resets -------------------------------------------
+
+    @Test
+    fun `GIVEN a live invite code WHEN it is redeemed THEN the joiner comes back signed in`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.joinHousehold("482913", "Liam", "112233", "#C05638") } returns signedIn(token = "joined")
+        val tokens = InMemoryTokenStorage()
+
+        // WHEN
+        val user = repository(remote, tokens).joinHousehold("482913", "Liam", "112233", "#C05638")
+
+        // THEN
+        assertEquals("emma", user.id)
+        assertEquals("joined", tokens.getAccessToken())
     }
 
     @Test
-    fun first_run_on_a_hub_that_already_has_members_says_so() = runTest {
-        val engine = MockEngine {
-            respondJson("""{"detail": "System is already initialized."}""", HttpStatusCode.BadRequest)
-        }
+    fun `GIVEN a live reset code WHEN it is redeemed THEN the member comes back signed in`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.redeemPinReset("K7M2QP", "998877") } returns signedIn(token = "reset")
+        val tokens = InMemoryTokenStorage()
 
-        assertFailsWith<HubAlreadySetUpException> { repo(engine).onboard("Emma", "482913", "#3C6E4E") }
+        // WHEN
+        val user = repository(remote, tokens).redeemPinReset("K7M2QP", "998877")
+
+        // THEN
+        assertEquals("emma", user.id)
+        assertEquals("reset", tokens.getAccessToken())
     }
 
     @Test
-    fun the_member_list_comes_back_as_members() = runTest {
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/auth/members") {
-                respondJson(
-                    """[
-                        {"id": "emma", "full_name": "Emma", "avatar_color": "#3C6E4E"},
-                        {"id": "liam", "full_name": "Liam", "avatar_color": "#C05638"}
-                    ]"""
-                )
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-
-        val members = repo(engine).listMembers()
-
-        assertEquals(
-            listOf(Member("emma", "Emma", "#3C6E4E"), Member("liam", "Liam", "#C05638")),
-            members
+    fun `GIVEN an invite the hub knows WHEN it is looked up THEN who invited whom is mapped for the UI`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.lookUpInvite("482913") } returns InvitePreviewReadDto(
+            invited_name = "Liam",
+            inviter_name = "Emma",
+            inviter_avatar_color = "#3C6E4E",
         )
-    }
 
-    @Test
-    fun the_member_list_behind_a_dead_proxy_throws_server_offline() = runTest {
-        val engine = MockEngine { respond("Bad Gateway", HttpStatusCode.BadGateway) }
+        // WHEN
+        val preview = repository(remote).lookUpInvite("482913")
 
-        assertFailsWith<ServerOfflineException> { repo(engine).listMembers() }
-    }
-
-    @Test
-    fun check_status_when_hub_unreachable_throws_server_offline() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
-
-        assertFailsWith<ServerOfflineException> { repo(engine).checkStatus() }
-    }
-
-    @Test
-    fun check_status_when_proxy_returns_502_bad_gateway_throws_server_offline() = runTest {
-        val engine = MockEngine {
-            respond(
-                content = "Bad Gateway",
-                status = HttpStatusCode.BadGateway,
-                headers = headersOf(HttpHeaders.ContentType, "text/plain")
-            )
-        }
-
-        assertFailsWith<ServerOfflineException> { repo(engine).checkStatus() }
-    }
-
-    @Test
-    fun check_status_when_proxy_returns_404_html_throws_domain_exception() = runTest {
-        val engine = MockEngine {
-            respond(
-                content = "<html><body>404 Not Found</body></html>",
-                status = HttpStatusCode.NotFound,
-                headers = headersOf(HttpHeaders.ContentType, "text/html; charset=utf-8")
-            )
-        }
-
-        // 404 on the status endpoint means the address is wrong, not that the hub is down.
-        assertFailsWith<NotFoundException> { repo(engine).checkStatus() }
-    }
-
-    @Test
-    fun a_phone_with_a_kept_token_has_a_stored_session_without_asking_the_hub() {
-        var calls = 0
-        val engine = MockEngine {
-            calls++
-            respond("Not Found", HttpStatusCode.NotFound)
-        }
-        val tokenStorage = InMemoryTokenStorage()
-        val repo = repo(engine, tokenStorage)
-
-        assertEquals(false, repo.hasStoredSession())
-
-        tokenStorage.saveTokens("token-from-last-time")
-
-        assertEquals(true, repo.hasStoredSession())
-        assertEquals(0, calls)
-    }
-
-    @Test
-    fun renewing_sends_the_kept_token_and_keeps_the_fresh_one() = runTest {
-        var sentWith: String? = null
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/auth/refresh") {
-                sentWith = request.headers[HttpHeaders.Authorization]
-                respondJson("""{"access_token": "fresh-token", "token_type": "bearer", "user": $emmaJson}""")
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
-        val repo = repo(engine, tokenStorage)
-
-        assertEquals("fresh-token", repo.refreshToken())
-
-        assertEquals("Bearer kept-token", sentWith)
-        assertEquals("fresh-token", tokenStorage.getAccessToken())
-        assertEquals("emma", repo.observeCurrentUser().first()?.id)
-    }
-
-    @Test
-    @OptIn(ExperimentalAtomicApi::class)
-    fun renewals_asked_for_together_reach_the_hub_once() = runTest {
-        val refreshCount = AtomicInt(0)
-        val engine = MockEngine { request ->
-            when (request.url.encodedPath) {
-                "/api/v1/auth/refresh" -> {
-                    refreshCount.addAndFetch(1)
-                    respondJson("""{"access_token": "fresh-token", "token_type": "bearer", "user": $emmaJson}""")
-                }
-                else -> respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
-        val repo = repo(engine, tokenStorage)
-
-        val results = (1..5).map { async { repo.refreshToken() } }.awaitAll()
-
-        assertEquals(5, results.size)
-        assertEquals(1, refreshCount.load())
-        assertEquals("fresh-token", tokenStorage.getAccessToken())
-    }
-
-    @Test
-    fun renewing_with_the_hub_unreachable_keeps_the_token() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
-        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("kept-token") }
-
-        assertFailsWith<ServerOfflineException> { repo(engine, tokenStorage).refreshToken() }
-        assertEquals("kept-token", tokenStorage.getAccessToken())
-    }
-
-    @Test
-    fun a_renewal_the_hub_refuses_is_unauthorized() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "Invalid or expired token."}""", HttpStatusCode.Unauthorized) }
-        val tokenStorage = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
-
-        assertFailsWith<UnauthorizedException> { repo(engine, tokenStorage).refreshToken() }
-    }
-
-    @Test
-    fun looking_up_an_invite_returns_who_invited_whom() = runTest {
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/invites/482913") {
-                respondJson(
-                    """{"invited_name": "Liam", "inviter_name": "Emma", "inviter_avatar_color": "#3C6E4E"}"""
-                )
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-
-        val preview = repo(engine).lookUpInvite("482913")
-
+        // THEN
         assertEquals("Liam", preview.invitedName)
         assertEquals("Emma", preview.inviterName)
         assertEquals("#3C6E4E", preview.inviterAvatarColor)
     }
 
-    @Test
-    fun looking_up_an_invalid_invite_says_so() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "That code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
+    // ---- reading the household --------------------------------------------
 
-        assertFailsWith<InviteInvalidException> { repo(engine).lookUpInvite("bad-code") }
+    @Test
+    fun `GIVEN the hub lists two profiles WHEN the members are asked for THEN they are mapped to members`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.listMembers() } returns listOf(
+            MemberProfileDto(id = "emma", full_name = "Emma", avatar_color = "#3C6E4E"),
+            MemberProfileDto(id = "liam", full_name = "Liam", avatar_color = "#C05638"),
+        )
+
+        // WHEN
+        val members = repository(remote).listMembers()
+
+        // THEN
+        assertEquals(listOf(Member("emma", "Emma", "#3C6E4E"), Member("liam", "Liam", "#C05638")), members)
     }
 
     @Test
-    fun looking_up_an_invite_when_guesses_are_locked_says_how_long_to_wait() = runTest {
-        val engine = MockEngine {
-            respondJson(
-                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 60}""",
-                HttpStatusCode.TooManyRequests
-            )
+    fun `GIVEN the hub reports itself set up with four members WHEN its status is asked for THEN that is what comes back`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.checkStatus() } returns AuthStatusDto(is_initialized = true, member_count = 4)
+
+        // WHEN
+        val status = repository(remote).checkStatus()
+
+        // THEN
+        assertEquals(true, status.isInitialized)
+        assertEquals(4, status.memberCount)
+    }
+
+    // ---- who is signed in --------------------------------------------------
+
+    @Test
+    fun `GIVEN the signed-in member is already known WHEN they are asked for THEN the hub is not asked at all`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn()
+        val repository = repository(remote)
+        repository.login("emma", "482913")
+
+        // WHEN
+        val user = repository.getCurrentUser()
+
+        // THEN
+        assertEquals("emma", user?.id)
+        verifySuspend(VerifyMode.exactly(0)) { remote.fetchCurrentUser() }
+    }
+
+    @Test
+    fun `GIVEN no token kept on this phone WHEN the signed-in member is asked for THEN nobody is signed in and the hub is not asked`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
+
+        // WHEN
+        val user = repository(remote).getCurrentUser()
+
+        // THEN
+        assertNull(user)
+        verifyNoMoreCalls(remote)
+    }
+
+    @Test
+    fun `GIVEN a token kept from last time WHEN the signed-in member is asked for THEN the hub is asked once and the answer is kept`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.fetchCurrentUser() } returns emmaDto
+        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("token-from-last-time") })
+
+        // WHEN
+        val first = repository.getCurrentUser()
+        val second = repository.getCurrentUser()
+
+        // THEN
+        assertEquals("emma", first?.id)
+        assertEquals("emma", second?.id)
+        verifySuspend(VerifyMode.exactly(1)) { remote.fetchCurrentUser() }
+    }
+
+    @Test
+    fun `GIVEN a kept token the hub will not answer for WHEN the signed-in member is asked for THEN nobody is signed in rather than an error`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.fetchCurrentUser() } throws ServerOfflineException()
+        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("token-from-last-time") })
+
+        // WHEN
+        val user = repository.getCurrentUser()
+
+        // THEN
+        assertNull(user)
+    }
+
+    @Test
+    fun `GIVEN a token kept on this phone WHEN a stored session is asked about THEN it says yes without asking the hub`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
+        val tokens = InMemoryTokenStorage()
+        val repository = repository(remote, tokens)
+
+        // WHEN
+        val beforeSignIn = repository.hasStoredSession()
+        tokens.saveTokens("token-from-last-time")
+        val afterSignIn = repository.hasStoredSession()
+
+        // THEN
+        assertEquals(false, beforeSignIn)
+        assertEquals(true, afterSignIn)
+        verifyNoMoreCalls(remote)
+    }
+
+    @Test
+    fun `GIVEN a signed-in member WHEN they sign out THEN the token and who they were are both forgotten`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn()
+        val tokens = InMemoryTokenStorage()
+        val repository = repository(remote, tokens)
+        repository.login("emma", "482913")
+
+        // WHEN
+        repository.logout()
+
+        // THEN
+        assertNull(tokens.getAccessToken())
+        assertNull(repository.observeCurrentUser().first())
+    }
+
+    @Test
+    fun `GIVEN the hub has stopped accepting this phone WHEN the sign-out is raised THEN it is announced and who was signed in is forgotten`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.login("emma", "482913") } returns signedIn()
+        val session = AuthSessionLocalDataSource()
+        val repository = repository(remote, session = session)
+        repository.login("emma", "482913")
+
+        // WHEN
+        repository.observeSignedOut().test {
+            session.raiseSignedOut()
+
+            // THEN
+            awaitItem()
+            assertNull(repository.observeCurrentUser().first())
+            cancelAndIgnoreRemainingEvents()
         }
-
-        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).lookUpInvite("482913") }
-        assertEquals(60, e.retryAfterSeconds)
     }
 
-    @Test
-    fun looking_up_an_invite_with_the_hub_unreachable_throws_server_offline() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
+    // ---- renewing ----------------------------------------------------------
 
-        assertFailsWith<ServerOfflineException> { repo(engine).lookUpInvite("482913") }
+    @Test
+    fun `GIVEN a token kept on this phone WHEN it is renewed THEN the kept one is handed to the hub and the fresh one replaces it`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.renew("kept-token") } returns signedIn(token = "fresh-token")
+        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val repository = repository(remote, tokens)
+
+        // WHEN
+        val fresh = repository.refreshToken()
+
+        // THEN
+        assertEquals("fresh-token", fresh)
+        assertEquals("fresh-token", tokens.getAccessToken())
+        assertEquals("emma", repository.observeCurrentUser().first()?.id)
     }
 
+    /**
+     * The renewal is held open until all five callers have asked, which is the only way to test a
+     * single-flight at all: if the hub answers without suspending, caller one finishes before caller
+     * two starts and there is no contention to coalesce. The version of this test that went through
+     * MockEngine never said so — it passed because the engine happened to suspend, not because the
+     * overlap was arranged. Here the gate arranges it, and the test fails if the guard is removed.
+     */
     @Test
-    fun joining_a_household_sends_the_name_pin_and_colour_and_keeps_the_token() = runTest {
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/invites/482913/redeem") {
-                sent = (request.body as TextContent).text
-                respondJson("""{"access_token": "joined-token", "token_type": "bearer", "user": $emmaJson}""", HttpStatusCode.Created)
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
+    fun `GIVEN five callers asking to renew at once WHEN they all ask THEN the hub is asked once and all five get the same token`() = runTest {
+        // GIVEN
+        val hubIsAnswering = CompletableDeferred<Unit>()
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.renew("kept-token") } calls {
+            hubIsAnswering.await()
+            signedIn(token = "fresh-token")
         }
-        val tokenStorage = InMemoryTokenStorage()
+        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val repository = repository(remote, tokens)
 
-        val user = repo(engine, tokenStorage).joinHousehold("482913", "Emma", "482913", "#C05638")
+        // WHEN
+        val callers = (1..5).map { async { repository.refreshToken() } }
+        runCurrent()
+        hubIsAnswering.complete(Unit)
+        val results = callers.awaitAll()
 
-        assertEquals("emma", user.id)
-        assertEquals("joined-token", tokenStorage.getAccessToken())
-        assertSameJson("""{"full_name": "Emma", "pin": "482913", "avatar_color": "#C05638"}""", sent)
+        // THEN
+        assertEquals(List(5) { "fresh-token" }, results)
+        verifySuspend(VerifyMode.exactly(1)) { remote.renew("kept-token") }
+        assertEquals("fresh-token", tokens.getAccessToken())
     }
 
     @Test
-    fun joining_with_an_invalid_code_says_so() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "That code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
-
-        assertFailsWith<InviteInvalidException> { repo(engine).joinHousehold("bad-code", "Emma", "482913", "#C05638") }
-    }
-
-    @Test
-    fun joining_with_a_name_already_taken_says_so() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "That name is taken.", "code": "name_taken"}""", HttpStatusCode.Conflict) }
-
-        assertFailsWith<NameTakenException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
-    }
-
-    @Test
-    fun joining_when_guesses_are_locked_says_how_long_to_wait() = runTest {
-        val engine = MockEngine {
-            respondJson(
-                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 45}""",
-                HttpStatusCode.TooManyRequests
-            )
+    fun `GIVEN a renewal the hub refuses WHEN five callers asked together THEN the refusal reaches every one of them`() = runTest {
+        // GIVEN
+        val hubIsAnswering = CompletableDeferred<Unit>()
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.renew("revoked-token") } calls {
+            hubIsAnswering.await()
+            throw UnauthorizedException("no longer accepted")
         }
+        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("revoked-token") })
 
-        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
-        assertEquals(45, e.retryAfterSeconds)
+        // WHEN
+        val callers = (1..5).map { async { runCatchingSafe { repository.refreshToken() } } }
+        runCurrent()
+        hubIsAnswering.complete(Unit)
+        val outcomes = callers.awaitAll()
+
+        // THEN
+        assertEquals(5, outcomes.count { it.exceptionOrNull() is UnauthorizedException })
+        verifySuspend(VerifyMode.exactly(1)) { remote.renew("revoked-token") }
     }
 
     @Test
-    fun joining_with_the_hub_unreachable_throws_server_offline() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
+    fun `GIVEN a renewal that has already finished WHEN another is asked for THEN the hub is asked again rather than handed the old answer`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.renew(any()) } returns signedIn(token = "fresh-token")
+        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("kept-token") })
 
-        assertFailsWith<ServerOfflineException> { repo(engine).joinHousehold("482913", "Emma", "482913", "#C05638") }
+        // WHEN
+        repository.refreshToken()
+        repository.refreshToken()
+
+        // THEN — the single flight lasts one renewal, not forever.
+        verifySuspend(VerifyMode.exactly(2)) { remote.renew(any()) }
     }
 
     @Test
-    fun redeeming_a_pin_reset_sends_the_pin_and_keeps_the_token() = runTest {
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            if (request.url.encodedPath == "/api/v1/auth/pin-resets/738291/redeem") {
-                sent = (request.body as TextContent).text
-                respondJson("""{"access_token": "reset-token", "token_type": "bearer", "user": $emmaJson}""")
-            } else {
-                respond("Not Found", HttpStatusCode.NotFound)
-            }
-        }
-        val tokenStorage = InMemoryTokenStorage()
+    fun `GIVEN the hub cannot be reached WHEN a token is renewed THEN the kept token is left alone`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>()
+        everySuspend { remote.renew("kept-token") } throws ServerOfflineException()
+        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
 
-        val user = repo(engine, tokenStorage).redeemPinReset("738291", "111111")
+        // WHEN
+        assertFailsWith<ServerOfflineException> { repository(remote, tokens).refreshToken() }
 
-        assertEquals("emma", user.id)
-        assertEquals("reset-token", tokenStorage.getAccessToken())
-        assertSameJson("""{"pin": "111111"}""", sent)
+        // THEN
+        assertEquals("kept-token", tokens.getAccessToken())
     }
 
     @Test
-    fun redeeming_an_invalid_pin_reset_code_says_so() = runTest {
-        val engine = MockEngine { respondJson("""{"detail": "That reset code isn't valid.", "code": "invite_invalid"}""", HttpStatusCode.BadRequest) }
+    fun `GIVEN nobody signed in on this phone WHEN a token is renewed THEN it is unauthorized without asking the hub`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
 
-        assertFailsWith<InviteInvalidException> { repo(engine).redeemPinReset("bad-code", "111111") }
+        // WHEN
+        assertFailsWith<UnauthorizedException> { repository(remote).refreshToken() }
+
+        // THEN
+        verifyNoMoreCalls(remote)
     }
 
-    @Test
-    fun redeeming_a_pin_reset_when_guesses_are_locked_says_how_long_to_wait() = runTest {
-        val engine = MockEngine {
-            respondJson(
-                """{"detail": "Too many attempts.", "code": "code_guesses_locked", "retry_after_seconds": 30}""",
-                HttpStatusCode.TooManyRequests
-            )
-        }
-
-        val e = assertFailsWith<CodeGuessesLockedException> { repo(engine).redeemPinReset("738291", "111111") }
-        assertEquals(30, e.retryAfterSeconds)
-    }
+    // ---- where the hub is --------------------------------------------------
 
     @Test
-    fun redeeming_a_pin_reset_with_the_hub_unreachable_throws_server_offline() = runTest {
-        val engine = MockEngine { throw IOException("Connection refused") }
+    fun `GIVEN a hub address with a scheme and a port WHEN the host is asked for THEN only the host and port come back`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
 
-        assertFailsWith<ServerOfflineException> { repo(engine).redeemPinReset("738291", "111111") }
+        // WHEN
+        val host = repository(remote).getHubHost()
+
+        // THEN
+        assertEquals("hub.test.local:8443", host)
     }
 }
