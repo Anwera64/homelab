@@ -3,7 +3,7 @@ package com.homelab.household.di
 import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.network.HubConfig
-import com.homelab.household.data.remote.ServerHealthMonitor
+import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.GossipRepository
@@ -65,7 +65,7 @@ class HubAddressWiringTest : KoinTest {
             "SpaceRepository" to { get<SpaceRepository>().getHouseholdSpace() },
             "MemoryRepository" to { get<MemoryRepository>().auditMemories() },
             "GossipRepository" to { get<GossipRepository>().listHouseholdMilestones() },
-            "ServerHealthMonitor" to { get<ServerHealthMonitor>().checkHealth() }
+            "ServerStatusRemoteDataSource" to { get<ServerStatusRemoteDataSource>().checkHealth() }
         )
 
         calls.forEach { (name, call) ->

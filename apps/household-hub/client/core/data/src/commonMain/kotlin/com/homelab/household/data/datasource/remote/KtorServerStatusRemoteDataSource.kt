@@ -1,4 +1,4 @@
-package com.homelab.household.data.remote
+package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.dto.HealthCheckDto
 import com.homelab.household.domain.model.ServerStatus
@@ -14,11 +14,11 @@ import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
-class ServerHealthMonitor(
+class KtorServerStatusRemoteDataSource(
     private val client: HttpClient,
-    private val baseUrl: String
-) {
-    suspend fun checkHealth(): ServerStatus {
+    private val baseUrl: String,
+) : ServerStatusRemoteDataSource {
+    override suspend fun checkHealth(): ServerStatus {
         val mark = TimeSource.Monotonic.markNow()
         return try {
             val response = client.get("$baseUrl/api/v1/health")
@@ -38,7 +38,7 @@ class ServerHealthMonitor(
         }
     }
 
-    fun observeStatus(intervalSeconds: Long = 10): Flow<ServerStatus> = flow {
+    override fun observeStatus(intervalSeconds: Long): Flow<ServerStatus> = flow {
         var currentDelay = intervalSeconds.seconds
         while (currentCoroutineContext().isActive) {
             val status = checkHealth()

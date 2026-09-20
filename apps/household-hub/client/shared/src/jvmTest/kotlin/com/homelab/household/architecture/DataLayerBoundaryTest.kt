@@ -31,7 +31,6 @@ class DataLayerBoundaryTest {
      * shape came from.
      */
     private val stillToConvert = setOf(
-        "ServerHealthMonitor.kt",       // slice 5, becomes ServerStatusRemoteDataSource
         "SessionRepositoryImpl.kt",     // slice 7
     )
 

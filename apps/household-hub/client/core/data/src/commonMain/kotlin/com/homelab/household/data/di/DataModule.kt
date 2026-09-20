@@ -5,18 +5,19 @@ import com.homelab.household.data.remote.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.PublicEndpoints
-import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.GossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.MemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
 import com.homelab.household.data.network.signOutOnUnauthorized
@@ -102,7 +103,7 @@ val dataModule = module {
     single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
-    single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
+    single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
 
     single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
     single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
