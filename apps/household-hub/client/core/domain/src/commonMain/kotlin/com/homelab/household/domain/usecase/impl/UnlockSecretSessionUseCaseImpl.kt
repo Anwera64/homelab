@@ -8,6 +8,6 @@ class UnlockSecretSessionUseCaseImpl(private val sessionRepository: SessionRepos
     override suspend operator fun invoke(sessionId: String, pinOrPassword: String): Boolean {
         if (sessionId.isBlank()) throw ValidationException("Session ID cannot be blank")
         if (pinOrPassword.isBlank()) throw ValidationException("PIN or password cannot be blank")
-        return sessionRepository.unlockSecretSession(sessionId)
+        return sessionRepository.unlockSecretSession(sessionId, pinOrPassword)
     }
 }

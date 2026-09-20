@@ -117,6 +117,11 @@ class SessionCacheLocalDataSourceTest {
     }
 
     // ---- secret locks ------------------------------------------------------
+    //
+    // These pin current behaviour, not intended behaviour. Stage 5 slice 5 makes secret sessions
+    // locked-by-default against a held `secret_read` token and deletes the set underneath these
+    // tests (`docs/STAGE_5_SECRET_SESSION_LOCKING.md` §5). Deleting them along with it is the plan,
+    // not a regression.
 
     @Test
     fun `GIVEN a household with no locks WHEN a session is asked about THEN it is not locked`() = runTest {

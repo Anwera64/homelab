@@ -155,7 +155,7 @@ class SessionRepositoryTest {
         val cache = SessionCacheLocalDataSource().apply { lockSecretSessions(listOf("s-2")) }
 
         // WHEN
-        val unlocked = repository(remote, cache).unlockSecretSession("s-2")
+        val unlocked = repository(remote, cache).unlockSecretSession("s-2", "482913")
 
         // THEN
         assertTrue(unlocked)

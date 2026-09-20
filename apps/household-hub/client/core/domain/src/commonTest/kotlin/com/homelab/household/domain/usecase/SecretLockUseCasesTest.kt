@@ -16,6 +16,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
+/**
+ * The PIN reaches the data layer and is dropped there for now: nothing verifies it on either
+ * side, which `docs/STAGE_5_SECRET_SESSION_LOCKING.md` §1 states outright. These tests pin the
+ * only check that does exist today — that something was typed — and the pass-through the spec's
+ * §5 needs when slice 5 sends the PIN to the hub.
+ */
 class SecretLockUseCasesTest {
 
     private val sessionRepo = mock<SessionRepository>()
@@ -35,9 +41,9 @@ class SecretLockUseCasesTest {
     }
 
     @Test
-    fun `GIVEN a locked conversation WHEN it is unlocked with a PIN WHEN THEN it opens`() = runTest {
+    fun `GIVEN a locked conversation WHEN it is unlocked with a PIN THEN it opens`() = runTest {
         // GIVEN
-        everySuspend { sessionRepo.unlockSecretSession("session-1") } returns true
+        everySuspend { sessionRepo.unlockSecretSession("session-1", "1234") } returns true
 
         // WHEN
         val success = unlockSecretSessionUseCase("session-1", "1234")
@@ -49,7 +55,7 @@ class SecretLockUseCasesTest {
     @Test
     fun `GIVEN a conversation that was not locked WHEN it is unlocked THEN it says there was nothing to open`() = runTest {
         // GIVEN
-        everySuspend { sessionRepo.unlockSecretSession("session-1") } returns false
+        everySuspend { sessionRepo.unlockSecretSession("session-1", "1234") } returns false
 
         // WHEN
         val success = unlockSecretSessionUseCase("session-1", "1234")
@@ -67,6 +73,6 @@ class SecretLockUseCasesTest {
         assertFailsWith<ValidationException> { unlockSecretSessionUseCase("session-1", blank) }
 
         // THEN
-        verifySuspend(VerifyMode.exactly(0)) { sessionRepo.unlockSecretSession("session-1") }
+        verifySuspend(VerifyMode.exactly(0)) { sessionRepo.unlockSecretSession("session-1", "1234") }
     }
 }
