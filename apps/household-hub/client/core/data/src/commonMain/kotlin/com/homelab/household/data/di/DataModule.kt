@@ -7,10 +7,18 @@ import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.remote.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.GossipRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.MemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
 import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -89,6 +97,10 @@ val dataModule = module {
     single { AuthSessionLocalDataSource() }
     single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<AgentRemoteDataSource> { KtorAgentRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<SpaceRemoteDataSource> { KtorSpaceRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
     single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
 
@@ -96,8 +108,8 @@ val dataModule = module {
     single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
     single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
-    single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<SpaceRepository> { SpaceRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<MemoryRepository> { MemoryRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<GossipRepository> { GossipRepositoryImpl(get(), get<HubConfig>().baseUrl) }
+    single<AgentRepository> { AgentRepositoryImpl(get()) }
+    single<SpaceRepository> { SpaceRepositoryImpl(get()) }
+    single<MemoryRepository> { MemoryRepositoryImpl(get()) }
+    single<GossipRepository> { GossipRepositoryImpl(get()) }
 }

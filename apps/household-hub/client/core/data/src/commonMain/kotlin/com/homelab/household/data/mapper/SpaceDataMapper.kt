@@ -13,4 +13,7 @@ object SpaceDataMapper {
         settings = dto.settings,
         createdAt = dto.created_at
     )
+
+    fun toWireSettings(settings: Map<String, Any?>): Map<String, String> =
+        settings.mapValues { it.value?.toString() ?: "" }
 }

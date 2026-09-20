@@ -31,12 +31,8 @@ class DataLayerBoundaryTest {
      * shape came from.
      */
     private val stillToConvert = setOf(
-        "AgentRepositoryImpl.kt",       // slice 4
-        "GossipRepositoryImpl.kt",      // slice 4
-        "MemoryRepositoryImpl.kt",      // slice 4
         "ServerHealthMonitor.kt",       // slice 5, becomes ServerStatusRemoteDataSource
         "SessionRepositoryImpl.kt",     // slice 7
-        "SpaceRepositoryImpl.kt",       // slice 4
     )
 
     @Test
