@@ -2,7 +2,7 @@ package com.homelab.household.di
 
 import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository

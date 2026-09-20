@@ -3,7 +3,7 @@ package com.homelab.household.data.repository
 import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.MemoryUpdateDto
 import com.homelab.household.data.mapper.MemoryDataMapper
-import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.network.NetworkExceptionHelper
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentMemory
 import com.homelab.household.domain.model.MemoryScope

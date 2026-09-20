@@ -16,7 +16,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.network.NetworkExceptionHelper
 
 class AgentRepositoryImpl(
     private val client: HttpClient,

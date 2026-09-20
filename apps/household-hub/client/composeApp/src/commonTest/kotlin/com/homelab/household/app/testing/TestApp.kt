@@ -11,7 +11,7 @@ import com.homelab.household.app.platform.LocalExternalApps
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.engine.HttpClientEngine
 import org.koin.compose.KoinApplication

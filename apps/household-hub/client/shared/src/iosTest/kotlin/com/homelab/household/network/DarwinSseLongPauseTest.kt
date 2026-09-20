@@ -1,6 +1,6 @@
 package com.homelab.household.network
 
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.network.SseFixture.ack

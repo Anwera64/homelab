@@ -11,7 +11,7 @@ import com.homelab.household.data.dto.ToolApprovalResponseDto
 import com.homelab.household.data.mapper.ChatMessageDataMapper
 import com.homelab.household.data.mapper.SessionDataMapper
 import com.homelab.household.data.remote.DefensiveSseStreamReader
-import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.network.NetworkExceptionHelper
 import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.ChatMessage

@@ -1,4 +1,4 @@
-package com.homelab.household.data.remote
+package com.homelab.household.data.network
 
 import com.homelab.household.data.local.InMemoryTokenStorage
 import io.ktor.client.HttpClient
@@ -29,50 +29,63 @@ class SignOutOnUnauthorizedTest {
         }
 
     @Test
-    fun a_401_to_a_signed_in_call_forgets_the_token_and_says_so_once() = runTest {
+    fun `GIVEN a token kept on this phone WHEN a signed-in call comes back 401 THEN the token is forgotten and the sign-out is announced once`() = runTest {
+        // GIVEN
         val tokens = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
         var signedOut = 0
 
+        // WHEN
         client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.get("$hub/api/v1/spaces/shared")
 
+        // THEN
         assertNull(tokens.getAccessToken())
         assertEquals(1, signedOut)
     }
 
     @Test
-    fun a_wrong_pin_at_sign_in_is_not_a_sign_out() = runTest {
+    fun `GIVEN someone else is signed in on this phone WHEN sign-in refuses a PIN with 401 THEN their token is left alone`() = runTest {
+        // GIVEN
         val tokens = InMemoryTokenStorage().apply { saveTokens("someone-elses-token") }
         var signedOut = 0
 
+        // WHEN
         client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.post("$hub/api/v1/auth/login")
 
+        // THEN
         assertEquals("someone-elses-token", tokens.getAccessToken())
         assertEquals(0, signedOut)
     }
 
     @Test
-    fun a_wrong_pin_while_signed_in_is_not_a_sign_out() = runTest {
+    fun `GIVEN a member changing their PIN WHEN the hub refuses the current one with 403 THEN they stay signed in`() = runTest {
+        // GIVEN
         val tokens = InMemoryTokenStorage().apply { saveTokens("good-token") }
         var signedOut = 0
 
+        // WHEN
         client(HttpStatusCode.Forbidden, tokens) { signedOut++ }.post("$hub/api/v1/users/me/pin")
 
+        // THEN
         assertEquals("good-token", tokens.getAccessToken())
         assertEquals(0, signedOut)
     }
 
     @Test
-    fun a_401_with_no_token_kept_signs_nobody_out() = runTest {
+    fun `GIVEN no token kept on this phone WHEN a call comes back 401 THEN nobody is signed out`() = runTest {
+        // GIVEN
         var signedOut = 0
 
+        // WHEN
         client(HttpStatusCode.Unauthorized, InMemoryTokenStorage()) { signedOut++ }.get("$hub/api/v1/spaces/shared")
 
+        // THEN
         assertEquals(0, signedOut)
     }
 
     @Test
-    fun calls_that_need_no_token_are_named_once() {
-        listOf(
+    fun `GIVEN the calls the hub answers without a token WHEN each is checked THEN only those read as public`() {
+        // GIVEN
+        val public = listOf(
             "/api/v1/auth/login",
             "/api/v1/auth/register-initial",
             "/api/v1/auth/members",
@@ -81,9 +94,11 @@ class SignOutOnUnauthorizedTest {
             "/api/v1/invites/K7M2QP",
             "/api/v1/invites/K7M2QP/redeem",
             "/api/v1/auth/pin-resets/K7M2QP/redeem",
-        ).forEach { path -> assertEquals(true, PublicEndpoints.isPublic("$hub$path"), path) }
+        )
+        val signedIn = listOf("/api/v1/invites", "/api/v1/users/me/pin", "/api/v1/auth/refresh", "/api/v1/auth/me")
 
-        listOf("/api/v1/invites", "/api/v1/users/me/pin", "/api/v1/auth/refresh", "/api/v1/auth/me")
-            .forEach { path -> assertEquals(false, PublicEndpoints.isPublic("$hub$path"), path) }
+        // WHEN / THEN
+        public.forEach { path -> assertEquals(true, PublicEndpoints.isPublic("$hub$path"), path) }
+        signedIn.forEach { path -> assertEquals(false, PublicEndpoints.isPublic("$hub$path"), path) }
     }
 }

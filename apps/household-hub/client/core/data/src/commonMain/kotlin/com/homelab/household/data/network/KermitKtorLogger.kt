@@ -1,4 +1,4 @@
-package com.homelab.household.data.remote
+package com.homelab.household.data.network
 
 import co.touchlab.kermit.Logger as KermitLogger
 import io.ktor.client.plugins.logging.Logger

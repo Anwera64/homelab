@@ -3,7 +3,7 @@ package com.homelab.household
 import androidx.compose.ui.window.ComposeUIViewController
 import com.homelab.household.app.App
 import com.homelab.household.data.di.DEFAULT_BASE_URL
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.HouseholdHubSdk
 import platform.UIKit.UIViewController
 import kotlin.experimental.ExperimentalNativeApi

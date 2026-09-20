@@ -2,7 +2,7 @@ package com.homelab.household.di
 
 import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
@@ -42,7 +42,7 @@ class KtorLoggingConfigurationTest : KoinTest {
 
         val client = get<HttpClient>()
         assertEquals(LogLevel.ALL, client.loggingLevel())
-        assertTrue(client.logger() is com.homelab.household.data.remote.KermitKtorLogger)
+        assertTrue(client.logger() is com.homelab.household.data.network.KermitKtorLogger)
     }
 
     @Test
@@ -58,7 +58,7 @@ class KtorLoggingConfigurationTest : KoinTest {
 
         val client = get<HttpClient>()
         assertEquals(LogLevel.INFO, client.loggingLevel())
-        assertTrue(client.logger() is com.homelab.household.data.remote.KermitKtorLogger)
+        assertTrue(client.logger() is com.homelab.household.data.network.KermitKtorLogger)
     }
 
     private fun HttpClient.loggingLevel(): LogLevel = loggingConfig().level

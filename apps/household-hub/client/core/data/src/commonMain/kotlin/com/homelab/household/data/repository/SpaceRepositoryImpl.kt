@@ -3,7 +3,7 @@ package com.homelab.household.data.repository
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.SpaceUpdateDto
 import com.homelab.household.data.mapper.SpaceDataMapper
-import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.network.NetworkExceptionHelper
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.Space
 import com.homelab.household.domain.repository.SpaceRepository

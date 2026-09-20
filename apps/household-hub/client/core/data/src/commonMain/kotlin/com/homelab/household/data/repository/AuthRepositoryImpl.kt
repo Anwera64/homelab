@@ -3,7 +3,6 @@ package com.homelab.household.data.repository
 import com.homelab.household.data.dto.AuthStatusDto
 import com.homelab.household.data.dto.InviteRedeemRequestDto
 import com.homelab.household.data.dto.MemberProfileDto
-import com.homelab.household.data.dto.PinRefusalDto
 import com.homelab.household.data.dto.PinResetRedeemRequestDto
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.dto.UserLoginRequestDto
@@ -12,38 +11,32 @@ import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
-import com.homelab.household.data.remote.NetworkExceptionHelper
+import com.homelab.household.data.network.codeGuessesLocked
+import com.homelab.household.data.network.ensureJsonSuccess
+import com.homelab.household.data.network.reachingHub
+import com.homelab.household.data.network.throwIfSignInRefused
 import com.homelab.household.data.remote.SignedOutSignal
-import com.homelab.household.domain.exception.CodeGuessesLockedException
 import com.homelab.household.domain.exception.HubAlreadySetUpException
 import com.homelab.household.domain.exception.InviteInvalidException
 import com.homelab.household.domain.exception.NameTakenException
-import com.homelab.household.domain.exception.NotFoundException
-import com.homelab.household.domain.exception.PinLockedException
-import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UnauthorizedException
-import com.homelab.household.domain.exception.UnexpectedContentTypeException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.exception.ValidationException
-import com.homelab.household.domain.exception.WrongPinException
 import com.homelab.household.domain.model.AuthStatus
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
-import com.homelab.household.domain.util.runCatchingSafe
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.http.isSuccess
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,18 +63,7 @@ class AuthRepositoryImpl(
             contentType(ContentType.Application.Json)
             setBody(UserLoginRequestDto(userId = memberId, pin = pin))
         }
-        when (response.status) {
-            HttpStatusCode.Unauthorized -> {
-                val attemptsLeft = response.refusal()?.attempts_left
-                throw if (attemptsLeft != null) WrongPinException(attemptsLeft) else UnauthorizedException("Wrong PIN")
-            }
-            HttpStatusCode.TooManyRequests -> {
-                val seconds = response.refusal()?.retry_after_seconds
-                    ?: response.headers[HttpHeaders.RetryAfter]?.toIntOrNull()
-                    ?: throw UpstreamGatewayException(statusCode = response.status.value)
-                throw PinLockedException(seconds)
-            }
-        }
+        response.throwIfSignInRefused()
         signedIn(response.ensureJsonSuccess().body())
     }
 
@@ -101,7 +83,7 @@ class AuthRepositoryImpl(
         val response = client.get("$baseUrl/api/v1/invites/$code")
         when (response.status) {
             HttpStatusCode.BadRequest -> throw InviteInvalidException()
-            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
         }
         InviteDataMapper.toPreview(response.ensureJsonSuccess().body())
     }
@@ -114,7 +96,7 @@ class AuthRepositoryImpl(
         when (response.status) {
             HttpStatusCode.BadRequest -> throw InviteInvalidException()
             HttpStatusCode.Conflict -> throw NameTakenException()
-            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
         }
         signedIn(response.ensureJsonSuccess().body())
     }
@@ -126,7 +108,7 @@ class AuthRepositoryImpl(
         }
         when (response.status) {
             HttpStatusCode.BadRequest -> throw InviteInvalidException()
-            HttpStatusCode.TooManyRequests -> throw codeGuessesLockedException(response)
+            HttpStatusCode.TooManyRequests -> throw response.codeGuessesLocked()
         }
         signedIn(response.ensureJsonSuccess().body())
     }
@@ -217,44 +199,5 @@ class AuthRepositoryImpl(
             ?: throw UpstreamGatewayException(statusCode = HttpStatusCode.OK.value, message = "The hub signed in without saying who")
         _currentUserFlow.value = user
         return user
-    }
-
-    /** Network failures become [ServerOfflineException]; everything else passes through as thrown. */
-    private suspend fun <T> reachingHub(block: suspend () -> T): T =
-        try {
-            block()
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-
-    private suspend fun HttpResponse.refusal(): PinRefusalDto? = runCatchingSafe { body<PinRefusalDto>() }.getOrNull()
-
-    private suspend fun codeGuessesLockedException(response: HttpResponse): CodeGuessesLockedException {
-        val seconds = response.refusal()?.retry_after_seconds
-            ?: response.headers[HttpHeaders.RetryAfter]?.toIntOrNull()
-            ?: throw UpstreamGatewayException(statusCode = response.status.value)
-        return CodeGuessesLockedException(seconds)
-    }
-
-    /**
-     * 502–504 is a proxy saying the hub is down or starting; 404 means the address is wrong; any
-     * other failure is the hub answering badly. A success that isn't JSON is a captive portal or
-     * the wrong server.
-     */
-    private fun HttpResponse.ensureJsonSuccess(): HttpResponse {
-        if (status.value in 502..504) {
-            throw ServerOfflineException(message = "Hub is offline or starting up (HTTP ${status.value})")
-        }
-        if (!status.isSuccess()) {
-            if (status == HttpStatusCode.NotFound) {
-                throw NotFoundException("Hub endpoint returned HTTP 404. Check your hub address.")
-            }
-            throw UpstreamGatewayException(statusCode = status.value)
-        }
-        val type = contentType()?.withoutParameters()
-        if (type != null && type != ContentType.Application.Json) {
-            throw UnexpectedContentTypeException(contentType = type.toString())
-        }
-        return this
     }
 }

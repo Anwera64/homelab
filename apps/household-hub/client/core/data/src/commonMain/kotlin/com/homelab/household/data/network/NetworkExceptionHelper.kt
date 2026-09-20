@@ -1,4 +1,4 @@
-package com.homelab.household.data.remote
+package com.homelab.household.data.network
 
 import com.homelab.household.domain.exception.ServerOfflineException
 import io.ktor.client.network.sockets.ConnectTimeoutException

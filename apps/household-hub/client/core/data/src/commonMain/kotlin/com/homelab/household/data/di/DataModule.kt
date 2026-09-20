@@ -2,12 +2,12 @@ package com.homelab.household.data.di
 
 import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.remote.DefensiveSseStreamReader
-import com.homelab.household.data.remote.HubConfig
-import com.homelab.household.data.remote.KermitKtorLogger
-import com.homelab.household.data.remote.PublicEndpoints
+import com.homelab.household.data.network.HubConfig
+import com.homelab.household.data.network.KermitKtorLogger
+import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.remote.ServerHealthMonitor
 import com.homelab.household.data.remote.SignedOutSignal
-import com.homelab.household.data.remote.signOutOnUnauthorized
+import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
