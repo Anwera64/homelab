@@ -1,6 +1,6 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
@@ -46,7 +46,7 @@ class KoinDependencyGraphTest : KoinTest {
 
         // Platform
         assertNotNull(get<HttpClientEngine>())
-        assertNotNull(get<TokenStorage>())
+        assertNotNull(get<TokenLocalDataSource>())
 
         // Repositories
         assertNotNull(get<AuthRepository>())

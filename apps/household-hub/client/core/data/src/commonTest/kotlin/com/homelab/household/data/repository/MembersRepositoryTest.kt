@@ -1,11 +1,11 @@
 package com.homelab.household.data.repository
 
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
 import com.homelab.household.data.dto.InviteReadDto
 import com.homelab.household.data.dto.PinResetReadDto
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.dto.UserReadDto
-import com.homelab.household.data.local.InMemoryTokenStorage
 import com.homelab.household.domain.exception.NameTakenException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SoleAdminException
@@ -19,10 +19,10 @@ import dev.mokkery.everySuspend
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlinx.coroutines.test.runTest
 
 /**
  * The members repository maps DTOs to domain models and is the one place that notices a changed PIN

@@ -1,6 +1,6 @@
-package com.homelab.household.data.local
+package com.homelab.household.data.datasource.local
 
-class InMemoryTokenStorage : TokenStorage {
+class InMemoryTokenStorage : TokenLocalDataSource {
     private var accessToken: String? = null
     private var refreshToken: String? = null
 

@@ -1,9 +1,9 @@
 package com.homelab.household.data.network
 
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.di.DEFAULT_BASE_URL
-import com.homelab.household.data.local.InMemoryTokenStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -15,10 +15,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 
 /**
  * The Auth plugin, not a data source, is what carries this phone's token onto an outgoing call —

@@ -1,6 +1,6 @@
 package com.homelab.household.data.network
 
-import com.homelab.household.data.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -9,10 +9,10 @@ import io.ktor.client.request.post
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlinx.coroutines.test.runTest
 
 /**
  * A 401 means the hub no longer accepts this phone's token — a PIN changed elsewhere, or the member

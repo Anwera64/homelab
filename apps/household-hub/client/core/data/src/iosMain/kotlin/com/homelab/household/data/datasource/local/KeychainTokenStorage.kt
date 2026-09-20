@@ -1,4 +1,4 @@
-package com.homelab.household.data.local
+package com.homelab.household.data.datasource.local
 
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.COpaquePointerVar
@@ -66,7 +66,7 @@ import platform.Security.kSecValueData
  * Nothing thrown by the Keychain or by JSON parsing escapes these four methods; anything
  * unreadable is deleted and reads as signed out.
  */
-class KeychainTokenStorage : TokenStorage {
+class KeychainTokenStorage : TokenLocalDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val lock = NSLock()

@@ -1,4 +1,4 @@
-package com.homelab.household.data.local
+package com.homelab.household.data.datasource.local
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -12,6 +12,13 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * The Android [TokenLocalDataSource], on a real device: the Keystore only exists there.
+ *
+ * Names here use underscores rather than the backticked `GIVEN … WHEN … THEN …` the rest of
+ * `:core:data` uses. A method name containing a space is not legal dex below minSdkVersion 30,
+ * and this module is minSdk 26, so D8 would refuse to build this file at all.
+ */
 @RunWith(AndroidJUnit4::class)
 class KeystoreTokenStorageTest {
 
@@ -19,12 +26,12 @@ class KeystoreTokenStorageTest {
     private val tokenFile get() = File(context.noBackupFilesDir, "auth_tokens.bin")
 
     @Before
-    fun setUp() {
+    fun signedOutToStart() {
         KeystoreTokenStorage(context).clear()
     }
 
     @Test
-    fun saved_tokens_survive_a_new_instance() {
+    fun GIVEN_a_token_saved_on_this_phone_WHEN_a_new_instance_reads_it_THEN_it_is_still_there() {
         KeystoreTokenStorage(context).saveTokens(accessToken = "access-123", refreshToken = "refresh-456")
 
         val restarted = KeystoreTokenStorage(context)
@@ -33,7 +40,7 @@ class KeystoreTokenStorageTest {
     }
 
     @Test
-    fun clear_signs_out_for_new_instances() {
+    fun GIVEN_a_signed_in_phone_WHEN_the_token_is_cleared_THEN_a_new_instance_reads_as_signed_out() {
         val storage = KeystoreTokenStorage(context)
         storage.saveTokens(accessToken = "access-123", refreshToken = "refresh-456")
         storage.clear()
@@ -45,7 +52,7 @@ class KeystoreTokenStorageTest {
     }
 
     @Test
-    fun token_file_is_encrypted_and_excluded_from_backup() {
+    fun GIVEN_a_saved_token_WHEN_the_file_on_disk_is_read_THEN_it_is_in_noBackupFilesDir_and_not_plain_text() {
         KeystoreTokenStorage(context).saveTokens(accessToken = "access-123", refreshToken = "refresh-456")
 
         assertTrue("Token file should live in noBackupFilesDir", tokenFile.exists())
@@ -55,7 +62,7 @@ class KeystoreTokenStorageTest {
     }
 
     @Test
-    fun corrupted_file_reads_as_signed_out_and_is_deleted() {
+    fun GIVEN_a_token_file_that_cannot_be_decrypted_WHEN_it_is_read_THEN_nobody_is_signed_in_and_the_file_is_dropped() {
         tokenFile.parentFile?.mkdirs()
         tokenFile.writeBytes(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17))
 

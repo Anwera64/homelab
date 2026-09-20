@@ -1,4 +1,4 @@
-package com.homelab.household.data.local
+package com.homelab.household.data.datasource.local
 
 import java.io.File
 import kotlinx.serialization.encodeToString
@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 
 class FileTokenStorage(
     storageDir: String? = null
-) : TokenStorage {
+) : TokenLocalDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val tokenFile: File

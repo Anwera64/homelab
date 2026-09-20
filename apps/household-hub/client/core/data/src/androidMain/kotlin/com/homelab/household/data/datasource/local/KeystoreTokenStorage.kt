@@ -1,4 +1,4 @@
-package com.homelab.household.data.local
+package com.homelab.household.data.datasource.local
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
  * The file lives in `noBackupFilesDir`: Keystore keys never leave the device, so a restored
  * backup could not be decrypted anyway. Anything unreadable is deleted and reads as signed out.
  */
-class KeystoreTokenStorage(context: Context) : TokenStorage {
+class KeystoreTokenStorage(context: Context) : TokenLocalDataSource {
 
     private val tokenFile = File(context.noBackupFilesDir, FILE_NAME)
     private val json = Json { ignoreUnknownKeys = true }

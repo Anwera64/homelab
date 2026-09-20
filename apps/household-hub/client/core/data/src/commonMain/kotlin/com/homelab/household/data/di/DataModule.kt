@@ -1,26 +1,27 @@
 package com.homelab.household.data.di
 
-import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.DefensiveSseStreamReader
-import com.homelab.household.data.network.HubConfig
-import com.homelab.household.data.network.KermitKtorLogger
-import com.homelab.household.data.network.PublicEndpoints
+import com.homelab.household.data.BuildConfig
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.datasource.remote.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.GossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
-import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
-import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.MemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
+import com.homelab.household.data.network.HubConfig
+import com.homelab.household.data.network.KermitKtorLogger
+import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.network.signOutOnUnauthorized
+import com.homelab.household.data.remote.DefensiveSseStreamReader
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
@@ -37,7 +38,6 @@ import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
-import com.homelab.household.data.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.auth.Auth
@@ -62,7 +62,7 @@ val dataModule = module {
     }
 
     single {
-        val tokenStorage: TokenStorage = get()
+        val tokenStorage: TokenLocalDataSource = get()
         val jsonSerializer: Json = get()
         val hubConfig: HubConfig = get()
         HttpClient(get<HttpClientEngine>()) {

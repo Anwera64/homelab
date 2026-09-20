@@ -17,11 +17,11 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.data.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.domain.model.Member
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.jetbrains.compose.resources.getString
 
 /** The members list, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)

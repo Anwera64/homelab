@@ -1,9 +1,9 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
 import com.homelab.household.data.dto.TokenResponseDto
-import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
 import com.homelab.household.data.network.HubConfig
@@ -28,7 +28,7 @@ import kotlinx.coroutines.sync.withLock
  */
 class AuthRepositoryImpl(
     private val remote: AuthRemoteDataSource,
-    private val tokenStorage: TokenStorage,
+    private val tokenStorage: TokenLocalDataSource,
     private val session: AuthSessionLocalDataSource,
     private val hubConfig: HubConfig,
 ) : AuthRepository {

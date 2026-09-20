@@ -1,7 +1,7 @@
 package com.homelab.household.data.repository
 
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
-import com.homelab.household.data.local.TokenStorage
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.PinResetDataMapper
 import com.homelab.household.data.mapper.UserDataMapper
@@ -17,7 +17,7 @@ import com.homelab.household.domain.repository.MembersRepository
  */
 class MembersRepositoryImpl(
     private val remote: MembersRemoteDataSource,
-    private val tokenStorage: TokenStorage,
+    private val tokenStorage: TokenLocalDataSource,
 ) : MembersRepository {
 
     override suspend fun listHouseholdMembers(): List<User> =

@@ -21,10 +21,10 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.data.local.InMemoryTokenStorage
-import org.jetbrains.compose.resources.getString
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.jetbrains.compose.resources.getString
 
 /** Changing a PIN, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
