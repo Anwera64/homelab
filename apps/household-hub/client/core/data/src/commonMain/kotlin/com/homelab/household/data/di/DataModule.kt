@@ -2,6 +2,7 @@ package com.homelab.household.data.di
 
 import com.homelab.household.data.BuildConfig
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.datasource.remote.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.AuthRemoteDataSource
@@ -12,16 +13,18 @@ import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorSessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.datasource.remote.MembersRemoteDataSource
 import com.homelab.household.data.datasource.remote.MemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.ServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.SessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.SpaceRemoteDataSource
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.network.signOutOnUnauthorized
-import com.homelab.household.data.remote.DefensiveSseStreamReader
+import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
@@ -96,6 +99,7 @@ val dataModule = module {
         }
     }
     single { AuthSessionLocalDataSource() }
+    single { SessionCacheLocalDataSource() }
     single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single<AgentRemoteDataSource> { KtorAgentRemoteDataSource(get(), get<HubConfig>().baseUrl) }
@@ -104,10 +108,11 @@ val dataModule = module {
     single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
     single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<SessionRemoteDataSource> { KtorSessionRemoteDataSource(get(), get<HubConfig>().baseUrl, get()) }
 
     single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
     single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
-    single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
+    single<SessionRepository> { SessionRepositoryImpl(get(), get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
     single<AgentRepository> { AgentRepositoryImpl(get()) }
     single<SpaceRepository> { SpaceRepositoryImpl(get()) }

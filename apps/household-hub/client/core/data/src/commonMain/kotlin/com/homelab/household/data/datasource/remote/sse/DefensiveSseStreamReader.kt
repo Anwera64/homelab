@@ -1,4 +1,4 @@
-package com.homelab.household.data.remote
+package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.utils.io.ByteReadChannel

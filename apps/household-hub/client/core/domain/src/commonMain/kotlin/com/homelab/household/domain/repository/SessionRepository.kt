@@ -15,7 +15,12 @@ interface SessionRepository {
     fun streamChatTurn(sessionId: String, content: String, autoApproveWrites: Boolean = false): Flow<ChatStreamEvent>
     suspend fun approveToolProposal(sessionId: String, toolCallId: String, approved: Boolean, modifiedArguments: Map<String, Any?>? = null): Boolean
     suspend fun lockAllSecretSessions(): Int
-    suspend fun unlockSecretSession(sessionId: String, pinOrPassword: String): Boolean
+    /**
+     * Opens a locked secret conversation, answering whether this caller is the one that opened
+     * it. Takes no PIN: verifying one is [com.homelab.household.domain.usecase.UnlockSecretSessionUseCase]'s
+     * job, and the data layer only records which conversations are open.
+     */
+    suspend fun unlockSecretSession(sessionId: String): Boolean
     fun observeMessages(sessionId: String): Flow<List<ChatMessage>>
     suspend fun retryMessage(messageId: String): Flow<ChatStreamEvent>
 }

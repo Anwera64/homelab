@@ -10,8 +10,8 @@ import java.io.File
  * return. A repository holding an `HttpClient` is the shape this module was reworked away from, and
  * it is what made every repository test a wire test with Ktor's own coroutines underneath it.
  *
- * [stillToConvert] is the shrinking baseline for that rework: each slice deletes its own entry, and
- * the list goes with the last one. Nothing is ever added to it.
+ * The rework is finished, so there is no baseline left to shrink: every repository in the module
+ * passes these rules, and a new one that does not will fail here rather than at review.
  */
 class DataLayerBoundaryTest {
 
@@ -23,23 +23,11 @@ class DataLayerBoundaryTest {
     private val repositoryDir = File(dataDir, "repository")
     private val dataSourceDir = File(dataDir, "datasource")
 
-    /**
-     * What has not been reworked onto data sources yet. Shrinks to empty; never grows.
-     *
-     * Slice 1 recorded this list by running the rules with no exemptions at all, which named these
-     * eight and nothing else â€” `ServerStatusRepositoryImpl` was already right, which is where the
-     * shape came from.
-     */
-    private val stillToConvert = setOf(
-        "SessionRepositoryImpl.kt",     // slice 7
-    )
-
     @Test
     fun a_repository_never_holds_an_http_client() {
         assertTrue(repositoryDir.exists(), "Repository directory must exist at: ${repositoryDir.absolutePath}")
 
         val violations = repositoryDir.kotlinFiles()
-            .filterNot { it.name in stillToConvert }
             .filter { file -> file.readLines().any { it.trim().startsWith("import io.ktor") } }
             .map { "${it.name} imports Ktor; it should take a data source instead" }
 
@@ -55,7 +43,6 @@ class DataLayerBoundaryTest {
         val allowed = setOf("datasource", "network", "di")
 
         val violations = dataDir.kotlinFiles()
-            .filterNot { it.name in stillToConvert }
             .filterNot { it.relativeTo(dataDir).invariantSeparatorsPath.substringBefore('/') in allowed }
             .filter { file -> file.readLines().any { it.trim().startsWith("import io.ktor.client") } }
             .map { "${it.relativeTo(dataDir).invariantSeparatorsPath} holds a Ktor client outside datasource/ and network/" }
@@ -78,7 +65,19 @@ class DataLayerBoundaryTest {
     fun a_data_source_returns_dtos_not_domain_models() {
         if (!dataSourceDir.exists()) return
 
-        val exempt = setOf("ServerStatusRemoteDataSource.kt", "KtorServerStatusRemoteDataSource.kt")
+        // Two, each with its reason written in the file itself:
+        //   ServerStatus* — "is the hub reachable?" has no failure case, so the answer is the
+        //     sealed ServerStatus rather than something thrown, and a DTO would be it renamed.
+        //   Session*      — openChatStream emits ChatStreamEvent, whose variants ARE the SSE
+        //     protocol's `type` field, one for one. A parallel DTO hierarchy would restate it,
+        //     and DefensiveSseStreamReader is the parser that builds them off the wire.
+        val exempt = setOf(
+            "ServerStatusRemoteDataSource.kt",
+            "KtorServerStatusRemoteDataSource.kt",
+            "SessionRemoteDataSource.kt",
+            "KtorSessionRemoteDataSource.kt",
+            "DefensiveSseStreamReader.kt",
+        )
 
         val violations = dataSourceDir.kotlinFiles()
             .filterNot { it.name in exempt }
