@@ -6,7 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +17,7 @@ class HearthTopBarTest {
     fun back_goes_back() = runComposeUiTest {
         var back = 0
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthTopBar(onBack = { back++ }, backDescription = "Back")
             }
         }
@@ -30,7 +30,7 @@ class HearthTopBarTest {
     @Test
     fun a_title_shows_beside_the_back_button() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthTopBar(onBack = {}, backDescription = "Back", title = "Members")
             }
         }

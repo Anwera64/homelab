@@ -12,8 +12,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.new_chat
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DefaultSizes
-import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +25,7 @@ class HearthBottomNavTest {
 
     @Test
     fun shows_four_tabs_and_the_centre_plus() = runComposeUiTest {
-        setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
+        setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
         NavTab.entries.forEach { onNodeWithText(labelOf(it)).assertIsDisplayed() }
         onNodeWithContentDescription(getString(Res.string.new_chat)).assertIsDisplayed()
@@ -33,7 +33,7 @@ class HearthBottomNavTest {
 
     @Test
     fun only_the_current_tab_is_selected() = runComposeUiTest {
-        setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Chats, onSelect = {}, onNewChat = {}) } }
+        setContent { StillTheme { HearthBottomNav(NavTab.Chats, onSelect = {}, onNewChat = {}) } }
 
         onNodeWithText(labelOf(NavTab.Chats)).assertIsSelected()
         NavTab.entries.filterNot { it == NavTab.Chats }
@@ -43,7 +43,7 @@ class HearthBottomNavTest {
     @Test
     fun tapping_a_tab_reports_it() = runComposeUiTest {
         var chosen: NavTab? = null
-        setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = { chosen = it }, onNewChat = {}) } }
+        setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = { chosen = it }, onNewChat = {}) } }
 
         onNodeWithText(labelOf(NavTab.MySpace)).performClick()
 
@@ -53,7 +53,7 @@ class HearthBottomNavTest {
     @Test
     fun the_plus_starts_a_new_chat() = runComposeUiTest {
         var newChats = 0
-        setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = { newChats++ }) } }
+        setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = { newChats++ }) } }
 
         onNodeWithContentDescription(getString(Res.string.new_chat)).performClick()
 
@@ -62,7 +62,7 @@ class HearthBottomNavTest {
 
     @Test
     fun every_target_is_at_least_44dp() = runComposeUiTest {
-        setContent { HearthTheme(darkTheme = false) { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
+        setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
         NavTab.entries.forEach {
             onNodeWithText(labelOf(it))

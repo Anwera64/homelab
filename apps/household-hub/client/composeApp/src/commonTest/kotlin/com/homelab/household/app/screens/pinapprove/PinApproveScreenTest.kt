@@ -15,9 +15,9 @@ import com.homelab.household.app.resources.approve_pin_label
 import com.homelab.household.app.resources.approve_title
 import com.homelab.household.app.resources.approve_wrong_pin
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
@@ -68,7 +68,7 @@ class PinApproveScreenTest {
         PinApproveUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         PinApproveContent(state = state, onPinChange = {}, onApprove = {}, onBack = {})
                     }
                 }

@@ -12,9 +12,9 @@ import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,7 +93,7 @@ class ProfileScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         ProfileContent(
                             state = state,
                             onBack = {},

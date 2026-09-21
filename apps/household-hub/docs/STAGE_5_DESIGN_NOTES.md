@@ -29,6 +29,7 @@ Where this document and the UI/UX specification disagree, this document is the l
 | Rule | What it means in practice |
 | :--- | :--- |
 | **Dimming means "can't be opened"** | Nothing readable is greyed out. A read-only chat, a built-in agent, a locked secret row all stay at full contrast and state their limit in words. Primary buttons are never disabled; they explain what's missing when tapped. |
+| **Waiting has one shape** | Five patterns, one set of beats, and nothing is ever dimmed while it waits. The tapped button keeps its colour and says the verb in progress; a screen arriving empty breathes where the answer lands; a screen refreshing keeps its rows. Nothing is drawn for the first 250ms, so a hub on the LAN shows no loading state at all. §6.21. |
 | **Screens scroll** | Any screen whose content can outgrow the viewport scrolls its content region, with header and navigation pinned. Only fixed-shape screens are exempt: the PIN pad, launch, full-screen states. |
 | **No raw identifier reaches a person** | `searxng_search` is "Search the web"; `calendar_write` with `action=delete` is "Remove from your calendar". One label map in code, keyed by backend names, feeds every screen. |
 | **No UI without a backend behind it** | Suggestion chips and voice input were designed, then dropped, because nothing produces them. Screens that still show unbacked data say so in §5. |
@@ -112,9 +113,22 @@ There are now **fifteen roles**. A role carries everything — family, size, wei
 
 **What moved:** nav labels no longer thicken when selected — selection reads through colour, and a label that also changes weight shifts the row by a hair as you move between tabs. Prose at 13.5 and 14.5 became 14, small emphasis at 11 and 12.5 became 12, and the eyebrow settled at 11.
 
+### Motion
+
+Time is a scale like space and type, and for the same reason: "waiting" drifts screen by screen otherwise. Four beats, and they are the same everywhere.
+
+| Beat | Value | What it is |
+| :--- | :--- | :--- |
+| `hold` | 250ms | Nothing is drawn. A hub on the LAN answers well inside it, so a normal call shows no loading state at all |
+| `minimumVisible` | 400ms | Once a pattern is on show it stays this long after the answer arrives, so it can never flash |
+| `slow` | 8s | Still waiting, longer than usual. The pattern stays and a quiet line joins it; nothing has failed |
+| `barCycle` / `breathe` / `wave` | 1150 / 1600 / 1400ms | One pass of the bar, one breath of a skeleton, one pass of the wave across the PIN dots |
+
+The wave also carries its stagger (90ms per dot) and its lift (4dp) — a `Dp`, which is why it lives with the motion rather than the sizes. A row of skeleton blocks staggers the same way, 60ms apart, so six of them read as one thing arriving rather than six lights blinking together.
+
 ### In code
 
-A screen reads the scale off the theme, beside the palette — `HearthTheme.spacing.lg`, `HearthTheme.size.iconMd` — with the values held by `HearthSpacing`, `HearthSizes` and `HearthShapes` in `app/theme` and handed down by `HearthTheme` through a composition local. Space doesn't change between day and night, but going through the theme means a later size class (the deferred tablet) can provide its own scale and every screen follows without being touched. Type reaches a screen the same way — `HearthTheme.typography.body` — and can be swapped over a subtree just as space can. `DesignSystemTokenTest` fails the build on a raw `dp` or a raw `sp` written anywhere else in `composeApp/commonMain`, on a `FontWeight` applied by hand at a call site, and on a screen reading `DefaultSpacing` / `DefaultSizes` past the theme. The one exception is the icon set: `HearthIcon` builds its vectors outside composition, and its 24-unit grid is the drawing itself, not a layout decision.
+A screen reads the scale off the theme, beside the palette — `HearthTheme.spacing.lg`, `HearthTheme.size.iconMd` — with the values held by `HearthSpacing`, `HearthSizes` and `HearthShapes` in `app/theme` and handed down by `HearthTheme` through a composition local. Space doesn't change between day and night, but going through the theme means a later size class (the deferred tablet) can provide its own scale and every screen follows without being touched. Type reaches a screen the same way — `HearthTheme.typography.body` — and can be swapped over a subtree just as space can. Motion arrives the same way, as `HearthTheme.motion`. `DesignSystemTokenTest` fails the build on a raw `dp`, a raw `sp` or a raw duration (`durationMillis = 300`, `300.milliseconds`) written anywhere else in `composeApp/commonMain`, on a `FontWeight` applied by hand at a call site, and on a screen reading `DefaultSpacing` / `DefaultSizes` past the theme. The one exception is the icon set: `HearthIcon` builds its vectors outside composition, and its 24-unit grid is the drawing itself, not a layout decision.
 
 ### Hearth icons
 
@@ -884,6 +898,42 @@ Accepting flips the header to ON, gives the screen the ghost frame, and marks th
 - The client parses suggestSecretMode from the stream’s done event and then drops it — no ViewModel reads it.
 - The phrases are English regexes only. Spanish or Catalan (“no se lo digas”, “entre nosotros”) never trigger.
 - Switching to secret locks the chat you’re in. Under the locking spec the next read needs an unlock token, so the app would bounce you to the PIN screen mid-conversation. Fix: PATCH /secret (and creating a secret chat) returns a secret_read token scoped to that one session — it only grants what you could already read a second ago. Not the all-chats token: that would let anyone holding the phone make a chat secret and read every other one.
+
+### 6.21 Waiting has one shape
+
+*Screens:* every screen that calls the hub
+
+#### Five patterns, and why there are five and not one
+
+A spinner in the middle of the screen says only "something is happening". Which thing, and where the answer will appear, is what a person actually needs to know — so the pattern follows the shape of the wait.
+
+| # | Pattern | Where |
+| :-- | :--- | :--- |
+| 1 | The tapped button keeps full colour and shadow, its label becomes the verb in progress, a 4dp bar runs along its bottom edge | The eight button actions: invite code, join, create an invite, approve a PIN, a new PIN, changing a PIN, removing a member, leaving |
+| 2 | The screen arrives empty: real chrome draws at once, breathing blocks where the answer lands | Members, Profile, Forgotten PIN |
+| 3 | The screen refreshes: rows stay put, a full-bleed bar under the header | Members, coming back to it |
+| 4 | One card reloads in place | Add a member, asking for a second code |
+| 5 | The PIN pad's six dots wave | The PIN pad, which has no submit button to put a bar on |
+
+Pattern 5 exists only because pattern 1 has nowhere to attach: the pad submits on the sixth digit, so there is no button. The dots are the only thing on screen that belongs to the action.
+
+#### Four beats, identical everywhere
+
+Nothing for 250ms, then the pattern, held at least 400ms; at 8 seconds a quiet caption joins it; then the Unreachable / Failed wording each screen already has.
+
+The first beat is the one that matters most and is the easiest to get wrong. A hub on the LAN answers in well under 250ms, so **the common case is that no loading state appears at all** — the screen simply updates. A loading state that flashes for two frames is worse than none, which is what the 400ms floor is for at the other end.
+
+Nothing is ever dimmed while it waits (§2). A working button keeps its colour, its shadow and its place in the accessibility tree; it is not `enabled = false` wearing a different name.
+
+#### An animated component must be able to stand still
+
+Compose UI tests synchronise on idleness, and **an infinite animation never lets a composition go idle** — `waitForIdle`, `waitUntil` and every `onNode…` under one time out rather than failing with something you can read.
+
+So motion is switched off by construction rather than driven by hand. `HearthMotion` carries `animate` beside its durations; `StillMotion` is the same scale with `animate = false` and the time-gated beats collapsed to zero. Every animated component reads `HearthTheme.motion.animate` and draws its **resting frame** when it is false: a full-opacity skeleton block, a bar frozen at a fixed fraction, dots at rest.
+
+Tests reach it through one composable, `StillTheme`, and never compose `HearthTheme` directly — `StillMotionInTestsTest` fails the build otherwise. That guard exists because the first version of this relied on `TestApp` alone, and the tests that most needed the off switch turn out not to use `TestApp`: every `every_previewed_state_draws` mounts its screen's `Content` on a bare theme. The first busy state added to a preview provider would have hung a whole screen test rather than failing it. The theme's own tests are the one exception, since proving `HearthTheme` hands out `DefaultMotion` means composing the real thing.
+
+The rule that follows: a component that cannot stand still cannot be tested, so it does not ship. Nothing asserts on the motion itself — no test names a duration, an easing or a frame. The only timing test is `waitPhase`, which is arithmetic over two thresholds with no clock in it. The motion is checked by eye, once, on a real device against a real hub.
 
 ---
 

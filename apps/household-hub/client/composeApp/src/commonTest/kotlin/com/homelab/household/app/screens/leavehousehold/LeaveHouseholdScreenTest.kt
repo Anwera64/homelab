@@ -16,9 +16,9 @@ import com.homelab.household.app.resources.leave_submit
 import com.homelab.household.app.resources.leave_title
 import com.homelab.household.app.resources.leave_wrong_pin
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
@@ -83,7 +83,7 @@ class LeaveHouseholdScreenTest {
         LeaveHouseholdUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         LeaveHouseholdContent(state = state, onPinChange = {}, onLeave = {}, onBack = {})
                     }
                 }

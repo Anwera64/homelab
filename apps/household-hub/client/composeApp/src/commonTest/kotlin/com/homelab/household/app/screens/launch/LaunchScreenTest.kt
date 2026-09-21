@@ -12,9 +12,9 @@ import androidx.compose.ui.unit.dp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.launch_offline_hint
 import com.homelab.household.app.testing.FakeExternalApps
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TEST_HUB_HOST
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
@@ -203,7 +203,7 @@ class LaunchScreenTest {
     fun the_offline_screen_scrolls_when_it_does_not_fit() = runComposeUiTest {
         val offline = LaunchUiStateProvider().values.first { it.status is HubStatus.Unavailable }
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 Box(Modifier.size(width = 360.dp, height = 320.dp)) {
                     LaunchContent(state = offline, onRetry = {}, onOpenTailscale = {})
                 }

@@ -5,7 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
@@ -14,7 +14,7 @@ class BentoCardTest {
     @Test
     fun shows_its_label_and_content() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 BentoCard(label = "Today · merged") { Text("Dinner together") }
             }
         }
@@ -26,7 +26,7 @@ class BentoCardTest {
     @Test
     fun label_is_optional() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 BentoCard { Text("Dinner together") }
             }
         }

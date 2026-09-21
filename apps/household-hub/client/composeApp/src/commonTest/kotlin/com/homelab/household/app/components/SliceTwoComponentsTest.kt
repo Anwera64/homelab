@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -20,7 +20,7 @@ class SliceTwoComponentsTest {
     fun a_pin_field_takes_six_digits_and_nothing_else() = runComposeUiTest {
         var pin = ""
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 PinField(value = pin, onValueChange = { pin = it }, label = "Choose a PIN")
             }
         }
@@ -34,7 +34,7 @@ class SliceTwoComponentsTest {
     fun a_pin_field_never_grows_past_six_digits() = runComposeUiTest {
         var pin = "482913"
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 PinField(value = pin, onValueChange = { pin = it }, label = "Choose a PIN")
             }
         }
@@ -48,7 +48,7 @@ class SliceTwoComponentsTest {
     fun code_boxes_upper_case_what_is_typed_and_stop_at_six() = runComposeUiTest {
         var code = ""
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 CodeBoxes(code = code, onCodeChange = { code = it }, contentDescription = "Invite code")
             }
         }
@@ -61,7 +61,7 @@ class SliceTwoComponentsTest {
     @Test
     fun code_boxes_draw_a_box_per_character_typed() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 CodeBoxes(code = "K7M", onCodeChange = {}, contentDescription = "Invite code")
             }
         }
@@ -74,7 +74,7 @@ class SliceTwoComponentsTest {
     @Test
     fun a_code_card_shows_the_code_and_how_long_it_lasts() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 CodeCard(label = "INVITE CODE", code = "K7M2QP", expiry = "Expires in 14:52")
             }
         }
@@ -86,7 +86,7 @@ class SliceTwoComponentsTest {
     @Test
     fun consequence_cards_list_what_goes_and_what_stays() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 ConsequenceCards(
                     erasedTitle = "Erased for good",
                     erased = listOf("Every conversation he's had"),
@@ -106,7 +106,7 @@ class SliceTwoComponentsTest {
     fun a_switch_reports_the_value_it_would_become() = runComposeUiTest {
         var admin = false
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthSwitch(checked = admin, onCheckedChange = { admin = it }, contentDescription = "Household admin")
             }
         }
@@ -120,7 +120,7 @@ class SliceTwoComponentsTest {
     fun a_settings_row_opens_what_it_names() = runComposeUiTest {
         var opened = 0
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 SettingsRow(label = "Members", onClick = { opened++ })
             }
         }
@@ -134,7 +134,7 @@ class SliceTwoComponentsTest {
     fun a_row_that_cannot_be_opened_says_why_and_does_nothing() = runComposeUiTest {
         var opened = 0
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 SettingsRow(
                     label = "Delete my account",
                     caption = "Not while you're the only admin",
@@ -154,7 +154,7 @@ class SliceTwoComponentsTest {
     fun a_taken_colour_cannot_be_chosen() = runComposeUiTest {
         var chosen = "#3C6E4E"
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 ColourSwatches(
                     swatches = listOf("#3C6E4E", "#C05638"),
                     selected = chosen,
@@ -174,7 +174,7 @@ class SliceTwoComponentsTest {
     fun a_free_colour_can_be_chosen() = runComposeUiTest {
         var chosen = "#3C6E4E"
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 ColourSwatches(
                     swatches = listOf("#3C6E4E", "#C05638"),
                     selected = chosen,

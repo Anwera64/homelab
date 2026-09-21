@@ -13,9 +13,9 @@ import com.homelab.household.app.resources.forgot_ask
 import com.homelab.household.app.resources.forgot_have_code
 import com.homelab.household.app.resources.forgot_title
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
@@ -63,7 +63,7 @@ class PinForgotScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         PinForgotContent(state = state, onHaveCode = {}, onBack = {})
                     }
                 }

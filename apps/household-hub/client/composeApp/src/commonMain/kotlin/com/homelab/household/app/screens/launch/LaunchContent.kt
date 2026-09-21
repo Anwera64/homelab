@@ -8,25 +8,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.BentoCard
 import com.homelab.household.app.components.ChipVariant
 import com.homelab.household.app.components.HearthChip
+import com.homelab.household.app.components.HearthProgressBar
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
@@ -148,15 +145,7 @@ private fun CheckingContent(hubAddress: String, modifier: Modifier) {
 
             HubAddressPill(hubAddress = hubAddress)
 
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .width(HearthTheme.size.progressTrack)
-                    .height(HearthTheme.size.progressHeight),
-                color = colors.primary,
-                trackColor = colors.outline,
-                strokeCap = StrokeCap.Round,
-                gapSize = HearthTheme.spacing.none
-            )
+            HearthProgressBar()
             Text(
                 text = stringResource(Res.string.launch_action_description),
                 style = HearthTheme.typography.monoSm,

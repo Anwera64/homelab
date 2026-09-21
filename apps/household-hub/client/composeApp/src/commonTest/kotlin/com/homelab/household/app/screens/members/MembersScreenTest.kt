@@ -14,9 +14,9 @@ import com.homelab.household.app.resources.members_reset_pin
 import com.homelab.household.app.resources.members_title
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
@@ -100,7 +100,7 @@ class MembersScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         MembersContent(
                             state = state,
                             onInvite = {},

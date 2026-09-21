@@ -7,8 +7,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.picker_title
 import com.homelab.household.app.testing.FakeSignInHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.Member
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -92,7 +92,7 @@ class ProfilePickerScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
                     }
                 }

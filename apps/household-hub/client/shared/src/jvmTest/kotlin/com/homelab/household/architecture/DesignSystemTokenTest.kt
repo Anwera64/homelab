@@ -5,11 +5,12 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Space, size and type are decided once, in `app/theme`, and every screen picks a step
- * (`HearthSpacing`, `HearthSize`, `HearthShapes`, `HearthTypography`). A dp or an sp written
- * anywhere else is how a design system drifts: 79 screens are designed, and the first 13dp invented
- * at a call site is the one the next screen copies. Type had already drifted that way — the canvas
- * drew 28 font sizes and the components wrote their own `sp` — which is what these rules end.
+ * Space, size, type and time are decided once, in `app/theme`, and every screen picks a step
+ * (`HearthSpacing`, `HearthSize`, `HearthShapes`, `HearthTypography`, `HearthMotion`). A dp, an sp
+ * or a duration written anywhere else is how a design system drifts: 79 screens are designed, and
+ * the first 13dp invented at a call site is the one the next screen copies. Type had already
+ * drifted that way — the canvas drew 28 font sizes and the components wrote their own `sp` — which
+ * is what these rules end.
  *
  * Test sources are exempt: a test that restates a token through the token proves nothing, so
  * assertions are free to name real numbers.
@@ -109,6 +110,35 @@ class DesignSystemTokenTest {
         assertTrue(
             violations.isEmpty(),
             "Raw sp outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
+        )
+    }
+
+    /**
+     * And the same rule for time. The four beats of a wait — the hold, the minimum a pattern stays
+     * visible, the slow threshold, the cycle of the motion itself — are decided once in
+     * `HearthMotion`, so the 300ms the next screen would otherwise pick has nowhere to be written.
+     * Without this, "waiting" drifts screen by screen exactly the way type did.
+     */
+    @Test
+    fun no_screen_or_component_writes_a_raw_duration() {
+        val literal = Regex("""(?<![\w.])(durationMillis\s*=\s*\d+|\d+(\.\d+)?\.(milliseconds|seconds))\b""")
+
+        val violations = uiDir.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filterNot { it.startsWith(themePackage) }
+            .flatMap { file ->
+                file.readLines().mapIndexedNotNull { index, line ->
+                    literal.find(line)?.let {
+                        "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
+                            "— take the beat from HearthTheme.motion instead"
+                    }
+                }
+            }
+            .toList()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Raw duration outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
         )
     }
 

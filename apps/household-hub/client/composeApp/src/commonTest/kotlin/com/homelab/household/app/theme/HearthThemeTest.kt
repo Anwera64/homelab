@@ -9,6 +9,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** Values come from the palette proof, sections 04 (Copenhagen Day) and 05 (Midnight Espresso). */
 @OptIn(ExperimentalTestApi::class)
@@ -166,6 +170,48 @@ class HearthThemeTest {
 
         waitForIdle()
         assertEquals(32.dp, seen)
+    }
+
+    @Test
+    fun the_theme_hands_out_the_motion_scale_too() = runComposeUiTest {
+        var motion: HearthMotion? = null
+
+        setContent {
+            HearthTheme(darkTheme = false) { motion = HearthTheme.motion }
+        }
+
+        waitForIdle()
+        assertEquals(DefaultMotion, motion)
+        assertTrue(motion!!.animate, "the app's own scale animates")
+    }
+
+    /**
+     * The off switch every screen test depends on. A subtree given [StillMotion] reports
+     * `animate == false`, so the components under it draw a resting frame instead of an
+     * endless one — without which the composition never goes idle and the test hangs.
+     */
+    @Test
+    fun a_subtree_given_the_still_scale_stops_animating() = runComposeUiTest {
+        var seen: HearthMotion? = null
+
+        setContent {
+            HearthTheme(darkTheme = false) {
+                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
+                    seen = HearthTheme.motion
+                }
+            }
+        }
+
+        waitForIdle()
+        assertFalse(seen!!.animate, "StillMotion must not animate")
+    }
+
+    /** Nothing is time-gated when motion is off, so a screen test never waits on the hold. */
+    @Test
+    fun the_still_scale_collapses_the_beats_but_keeps_the_slow_threshold() {
+        assertEquals(Duration.ZERO, StillMotion.hold)
+        assertEquals(Duration.ZERO, StillMotion.minimumVisible)
+        assertEquals(8.seconds, StillMotion.slow, "the slow line must never appear by accident")
     }
 
     private fun assertColor(expectedRgb: Long, actual: Color, token: String) {

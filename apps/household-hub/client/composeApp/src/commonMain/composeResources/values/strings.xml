@@ -265,4 +265,8 @@
     <string name="leave_wrong_pin">That isn’t your PIN. %1$d tries left.</string>
     <string name="leave_locked">Too many wrong PINs. Try again in %1$d seconds.</string>
     <string name="leave_unreachable">Can’t reach your hub. Nothing was changed.</string>
+
+    <!-- Slice 2 · waiting. Screen readers only: what a busy control and a loading block announce. -->
+    <string name="a11y_working">Working</string>
+    <string name="a11y_loading">Loading</string>
 </resources>

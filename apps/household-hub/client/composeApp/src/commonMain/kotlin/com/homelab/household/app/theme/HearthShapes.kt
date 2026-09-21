@@ -17,6 +17,13 @@ object HearthShapes {
     /** Full-width actions. */
     val button = RoundedCornerShape(16.dp)
 
+    /**
+     * A block standing in for a line of text that hasn't arrived. Gentler than [item] because a
+     * skeleton line is only 14dp tall: at that height a bigger radius reads as a lozenge, and the
+     * fully rounded [pill] reads as a chip.
+     */
+    val skeleton = RoundedCornerShape(4.dp)
+
     /** Chips, pills and badges. */
     val pill = RoundedCornerShape(percent = 50)
 

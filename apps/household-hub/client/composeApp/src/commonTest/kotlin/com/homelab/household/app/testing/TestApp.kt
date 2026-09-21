@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.platform.LocalExternalApps
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.network.HubConfig
@@ -28,6 +27,11 @@ const val TEST_HUB_URL = "https://$TEST_HUB_HOST"
  * is the production wiring.
  *
  * It takes a plain engine, so it knows nothing about any particular screen's hub.
+ *
+ * The one thing it does change about the app's own composition is the motion scale: it composes
+ * [StillTheme], so the waiting patterns draw their resting frame. Tests that mount a screen's
+ * `Content` directly compose [StillTheme] themselves — that is the whole of the off switch, and
+ * `StillMotionInTestsTest` fails the build on a test that skips it.
  */
 @Composable
 fun TestApp(
@@ -55,7 +59,7 @@ fun TestApp(
             LocalViewModelStoreOwner provides viewModelStoreOwner,
             LocalExternalApps provides externalApps
         ) {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 content()
             }
         }
