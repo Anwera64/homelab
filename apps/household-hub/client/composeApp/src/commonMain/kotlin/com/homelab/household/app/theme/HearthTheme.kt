@@ -24,6 +24,10 @@ internal val LocalHearthTypography =
 internal val LocalHearthSpacing = staticCompositionLocalOf { DefaultSpacing }
 internal val LocalHearthSizes = staticCompositionLocalOf { DefaultSizes }
 
+// Motion is the one scale a test routinely provides for itself: `TestApp` hands the screens
+// under it `StillMotion`, without which an endlessly-animating tree never goes idle.
+internal val LocalHearthMotion = staticCompositionLocalOf { DefaultMotion }
+
 /** Follows the system theme unless told otherwise. Secret Mode never changes the theme. */
 @Composable
 fun HearthTheme(
@@ -39,7 +43,8 @@ fun HearthTheme(
         LocalHearthFonts provides fonts,
         LocalHearthTypography provides typography,
         LocalHearthSpacing provides DefaultSpacing,
-        LocalHearthSizes provides DefaultSizes
+        LocalHearthSizes provides DefaultSizes,
+        LocalHearthMotion provides DefaultMotion
     ) {
         MaterialTheme(
             colorScheme = colors.toColorScheme(darkTheme),
@@ -75,6 +80,11 @@ object HearthTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalHearthSizes.current
+
+    val motion: HearthMotion
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalHearthMotion.current
 }
 
 private fun HearthColors.toColorScheme(darkTheme: Boolean): ColorScheme {
