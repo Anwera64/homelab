@@ -80,6 +80,34 @@ class ProfileViewModelTest {
         assertEquals(false, viewModel.uiState.value.isSoleAdmin)
     }
 
+    /**
+     * Offline, the member comes off the phone and the household does not. Losing the member with the
+     * household is what drew an empty circle where a name and a colour belong.
+     */
+    @Test
+    fun the_member_is_shown_even_when_the_household_cannot_be_listed() = runTest(testDispatcher) {
+        everySuspend { getCurrentUser() } returns emma
+        everySuspend { listHouseholdMembers() } throws ServerOfflineException()
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(emma, viewModel.uiState.value.member)
+        assertEquals(ProfileStatus.Unreachable, viewModel.uiState.value.status)
+    }
+
+    /** Nobody can be promoted offline either, so the question is left alone rather than guessed. */
+    @Test
+    fun a_household_that_cannot_be_listed_leaves_the_sole_admin_question_unanswered() = runTest(testDispatcher) {
+        everySuspend { getCurrentUser() } returns emma
+        everySuspend { listHouseholdMembers() } throws ServerOfflineException()
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isSoleAdmin)
+    }
+
     @Test
     fun an_unreachable_hub_says_so_and_can_be_asked_again() = runTest(testDispatcher) {
         everySuspend { getCurrentUser() } throws ServerOfflineException()

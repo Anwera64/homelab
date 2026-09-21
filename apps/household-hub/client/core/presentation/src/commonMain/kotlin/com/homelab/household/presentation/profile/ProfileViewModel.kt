@@ -32,29 +32,36 @@ class ProfileViewModel(
         load()
     }
 
-    /** Also the "Try again" when the hub didn't answer. */
+    /**
+     * Also the "Try again" when the hub didn't answer.
+     *
+     * The two asks are separate because they can fail separately: who you are is kept on this
+     * phone and answers offline, while the household has to come from the hub. Showing the member
+     * without the household is the offline profile — a name, a colour, and a line saying the hub
+     * could not be reached — so the failure of the second must not throw away the first.
+     */
     fun load() {
         _uiState.update { it.copy(status = ProfileStatus.Loading) }
         viewModelScope.launch {
-            runCatchingSafe {
-                val member = getCurrentUser()
-                val household = listHouseholdMembers()
-                member to household
-            }.fold(
-                onSuccess = { (member, household) ->
+            val member = runCatchingSafe { getCurrentUser() }
+                .onSuccess { _uiState.update { state -> state.copy(member = it) } }
+
+            runCatchingSafe { listHouseholdMembers() }.fold(
+                onSuccess = { household ->
                     // Nothing can promote anyone, so the only admin cannot leave (design notes §4).
-                    val soleAdmin = member?.isAdmin == true && household.count { it.isAdmin } <= 1
-                    _uiState.update {
-                        it.copy(member = member, isSoleAdmin = soleAdmin, status = ProfileStatus.Ready)
-                    }
+                    val soleAdmin = member.getOrNull()?.isAdmin == true && household.count { it.isAdmin } <= 1
+                    _uiState.update { it.copy(isSoleAdmin = soleAdmin, status = ProfileStatus.Ready) }
                 },
-                onFailure = { error ->
-                    val status = if (error is ServerOfflineException) ProfileStatus.Unreachable else ProfileStatus.Failed
-                    _uiState.update { it.copy(status = status) }
-                }
+                onFailure = { error -> _uiState.update { it.copy(status = failureOf(error)) } }
             )
+
+            // A member this phone could not name is a failure of its own, whatever the household did.
+            member.onFailure { error -> _uiState.update { it.copy(status = failureOf(error)) } }
         }
     }
+
+    private fun failureOf(error: Throwable): ProfileStatus =
+        if (error is ServerOfflineException) ProfileStatus.Unreachable else ProfileStatus.Failed
 
     fun onSignOut() {
         viewModelScope.launch {
