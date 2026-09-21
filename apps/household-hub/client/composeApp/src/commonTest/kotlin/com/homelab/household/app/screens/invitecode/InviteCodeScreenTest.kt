@@ -6,9 +6,12 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.width
 import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_invite_code_checking
@@ -23,6 +26,7 @@ import com.homelab.household.presentation.invitecode.InviteCodeStatus
 import com.homelab.household.presentation.invitecode.InviteCodeUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.jetbrains.compose.resources.getString
 
 /** Entering an invite code, with the real stack under it; only the hub is faked. */
@@ -156,6 +160,37 @@ class InviteCodeScreenTest {
             )
         onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
         onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
+    }
+
+    /**
+     * The slow line sits under the button, so the button now has a `Column` between it and the
+     * screen. A wrapper that keeps the caller's width for itself is exactly how every full-width
+     * button in the app came to be a full-width box around a button hugging its label — invisible
+     * to tests that assert semantics, colour and height and never once a width.
+     */
+    @Test
+    fun the_continue_button_still_fills_the_screen_under_its_wrapper() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                InviteCodeContent(
+                    state = InviteCodeUiState(code = "K7M2QP"),
+                    onCodeChange = {},
+                    onContinue = {},
+                    onPaste = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        val screen = onRoot().getUnclippedBoundsInRoot().width
+        val button = onNodeWithText(getString(Res.string.invite_code_continue))
+            .getUnclippedBoundsInRoot()
+            .width
+
+        assertTrue(
+            button > screen / 2,
+            "the button was told to fill its width but measured $button inside a $screen screen"
+        )
     }
 
     @Test
