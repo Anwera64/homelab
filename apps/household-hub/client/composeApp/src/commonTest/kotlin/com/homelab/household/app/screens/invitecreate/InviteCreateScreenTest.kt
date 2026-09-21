@@ -15,10 +15,12 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.SkeletonGroupTag
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_invite_create_making
 import com.homelab.household.app.resources.a11y_invite_create_remaking
 import com.homelab.household.app.resources.invite_create_making
+import com.homelab.household.app.resources.invite_create_making_new
 import com.homelab.household.app.resources.invite_create_name_label
 import com.homelab.household.app.resources.invite_create_name_missing
 import com.homelab.household.app.resources.invite_create_new_code
@@ -156,6 +158,12 @@ class InviteCreateScreenTest {
                 getString(Res.string.a11y_invite_create_remaking)
             )
         )
+
+        // The old code must go. Leaving it on screen invites the admin to read out six characters
+        // that are being replaced, which is worse than showing nothing (§6.21, pattern 4).
+        onNodeWithText("K7M2QP").assertDoesNotExist()
+        onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.invite_create_making_new)).assertIsDisplayed()
     }
 
     @Test

@@ -18,11 +18,16 @@ import com.homelab.household.app.components.BentoCard
 import com.homelab.household.app.components.ChipVariant
 import com.homelab.household.app.components.DestructiveButton
 import com.homelab.household.app.components.HearthChip
+import com.homelab.household.app.components.HearthProgressBar
+import com.homelab.household.app.components.HearthProgressBarWidth
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SkeletonBlock
+import com.homelab.household.app.components.SkeletonCircle
+import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_admin
 import com.homelab.household.app.resources.members_back
@@ -62,11 +67,26 @@ fun MembersContent(
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
+    // Two shapes of wait, and the rows are what tells them apart (design notes §6.21). Arriving
+    // has nothing to show yet, so blocks stand where the members will be; coming back already has
+    // them, and replacing readable rows with blocks would be a step backwards.
+    val loading = state.status == MembersStatus.Loading
+    val arriving = loading && state.rows.isEmpty()
+
     HearthScaffold(
         modifier = modifier,
-        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.members_back)) },
+        header = {
+            Column {
+                HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.members_back))
+                if (loading && !arriving) {
+                    HearthProgressBar(width = HearthProgressBarWidth.FullBleed)
+                }
+            }
+        },
         bottomBar = {
-            if (state.youAreAdmin) {
+            // Not while arriving: whether this phone is the admin's is one of the things the hub
+            // has not said yet, and a button that may not be yours is worse than none.
+            if (state.youAreAdmin && !arriving) {
                 Column(modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl)) {
                     PrimaryButton(
                         text = stringResource(Res.string.members_invite),
@@ -89,6 +109,14 @@ fun MembersContent(
                 }
             }
 
+            if (arriving) {
+                item {
+                    SkeletonGroup {
+                        repeat(ARRIVING_CARDS) { position -> MemberCardSkeleton(position) }
+                    }
+                }
+            }
+
             items(state.rows, key = { it.id }) { row ->
                 MemberCard(
                     row = row,
@@ -99,6 +127,45 @@ fun MembersContent(
             }
 
             failureItem(state.status, onRetry)
+        }
+    }
+}
+
+/**
+ * A member card that has not arrived. Drawn at the real card's geometry — the same avatar size,
+ * the same divider, the same two button-height rows — so nothing moves when the answer lands.
+ *
+ * [position] sets its breath a beat behind the card above it, so two of them read as one list
+ * arriving rather than two lights blinking together.
+ */
+@Composable
+private fun MemberCardSkeleton(position: Int) {
+    val size = HearthTheme.size
+
+    BentoCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkeletonCircle(size = size.touchTarget, position = position)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            ) {
+                SkeletonBlock(widthFraction = NAME_WIDTH, position = position)
+                SkeletonBlock(widthFraction = ROLE_WIDTH, height = HearthTheme.spacing.md, position = position)
+            }
+        }
+
+        HorizontalDivider(color = HearthTheme.colors.outlineSoft)
+        Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+            repeat(2) {
+                SkeletonBlock(
+                    modifier = Modifier.weight(1f),
+                    height = size.control,
+                    position = position
+                )
+            }
         }
     }
 }
@@ -154,6 +221,13 @@ private fun MemberCard(row: MemberRow, youAreAdmin: Boolean, onResetPin: () -> U
         }
     }
 }
+
+/** How many stand-ins a first load draws: a household of two is the case this app was built for. */
+private const val ARRIVING_CARDS = 2
+
+/** How much of the row a skeleton line fills. Unequal, so it reads as a wait and not as a grid. */
+private const val NAME_WIDTH = 0.45f
+private const val ROLE_WIDTH = 0.25f
 
 private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(status: MembersStatus, onRetry: () -> Unit) {
     when (status) {
