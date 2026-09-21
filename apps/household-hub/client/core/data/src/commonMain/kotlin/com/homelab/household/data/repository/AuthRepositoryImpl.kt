@@ -1,7 +1,7 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.mapper.InviteDataMapper
@@ -23,12 +23,12 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Orchestration and mapping. Every call goes out through [remote], every DTO becomes a domain model
- * here, and what this phone keeps lives in [tokenStorage] and [session]. Nothing in this file knows
+ * here, and what this phone keeps lives in [storage] and [session]. Nothing in this file knows
  * that the hub speaks HTTP.
  */
 class AuthRepositoryImpl(
     private val remote: AuthRemoteDataSource,
-    private val tokenStorage: TokenLocalDataSource,
+    private val storage: StoredSessionLocalDataSource,
     private val session: AuthSessionLocalDataSource,
     private val hubConfig: HubConfig,
 ) : AuthRepository {
@@ -64,7 +64,7 @@ class AuthRepositoryImpl(
      */
     override suspend fun getCurrentUser(): User? {
         session.currentUser()?.let { return UserDataMapper.toDomain(it) }
-        if (tokenStorage.getAccessToken() == null) return null
+        if (storage.getAccessToken() == null) return null
 
         return runCatchingSafe {
             val dto = remote.fetchCurrentUser()
@@ -73,10 +73,10 @@ class AuthRepositoryImpl(
         }.getOrNull()
     }
 
-    override fun hasStoredSession(): Boolean = tokenStorage.getAccessToken() != null
+    override fun hasStoredSession(): Boolean = storage.getAccessToken() != null
 
     override suspend fun logout() {
-        tokenStorage.clear()
+        storage.clear()
         session.forgetCurrentUser()
     }
 
@@ -107,7 +107,7 @@ class AuthRepositoryImpl(
     }
 
     private suspend fun renew(): String {
-        val kept = tokenStorage.getAccessToken()
+        val kept = storage.getAccessToken()
             ?: throw UnauthorizedException("Nobody is signed in on this phone")
         val fresh = remote.renew(kept)
         signedIn(fresh)
@@ -119,7 +119,7 @@ class AuthRepositoryImpl(
 
     /** Keeps the token and remembers who it belongs to, for every way of signing in. */
     private fun signedIn(response: TokenResponseDto): User {
-        tokenStorage.saveTokens(response.access_token)
+        storage.saveTokens(response.access_token)
         val user = response.user
             ?: throw UpstreamGatewayException(statusCode = 200, message = "The hub signed in without saying who")
         session.cacheCurrentUser(user)

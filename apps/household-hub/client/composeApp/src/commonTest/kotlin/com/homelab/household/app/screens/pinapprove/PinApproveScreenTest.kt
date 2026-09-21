@@ -18,7 +18,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
@@ -31,7 +31,7 @@ class PinApproveScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun your_own_pin_produces_the_code_to_read_out() {
@@ -39,7 +39,7 @@ class PinApproveScreenTest {
         hub.approvesResets(code = "P4XN7T")
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.approve_pin_label)).performTextInput("246801")
             onNodeWithText(getString(Res.string.approve_generate)).performClick()
@@ -54,7 +54,7 @@ class PinApproveScreenTest {
         hub.refusesThePin(attemptsLeft = 3)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.approve_pin_label)).performTextInput("000000")
             onNodeWithText(getString(Res.string.approve_generate)).performClick()

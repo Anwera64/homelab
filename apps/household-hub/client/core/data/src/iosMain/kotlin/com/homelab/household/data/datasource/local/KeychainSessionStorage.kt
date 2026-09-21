@@ -66,7 +66,7 @@ import platform.Security.kSecValueData
  * Nothing thrown by the Keychain or by JSON parsing escapes these four methods; anything
  * unreadable is deleted and reads as signed out.
  */
-class KeychainTokenStorage : TokenLocalDataSource {
+class KeychainSessionStorage : StoredSessionLocalDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val lock = NSLock()
@@ -75,7 +75,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
         locked {
             // A null refresh token means "leave the stored one alone", so merge before writing.
             val stored = readPayload()
-            val payload = TokenDiskPayload(
+            val payload = SessionDiskPayload(
                 accessToken = accessToken,
                 refreshToken = refreshToken ?: stored?.refreshToken
             )
@@ -100,7 +100,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
     }
 
     /** Reads the stored payload, deleting (and reporting signed out) anything unreadable. */
-    private fun readPayload(): TokenDiskPayload? {
+    private fun readPayload(): SessionDiskPayload? {
         val bytes = try {
             Keychain.read()
         } catch (_: Throwable) {
@@ -108,7 +108,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
         } ?: return null
 
         return try {
-            json.decodeFromString<TokenDiskPayload>(bytes.decodeToString())
+            json.decodeFromString<SessionDiskPayload>(bytes.decodeToString())
         } catch (_: Throwable) {
             try {
                 Keychain.delete()
@@ -129,7 +129,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
 }
 
 /**
- * The raw generic-password item behind [KeychainTokenStorage].
+ * The raw generic-password item behind [KeychainSessionStorage].
  *
  * Memory management: every CoreFoundation object created here is created with a `Create` function
  * (so we own a +1 reference) and handed to `defer`, which releases it when the enclosing

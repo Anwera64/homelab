@@ -3,7 +3,7 @@ package com.homelab.household.data.di
 import com.homelab.household.data.BuildConfig
 import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
@@ -65,7 +65,7 @@ val dataModule = module {
     }
 
     single {
-        val tokenStorage: TokenLocalDataSource = get()
+        val storage: StoredSessionLocalDataSource = get()
         val jsonSerializer: Json = get()
         val hubConfig: HubConfig = get()
         HttpClient(get<HttpClientEngine>()) {
@@ -83,8 +83,8 @@ val dataModule = module {
             install(Auth) {
                 bearer {
                     loadTokens {
-                        val access = tokenStorage.getAccessToken()
-                        val refresh = tokenStorage.getRefreshToken()
+                        val access = storage.getAccessToken()
+                        val refresh = storage.getRefreshToken()
                         if (access != null) {
                             BearerTokens(accessToken = access, refreshToken = refresh ?: "")
                         } else {
@@ -95,7 +95,7 @@ val dataModule = module {
                 }
             }
             val session: AuthSessionLocalDataSource = get()
-            signOutOnUnauthorized(tokenStorage) { session.raiseSignedOut() }
+            signOutOnUnauthorized(storage) { session.raiseSignedOut() }
         }
     }
     single { AuthSessionLocalDataSource() }

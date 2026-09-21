@@ -19,7 +19,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import org.jetbrains.compose.resources.getString
@@ -31,7 +31,7 @@ class InviteCreateScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun a_name_and_a_tap_produce_a_code_to_read_out() {
@@ -39,7 +39,7 @@ class InviteCreateScreenTest {
         hub.makesInvites(code = "K7M2QP")
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.invite_create_name_label)).performTextInput("Liam")
             onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()
@@ -55,7 +55,7 @@ class InviteCreateScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
 
             onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()
 
@@ -69,7 +69,7 @@ class InviteCreateScreenTest {
         hub.saysTheNameIsTaken()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.invite_create_name_label)).performTextInput("Emma")
             onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()

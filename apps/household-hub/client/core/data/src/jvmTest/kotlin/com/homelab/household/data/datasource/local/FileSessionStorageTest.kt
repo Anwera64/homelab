@@ -6,14 +6,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * The JVM's [TokenLocalDataSource]. A second instance stands in for a restart: what one wrote, the
+ * The JVM's [StoredSessionLocalDataSource]. A second instance stands in for a restart: what one wrote, the
  * next one must read, because that is the whole job.
  */
-class FileTokenStorageTest {
+class FileSessionStorageTest {
 
     private val testDir = "build/test-token-storage"
 
-    private fun storage() = FileTokenStorage(storageDir = testDir)
+    private fun storage() = FileSessionStorage(storageDir = testDir)
 
     @BeforeEach
     fun signedOutToStart() {

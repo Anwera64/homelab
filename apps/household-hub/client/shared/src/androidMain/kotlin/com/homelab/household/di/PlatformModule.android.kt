@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.datasource.local.KeystoreTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.KeystoreSessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import java.time.Duration
@@ -23,5 +23,5 @@ actual val platformModule: Module = module {
             }
         }
     }
-    single<TokenLocalDataSource> { KeystoreTokenStorage(androidContext()) }
+    single<StoredSessionLocalDataSource> { KeystoreSessionStorage(androidContext()) }
 }

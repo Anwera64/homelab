@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.HttpClient
@@ -35,7 +35,7 @@ class KtorLoggingConfigurationTest : KoinTest {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = true)) + module {
                     single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
-                    single<TokenLocalDataSource> { InMemoryTokenStorage() }
+                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
                 }
             )
         }
@@ -51,7 +51,7 @@ class KtorLoggingConfigurationTest : KoinTest {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = false)) + module {
                     single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
-                    single<TokenLocalDataSource> { InMemoryTokenStorage() }
+                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
                 }
             )
         }

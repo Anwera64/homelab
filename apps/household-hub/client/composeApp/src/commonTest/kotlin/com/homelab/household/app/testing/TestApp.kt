@@ -8,8 +8,8 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.platform.LocalExternalApps
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.engine.HttpClientEngine
@@ -36,7 +36,7 @@ const val TEST_HUB_URL = "https://$TEST_HUB_HOST"
 @Composable
 fun TestApp(
     engine: HttpClientEngine,
-    tokenStorage: TokenLocalDataSource = InMemoryTokenStorage(),
+    sessionStorage: StoredSessionLocalDataSource = InMemorySessionStorage(),
     externalApps: ExternalApps = FakeExternalApps(),
     content: @Composable () -> Unit
 ) {
@@ -51,7 +51,7 @@ fun TestApp(
         modules(
             sdkModules(HubConfig(TEST_HUB_URL)) + module {
                 single<HttpClientEngine> { engine }
-                single<TokenLocalDataSource> { tokenStorage }
+                single<StoredSessionLocalDataSource> { sessionStorage }
             }
         )
     }) {

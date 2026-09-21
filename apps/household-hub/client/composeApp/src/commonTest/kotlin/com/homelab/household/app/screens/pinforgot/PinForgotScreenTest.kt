@@ -16,7 +16,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
@@ -29,14 +29,14 @@ class PinForgotScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun it_names_the_housemate_who_can_vouch() {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = {}) } }
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.forgot_ask, "Liam")), timeoutMillis = wait)
             onNodeWithText(getString(Res.string.forgot_alone_title)).assertIsDisplayed()
@@ -49,7 +49,7 @@ class PinForgotScreenTest {
         var code = 0
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = { code++ }) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = { code++ }) } }
 
             onNodeWithText(getString(Res.string.forgot_have_code)).performClick()
             waitUntil(timeoutMillis = wait) { code == 1 }

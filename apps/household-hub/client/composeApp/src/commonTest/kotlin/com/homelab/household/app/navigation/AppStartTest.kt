@@ -5,7 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.ContentType
@@ -48,10 +48,10 @@ class AppStartTest {
 
     @Test
     fun a_phone_still_signed_in_opens_on_home_without_waiting_for_the_hub() {
-        val tokens = InMemoryTokenStorage().apply { saveTokens("token-from-last-time") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("token-from-last-time") }
 
         runScreenTest {
-            setContent { TestApp(hub, tokenStorage = tokens) { AppNavHost(screens = StubScreens()) } }
+            setContent { TestApp(hub, sessionStorage = tokens) { AppNavHost(screens = StubScreens()) } }
 
             waitUntilExactlyOneExists(hasText(StubScreens.HOME), timeoutMillis = WAIT_MILLIS)
         }
@@ -59,10 +59,10 @@ class AppStartTest {
 
     @Test
     fun a_phone_still_signed_in_renews_its_token_once() {
-        val tokens = InMemoryTokenStorage().apply { saveTokens("token-from-last-time") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("token-from-last-time") }
 
         runScreenTest {
-            setContent { TestApp(hubThatRenews(), tokenStorage = tokens) { AppNavHost(screens = StubScreens()) } }
+            setContent { TestApp(hubThatRenews(), sessionStorage = tokens) { AppNavHost(screens = StubScreens()) } }
 
             waitUntil(timeoutMillis = WAIT_MILLIS) { tokens.getAccessToken() == "fresh-token" }
         }
@@ -72,11 +72,11 @@ class AppStartTest {
 
     @Test
     fun a_phone_whose_token_the_hub_no_longer_accepts_goes_to_who_is_here() {
-        val tokens = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
         val refusing = MockEngine { respond("""{"detail":"Invalid or expired token."}""", HttpStatusCode.Unauthorized) }
 
         runScreenTest {
-            setContent { TestApp(refusing, tokenStorage = tokens) { AppNavHost(screens = StubScreens()) } }
+            setContent { TestApp(refusing, sessionStorage = tokens) { AppNavHost(screens = StubScreens()) } }
 
             waitUntilExactlyOneExists(hasText(StubScreens.SIGN_IN), timeoutMillis = WAIT_MILLIS)
         }
@@ -87,7 +87,7 @@ class AppStartTest {
     @Test
     fun a_phone_with_nobody_signed_in_opens_on_launch() {
         runScreenTest {
-            setContent { TestApp(hub, tokenStorage = InMemoryTokenStorage()) { AppNavHost(screens = StubScreens()) } }
+            setContent { TestApp(hub, sessionStorage = InMemorySessionStorage()) { AppNavHost(screens = StubScreens()) } }
 
             waitUntilExactlyOneExists(hasText(StubScreens.LAUNCH), timeoutMillis = WAIT_MILLIS)
         }

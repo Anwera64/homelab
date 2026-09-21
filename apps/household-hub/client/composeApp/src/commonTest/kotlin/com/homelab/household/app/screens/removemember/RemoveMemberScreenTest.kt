@@ -18,7 +18,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
@@ -31,7 +31,7 @@ class RemoveMemberScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun typing_their_name_removes_them() {
@@ -41,7 +41,7 @@ class RemoveMemberScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = { removed++ }) }
+                TestApp(hub.engine, sessionStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = { removed++ }) }
             }
 
             onNodeWithContentDescription(getString(Res.string.remove_confirm_label, "Liam")).performTextInput("Liam")
@@ -56,7 +56,7 @@ class RemoveMemberScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.remove_confirm_label, "Liam")).performTextInput("Li")
             onNodeWithText(getString(Res.string.remove_submit, "Liam")).performClick()

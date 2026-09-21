@@ -4,9 +4,9 @@ import java.io.File
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class FileTokenStorage(
+class FileSessionStorage(
     storageDir: String? = null
-) : TokenLocalDataSource {
+) : StoredSessionLocalDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val tokenFile: File
@@ -32,7 +32,7 @@ class FileTokenStorage(
             if (tokenFile.exists()) {
                 val text = tokenFile.readText()
                 if (text.isNotBlank()) {
-                    val payload = json.decodeFromString<TokenDiskPayload>(text)
+                    val payload = json.decodeFromString<SessionDiskPayload>(text)
                     inMemoryAccessToken = payload.accessToken
                     inMemoryRefreshToken = payload.refreshToken
                 }
@@ -47,7 +47,7 @@ class FileTokenStorage(
             inMemoryRefreshToken = refreshToken
         }
         try {
-            val payload = TokenDiskPayload(
+            val payload = SessionDiskPayload(
                 accessToken = inMemoryAccessToken ?: accessToken,
                 refreshToken = inMemoryRefreshToken
             )

@@ -2,9 +2,9 @@ package com.homelab.household.data.datasource.local
 
 import kotlinx.serialization.Serializable
 
-/** What a persistent [TokenLocalDataSource] writes to disk. */
+/** What a persistent [StoredSessionLocalDataSource] writes to disk. */
 @Serializable
-internal data class TokenDiskPayload(
+internal data class SessionDiskPayload(
     val accessToken: String,
     val refreshToken: String? = null
 )

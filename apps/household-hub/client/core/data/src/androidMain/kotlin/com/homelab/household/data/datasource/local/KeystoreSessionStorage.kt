@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
  * The file lives in `noBackupFilesDir`: Keystore keys never leave the device, so a restored
  * backup could not be decrypted anyway. Anything unreadable is deleted and reads as signed out.
  */
-class KeystoreTokenStorage(context: Context) : TokenLocalDataSource {
+class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
 
     private val tokenFile = File(context.noBackupFilesDir, FILE_NAME)
     private val json = Json { ignoreUnknownKeys = true }
@@ -34,7 +34,7 @@ class KeystoreTokenStorage(context: Context) : TokenLocalDataSource {
             this.refreshToken = refreshToken
         }
         try {
-            write(TokenDiskPayload(accessToken = accessToken, refreshToken = this.refreshToken))
+            write(SessionDiskPayload(accessToken = accessToken, refreshToken = this.refreshToken))
         } catch (_: Exception) {
         }
     }
@@ -68,7 +68,7 @@ class KeystoreTokenStorage(context: Context) : TokenLocalDataSource {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, bytes, 0, IV_LENGTH))
             val plain = cipher.doFinal(bytes, IV_LENGTH, bytes.size - IV_LENGTH)
-            val payload = json.decodeFromString<TokenDiskPayload>(plain.decodeToString())
+            val payload = json.decodeFromString<SessionDiskPayload>(plain.decodeToString())
             accessToken = payload.accessToken
             refreshToken = payload.refreshToken
         } catch (_: Exception) {
@@ -76,7 +76,7 @@ class KeystoreTokenStorage(context: Context) : TokenLocalDataSource {
         }
     }
 
-    private fun write(payload: TokenDiskPayload) {
+    private fun write(payload: SessionDiskPayload) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         val encrypted = cipher.doFinal(json.encodeToString(payload).encodeToByteArray())

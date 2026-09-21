@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.domain.repository.AgentRepository
@@ -53,7 +53,7 @@ class HubAddressWiringTest : KoinTest {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test")) + module {
                     single<HttpClientEngine> { recordingEngine }
-                    single<TokenLocalDataSource> { InMemoryTokenStorage() }
+                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
                 }
             )
         }

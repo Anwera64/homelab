@@ -38,10 +38,10 @@ stays free of platform-only APIs, and a test enforces it.
   `SessionRemoteDataSource`, because `ChatStreamEvent`'s variants are the SSE protocol's `type`
   field one for one.
 
-  Token storage keeps one implementation per platform, all with the same semantics — a `null`
+  Session storage keeps one implementation per platform, all with the same semantics — a `null`
   refresh token leaves the stored one alone, anything unreadable reads as signed out, and nothing
-  throws out of the four methods: `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android,
-  AES-256-GCM key in the Android Keystore, file in `noBackupFilesDir`) and `KeychainTokenStorage`
+  throws out of the four methods: `FileSessionStorage` (JVM), `KeystoreSessionStorage` (Android,
+  AES-256-GCM key in the Android Keystore, file in `noBackupFilesDir`) and `KeychainSessionStorage`
   (iOS, a generic-password item marked `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it
   never syncs to iCloud or restores onto another device — the Apple equivalent of
   `noBackupFilesDir`. It keeps no cache; only the read-modify-write in `saveTokens` needs the
@@ -56,7 +56,7 @@ stays free of platform-only APIs, and a test enforces it.
   user to another app (Tailscale, from the offline screen). Never imports `data`, `di`, `sdk` or
   Ktor — enforced by a test.
 * **`:shared` (DI coordinator):** Koin graph, `platformModule` (`expect`/`actual`: HTTP engine and
-  token storage per platform), `HouseholdHubSdk` entry point, and the architecture tests.
+  session storage per platform), `HouseholdHubSdk` entry point, and the architecture tests.
 * **`:androidApp`:** the Android application — `HouseholdHubApplication` (starts Koin with the
   Android context), `MainActivity` (`installSplashScreen()`, then
   `setContent { App(AndroidExternalApps(this)) }`), the system splash (`Theme.HyggeHub.Starting`:
@@ -220,7 +220,7 @@ cd apps\household-hub\client
 .\gradlew.bat :core:data:jvmEngineDispatcherTest
 
 # On-device tests (needs a running emulator or a phone)
-.\gradlew.bat :core:data:connectedAndroidTest      # Keystore token storage
+.\gradlew.bat :core:data:connectedAndroidTest      # Keystore session storage
 .\gradlew.bat :androidApp:connectedDebugAndroidTest # launch smoke test + SSE streaming proof
 ```
 
@@ -240,7 +240,7 @@ cd apps/household-hub/client
 
 The Keychain is the one thing Gradle cannot test. A bare Kotlin/Native test binary is spawned
 outside the simulator's daemon environment, so every `SecItem*` call returns `errSecNotAvailable`
-(-25291). `KeychainTokenStorage` is covered instead by an XCTest bundle **hosted by the app**,
+(-25291). `KeychainSessionStorage` is covered instead by an XCTest bundle **hosted by the app**,
 which does have the entitlements — run it from Xcode, or:
 
 ```bash

@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.mapper.InviteDataMapper
 import com.homelab.household.data.mapper.PinResetDataMapper
@@ -17,7 +17,7 @@ import com.homelab.household.domain.repository.MembersRepository
  */
 class MembersRepositoryImpl(
     private val remote: MembersRemoteDataSource,
-    private val tokenStorage: TokenLocalDataSource,
+    private val storage: StoredSessionLocalDataSource,
 ) : MembersRepository {
 
     override suspend fun listHouseholdMembers(): List<User> =
@@ -30,7 +30,7 @@ class MembersRepositoryImpl(
         PinResetDataMapper.toDomain(remote.approvePinReset(memberId, ownPin))
 
     override suspend fun changePin(currentPin: String, newPin: String) {
-        tokenStorage.saveTokens(remote.changePin(currentPin, newPin).access_token)
+        storage.saveTokens(remote.changePin(currentPin, newPin).access_token)
     }
 
     override suspend fun removeMember(memberId: String) = remote.removeMember(memberId)

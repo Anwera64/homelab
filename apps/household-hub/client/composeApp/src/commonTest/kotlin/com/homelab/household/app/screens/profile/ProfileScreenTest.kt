@@ -15,7 +15,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,7 +28,7 @@ class ProfileScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun the_only_admin_is_told_they_cannot_leave() {
@@ -36,7 +36,7 @@ class ProfileScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
                     ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = {})
                 }
             }
@@ -53,7 +53,7 @@ class ProfileScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
                     ProfileScreen(onBack = {}, onMembers = { members++ }, onChangePin = {}, onLeave = {}, onSignedOut = {})
                 }
             }
@@ -67,12 +67,12 @@ class ProfileScreenTest {
     @Test
     fun signing_out_forgets_the_token_and_leaves() {
         val hub = FakeMembersHub()
-        val tokens = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
         var signedOut = 0
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = tokens) {
+                TestApp(hub.engine, sessionStorage = tokens) {
                     ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = { signedOut++ })
                 }
             }

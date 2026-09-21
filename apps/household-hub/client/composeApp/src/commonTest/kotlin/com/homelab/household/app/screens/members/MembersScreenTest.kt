@@ -17,7 +17,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +30,7 @@ class MembersScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun the_admin_sees_everyone_and_can_invite_reset_and_remove() {
@@ -40,7 +40,7 @@ class MembersScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
                     MembersScreen(onBack = {}, onInvite = {}, onResetPin = { reset += it }, onRemove = { removed += it })
                 }
             }
@@ -66,7 +66,7 @@ class MembersScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
                     MembersScreen(onBack = {}, onInvite = {}, onResetPin = {}, onRemove = {})
                 }
             }
@@ -84,7 +84,7 @@ class MembersScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = signedIn()) {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
                     MembersScreen(onBack = {}, onInvite = {}, onResetPin = {}, onRemove = {})
                 }
             }

@@ -1,6 +1,6 @@
 package com.homelab.household.data.network
 
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
 import com.homelab.household.data.di.DEFAULT_BASE_URL
@@ -32,8 +32,8 @@ class BearerAuthPropagationTest {
     fun `GIVEN a phone with a kept token WHEN two different calls reach the hub THEN both carry it as a bearer header`() = runTest {
         // GIVEN
         val capturedHeaders = mutableListOf<String?>()
-        val tokenStorage = InMemoryTokenStorage()
-        tokenStorage.saveTokens(accessToken = "bearer-secret-token-abc")
+        val storage = InMemorySessionStorage()
+        storage.saveTokens(accessToken = "bearer-secret-token-abc")
 
         val mockEngine = MockEngine { request ->
             capturedHeaders.add(request.headers[HttpHeaders.Authorization])
@@ -57,7 +57,7 @@ class BearerAuthPropagationTest {
             install(Auth) {
                 bearer {
                     loadTokens {
-                        tokenStorage.getAccessToken()?.let { BearerTokens(accessToken = it, refreshToken = "") }
+                        storage.getAccessToken()?.let { BearerTokens(accessToken = it, refreshToken = "") }
                     }
                     sendWithoutRequest { request -> !request.url.buildString().contains("/auth/") }
                 }

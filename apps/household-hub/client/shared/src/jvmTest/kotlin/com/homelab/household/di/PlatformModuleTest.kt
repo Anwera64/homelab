@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.datasource.local.FileTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.FileSessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIOEngineConfig
@@ -25,6 +25,6 @@ class PlatformModuleTest : KoinTest {
 
         val engine = get<HttpClientEngine>()
         assertTrue(engine.config is CIOEngineConfig, "Expected a CIO engine on the JVM, got ${engine::class.simpleName}")
-        assertTrue(get<TokenLocalDataSource>() is FileTokenStorage)
+        assertTrue(get<StoredSessionLocalDataSource>() is FileSessionStorage)
     }
 }

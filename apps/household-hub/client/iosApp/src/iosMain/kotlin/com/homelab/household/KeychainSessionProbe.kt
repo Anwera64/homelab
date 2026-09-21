@@ -1,10 +1,10 @@
 package com.homelab.household
 
-import com.homelab.household.data.datasource.local.KeychainTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.KeychainSessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 
 /**
- * Test support: the narrowest possible Swift-visible window onto [KeychainTokenStorage].
+ * Test support: the narrowest possible Swift-visible window onto [KeychainSessionStorage].
  *
  * Why it exists at all: the Keychain cannot be proved from a bare Kotlin/Native test binary — one
  * gets `errSecNotAvailable (-25291)`, because Gradle runs it as a plain Mach-O process with no app
@@ -20,14 +20,14 @@ import com.homelab.household.data.datasource.local.TokenLocalDataSource
  * references it) and obvious. Every member below takes and returns only `String`/`Unit`, so no
  * `:core:data` type appears in the exported header either.
  *
- * Each instance wraps its own [KeychainTokenStorage], which is what makes "a second instance reads
+ * Each instance wraps its own [KeychainSessionStorage], which is what makes "a second instance reads
  * what the first wrote" a real assertion about the Keychain rather than about a shared field.
  */
-class KeychainTokenProbe {
+class KeychainSessionProbe {
 
-    private val storage: TokenLocalDataSource = KeychainTokenStorage()
+    private val storage: StoredSessionLocalDataSource = KeychainSessionStorage()
 
-    /** [TokenLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
+    /** [StoredSessionLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
     fun save(accessToken: String, refreshToken: String?) {
         storage.saveTokens(accessToken, refreshToken)
     }
