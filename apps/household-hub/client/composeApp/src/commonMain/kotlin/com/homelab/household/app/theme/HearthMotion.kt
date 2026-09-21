@@ -8,7 +8,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * How long waiting takes, and whether it moves at all (design notes §3, §6.20). Read it from the
+ * How long waiting takes, and whether it moves at all (design notes §3, §6.21). Read it from the
  * theme — `HearthTheme.motion.hold` — for the same reason space and size come through the theme:
  * the four beats of a wait are decided once, so no screen can invent its own.
  *

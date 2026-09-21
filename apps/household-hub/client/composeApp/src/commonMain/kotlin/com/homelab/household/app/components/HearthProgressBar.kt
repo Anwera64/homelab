@@ -33,7 +33,7 @@ enum class HearthProgressBarWidth {
 }
 
 /**
- * The app's one progress bar (design notes §6.20). Launch and the picker drew the same eight lines
+ * The app's one progress bar (design notes §6.21). Launch and the picker drew the same eight lines
  * of `LinearProgressIndicator` byte for byte; this is that, named, with the two other widths the
  * waiting patterns need.
  *

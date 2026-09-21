@@ -36,7 +36,7 @@ const val SkeletonGroupTag = "SkeletonGroup"
 
 /**
  * The blocks that stand where an answer will land while the hub is asked for it (design notes
- * §6.20, pattern 2). Real chrome draws at once; only the part that depends on the answer breathes.
+ * §6.21, pattern 2). Real chrome draws at once; only the part that depends on the answer breathes.
  *
  * The group is what a screen reader hears — once, politely. The blocks inside it are shapes with
  * nothing to say yet, so they are cleared out of the semantics tree entirely rather than read
