@@ -1,7 +1,7 @@
 package com.homelab.household
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.homelab.household.data.remote.DefensiveSseStreamReader
+import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet

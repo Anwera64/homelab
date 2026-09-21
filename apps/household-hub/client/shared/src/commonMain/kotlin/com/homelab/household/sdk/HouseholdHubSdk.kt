@@ -1,7 +1,7 @@
 package com.homelab.household.sdk
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.di.appModules
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin

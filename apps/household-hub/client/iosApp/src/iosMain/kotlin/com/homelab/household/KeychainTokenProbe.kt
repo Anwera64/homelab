@@ -1,7 +1,7 @@
 package com.homelab.household
 
-import com.homelab.household.data.local.KeychainTokenStorage
-import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.datasource.local.KeychainTokenStorage
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 
 /**
  * Test support: the narrowest possible Swift-visible window onto [KeychainTokenStorage].
@@ -25,9 +25,9 @@ import com.homelab.household.data.local.TokenStorage
  */
 class KeychainTokenProbe {
 
-    private val storage: TokenStorage = KeychainTokenStorage()
+    private val storage: TokenLocalDataSource = KeychainTokenStorage()
 
-    /** [TokenStorage.saveTokens]; a null [refreshToken] means "keep the stored one". */
+    /** [TokenLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
     fun save(accessToken: String, refreshToken: String?) {
         storage.saveTokens(accessToken, refreshToken)
     }

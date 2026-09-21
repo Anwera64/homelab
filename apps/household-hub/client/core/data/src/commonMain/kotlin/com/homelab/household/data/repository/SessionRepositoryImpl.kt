@@ -1,266 +1,147 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.dto.ChatMessageReadDto
-import com.homelab.household.data.dto.ChatTurnRequestDto
-import com.homelab.household.data.dto.SessionCreateDto
-import com.homelab.household.data.dto.SessionDetailReadDto
-import com.homelab.household.data.dto.SessionReadDto
-import com.homelab.household.data.dto.SessionSecretToggleDto
-import com.homelab.household.data.dto.ToolApprovalRequestDto
-import com.homelab.household.data.dto.ToolApprovalResponseDto
+import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.mapper.ChatMessageDataMapper
 import com.homelab.household.data.mapper.SessionDataMapper
-import com.homelab.household.data.remote.DefensiveSseStreamReader
-import com.homelab.household.data.remote.NetworkExceptionHelper
 import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.repository.SessionRepository
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.delete
-import io.ktor.client.request.get
-import io.ktor.client.request.patch
-import io.ktor.client.request.post
-import io.ktor.client.request.preparePost
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
-import io.ktor.http.isSuccess
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.Channel
+import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 
+/**
+ * Orchestration and mapping for conversations, plus the one real policy in the module: what to do
+ * when the hub says it is already working on a turn for this conversation.
+ *
+ * Nothing here crosses a dispatcher — the streamed turn's awkwardness lives entirely in
+ * `KtorSessionRemoteDataSource.openChatStream` — so every `delay` below runs on the caller's clock,
+ * which under test is `runTest`'s virtual one.
+ */
 class SessionRepositoryImpl(
-    private val client: HttpClient,
-    private val baseUrl: String,
+    private val remote: SessionRemoteDataSource,
+    private val cache: SessionCacheLocalDataSource,
     private val pollDelayMs: Long = 1000L,
-    private val sseStreamReader: DefensiveSseStreamReader = DefensiveSseStreamReader()
 ) : SessionRepository {
 
-    private val lockedSecretSessions = mutableSetOf<String>()
-    private val sessionMessagesCache = mutableMapOf<String, MutableStateFlow<List<ChatMessage>>>()
-
-    override suspend fun listSessions(): List<ConversationSession> {
-        return try {
-            val dtoList = client.get("$baseUrl/api/v1/sessions").body<List<SessionReadDto>>()
-            dtoList.map { dto ->
-                val session = SessionDataMapper.toDomain(dto)
-                if (session.isSecret && lockedSecretSessions.contains(session.id)) {
-                    session.copy(isSecretLocked = true)
-                } else {
-                    session
-                }
-            }
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
+    override suspend fun listSessions(): List<ConversationSession> =
+        remote.listSessions().map { SessionDataMapper.toDomain(it).withLockState() }
 
     override suspend fun getSession(sessionId: String): Pair<ConversationSession, List<ChatMessage>> {
-        return try {
-            val detailDto = client.get("$baseUrl/api/v1/sessions/$sessionId").body<SessionDetailReadDto>()
-            val session = SessionDataMapper.toDomain(detailDto)
-            val mappedSession = if (session.isSecret && lockedSecretSessions.contains(session.id)) {
-                session.copy(isSecretLocked = true)
-            } else {
-                session
-            }
-            val messages = detailDto.messages.map { ChatMessageDataMapper.toDomain(it) }
-            getOrCreateMessageFlow(sessionId).value = messages
-            Pair(mappedSession, messages)
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
+        val detail = remote.fetchSession(sessionId)
+        cache.cacheMessages(sessionId, detail.messages)
+        return SessionDataMapper.toDomain(detail).withLockState() to
+            detail.messages.map(ChatMessageDataMapper::toDomain)
     }
 
-    override suspend fun createSession(
-        agentId: String,
-        title: String,
-        isSecret: Boolean
-    ): ConversationSession {
-        return try {
-            val response = client.post("$baseUrl/api/v1/sessions") {
-                contentType(ContentType.Application.Json)
-                setBody(SessionCreateDto(agent_id = agentId, title = title, is_secret = isSecret))
-            }.body<SessionReadDto>()
-            SessionDataMapper.toDomain(response)
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
+    override suspend fun createSession(agentId: String, title: String, isSecret: Boolean): ConversationSession =
+        SessionDataMapper.toDomain(remote.createSession(agentId, title, isSecret))
 
-    override suspend fun archiveSession(sessionId: String) {
-        try {
-            client.post("$baseUrl/api/v1/sessions/$sessionId/archive")
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
+    override suspend fun archiveSession(sessionId: String) = remote.archiveSession(sessionId)
 
-    override suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): ConversationSession {
-        return try {
-            val response = client.patch("$baseUrl/api/v1/sessions/$sessionId/secret") {
-                contentType(ContentType.Application.Json)
-                setBody(SessionSecretToggleDto(is_secret = isSecret))
-            }.body<SessionReadDto>()
-            SessionDataMapper.toDomain(response)
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
+    override suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): ConversationSession =
+        SessionDataMapper.toDomain(remote.toggleSecretMode(sessionId, isSecret))
 
-    override suspend fun deleteSession(sessionId: String) {
-        try {
-            client.delete("$baseUrl/api/v1/sessions/$sessionId")
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
-
-    override fun streamChatTurn(
-        sessionId: String,
-        content: String,
-        autoApproveWrites: Boolean
-    ): Flow<ChatStreamEvent> = channelFlow {
-        try {
-            val statement = client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
-                contentType(ContentType.Application.Json)
-                setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
-            }
-
-            // `statement.execute` runs its block on the engine's dispatcher on every non-JVM target
-            // (Ktor's `useEngineDispatcher` is unconditionally true there, and becomes so everywhere
-            // in Ktor 4). `Flow.emit` may not cross a dispatcher boundary, so the producer is a
-            // `channelFlow` and events leave the block via `send`, which is context-agnostic.
-            statement.execute { response ->
-                when (response.status) {
-                    HttpStatusCode.OK -> {
-                        val channel = response.bodyAsChannel()
-                        sseStreamReader.readEvents(channel).collect { event ->
-                            send(event)
-                        }
-                    }
-                    HttpStatusCode.Conflict -> {
-                        // 409 Conflict: Background worker is busy or session locked -> self-healing polling
-                        pollUntilFinished(sessionId).collect { event ->
-                            send(event)
-                        }
-                    }
-                    else -> {
-                        throw IllegalStateException("Unexpected status ${response.status}")
-                    }
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-        // RENDEZVOUS keeps the lock-step back pressure the previous `flow { emit(...) }` had.
-    }.buffer(Channel.RENDEZVOUS)
-
-    private fun pollUntilFinished(sessionId: String): Flow<ChatStreamEvent> = channelFlow {
-        var delayMs = pollDelayMs
-        var elapsedMs = 0L
-        val maxWaitMs = 60_000L
-        var completed = false
-
-        while (!completed && elapsedMs < maxWaitMs) {
-            var doneEvent: ChatStreamEvent.Done? = null
-            delay(delayMs)
-            elapsedMs += delayMs
-            delayMs = (delayMs * 1.5).toLong()
-
-            try {
-                val sessionDetail = client.get("$baseUrl/api/v1/sessions/$sessionId")
-                    .body<SessionDetailReadDto>()
-                val messages = sessionDetail.messages
-                val lastAssistant = messages.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
-                if (lastAssistant != null) {
-                    doneEvent = ChatStreamEvent.Done(
-                        messageId = lastAssistant.id,
-                        assistantContent = lastAssistant.content,
-                        agentName = "Assistant"
-                    )
-                    completed = true
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                if (NetworkExceptionHelper.isNetworkOfflineException(e)) {
-                    throw ServerOfflineException(message = "Server connection lost while polling", cause = e)
-                }
-            }
-
-            doneEvent?.let { send(it) }
-        }
-
-        if (!completed) {
-            throw DomainException("Session inference recovery timed out after 60s")
-        }
-    }.buffer(Channel.RENDEZVOUS)
+    override suspend fun deleteSession(sessionId: String) = remote.deleteSession(sessionId)
 
     override suspend fun approveToolProposal(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>?
-    ): Boolean {
-        return try {
-            val response = client.post("$baseUrl/api/v1/sessions/$sessionId/tools/approve") {
-                contentType(ContentType.Application.Json)
-                setBody(
-                    ToolApprovalRequestDto(
-                        tool_call_id = toolCallId,
-                        approved = approved
-                    )
-                )
-            }
-            response.status.isSuccess()
-        } catch (e: Exception) {
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }
+        modifiedArguments: Map<String, Any?>?,
+    ): Boolean = remote.approveToolProposal(sessionId, toolCallId, approved)
 
     override suspend fun lockAllSecretSessions(): Int {
-        val allSessions = listSessions()
-        val secretSessions = allSessions.filter { it.isSecret }
-        secretSessions.forEach { lockedSecretSessions.add(it.id) }
-        return secretSessions.size
+        val secret = remote.listSessions().filter { it.is_secret }.map { it.id }
+        cache.lockSecretSessions(secret)
+        return secret.size
     }
 
-    override suspend fun unlockSecretSession(sessionId: String, pinOrPassword: String): Boolean {
-        if (pinOrPassword.isNotBlank()) {
-            lockedSecretSessions.remove(sessionId)
-            return true
-        }
-        return false
-    }
+    /**
+     * [pinOrPassword] is accepted and dropped. That is deliberate and temporary: stage 5 slice 5
+     * sends it to `POST /auth/unlock-secret` and keeps the `secret_read` token the hub returns
+     * (`docs/STAGE_5_SECRET_SESSION_LOCKING.md` §5). What it must *not* do is check the PIN here —
+     * the old version returned true for any non-blank string, which read like verification and was
+     * not.
+     */
+    override suspend fun unlockSecretSession(sessionId: String, pinOrPassword: String): Boolean =
+        cache.unlockSecretSession(sessionId)
 
-    override fun observeMessages(sessionId: String): Flow<List<ChatMessage>> {
-        return getOrCreateMessageFlow(sessionId)
-    }
+    override fun observeMessages(sessionId: String): Flow<List<ChatMessage>> =
+        cache.observeMessages(sessionId).map { it.map(ChatMessageDataMapper::toDomain) }
 
     override suspend fun retryMessage(messageId: String): Flow<ChatStreamEvent> {
-        val entry = sessionMessagesCache.entries.firstOrNull { (_, flow) ->
-            flow.value.any { it.id == messageId }
-        } ?: throw DomainException("Message with id $messageId not found to retry")
-
-        val sessionId = entry.key
-        val message = entry.value.value.first { it.id == messageId }
+        val (sessionId, message) = cache.sessionHolding(messageId)
+            ?: throw DomainException("Message with id $messageId not found to retry")
         return streamChatTurn(sessionId = sessionId, content = message.content)
     }
 
-    private fun getOrCreateMessageFlow(sessionId: String): MutableStateFlow<List<ChatMessage>> {
-        return sessionMessagesCache.getOrPut(sessionId) { MutableStateFlow(emptyList()) }
+    /**
+     * `catch` only sees failures from upstream, so a conflict from the hub starts the recovery while
+     * a failure in whoever is collecting still reaches them untouched.
+     */
+    override fun streamChatTurn(
+        sessionId: String,
+        content: String,
+        autoApproveWrites: Boolean,
+    ): Flow<ChatStreamEvent> =
+        remote.openChatStream(sessionId, content, autoApproveWrites)
+            .catch { cause ->
+                if (cause is SessionConflictException) emitAll(recoverReply(sessionId)) else throw cause
+            }
+
+    /**
+     * The hub was busy, so the turn was never streamed. Read the conversation back, waiting longer
+     * each time, until the agent's reply has landed — then report it as the [ChatStreamEvent.Done]
+     * the collector was waiting for. A refusal along the way is not the end of the turn and is
+     * ignored, but a hub that has gone away is worth saying out loud.
+     */
+    private fun recoverReply(sessionId: String): Flow<ChatStreamEvent> = flow {
+        var wait = pollDelayMs
+        var waited = 0L
+
+        while (waited < MAX_RECOVERY_WAIT_MS) {
+            delay(wait)
+            waited += wait
+            wait = (wait * 1.5).toLong()
+
+            val detail = runCatchingSafe { remote.fetchSession(sessionId) }
+                .onFailure { failure ->
+                    if (failure is ServerOfflineException) {
+                        throw ServerOfflineException(message = "Server connection lost while polling", cause = failure)
+                    }
+                }
+                .getOrNull()
+
+            val reply = detail?.messages?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
+            if (reply != null) {
+                emit(
+                    ChatStreamEvent.Done(
+                        messageId = reply.id,
+                        assistantContent = reply.content,
+                        agentName = "Assistant",
+                    )
+                )
+                return@flow
+            }
+        }
+
+        throw DomainException("Session inference recovery timed out after ${MAX_RECOVERY_WAIT_MS / 1000}s")
+    }
+
+    private fun ConversationSession.withLockState(): ConversationSession =
+        if (isSecret && cache.isLocked(id)) copy(isSecretLocked = true) else this
+
+    private companion object {
+        const val MAX_RECOVERY_WAIT_MS = 60_000L
     }
 }

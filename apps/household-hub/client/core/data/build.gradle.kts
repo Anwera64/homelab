@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.kotlin.multiplatform.library)
+    // A repository's collaborators are data sources, and these are how they are mocked — a compiler
+    // plugin rather than a bytecode rewriter, so the same tests run on iOS. Matches :core:domain.
+    alias(libs.plugins.mokkery)
 }
 
 val generateBuildConfig = tasks.register("generateBuildConfig") {

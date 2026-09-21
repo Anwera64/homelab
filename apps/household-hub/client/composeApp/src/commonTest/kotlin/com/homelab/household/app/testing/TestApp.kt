@@ -9,9 +9,9 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.platform.LocalExternalApps
 import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.data.local.InMemoryTokenStorage
-import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.HubConfig
+import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.network.HubConfig
 import com.homelab.household.sdk.sdkModules
 import io.ktor.client.engine.HttpClientEngine
 import org.koin.compose.KoinApplication
@@ -32,7 +32,7 @@ const val TEST_HUB_URL = "https://$TEST_HUB_HOST"
 @Composable
 fun TestApp(
     engine: HttpClientEngine,
-    tokenStorage: TokenStorage = InMemoryTokenStorage(),
+    tokenStorage: TokenLocalDataSource = InMemoryTokenStorage(),
     externalApps: ExternalApps = FakeExternalApps(),
     content: @Composable () -> Unit
 ) {
@@ -47,7 +47,7 @@ fun TestApp(
         modules(
             sdkModules(HubConfig(TEST_HUB_URL)) + module {
                 single<HttpClientEngine> { engine }
-                single<TokenStorage> { tokenStorage }
+                single<TokenLocalDataSource> { tokenStorage }
             }
         )
     }) {

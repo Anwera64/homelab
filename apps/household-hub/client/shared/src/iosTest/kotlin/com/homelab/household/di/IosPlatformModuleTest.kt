@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.local.KeychainTokenStorage
-import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.datasource.local.KeychainTokenStorage
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.GossipRepository
@@ -20,13 +20,13 @@ import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.DarwinClientEngineConfig
-import org.koin.core.context.stopKoin
-import org.koin.test.KoinTest
-import org.koin.test.get
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.koin.core.context.stopKoin
+import org.koin.test.KoinTest
+import org.koin.test.get
 
 class IosPlatformModuleTest : KoinTest {
 
@@ -44,7 +44,7 @@ class IosPlatformModuleTest : KoinTest {
             engine.config is DarwinClientEngineConfig,
             "Expected a Darwin engine on iOS, got ${engine::class.simpleName}"
         )
-        assertTrue(get<TokenStorage>() is KeychainTokenStorage)
+        assertTrue(get<TokenLocalDataSource>() is KeychainTokenStorage)
     }
 
     @Test
@@ -55,7 +55,7 @@ class IosPlatformModuleTest : KoinTest {
 
         // Platform
         assertNotNull(get<HttpClientEngine>())
-        assertNotNull(get<TokenStorage>())
+        assertNotNull(get<TokenLocalDataSource>())
 
         // Repositories
         assertNotNull(get<AuthRepository>())

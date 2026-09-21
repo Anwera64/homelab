@@ -1,13 +1,30 @@
 package com.homelab.household.data.di
 
-import com.homelab.household.data.local.TokenStorage
-import com.homelab.household.data.remote.DefensiveSseStreamReader
-import com.homelab.household.data.remote.HubConfig
-import com.homelab.household.data.remote.KermitKtorLogger
-import com.homelab.household.data.remote.PublicEndpoints
-import com.homelab.household.data.remote.ServerHealthMonitor
-import com.homelab.household.data.remote.SignedOutSignal
-import com.homelab.household.data.remote.signOutOnUnauthorized
+import com.homelab.household.data.BuildConfig
+import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorMembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorSessionRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
+import com.homelab.household.data.network.HubConfig
+import com.homelab.household.data.network.KermitKtorLogger
+import com.homelab.household.data.network.PublicEndpoints
+import com.homelab.household.data.network.signOutOnUnauthorized
+import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
@@ -24,7 +41,6 @@ import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
-import com.homelab.household.data.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.auth.Auth
@@ -49,7 +65,7 @@ val dataModule = module {
     }
 
     single {
-        val tokenStorage: TokenStorage = get()
+        val tokenStorage: TokenLocalDataSource = get()
         val jsonSerializer: Json = get()
         val hubConfig: HubConfig = get()
         HttpClient(get<HttpClientEngine>()) {
@@ -78,20 +94,28 @@ val dataModule = module {
                     sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
             }
-            val signedOut: SignedOutSignal = get()
-            signOutOnUnauthorized(tokenStorage) { signedOut.raise() }
+            val session: AuthSessionLocalDataSource = get()
+            signOutOnUnauthorized(tokenStorage) { session.raiseSignedOut() }
         }
     }
-    single { SignedOutSignal() }
+    single { AuthSessionLocalDataSource() }
+    single { SessionCacheLocalDataSource() }
+    single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<AgentRemoteDataSource> { KtorAgentRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<SpaceRemoteDataSource> { KtorSpaceRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single { DefensiveSseStreamReader(get()) }
-    single { ServerHealthMonitor(get(), get<HubConfig>().baseUrl) }
+    single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+    single<SessionRemoteDataSource> { KtorSessionRemoteDataSource(get(), get<HubConfig>().baseUrl, get()) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get<HubConfig>().baseUrl, get()) }
-    single<MembersRepository> { MembersRepositoryImpl(get(), get(), get<HubConfig>().baseUrl) }
-    single<SessionRepository> { SessionRepositoryImpl(get(), get<HubConfig>().baseUrl, 1000L, get()) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
+    single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
+    single<SessionRepository> { SessionRepositoryImpl(get(), get()) }
     single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
-    single<AgentRepository> { AgentRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<SpaceRepository> { SpaceRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<MemoryRepository> { MemoryRepositoryImpl(get(), get<HubConfig>().baseUrl) }
-    single<GossipRepository> { GossipRepositoryImpl(get(), get<HubConfig>().baseUrl) }
+    single<AgentRepository> { AgentRepositoryImpl(get()) }
+    single<SpaceRepository> { SpaceRepositoryImpl(get()) }
+    single<MemoryRepository> { MemoryRepositoryImpl(get()) }
+    single<GossipRepository> { GossipRepositoryImpl(get()) }
 }

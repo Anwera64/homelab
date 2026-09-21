@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.local.KeychainTokenStorage
-import com.homelab.household.data.local.TokenStorage
+import com.homelab.household.data.datasource.local.KeychainTokenStorage
+import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
 import org.koin.core.module.Module
@@ -20,5 +20,5 @@ actual val platformModule: Module = module {
             }
         }
     }
-    single<TokenStorage> { KeychainTokenStorage() }
+    single<TokenLocalDataSource> { KeychainTokenStorage() }
 }

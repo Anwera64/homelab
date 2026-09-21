@@ -20,19 +20,32 @@ stays free of platform-only APIs, and a test enforces it.
 
 * **`:core:domain` (pure Kotlin core):** entities, repository protocols, use cases. Zero dependencies
   on Android, JVM, Ktor, serialization or UI frameworks.
-* **`:core:data` (network & persistence):** depends only on `:core:domain`.
-  * Ktor client with `ContentNegotiation`, `Logging` and preemptive Bearer `Auth`.
-  * `DefensiveSseStreamReader` — token-by-token SSE with prompt-delimiter sanitisation.
-  * `ServerHealthMonitor`, `NetworkExceptionHelper` (`rethrowAsDomain` maps network failures to
-    `ServerOfflineException`), repositories and mappers.
-  * `HubConfig` — the one hub address, injected; no repository defaults it any more.
-  * Token storage, one per platform, all with the same semantics — a `null` refresh token leaves the
-    stored one alone, anything unreadable reads as signed out, and nothing throws out of the four
-    methods: `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android, AES-256-GCM key in the
-    Android Keystore, file in `noBackupFilesDir`) and `KeychainTokenStorage` (iOS, a generic-password
-    item marked `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it never syncs to iCloud or
-    restores onto another device — the Apple equivalent of `noBackupFilesDir`. It keeps no cache;
-    only the read-modify-write in `saveTokens` needs the `NSLock`).
+* **`:core:data` (network & persistence):** depends only on `:core:domain`. **A repository never
+  does the call itself** — it orchestrates data sources and maps what they return, and
+  `DataLayerBoundaryTest` fails the build if one reaches for Ktor.
+
+  | Package | What lives there |
+  | :--- | :--- |
+  | `network/` | The HTTP plumbing, and the only place outside `datasource/remote/` that holds Ktor: `HubConfig` (the one hub address, injected), `KermitKtorLogger`, `PublicEndpoints`, `signOutOnUnauthorized`, `NetworkExceptionHelper`, and `HubResponse` — `reachingHub`, `ensureJsonSuccess`, `throwIfSignInRefused`, `throwIfPinRefused`, `codeGuessesLocked`, which is where every one of the hub's answers becomes a domain exception, named once. |
+  | `datasource/remote/` | One `<X>RemoteDataSource` protocol and one `Ktor<X>...` implementation each for auth, members, sessions, agents, spaces, memories, gossip and server status. A call in, a DTO out. `sse/DefensiveSseStreamReader` — token-by-token SSE with prompt-delimiter sanitisation — belongs to the session one. |
+  | `datasource/local/` | What the phone keeps: `TokenLocalDataSource` (one implementation per platform), `AuthSessionLocalDataSource` (who is signed in, and the sign-out relay), `SessionCacheLocalDataSource` (each conversation's messages, and which secret ones are locked). |
+  | `repository/` | Orchestration and mapping. Zero Ktor imports. |
+
+  **DTOs below the repository, domain models above it** — a data source speaks `dto/` and throws
+  domain exceptions, and `mapper/` turns one into the other in the repository. Two data sources are
+  exempt, each for a reason written in the file: `ServerStatusRemoteDataSource`, because "is the hub
+  reachable?" has no failure case and `ServerStatus` already *is* the answer; and
+  `SessionRemoteDataSource`, because `ChatStreamEvent`'s variants are the SSE protocol's `type`
+  field one for one.
+
+  Token storage keeps one implementation per platform, all with the same semantics — a `null`
+  refresh token leaves the stored one alone, anything unreadable reads as signed out, and nothing
+  throws out of the four methods: `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android,
+  AES-256-GCM key in the Android Keystore, file in `noBackupFilesDir`) and `KeychainTokenStorage`
+  (iOS, a generic-password item marked `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it
+  never syncs to iCloud or restores onto another device — the Apple equivalent of
+  `noBackupFilesDir`. It keeps no cache; only the read-modify-write in `saveTokens` needs the
+  `NSLock`).
 * **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
   screen (`presentation/launch/`, `firstrun/`, `profilepicker/`, `pinentry/`), each holding that
   screen's `ViewModel`, its `UiState` and its `Event` — for example `LaunchViewModel` with
@@ -243,6 +256,12 @@ engine, the real `SessionRepositoryImpl.streamChatTurn`, collected off the engin
 delta N+1 until the client has acked delta N over a second connection, so a buffering engine
 deadlocks rather than passing by luck. `DarwinSseLongPauseTest` outlasts NSURLSession's 60-second
 default `timeoutIntervalForRequest`, which is why it cannot be made cheap.
+
+`DataLayerBoundaryTest` enforces the rule inside `:core:data` that the layer boundaries cannot
+see: a repository never holds an `HttpClient`, Ktor stays inside `datasource/` and `network/`, and
+a data source returns DTOs rather than domain models. It is what keeps repository tests mockable —
+they run against Mokkery fakes with no engine, no HTTP and no scheduling to race, while the wire is
+covered a level down in `Ktor<X>RemoteDataSourceTest`.
 
 The architecture tests enforce: domain has no outward dependencies; presentation never imports data;
 data never imports presentation; `commonMain` has no `java.`/`javax.`/`android.`/`platform.`/engine
