@@ -554,7 +554,7 @@ The agent pill greys in the offline conversation on purpose — the agent list c
 
 #### This needs a client database that does not exist
 
-:core:data/local/ holds FileTokenStorage, InMemoryTokenStorage and TokenStorage — nothing else. No SQLDelight, Room or DataStore in any build file. The SQLite DB is the BACKEND's; the client caches only the auth token.
+:core:data/local/ holds StoredSessionLocalDataSource and its per-platform implementations — nothing else. No SQLDelight, Room or DataStore in any build file. The SQLite DB is the BACKEND's; the client keeps only the auth token and the member it belongs to, which is what lets the profile draw itself offline and nothing more.
 
 So offline reading is net-new work: a cache for sessions, messages, members, spaces and events, plus a written-at timestamp per record to drive the banner.
 

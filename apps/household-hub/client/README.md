@@ -28,7 +28,7 @@ stays free of platform-only APIs, and a test enforces it.
   | :--- | :--- |
   | `network/` | The HTTP plumbing, and the only place outside `datasource/remote/` that holds Ktor: `HubConfig` (the one hub address, injected), `KermitKtorLogger`, `PublicEndpoints`, `signOutOnUnauthorized`, `NetworkExceptionHelper`, and `HubResponse` — `reachingHub`, `ensureJsonSuccess`, `throwIfSignInRefused`, `throwIfPinRefused`, `codeGuessesLocked`, which is where every one of the hub's answers becomes a domain exception, named once. |
   | `datasource/remote/` | One `<X>RemoteDataSource` protocol and one `Ktor<X>...` implementation each for auth, members, sessions, agents, spaces, memories, gossip and server status. A call in, a DTO out. `sse/DefensiveSseStreamReader` — token-by-token SSE with prompt-delimiter sanitisation — belongs to the session one. |
-  | `datasource/local/` | What the phone keeps: `TokenLocalDataSource` (one implementation per platform), `AuthSessionLocalDataSource` (who is signed in, and the sign-out relay), `SessionCacheLocalDataSource` (each conversation's messages, and which secret ones are locked). |
+  | `datasource/local/` | What the phone keeps: `StoredSessionLocalDataSource` (the token and the member it belongs to, one implementation per platform), `AuthEventsLocalDataSource` (the sign-out relay), `SessionCacheLocalDataSource` (each conversation's messages, and which secret ones are locked). |
   | `repository/` | Orchestration and mapping. Zero Ktor imports. |
 
   **DTOs below the repository, domain models above it** — a data source speaks `dto/` and throws
@@ -38,14 +38,19 @@ stays free of platform-only APIs, and a test enforces it.
   `SessionRemoteDataSource`, because `ChatStreamEvent`'s variants are the SSE protocol's `type`
   field one for one.
 
-  Session storage keeps one implementation per platform, all with the same semantics — a `null`
-  refresh token leaves the stored one alone, anything unreadable reads as signed out, and nothing
-  throws out of the four methods: `FileSessionStorage` (JVM), `KeystoreSessionStorage` (Android,
-  AES-256-GCM key in the Android Keystore, file in `noBackupFilesDir`) and `KeychainSessionStorage`
-  (iOS, a generic-password item marked `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it
-  never syncs to iCloud or restores onto another device — the Apple equivalent of
-  `noBackupFilesDir`. It keeps no cache; only the read-modify-write in `saveTokens` needs the
-  `NSLock`).
+  Session storage holds the token **and the member the hub last said it belongs to**, in one item,
+  with one implementation per platform and all the same semantics — a `null` refresh token leaves
+  the stored one alone, saving a token never disturbs the stored member, `clear()` wipes both,
+  anything unreadable reads as signed out, and nothing throws: `FileSessionStorage` (JVM),
+  `KeystoreSessionStorage` (Android, AES-256-GCM key in the Android Keystore, file in
+  `noBackupFilesDir`) and `KeychainSessionStorage` (iOS, a generic-password item marked
+  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` so it never syncs to iCloud or restores onto
+  another device — the Apple equivalent of `noBackupFilesDir`. It keeps no cache; the
+  read-modify-writes in `saveTokens` and `saveUser` need the `NSLock`).
+
+  The member is kept there, rather than in memory, because the profile has to draw a name and a
+  colour on a cold start with no hub to ask — `getCurrentUser()` reads the phone, and asks the hub
+  only when there is a token with no member beside it.
 * **`:core:presentation` (state & ViewModels):** depends only on `:core:domain`. One package per
   screen (`presentation/launch/`, `firstrun/`, `profilepicker/`, `pinentry/`), each holding that
   screen's `ViewModel`, its `UiState` and its `Event` — for example `LaunchViewModel` with

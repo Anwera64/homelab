@@ -48,7 +48,7 @@ No features; everything after this builds on it.
 
 - **Targets.** ✅ Done. Every client module builds for the JVM, Android, `iosArm64` and `iosSimulatorArm64`.
 - **Networking.** ✅ Done. The engine sits behind a platform seam: OkHttp on Android, CIO on the JVM, Darwin on iOS. Token-by-token SSE is proven on both — on iOS by a lock-step test that a buffering engine cannot pass.
-- **Token storage.** ✅ Done. `FileTokenStorage` (JVM), `KeystoreTokenStorage` (Android), `KeychainTokenStorage` (iOS).
+- **Session storage.** ✅ Done. The token and the signed-in member, in one item per platform: `FileSessionStorage` (JVM), `KeystoreSessionStorage` (Android), `KeychainSessionStorage` (iOS).
 - **Hub address.** `DEFAULT_BASE_URL` is hard-coded to `https://hub.spicy-llama.duckdns.org` in `DataModule`, and also defaulted inside several repositories. Keep it for now; make it one value.
 - **`:composeApp`.** A Kotlin Multiplatform library with the screens, theme and navigation, wired to Koin through `HouseholdHubSdk`.
 - **`:androidApp`.** The Android application module: `MainActivity`, SDK initialisation, `setContent { App() }`.
@@ -159,7 +159,7 @@ lock-step fixture that refuses to send delta N+1 until the client acks delta N �
 deadlocks rather than passing by luck. "iOS drifts while Android leads" cost the two violations above
 and nothing more.
 
-**Still open:** `KeychainTokenStorage` is covered by an XCTest hosted by the app bundle, because a
+**Still open:** `KeychainSessionStorage` is covered by an XCTest hosted by the app bundle, because a
 bare Kotlin/Native test binary cannot reach the Keychain at all (`errSecNotAvailable`). A real device
 run, signing, and the local-network permission for the hub's LAN address remain untried.
 
