@@ -15,6 +15,13 @@ class InviteCreateUiStateProvider : PreviewParameterProvider<InviteCreateUiState
         "Empty" to InviteCreateUiState(),
         "A name, no code yet" to InviteCreateUiState(name = "Liam"),
         "Joining as an admin" to InviteCreateUiState(name = "Noor", isAdmin = true),
+        "Making the first code" to InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating),
+        "Making a second code" to InviteCreateUiState(
+            name = "Liam",
+            invite = invite,
+            secondsLeft = 892,
+            status = InviteCreateStatus.Creating
+        ),
         "Code to read out" to InviteCreateUiState(name = "Liam", invite = invite, secondsLeft = 892),
         "Code expired" to InviteCreateUiState(
             name = "Liam",

@@ -10,6 +10,7 @@ class LeaveHouseholdUiStateProvider : PreviewParameterProvider<LeaveHouseholdUiS
     private val named = listOf(
         "Asking for your PIN" to LeaveHouseholdUiState(),
         "PIN typed" to LeaveHouseholdUiState(pin = "135790"),
+        "Deleting your account" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
         "Wrong PIN" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.WrongPin(attemptsLeft = 4)),
         "The only admin" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.SoleAdmin),
         "Locked" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.Locked(secondsLeft = 30)),

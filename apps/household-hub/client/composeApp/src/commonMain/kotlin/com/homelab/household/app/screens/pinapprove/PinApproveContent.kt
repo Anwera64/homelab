@@ -22,14 +22,17 @@ import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_approve_checking
 import com.homelab.household.app.resources.approve_agree_access
 import com.homelab.household.app.resources.approve_agree_label
 import com.homelab.household.app.resources.approve_agree_limit
 import com.homelab.household.app.resources.approve_back
 import com.homelab.household.app.resources.approve_cancel
+import com.homelab.household.app.resources.approve_checking
 import com.homelab.household.app.resources.approve_code_instruction
 import com.homelab.household.app.resources.approve_code_label
 import com.homelab.household.app.resources.approve_detail
@@ -43,7 +46,9 @@ import com.homelab.household.app.resources.invite_create_expires
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.asCountdown
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.pinapprove.PinApproveStatus
 import com.homelab.household.presentation.pinapprove.PinApproveUiState
 import org.jetbrains.compose.resources.stringResource
@@ -62,6 +67,9 @@ fun PinApproveContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == PinApproveStatus.Checking)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val approved = state.status as? PinApproveStatus.Approved
@@ -76,8 +84,12 @@ fun PinApproveContent(
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
                 ) {
                     PrimaryButton(
-                        text = stringResource(Res.string.approve_generate),
+                        text = stringResource(
+                            if (waiting) Res.string.approve_checking else Res.string.approve_generate
+                        ),
                         onClick = onApprove,
+                        busy = waiting,
+                        busyDescription = stringResource(Res.string.a11y_approve_checking),
                         modifier = Modifier.fillMaxWidth()
                     )
                     SecondaryButton(
@@ -85,6 +97,7 @@ fun PinApproveContent(
                         onClick = onBack,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    SlowLine(wait)
                 }
             }
         }

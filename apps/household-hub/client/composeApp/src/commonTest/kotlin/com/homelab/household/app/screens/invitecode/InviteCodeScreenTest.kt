@@ -1,18 +1,29 @@
 package com.homelab.household.app.screens.invitecode
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_invite_code_checking
+import com.homelab.household.app.resources.invite_code_checking
+import com.homelab.household.app.resources.invite_code_continue
 import com.homelab.household.app.resources.invite_code_title
 import com.homelab.household.app.testing.FakeJoinHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.InvitePreview
-import org.jetbrains.compose.resources.getString
+import com.homelab.household.presentation.invitecode.InviteCodeStatus
+import com.homelab.household.presentation.invitecode.InviteCodeUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.jetbrains.compose.resources.getString
 
 /** Entering an invite code, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
@@ -114,6 +125,37 @@ class InviteCodeScreenTest {
             onInviteCode { tapsBack() }
             waitUntil(timeoutMillis = WAIT_MILLIS) { back == 1 }
         }
+    }
+
+    /**
+     * The tapped button carries the wait: its label becomes the verb in progress, a bar runs along
+     * its bottom edge, and a screen reader hears what is being checked rather than "Working".
+     * Nothing is dimmed — the button stays enabled and at full colour (design notes §2).
+     */
+    @Test
+    fun checking_the_code_shows_on_the_button_that_asked() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                InviteCodeContent(
+                    state = InviteCodeUiState(code = "K7M2QP", status = InviteCodeStatus.Checking),
+                    onCodeChange = {},
+                    onContinue = {},
+                    onPaste = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        onNodeWithText(getString(Res.string.invite_code_checking))
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_invite_code_checking)
+                )
+            )
+        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
     }
 
     @Test

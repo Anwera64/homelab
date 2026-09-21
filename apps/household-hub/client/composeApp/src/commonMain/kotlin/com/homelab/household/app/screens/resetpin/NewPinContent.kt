@@ -13,7 +13,9 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_new_pin_setting
 import com.homelab.household.app.resources.change_pin_mismatch
 import com.homelab.household.app.resources.change_pin_not_six_digits
 import com.homelab.household.app.resources.invite_code_locked
@@ -22,11 +24,14 @@ import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.new_pin_again
 import com.homelab.household.app.resources.new_pin_detail
 import com.homelab.household.app.resources.new_pin_label
+import com.homelab.household.app.resources.new_pin_setting
 import com.homelab.household.app.resources.new_pin_submit
 import com.homelab.household.app.resources.new_pin_title
 import com.homelab.household.app.resources.reset_code_invalid
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.resetpin.NewPinStatus
 import com.homelab.household.presentation.resetpin.NewPinUiState
 import org.jetbrains.compose.resources.stringResource
@@ -44,6 +49,9 @@ fun NewPinContent(
     onSetPin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == NewPinStatus.Setting)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
@@ -52,10 +60,13 @@ fun NewPinContent(
         bottomBar = {
             Column(modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl)) {
                 PrimaryButton(
-                    text = stringResource(Res.string.new_pin_submit),
+                    text = stringResource(if (waiting) Res.string.new_pin_setting else Res.string.new_pin_submit),
                     onClick = onSetPin,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_new_pin_setting),
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
             }
         }
     ) { padding ->

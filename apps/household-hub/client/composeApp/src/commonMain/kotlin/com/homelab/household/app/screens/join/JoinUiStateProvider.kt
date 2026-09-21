@@ -17,6 +17,7 @@ class JoinUiStateProvider : PreviewParameterProvider<JoinUiState> {
     private val named = listOf(
         "From the invite" to base,
         "Filled in" to base.copy(pin = "975310", colour = AvatarPalette.swatches[1]),
+        "Joining" to base.copy(pin = "975310", status = JoinStatus.Joining),
         "A colour somebody wears" to base.copy(
             takenColours = setOf(AvatarPalette.swatches.first()),
             colour = AvatarPalette.swatches[1]
