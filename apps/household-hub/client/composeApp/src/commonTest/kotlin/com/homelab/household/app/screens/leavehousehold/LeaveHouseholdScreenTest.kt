@@ -1,15 +1,23 @@
 package com.homelab.household.app.screens.leavehousehold
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_leave_deleting
+import com.homelab.household.app.resources.leave_deleting
 import com.homelab.household.app.resources.leave_pin_label
 import com.homelab.household.app.resources.leave_sole_admin
 import com.homelab.household.app.resources.leave_submit
@@ -20,6 +28,8 @@ import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
+import com.homelab.household.presentation.leavehousehold.LeaveHouseholdUiState
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
 
@@ -76,6 +86,36 @@ class LeaveHouseholdScreenTest {
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.leave_sole_admin)), timeoutMillis = wait)
         }
+    }
+
+    /**
+     * The most destructive action in the app, so it says plainly that it is under way.
+     * Nothing is dimmed: the button keeps its colour, stays enabled, and a screen reader hears what
+     * is happening rather than "Working" (design notes §2, §6.21).
+     */
+    @Test
+    fun deleting_the_account_shows_on_the_button() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                LeaveHouseholdContent(
+                    state = LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
+                    onPinChange = {},
+                    onLeave = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        onNodeWithText(getString(Res.string.leave_deleting))
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_leave_deleting)
+                )
+            )
+        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.leave_submit)).assertDoesNotExist()
     }
 
     @Test

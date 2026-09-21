@@ -20,7 +20,9 @@ import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_remove_removing
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.remove_agents_note
 import com.homelab.household.app.resources.remove_back
@@ -32,6 +34,7 @@ import com.homelab.household.app.resources.remove_erased_chats
 import com.homelab.household.app.resources.remove_erased_space
 import com.homelab.household.app.resources.remove_erased_title
 import com.homelab.household.app.resources.remove_keep
+import com.homelab.household.app.resources.remove_removing
 import com.homelab.household.app.resources.remove_stays_agents
 import com.homelab.household.app.resources.remove_stays_shared
 import com.homelab.household.app.resources.remove_stays_title
@@ -40,6 +43,8 @@ import com.homelab.household.app.resources.remove_title
 import com.homelab.household.app.resources.remove_unreachable
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.removemember.RemoveMemberStatus
 import com.homelab.household.presentation.removemember.RemoveMemberUiState
 import org.jetbrains.compose.resources.stringResource
@@ -58,6 +63,9 @@ fun RemoveMemberContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == RemoveMemberStatus.Removing)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val name = state.member.name
@@ -71,8 +79,14 @@ fun RemoveMemberContent(
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
             ) {
                 PrimaryButton(
-                    text = stringResource(Res.string.remove_submit, name),
+                    text = if (waiting) {
+                        stringResource(Res.string.remove_removing)
+                    } else {
+                        stringResource(Res.string.remove_submit, name)
+                    },
                     onClick = onRemove,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_remove_removing, name),
                     modifier = Modifier.fillMaxWidth()
                 )
                 SecondaryButton(
@@ -80,6 +94,7 @@ fun RemoveMemberContent(
                     onClick = onBack,
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
             }
         }
     ) { padding ->

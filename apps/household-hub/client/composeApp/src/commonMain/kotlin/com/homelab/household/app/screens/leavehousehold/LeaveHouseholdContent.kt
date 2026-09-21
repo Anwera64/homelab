@@ -17,10 +17,13 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_leave_deleting
 import com.homelab.household.app.resources.change_pin_not_six_digits
 import com.homelab.household.app.resources.leave_back
 import com.homelab.household.app.resources.leave_cancel
+import com.homelab.household.app.resources.leave_deleting
 import com.homelab.household.app.resources.leave_detail
 import com.homelab.household.app.resources.leave_erased_calendar
 import com.homelab.household.app.resources.leave_erased_chats
@@ -40,6 +43,8 @@ import com.homelab.household.app.resources.leave_wrong_pin
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdUiState
 import org.jetbrains.compose.resources.stringResource
@@ -58,6 +63,9 @@ fun LeaveHouseholdContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == LeaveHouseholdStatus.Leaving)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
@@ -70,8 +78,10 @@ fun LeaveHouseholdContent(
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
             ) {
                 DestructiveButton(
-                    text = stringResource(Res.string.leave_submit),
+                    text = stringResource(if (waiting) Res.string.leave_deleting else Res.string.leave_submit),
                     onClick = onLeave,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_leave_deleting),
                     modifier = Modifier.fillMaxWidth()
                 )
                 SecondaryButton(
@@ -79,6 +89,7 @@ fun LeaveHouseholdContent(
                     onClick = onBack,
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
             }
         }
     ) { padding ->

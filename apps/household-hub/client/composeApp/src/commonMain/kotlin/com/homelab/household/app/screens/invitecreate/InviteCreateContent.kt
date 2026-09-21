@@ -24,8 +24,11 @@ import com.homelab.household.app.components.HearthTextField
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_invite_create_making
+import com.homelab.household.app.resources.a11y_invite_create_remaking
 import com.homelab.household.app.resources.invite_create_admin_caption
 import com.homelab.household.app.resources.invite_create_admin_label
 import com.homelab.household.app.resources.invite_create_back
@@ -35,6 +38,7 @@ import com.homelab.household.app.resources.invite_create_expired
 import com.homelab.household.app.resources.invite_create_expires
 import com.homelab.household.app.resources.invite_create_footnote
 import com.homelab.household.app.resources.invite_create_instruction
+import com.homelab.household.app.resources.invite_create_making
 import com.homelab.household.app.resources.invite_create_name_helper
 import com.homelab.household.app.resources.invite_create_name_label
 import com.homelab.household.app.resources.invite_create_name_missing
@@ -46,7 +50,9 @@ import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.asCountdown
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.firstrun.NameError
 import com.homelab.household.presentation.invitecreate.InviteCreateStatus
 import com.homelab.household.presentation.invitecreate.InviteCreateUiState
@@ -69,6 +75,9 @@ fun InviteCreateContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == InviteCreateStatus.Creating)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val invite = state.invite
@@ -131,10 +140,15 @@ fun InviteCreateContent(
 
             if (invite == null) {
                 PrimaryButton(
-                    text = stringResource(Res.string.invite_create_new_code),
+                    text = stringResource(
+                        if (waiting) Res.string.invite_create_making else Res.string.invite_create_new_code
+                    ),
                     onClick = onCreate,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_invite_create_making),
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
             } else {
                 CodeCard(
                     label = stringResource(Res.string.invite_create_code_label),
@@ -157,9 +171,13 @@ fun InviteCreateContent(
                         modifier = Modifier.weight(1f)
                     )
                     SecondaryButton(
-                        text = stringResource(Res.string.invite_create_new_code),
+                        text = stringResource(
+                            if (waiting) Res.string.invite_create_making else Res.string.invite_create_new_code
+                        ),
                         onClick = onNewCode,
                         icon = HearthIcon.Retry,
+                        busy = waiting,
+                        busyDescription = stringResource(Res.string.a11y_invite_create_remaking),
                         modifier = Modifier.weight(1f)
                     )
                 }

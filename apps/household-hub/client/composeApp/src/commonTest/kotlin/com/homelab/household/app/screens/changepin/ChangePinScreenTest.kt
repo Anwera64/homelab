@@ -1,19 +1,27 @@
 package com.homelab.household.app.screens.changepin
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_change_pin_saving
 import com.homelab.household.app.resources.change_pin_again
 import com.homelab.household.app.resources.change_pin_current
 import com.homelab.household.app.resources.change_pin_mismatch
 import com.homelab.household.app.resources.change_pin_new
+import com.homelab.household.app.resources.change_pin_saving
 import com.homelab.household.app.resources.change_pin_submit
 import com.homelab.household.app.resources.change_pin_title
 import com.homelab.household.app.resources.change_pin_wrong
@@ -22,6 +30,8 @@ import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.presentation.changepin.ChangePinStatus
+import com.homelab.household.presentation.changepin.ChangePinUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.jetbrains.compose.resources.getString
@@ -91,6 +101,43 @@ class ChangePinScreenTest {
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.change_pin_mismatch)), timeoutMillis = wait)
         }
+    }
+
+    /**
+     * A PIN being saved signs out the other devices, so the wait is worth showing.
+     * Nothing is dimmed: the button keeps its colour, stays enabled, and a screen reader hears what
+     * is happening rather than "Working" (design notes §2, §6.21).
+     */
+    @Test
+    fun saving_the_new_pin_shows_on_the_button() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                ChangePinContent(
+                    state = ChangePinUiState(
+                        current = "135790",
+                        new = "864209",
+                        again = "864209",
+                        status = ChangePinStatus.Saving
+                    ),
+                    onCurrentChange = {},
+                    onNewChange = {},
+                    onAgainChange = {},
+                    onChange = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        onNodeWithText(getString(Res.string.change_pin_saving))
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_change_pin_saving)
+                )
+            )
+        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.change_pin_submit)).assertDoesNotExist()
     }
 
     @Test

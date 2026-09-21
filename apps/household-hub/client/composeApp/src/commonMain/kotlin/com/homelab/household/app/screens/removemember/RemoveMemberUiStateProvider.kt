@@ -15,6 +15,7 @@ class RemoveMemberUiStateProvider : PreviewParameterProvider<RemoveMemberUiState
         "Nothing typed" to base,
         "Half typed" to base.copy(typedName = "Li"),
         "Name typed out" to base.copy(typedName = "Liam"),
+        "Removing them" to base.copy(typedName = "Liam", status = RemoveMemberStatus.Removing),
         "Another name" to base.copy(typedName = "Emma", nameMismatch = true),
         "Hub unreachable" to base.copy(typedName = "Liam", status = RemoveMemberStatus.Unreachable)
     )

@@ -11,6 +11,7 @@ class InviteCodeUiStateProvider : PreviewParameterProvider<InviteCodeUiState> {
         "Empty" to InviteCodeUiState(),
         "Part typed" to InviteCodeUiState(code = "K7M"),
         "Complete" to InviteCodeUiState(code = "K7M2QP"),
+        "Checking with the hub" to InviteCodeUiState(code = "K7M2QP", status = InviteCodeStatus.Checking),
         "Too short" to InviteCodeUiState(code = "K7M", status = InviteCodeStatus.Incomplete),
         "Not a code the hub knows" to InviteCodeUiState(code = "ZZZZZZ", status = InviteCodeStatus.Invalid),
         "Guessing locked" to InviteCodeUiState(code = "ZZZZZZ", status = InviteCodeStatus.Locked(secondsLeft = 30)),

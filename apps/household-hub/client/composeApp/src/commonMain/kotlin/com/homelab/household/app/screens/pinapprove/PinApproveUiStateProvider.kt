@@ -14,6 +14,7 @@ class PinApproveUiStateProvider : PreviewParameterProvider<PinApproveUiState> {
     private val named = listOf(
         "Asking for your PIN" to base,
         "PIN typed" to base.copy(pin = "246801"),
+        "Checking your PIN" to base.copy(pin = "246801", status = PinApproveStatus.Checking),
         "Wrong PIN" to base.copy(status = PinApproveStatus.WrongPin(attemptsLeft = 3)),
         "Locked" to base.copy(status = PinApproveStatus.Locked(secondsLeft = 30)),
         "Code to read out" to base.copy(status = PinApproveStatus.Approved("P4XN7T"), secondsLeft = 892),
