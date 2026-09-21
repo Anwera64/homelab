@@ -1,6 +1,10 @@
 package com.homelab.household.app.components
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -9,10 +13,14 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_working
 import com.homelab.household.app.testing.StillTheme
@@ -23,6 +31,7 @@ import com.homelab.household.app.theme.StillMotion
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Primary buttons are never disabled (design notes §2): they have no `enabled` parameter, so a tap
@@ -159,6 +168,74 @@ class ButtonsTest {
         assertEquals(NightColors.error, BusyBar.destructive(NightColors).bar)
     }
 
+    /**
+     * A button is as wide as its caller said, which sounds too obvious to test and was wrong for
+     * every button in the app. The busy bar's wrapper took the caller's modifier and left the
+     * button itself wrap-content inside it, so `Modifier.fillMaxWidth()` produced a full-width
+     * *box* around a button still hugging its label — and the shadow hugged it too.
+     */
+    @Test
+    fun a_primary_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
+        PrimaryButton(text = "Create", onClick = {}, modifier = modifier)
+    }
+
+    @Test
+    fun a_secondary_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
+        SecondaryButton(text = "Create", onClick = {}, modifier = modifier)
+    }
+
+    @Test
+    fun a_destructive_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
+        DestructiveButton(text = "Create", onClick = {}, modifier = modifier)
+    }
+
+    /** The bar is laid over the button, so it must not change what the button measures. */
+    @Test
+    fun a_working_button_fills_its_width_the_same_way() = assertFillsTheWidthItIsGiven { modifier ->
+        PrimaryButton(text = "Create", onClick = {}, busy = true, modifier = modifier)
+    }
+
+    /**
+     * And a button told nothing still wraps. "Paste" on the invite-code screen and "Try again" on
+     * Members pass no modifier at all, so a fix that simply filled the width from inside the
+     * component would have stretched them across the screen.
+     */
+    @Test
+    fun a_primary_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
+        PrimaryButton(text = "Create", onClick = {})
+    }
+
+    @Test
+    fun a_secondary_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
+        SecondaryButton(text = "Create", onClick = {})
+    }
+
+    @Test
+    fun a_destructive_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
+        DestructiveButton(text = "Create", onClick = {})
+    }
+
+    private fun assertFillsTheWidthItIsGiven(button: @Composable (Modifier) -> Unit) = runComposeUiTest {
+        setContent {
+            StillTheme {
+                Box(Modifier.width(ROOMY)) { button(Modifier.fillMaxWidth()) }
+            }
+        }
+
+        onNodeWithText("Create").assertWidthIsEqualTo(ROOMY)
+    }
+
+    private fun assertWrapsItsLabel(button: @Composable () -> Unit) = runComposeUiTest {
+        setContent {
+            StillTheme {
+                Box(Modifier.width(ROOMY)) { button() }
+            }
+        }
+
+        val width = onNodeWithText("Create").getUnclippedBoundsInRoot().width
+        assertTrue(width < ROOMY, "a button given no width should wrap its label, but measured $width")
+    }
+
     private fun assertAlwaysClickable(button: @Composable (onClick: () -> Unit) -> Unit) = runComposeUiTest {
         var clicks = 0
         setContent { StillTheme { button { clicks++ } } }
@@ -184,5 +261,10 @@ class ButtonsTest {
 
         onNodeWithText("Creating…").performClick()
         assertEquals(0, clicks)
+    }
+
+    private companion object {
+        /** Wider than any of these labels needs, so "it wrapped" and "it filled" cannot be confused. */
+        val ROOMY = 320.dp
     }
 }

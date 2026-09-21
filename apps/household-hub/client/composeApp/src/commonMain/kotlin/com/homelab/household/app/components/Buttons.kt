@@ -57,9 +57,12 @@ import org.jetbrains.compose.resources.stringResource
 @Immutable
 internal data class BusyBar(val bar: Color, val track: Color) {
     companion object {
-        fun filled(colors: HearthColors) = BusyBar(colors.onPrimary, colors.onPrimary.copy(alpha = FILLED_TRACK))
+        fun filled(colors: HearthColors) =
+            BusyBar(colors.onPrimary, colors.onPrimary.copy(alpha = FILLED_TRACK))
+
         fun outlined(colors: HearthColors) = BusyBar(colors.primary, colors.outlineSoft)
-        fun destructive(colors: HearthColors) = BusyBar(colors.error, colors.error.copy(alpha = DESTRUCTIVE_TRACK))
+        fun destructive(colors: HearthColors) =
+            BusyBar(colors.error, colors.error.copy(alpha = DESTRUCTIVE_TRACK))
 
         private const val FILLED_TRACK = 0.24f
         private const val DESTRUCTIVE_TRACK = 0.18f
@@ -100,7 +103,10 @@ fun PrimaryButton(
                 )
                 .busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
-            colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.onPrimary),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.primary,
+                contentColor = colors.onPrimary
+            ),
             contentPadding = buttonPadding
         ) {
             ButtonContent(text, icon)
@@ -136,8 +142,15 @@ fun DestructiveButton(
 ) {
     val colors = HearthTheme.colors
     OutlinedActionButton(
-        text, onClick, modifier, icon, busy, busyDescription,
-        colors.error, colors.error, BusyBar.destructive(colors)
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        icon = icon,
+        busy = busy,
+        busyDescription = busyDescription,
+        borderColor = colors.error,
+        contentColor = colors.error,
+        busyBar = BusyBar.destructive(colors)
     )
 }
 
@@ -156,7 +169,9 @@ private fun OutlinedActionButton(
     WithBusyBar(modifier = modifier, busy = busy, busyBar = busyBar) {
         OutlinedButton(
             onClick = { if (!busy) onClick() },
-            modifier = Modifier.heightIn(min = buttonMinHeight).busySemantics(busy, busyDescription),
+            modifier = Modifier
+                .heightIn(min = buttonMinHeight)
+                .busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
             border = BorderStroke(HearthTheme.size.hairline, borderColor),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
@@ -173,6 +188,16 @@ private fun OutlinedActionButton(
  * The bar is a sibling rather than part of the button's content, because the content sits inside
  * [buttonPadding] and the bar belongs on the edge. `matchParentSize` gives the overlay exactly the
  * button's measured size, and the clip keeps the bar inside the button's corners.
+ *
+ * **[modifier] sizes this box, so its minimum constraints have to reach the button inside it.**
+ * Without `propagateMinConstraints` the caller's `fillMaxWidth()` widened the box and left the
+ * button wrap-content in the corner of it — every full-width button in the app was a full-width
+ * box around a button hugging its label, shadow and all. Propagating the *minimum* is what keeps
+ * both readings honest: a caller who asked for a width gets it, and one who asked for nothing
+ * still wraps, because then the minimum is zero.
+ *
+ * One box rather than one per branch, so flipping [busy] does not discard the button and build a
+ * new one — that would reset its interaction state mid-tap, at the worst possible moment.
  */
 @Composable
 private fun WithBusyBar(
@@ -181,13 +206,9 @@ private fun WithBusyBar(
     busyBar: BusyBar,
     button: @Composable () -> Unit
 ) {
-    if (!busy) {
-        Box(modifier) { button() }
-        return
-    }
-    Box(modifier) {
+    Box(modifier = modifier, propagateMinConstraints = true) {
         button()
-        BusyBarOverlay(busyBar)
+        if (busy) BusyBarOverlay(busyBar)
     }
 }
 
@@ -220,7 +241,12 @@ private fun Modifier.busySemantics(busy: Boolean, description: String?): Modifie
 @Composable
 private fun RowScope.ButtonContent(text: String, icon: HearthIcon?) {
     if (icon != null) {
-        HearthIconImage(icon = icon, contentDescription = null, active = true, size = HearthTheme.size.iconMd)
+        HearthIconImage(
+            icon = icon,
+            contentDescription = null,
+            active = true,
+            size = HearthTheme.size.iconMd
+        )
         Spacer(Modifier.width(HearthTheme.spacing.sm))
     }
     Text(text, style = HearthTheme.typography.bodyStrong)
