@@ -22,6 +22,9 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.SettingsRow
+import com.homelab.household.app.components.SkeletonBlock
+import com.homelab.household.app.components.SkeletonCircle
+import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_failed
@@ -39,7 +42,7 @@ import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
 import org.jetbrains.compose.resources.stringResource
 
-/** The default colour a member wears when the hub hasn't said. */
+/** The colour a member wears when the hub hasn't said which. */
 private const val DEFAULT_COLOUR = "#3C6E4E"
 
 /**
@@ -70,20 +73,26 @@ fun ProfileContent(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MemberAvatar(
-                    name = member?.fullName.orEmpty(),
-                    colour = member?.avatarColor ?: DEFAULT_COLOUR,
-                    size = HearthTheme.size.tile,
-                    glyph = type.glyphXxl
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                    Text(member?.fullName.orEmpty(), style = type.title, color = colors.textPrimary)
-                    if (member?.isAdmin == true) {
-                        HearthChip(label = stringResource(Res.string.profile_admin), variant = ChipVariant.Primary)
+            // Only the header depends on the hub. Everything below it is this screen's own copy,
+            // so it draws from the first frame rather than waiting to be told (§6.21, pattern 2).
+            if (member == null) {
+                ArrivingHeader()
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MemberAvatar(
+                        name = member.fullName,
+                        colour = member.avatarColor ?: DEFAULT_COLOUR,
+                        size = HearthTheme.size.tile,
+                        glyph = type.glyphXxl
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                        Text(member.fullName, style = type.title, color = colors.textPrimary)
+                        if (member.isAdmin) {
+                            HearthChip(label = stringResource(Res.string.profile_admin), variant = ChipVariant.Primary)
+                        }
                     }
                 }
             }
@@ -124,6 +133,34 @@ fun ProfileContent(
         }
     }
 }
+
+/**
+ * Your name and whether you are the admin, before the hub has said either. Drawn at the real
+ * header's geometry — the same avatar circle, a line for the name and a shorter one for the chip —
+ * so the header does not jump when the answer lands.
+ */
+@Composable
+private fun ArrivingHeader() {
+    SkeletonGroup {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkeletonCircle(size = HearthTheme.size.tile)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+            ) {
+                SkeletonBlock(widthFraction = NAME_WIDTH, height = HearthTheme.spacing.xl)
+                SkeletonBlock(widthFraction = CHIP_WIDTH, height = HearthTheme.spacing.lg)
+            }
+        }
+    }
+}
+
+/** How much of the row the name and the admin chip fill before either has arrived. */
+private const val NAME_WIDTH = 0.6f
+private const val CHIP_WIDTH = 0.3f
 
 @Composable
 private fun failure(status: ProfileStatus): String? = when (status) {

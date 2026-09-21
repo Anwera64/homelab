@@ -162,6 +162,7 @@
     <string name="invite_create_code_label">INVITE CODE</string>
     <string name="invite_create_expires">Expires in %1$s</string>
     <string name="invite_create_expired">Expired</string>
+    <string name="invite_create_making_new">Making a new code…</string>
     <string name="invite_create_instruction">Have %1$s open HyggeHub on their phone and enter this code.</string>
     <string name="invite_create_copy">Copy</string>
     <string name="invite_create_new_code">New code</string>
@@ -289,6 +290,7 @@
     <string name="a11y_invite_create_making">Making an invite code</string>
     <string name="a11y_invite_create_remaking">Making a new invite code</string>
     <string name="a11y_approve_checking">Checking your PIN</string>
+    <string name="a11y_pin_checking">Checking your PIN</string>
     <string name="a11y_new_pin_setting">Setting your PIN</string>
     <string name="a11y_change_pin_saving">Saving your new PIN</string>
     <string name="a11y_remove_removing">Removing %1$s</string>

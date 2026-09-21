@@ -157,7 +157,8 @@ fun InviteCreateContent(
                         stringResource(Res.string.invite_create_expired)
                     } else {
                         stringResource(Res.string.invite_create_expires, state.secondsLeft.asCountdown())
-                    }
+                    },
+                    loading = waiting
                 )
                 Text(
                     text = stringResource(Res.string.invite_create_instruction, invite.invitedName),

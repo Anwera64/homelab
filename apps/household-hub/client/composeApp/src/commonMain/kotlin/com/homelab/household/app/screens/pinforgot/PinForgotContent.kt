@@ -19,6 +19,9 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SkeletonBlock
+import com.homelab.household.app.components.SkeletonCircle
+import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.forgot_alone_command
 import com.homelab.household.app.resources.forgot_alone_detail
@@ -36,6 +39,7 @@ import com.homelab.household.app.resources.forgot_title
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.presentation.pinforgot.PinForgotStatus
 import com.homelab.household.presentation.pinforgot.PinForgotUiState
 import org.jetbrains.compose.resources.stringResource
 
@@ -70,7 +74,11 @@ fun PinForgotContent(
             }
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
-                if (vouching != null) {
+                // Who can vouch is the one thing here the hub has to answer. "I have a reset code"
+                // is always true, so it stays tappable while the rest arrives.
+                if (state.status == PinForgotStatus.Loading) {
+                    ArrivingVouch()
+                } else if (vouching != null) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
                         verticalAlignment = Alignment.CenterVertically
@@ -124,6 +132,42 @@ fun PinForgotContent(
         }
     }
 }
+
+/**
+ * The housemate who can vouch, before the hub has named them. Drawn at the real block's geometry —
+ * the face, the two lines beside it, and the three steps — so nothing shifts when the name lands.
+ */
+@Composable
+private fun ArrivingVouch() {
+    SkeletonGroup {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkeletonCircle(size = HearthTheme.size.touchTarget)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)
+            ) {
+                SkeletonBlock(widthFraction = ASK_WIDTH)
+                SkeletonBlock(widthFraction = ASK_DETAIL_WIDTH, height = HearthTheme.spacing.md)
+            }
+        }
+        repeat(STEPS) { position ->
+            SkeletonBlock(
+                widthFraction = STEP_WIDTHS[position],
+                height = HearthTheme.spacing.md,
+                position = position
+            )
+        }
+    }
+}
+
+/** How much of the row each stand-in fills. Unequal, so it reads as a wait and not as a grid. */
+private const val ASK_WIDTH = 0.55f
+private const val ASK_DETAIL_WIDTH = 0.4f
+private const val STEPS = 3
+private val STEP_WIDTHS = listOf(0.9f, 0.75f, 0.8f)
 
 @Composable
 private fun Step(number: Int, text: String) {
