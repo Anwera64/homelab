@@ -31,3 +31,17 @@ private fun DestructiveButtonPreview() {
         DestructiveButton(text = "Revoke access", onClick = {}, icon = HearthIcon.Revoke)
     }
 }
+
+/**
+ * The working state of each kind, beside its resting one. Previews keep `DefaultMotion`, so the
+ * bar along each bottom edge is running here — this is the one place the motion is looked at.
+ */
+@DayNightPreviews
+@Composable
+private fun BusyButtonPreview() {
+    ComponentPreview {
+        PrimaryButton(text = "Creating household…", onClick = {}, busy = true)
+        SecondaryButton(text = "Trying again…", onClick = {}, busy = true)
+        DestructiveButton(text = "Removing Emma…", onClick = {}, busy = true)
+    }
+}
