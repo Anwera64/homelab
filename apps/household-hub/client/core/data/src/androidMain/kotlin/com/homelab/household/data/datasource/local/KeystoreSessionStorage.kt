@@ -3,6 +3,7 @@ package com.homelab.household.data.datasource.local
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import com.homelab.household.data.dto.UserReadDto
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -12,7 +13,8 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.serialization.json.Json
 
 /**
- * Keeps auth tokens encrypted with an AES-256-GCM key held in the Android Keystore.
+ * Keeps the session — tokens and the signed-in member — encrypted with an AES-256-GCM key held in
+ * the Android Keystore.
  *
  * The file lives in `noBackupFilesDir`: Keystore keys never leave the device, so a restored
  * backup could not be decrypted anyway. Anything unreadable is deleted and reads as signed out.
@@ -25,6 +27,7 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
     private var loaded = false
     private var accessToken: String? = null
     private var refreshToken: String? = null
+    private var user: UserReadDto? = null
 
     @Synchronized
     override fun saveTokens(accessToken: String, refreshToken: String?) {
@@ -33,10 +36,7 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
         if (refreshToken != null) {
             this.refreshToken = refreshToken
         }
-        try {
-            write(SessionDiskPayload(accessToken = accessToken, refreshToken = this.refreshToken))
-        } catch (_: Exception) {
-        }
+        writeOrIgnore()
     }
 
     @Synchronized
@@ -52,10 +52,24 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
     }
 
     @Synchronized
+    override fun saveUser(user: UserReadDto?) {
+        ensureLoaded()
+        this.user = user
+        writeOrIgnore()
+    }
+
+    @Synchronized
+    override fun getUser(): UserReadDto? {
+        ensureLoaded()
+        return user
+    }
+
+    @Synchronized
     override fun clear() {
         loaded = true
         accessToken = null
         refreshToken = null
+        user = null
         tokenFile.delete()
     }
 
@@ -71,8 +85,17 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
             val payload = json.decodeFromString<SessionDiskPayload>(plain.decodeToString())
             accessToken = payload.accessToken
             refreshToken = payload.refreshToken
+            user = payload.user
         } catch (_: Exception) {
             tokenFile.delete()
+        }
+    }
+
+    /** Writes everything this phone currently knows; a phone that cannot write is not a crash. */
+    private fun writeOrIgnore() {
+        try {
+            write(SessionDiskPayload(accessToken = accessToken, refreshToken = refreshToken, user = user))
+        } catch (_: Exception) {
         }
     }
 

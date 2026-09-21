@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.local
 
+import com.homelab.household.data.dto.UserReadDto
 import java.io.File
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -12,6 +13,7 @@ class FileSessionStorage(
     private val tokenFile: File
     private var inMemoryAccessToken: String? = null
     private var inMemoryRefreshToken: String? = null
+    private var inMemoryUser: UserReadDto? = null
 
     init {
         val baseDir = if (!storageDir.isNullOrBlank()) {
@@ -35,6 +37,7 @@ class FileSessionStorage(
                     val payload = json.decodeFromString<SessionDiskPayload>(text)
                     inMemoryAccessToken = payload.accessToken
                     inMemoryRefreshToken = payload.refreshToken
+                    inMemoryUser = payload.user
                 }
             }
         } catch (_: Exception) {
@@ -46,27 +49,41 @@ class FileSessionStorage(
         if (refreshToken != null) {
             inMemoryRefreshToken = refreshToken
         }
-        try {
-            val payload = SessionDiskPayload(
-                accessToken = inMemoryAccessToken ?: accessToken,
-                refreshToken = inMemoryRefreshToken
-            )
-            tokenFile.writeText(json.encodeToString(payload))
-        } catch (_: Exception) {
-        }
+        write()
     }
 
     override fun getAccessToken(): String? = inMemoryAccessToken
 
     override fun getRefreshToken(): String? = inMemoryRefreshToken
 
+    override fun saveUser(user: UserReadDto?) {
+        inMemoryUser = user
+        write()
+    }
+
+    override fun getUser(): UserReadDto? = inMemoryUser
+
     override fun clear() {
         inMemoryAccessToken = null
         inMemoryRefreshToken = null
+        inMemoryUser = null
         try {
             if (tokenFile.exists()) {
                 tokenFile.delete()
             }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Writes everything this machine currently knows, so no field can be dropped by a partial save. */
+    private fun write() {
+        try {
+            val payload = SessionDiskPayload(
+                accessToken = inMemoryAccessToken,
+                refreshToken = inMemoryRefreshToken,
+                user = inMemoryUser
+            )
+            tokenFile.writeText(json.encodeToString(payload))
         } catch (_: Exception) {
         }
     }

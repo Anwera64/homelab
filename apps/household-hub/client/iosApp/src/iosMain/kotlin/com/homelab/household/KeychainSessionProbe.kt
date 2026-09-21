@@ -2,6 +2,7 @@ package com.homelab.household
 
 import com.homelab.household.data.datasource.local.KeychainSessionStorage
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
+import com.homelab.household.data.dto.UserReadDto
 
 /**
  * Test support: the narrowest possible Swift-visible window onto [KeychainSessionStorage].
@@ -35,6 +36,22 @@ class KeychainSessionProbe {
     fun accessToken(): String? = storage.getAccessToken()
 
     fun refreshToken(): String? = storage.getRefreshToken()
+
+    /**
+     * [StoredSessionLocalDataSource.saveUser]. The member is built here rather than in Swift so
+     * that `UserReadDto` stays out of the exported header, which is the whole point of this class.
+     */
+    fun saveMember(id: String, name: String) {
+        storage.saveUser(UserReadDto(id = id, full_name = name, is_admin = true, is_active = true))
+    }
+
+    fun forgetMember() {
+        storage.saveUser(null)
+    }
+
+    fun memberId(): String? = storage.getUser()?.id
+
+    fun memberName(): String? = storage.getUser()?.full_name
 
     fun clear() {
         storage.clear()

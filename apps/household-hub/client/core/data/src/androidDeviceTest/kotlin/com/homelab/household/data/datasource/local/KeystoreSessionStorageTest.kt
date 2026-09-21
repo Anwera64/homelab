@@ -3,6 +3,7 @@ package com.homelab.household.data.datasource.local
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.homelab.household.data.dto.UserReadDto
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +25,14 @@ class KeystoreSessionStorageTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val tokenFile get() = File(context.noBackupFilesDir, "auth_tokens.bin")
+
+    private val emma = UserReadDto(
+        id = "emma",
+        full_name = "Emma Larsson",
+        is_admin = true,
+        is_active = true,
+        avatar_color = "#3C6E4E",
+    )
 
     @Before
     fun signedOutToStart() {
@@ -70,5 +79,52 @@ class KeystoreSessionStorageTest {
         assertNull(storage.getAccessToken())
         assertNull(storage.getRefreshToken())
         assertFalse(tokenFile.exists())
+    }
+
+    @Test
+    fun GIVEN_a_member_saved_on_this_phone_WHEN_a_new_instance_reads_them_THEN_they_are_still_there() {
+        KeystoreSessionStorage(context).apply {
+            saveTokens(accessToken = "access-123")
+            saveUser(emma)
+        }
+
+        val restarted = KeystoreSessionStorage(context)
+        assertEquals(emma, restarted.getUser())
+    }
+
+    @Test
+    fun GIVEN_a_stored_member_WHEN_only_a_token_is_saved_THEN_a_new_instance_still_reads_them() {
+        KeystoreSessionStorage(context).apply {
+            saveTokens(accessToken = "access-123")
+            saveUser(emma)
+        }
+
+        KeystoreSessionStorage(context).saveTokens(accessToken = "access-789")
+
+        val restarted = KeystoreSessionStorage(context)
+        assertEquals("access-789", restarted.getAccessToken())
+        assertEquals(emma, restarted.getUser())
+    }
+
+    @Test
+    fun GIVEN_a_saved_member_WHEN_the_file_on_disk_is_read_THEN_their_name_is_not_plain_text() {
+        KeystoreSessionStorage(context).apply {
+            saveTokens(accessToken = "access-123")
+            saveUser(emma)
+        }
+
+        val onDisk = tokenFile.readBytes().toString(Charsets.ISO_8859_1)
+        assertFalse("The member's name must not be stored in plain text", onDisk.contains("Emma Larsson"))
+    }
+
+    @Test
+    fun GIVEN_a_signed_in_phone_WHEN_the_storage_is_cleared_THEN_a_new_instance_reads_no_member() {
+        val storage = KeystoreSessionStorage(context)
+        storage.saveTokens(accessToken = "access-123")
+        storage.saveUser(emma)
+
+        storage.clear()
+
+        assertNull(KeystoreSessionStorage(context).getUser())
     }
 }
