@@ -7,8 +7,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.invite_code_title
 import com.homelab.household.app.testing.FakeJoinHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.InvitePreview
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -123,7 +123,7 @@ class InviteCodeScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         InviteCodeContent(
                             state = state,
                             onCodeChange = {},

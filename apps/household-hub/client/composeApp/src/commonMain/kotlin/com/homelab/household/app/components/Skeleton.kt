@@ -1,6 +1,7 @@
 package com.homelab.household.app.components
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -70,29 +71,31 @@ fun SkeletonBlock(
     modifier: Modifier = Modifier,
     height: Dp = HearthTheme.spacing.lg,
     widthFraction: Float = 1f,
-    shape: Shape = HearthShapes.pill
+    shape: Shape = HearthShapes.skeleton,
+    position: Int = 0
 ) {
-    Skeleton(modifier.fillMaxWidth(widthFraction).height(height), shape)
+    Skeleton(modifier.fillMaxWidth(widthFraction).height(height), shape, position)
 }
 
 /** An avatar that hasn't arrived. */
 @Composable
-fun SkeletonCircle(modifier: Modifier = Modifier, size: Dp = HearthTheme.size.touchTarget) {
-    Skeleton(modifier.size(size), CircleShape)
+fun SkeletonCircle(modifier: Modifier = Modifier, size: Dp = HearthTheme.size.touchTarget, position: Int = 0) {
+    Skeleton(modifier.size(size), CircleShape, position)
 }
 
 @Composable
-private fun Skeleton(modifier: Modifier, shape: Shape) {
+private fun Skeleton(modifier: Modifier, shape: Shape, position: Int) {
     Box(
         modifier = modifier
-            .alpha(breath())
+            .alpha(breath(position))
             .background(HearthTheme.colors.outlineSoft, shape)
             .clearAndSetSemantics {}
     )
 }
 
 /**
- * The breath: dim to full and back, forever, over `motion.breathe`.
+ * The breath: dim to full and back, forever, over `motion.breathe`. [position] sets it a beat
+ * behind its neighbour, so a row of blocks arrives as one thing rather than blinking in unison.
  *
  * With motion off it is a constant instead — not a first frame but the *full* one, so a skeleton
  * in a test or a screenshot reads as a solid block rather than a half-faded one. It has to be a
@@ -100,7 +103,7 @@ private fun Skeleton(modifier: Modifier, shape: Shape) {
  * going idle, and a UI test under it would hang rather than fail.
  */
 @Composable
-private fun breath(): Float {
+private fun breath(position: Int): Float {
     val motion = HearthTheme.motion
     if (!motion.animate) return FULL
 
@@ -110,7 +113,8 @@ private fun breath(): Float {
         targetValue = FULL,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = motion.breathe.inWholeMilliseconds.toInt()),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
+            initialStartOffset = StartOffset((motion.breatheStagger * position).inWholeMilliseconds.toInt())
         ),
         label = "skeletonAlpha"
     )

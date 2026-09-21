@@ -4,8 +4,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DayColors
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.NightColors
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +15,7 @@ class HearthChipTest {
 
     @Test
     fun shows_its_label() = runComposeUiTest {
-        setContent { HearthTheme(darkTheme = false) { HearthChip(label = "Read only") } }
+        setContent { StillTheme { HearthChip(label = "Read only") } }
 
         onNodeWithText("Read only").assertIsDisplayed()
     }

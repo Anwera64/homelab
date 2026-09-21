@@ -8,21 +8,22 @@ import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
 
 /**
- * A member row, waiting. Previews keep `DefaultMotion`, so this is the breath as it actually runs;
- * the lines are deliberately uneven, which is what makes it read as a wait rather than a grid.
+ * A member row, waiting. Previews keep `DefaultMotion`, so this is the breath as it actually runs:
+ * the lines are deliberately uneven, and each row breathes a beat behind the one above, which is
+ * what makes it read as a wait rather than a grid.
  */
 @DayNightPreviews
 @Composable
 private fun SkeletonPreview() {
     ComponentPreview {
         SkeletonGroup {
-            repeat(3) {
+            repeat(3) { row ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SkeletonCircle()
-                    SkeletonBlock(widthFraction = 0.6f)
+                    SkeletonCircle(position = row)
+                    SkeletonBlock(widthFraction = 0.6f, position = row)
                 }
             }
         }

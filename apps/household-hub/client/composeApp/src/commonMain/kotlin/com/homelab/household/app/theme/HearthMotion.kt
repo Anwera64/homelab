@@ -30,6 +30,11 @@ data class HearthMotion(
     val barCycle: Duration = 1150.milliseconds,
     /** One breath of a skeleton block, dim to full and back. */
     val breathe: Duration = 1600.milliseconds,
+    /**
+     * How far behind its neighbour each block in a row of them runs. Six blocks standing in for
+     * six code characters read as one thing arriving rather than six lights blinking together.
+     */
+    val breatheStagger: Duration = 60.milliseconds,
     /** One pass of the wave across the PIN pad's six dots. */
     val wave: Duration = 1400.milliseconds,
     /** How far behind its neighbour each dot in that wave runs. */
@@ -51,5 +56,6 @@ val DefaultMotion = HearthMotion()
 val StillMotion = HearthMotion(
     hold = Duration.ZERO,
     minimumVisible = Duration.ZERO,
+    breatheStagger = Duration.ZERO,
     animate = false
 )

@@ -17,8 +17,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DefaultSizes
-import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +31,7 @@ class MessageComposerTest {
         var text by mutableStateOf("")
         var sent: String? = null
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 MessageComposer(
                     value = text,
                     onValueChange = { text = it },
@@ -51,7 +51,7 @@ class MessageComposerTest {
     fun send_is_always_clickable_even_when_empty() = runComposeUiTest {
         var sends = 0
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 MessageComposer(value = "", onValueChange = {}, onSend = { sends++ }, placeholder = "Message…")
             }
         }
@@ -65,7 +65,7 @@ class MessageComposerTest {
     fun the_composer_never_clears_the_text_itself() = runComposeUiTest {
         var text by mutableStateOf("Move dinner to 20:00")
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 MessageComposer(value = text, onValueChange = { text = it }, onSend = {}, placeholder = "Message…")
             }
         }
@@ -79,7 +79,7 @@ class MessageComposerTest {
     @Test
     fun send_is_big_enough_to_hit() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message…")
             }
         }
@@ -92,7 +92,7 @@ class MessageComposerTest {
     @Test
     fun shows_the_placeholder_when_empty() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message the Coordinator…")
             }
         }

@@ -1,7 +1,6 @@
 package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -16,9 +15,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_working
+import com.homelab.household.app.testing.StillTheme
+import com.homelab.household.app.theme.DayColors
 import com.homelab.household.app.theme.DefaultSizes
-import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.app.theme.LocalHearthMotion
+import com.homelab.household.app.theme.NightColors
 import com.homelab.household.app.theme.StillMotion
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -78,10 +78,8 @@ class ButtonsTest {
     @Test
     fun a_busy_button_is_not_dimmed_but_says_it_is_working() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
-                    PrimaryButton(text = "Creating…", onClick = {}, busy = true)
-                }
+            StillTheme {
+                PrimaryButton(text = "Creating…", onClick = {}, busy = true)
             }
         }
 
@@ -96,23 +94,74 @@ class ButtonsTest {
         onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
     }
 
+    /**
+     * "Working" is only what a button says when its caller has nothing better. Every action on the
+     * canvas names its own wait — "Checking your code", "Joining the household" — because a screen
+     * reader hearing "Working" three screens running has learned nothing.
+     */
+    @Test
+    fun a_button_announces_the_wait_its_caller_names() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                PrimaryButton(
+                    text = "Joining…",
+                    onClick = {},
+                    busy = true,
+                    busyDescription = "Joining the household"
+                )
+            }
+        }
+
+        onNodeWithText("Joining…").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Joining the household")
+        )
+    }
+
     /** And no bar when it isn't working — the affordance only exists during the wait. */
     @Test
     fun a_button_at_rest_carries_no_bar() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
-                    PrimaryButton(text = "Create", onClick = {})
-                }
+            StillTheme {
+                PrimaryButton(text = "Create", onClick = {})
             }
         }
 
         onNodeWithTag(HearthProgressBarTag).assertDoesNotExist()
     }
 
+    /**
+     * The bar is drawn on the button's own surface, not on a gap: a filled button's track is its
+     * content colour at a fraction, an outlined one's is the app's soft outline. An earlier version
+     * took the track from `Color.Transparent` and the bar from the button's content colour, which
+     * made the secondary bar `textMuted` — a grey bar on a grey button, all but invisible.
+     */
+    @Test
+    fun each_kind_of_button_draws_its_bar_on_its_own_surface() {
+        with(BusyBar.filled(DayColors)) {
+            assertEquals(DayColors.onPrimary, bar, "a filled button's bar")
+            assertEquals(DayColors.onPrimary.copy(alpha = 0.24f), track, "a filled button's track")
+        }
+        with(BusyBar.outlined(DayColors)) {
+            assertEquals(DayColors.primary, bar, "an outlined button's bar")
+            assertEquals(DayColors.outlineSoft, track, "an outlined button's track")
+        }
+        with(BusyBar.destructive(DayColors)) {
+            assertEquals(DayColors.error, bar, "a destructive button's bar")
+            assertEquals(DayColors.error.copy(alpha = 0.18f), track, "a destructive button's track")
+        }
+    }
+
+    /** Both palettes, since a bar taken from the wrong role only shows up in one of them. */
+    @Test
+    fun the_bar_follows_the_palette_it_is_drawn_in() {
+        assertEquals(NightColors.onPrimary, BusyBar.filled(NightColors).bar)
+        assertEquals(NightColors.primary, BusyBar.outlined(NightColors).bar)
+        assertEquals(NightColors.error, BusyBar.destructive(NightColors).bar)
+    }
+
     private fun assertAlwaysClickable(button: @Composable (onClick: () -> Unit) -> Unit) = runComposeUiTest {
         var clicks = 0
-        setContent { HearthTheme(darkTheme = false) { button { clicks++ } } }
+        setContent { StillTheme { button { clicks++ } } }
 
         onNodeWithText("Create")
             .assertIsEnabled()
@@ -128,10 +177,8 @@ class ButtonsTest {
     ) = runComposeUiTest {
         var clicks = 0
         setContent {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
-                    button(true) { clicks++ }
-                }
+            StillTheme {
+                button(true) { clicks++ }
             }
         }
 

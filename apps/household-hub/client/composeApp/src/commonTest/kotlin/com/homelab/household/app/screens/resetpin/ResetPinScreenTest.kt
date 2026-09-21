@@ -20,9 +20,9 @@ import com.homelab.household.app.resources.reset_code_field
 import com.homelab.household.app.resources.reset_code_invalid
 import com.homelab.household.app.resources.reset_code_title
 import com.homelab.household.app.testing.FakeJoinHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,7 +111,7 @@ class ResetPinScreenTest {
         ResetCodeUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         ResetCodeContent(state = state, onCodeChange = {}, onContinue = {}, onBack = {})
                     }
                 }
@@ -123,7 +123,7 @@ class ResetPinScreenTest {
         NewPinUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         NewPinContent(state = state, onPinChange = {}, onAgainChange = {}, onSetPin = {})
                     }
                 }

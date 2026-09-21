@@ -8,9 +8,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.platform.LocalExternalApps
-import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.app.theme.LocalHearthMotion
-import com.homelab.household.app.theme.StillMotion
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.data.datasource.local.TokenLocalDataSource
 import com.homelab.household.data.network.HubConfig
@@ -31,10 +28,10 @@ const val TEST_HUB_URL = "https://$TEST_HUB_HOST"
  *
  * It takes a plain engine, so it knows nothing about any particular screen's hub.
  *
- * The one thing it does change about the app's own composition is the motion scale: every screen
- * under it gets `StillMotion`, so the waiting patterns draw their resting frame. Without that an
- * infinite animation keeps the composition from ever going idle, and every `waitForIdle`,
- * `waitUntil` and `onNode…` in the test above times out instead of reporting anything.
+ * The one thing it does change about the app's own composition is the motion scale: it composes
+ * [StillTheme], so the waiting patterns draw their resting frame. Tests that mount a screen's
+ * `Content` directly compose [StillTheme] themselves — that is the whole of the off switch, and
+ * `StillMotionInTestsTest` fails the build on a test that skips it.
  */
 @Composable
 fun TestApp(
@@ -62,10 +59,8 @@ fun TestApp(
             LocalViewModelStoreOwner provides viewModelStoreOwner,
             LocalExternalApps provides externalApps
         ) {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
-                    content()
-                }
+            StillTheme {
+                content()
             }
         }
     }

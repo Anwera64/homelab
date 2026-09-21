@@ -16,9 +16,9 @@ import com.homelab.household.app.resources.invite_create_new_code
 import com.homelab.household.app.resources.invite_create_title
 import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -85,7 +85,7 @@ class InviteCreateScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         InviteCreateContent(
                             state = state,
                             onNameChange = {},

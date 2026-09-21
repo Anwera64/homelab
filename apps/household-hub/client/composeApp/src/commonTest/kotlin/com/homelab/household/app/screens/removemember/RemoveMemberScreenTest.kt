@@ -15,9 +15,9 @@ import com.homelab.household.app.resources.remove_confirm_mismatch
 import com.homelab.household.app.resources.remove_submit
 import com.homelab.household.app.resources.remove_title
 import com.homelab.household.app.testing.FakeMembersHub
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.data.datasource.local.InMemoryTokenStorage
 import com.homelab.household.domain.model.Member
 import kotlin.test.Test
@@ -70,7 +70,7 @@ class RemoveMemberScreenTest {
         RemoveMemberUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         RemoveMemberContent(state = state, onNameChange = {}, onRemove = {}, onBack = {})
                     }
                 }

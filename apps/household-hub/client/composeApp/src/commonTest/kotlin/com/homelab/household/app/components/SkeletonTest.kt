@@ -1,7 +1,7 @@
 package com.homelab.household.app.components
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -10,14 +10,19 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_loading
-import com.homelab.household.app.theme.HearthTheme
-import com.homelab.household.app.theme.LocalHearthMotion
+import com.homelab.household.app.testing.StillTheme
+import com.homelab.household.app.theme.DefaultMotion
+import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.StillMotion
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 /**
  * A skeleton is a shape standing in for an answer that hasn't arrived. It says nothing, because
@@ -89,6 +94,31 @@ class SkeletonTest {
     }
 
     /**
+     * A skeleton line is a stand-in for a line of text, and the canvas draws it with the same
+     * gentle 4dp corner a line of text would have if it had one — not the fully-rounded pill an
+     * earlier version defaulted to, which at 14dp high reads as a lozenge rather than a line.
+     */
+    @Test
+    fun a_skeleton_line_takes_the_skeleton_corner() {
+        assertEquals(HearthShapes.skeleton, RoundedCornerShape(4.dp))
+        assertNotEquals(HearthShapes.pill, HearthShapes.skeleton)
+    }
+
+    /**
+     * Six blocks standing in for six code characters breathe a beat apart, so the card reads as one
+     * thing arriving rather than six lights blinking together.
+     */
+    @Test
+    fun the_breath_can_be_staggered_across_a_row_of_blocks() {
+        assertTrue(DefaultMotion.breatheStagger > Duration.ZERO, "a stagger of zero is no stagger")
+        assertTrue(
+            DefaultMotion.breatheStagger < DefaultMotion.breathe,
+            "a stagger longer than the breath itself would put the last block a whole cycle behind"
+        )
+        assertEquals(Duration.ZERO, StillMotion.breatheStagger, "nothing is time-gated with motion off")
+    }
+
+    /**
      * The whole subtree, not just the group's own children: a label smuggled into a skeleton would
      * sit a level further down, inside the block that drew it.
      */
@@ -97,8 +127,8 @@ class SkeletonTest {
 
     @Composable
     private fun Still(content: @Composable () -> Unit) {
-        HearthTheme(darkTheme = false) {
-            CompositionLocalProvider(LocalHearthMotion provides StillMotion) { content() }
+        StillTheme {
+            content()
         }
     }
 }

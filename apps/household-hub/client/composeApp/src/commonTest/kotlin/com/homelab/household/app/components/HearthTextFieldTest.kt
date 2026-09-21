@@ -14,7 +14,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -25,7 +25,7 @@ class HearthTextFieldTest {
     @Test
     fun error_sits_below_the_field_and_marks_it_as_an_error() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthTextField(value = "", onValueChange = {}, label = "Name", error = "Give it a name")
             }
         }
@@ -42,7 +42,7 @@ class HearthTextFieldTest {
     @Test
     fun without_an_error_the_field_is_not_marked() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthTextField(value = "", onValueChange = {}, label = "Name")
             }
         }
@@ -55,7 +55,7 @@ class HearthTextFieldTest {
         var text by mutableStateOf("")
         var error by mutableStateOf<String?>(null)
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthTextField(value = text, onValueChange = { text = it }, label = "Handle", error = error)
             }
         }

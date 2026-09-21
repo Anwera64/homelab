@@ -26,7 +26,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -40,7 +40,7 @@ class HearthScaffoldTest {
     @Test
     fun header_and_bottom_bar_stay_while_the_content_scrolls() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthScaffold(
                     header = { Text("HyggeHub · Household") },
                     bottomBar = { Text("Bottom bar") }
@@ -62,7 +62,7 @@ class HearthScaffoldTest {
     @Test
     fun a_lazy_list_scrolls_inside() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthScaffold(header = { Text("Chats") }) { padding ->
                     LazyColumn(modifier = Modifier.testTag("list"), contentPadding = padding) {
                         items(500) { Text("Chat $it") }
@@ -80,7 +80,7 @@ class HearthScaffoldTest {
     @Test
     fun the_content_starts_under_the_header_and_ends_above_the_bottom_bar() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthScaffold(
                     header = { Box(Modifier.fillMaxWidth().height(BAR)) },
                     bottomBar = { Box(Modifier.fillMaxWidth().height(BAR)) },
@@ -101,7 +101,7 @@ class HearthScaffoldTest {
     @Test
     fun without_bars_the_window_insets_and_the_gutter_reach_the_content() = runComposeUiTest {
         setContent {
-            HearthTheme(darkTheme = false) {
+            StillTheme {
                 HearthScaffold(contentWindowInsets = WindowInsets(top = STATUS_BAR)) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
                 }

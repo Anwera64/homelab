@@ -6,8 +6,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.first_run_title
+import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.presentation.firstrun.AvatarPalette
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -138,7 +138,7 @@ class FirstRunScreenTest {
         states.forEach { state ->
             runComposeUiTest {
                 setContent {
-                    HearthTheme(darkTheme = false) {
+                    StillTheme {
                         FirstRunContent(
                             state = state,
                             onNameChange = {},

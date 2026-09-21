@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_working
+import com.homelab.household.app.theme.HearthColors
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
@@ -49,7 +50,7 @@ fun HearthProgressBar(
     modifier: Modifier = Modifier,
     width: HearthProgressBarWidth = HearthProgressBarWidth.Track,
     color: Color = HearthTheme.colors.primary,
-    trackColor: Color = if (width == HearthProgressBarWidth.Track) HearthTheme.colors.outline else Color.Transparent
+    trackColor: Color = width.trackColor(HearthTheme.colors)
 ) {
     val size = HearthTheme.size
     val working = stringResource(Res.string.a11y_working)
@@ -88,6 +89,18 @@ fun HearthProgressBar(
             drawStopIndicator = {}
         )
     }
+}
+
+/**
+ * The unlit part of the track. A bar with a transparent one reads as a fragment floating on the
+ * canvas rather than as a track filling up, which is the thing a wait is meant to look like.
+ *
+ * [HearthProgressBarWidth.Track] keeps `outline` because that is what Launch and the picker have
+ * always drawn; the two newer widths sit on a soft outline, as the canvas draws them.
+ */
+internal fun HearthProgressBarWidth.trackColor(colors: HearthColors): Color = when (this) {
+    HearthProgressBarWidth.Track -> colors.outline
+    HearthProgressBarWidth.FullBleed, HearthProgressBarWidth.Inset -> colors.outlineSoft
 }
 
 /** Where the bar is frozen with motion off: far enough along to be visibly a bar, not a full one. */

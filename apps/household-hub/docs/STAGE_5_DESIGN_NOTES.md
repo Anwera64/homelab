@@ -124,7 +124,7 @@ Time is a scale like space and type, and for the same reason: "waiting" drifts s
 | `slow` | 8s | Still waiting, longer than usual. The pattern stays and a quiet line joins it; nothing has failed |
 | `barCycle` / `breathe` / `wave` | 1150 / 1600 / 1400ms | One pass of the bar, one breath of a skeleton, one pass of the wave across the PIN dots |
 
-The wave also carries its stagger (90ms per dot) and its lift (4dp) — a `Dp`, which is why it lives with the motion rather than the sizes.
+The wave also carries its stagger (90ms per dot) and its lift (4dp) — a `Dp`, which is why it lives with the motion rather than the sizes. A row of skeleton blocks staggers the same way, 60ms apart, so six of them read as one thing arriving rather than six lights blinking together.
 
 ### In code
 
@@ -929,7 +929,9 @@ Nothing is ever dimmed while it waits (§2). A working button keeps its colour, 
 
 Compose UI tests synchronise on idleness, and **an infinite animation never lets a composition go idle** — `waitForIdle`, `waitUntil` and every `onNode…` under one time out rather than failing with something you can read.
 
-So motion is switched off by construction rather than driven by hand. `HearthMotion` carries `animate` beside its durations; `StillMotion` is the same scale with `animate = false` and the two time-gated beats collapsed to zero, and `TestApp` provides it to every screen test. Every animated component reads `HearthTheme.motion.animate` and draws its **resting frame** when it is false: a full-opacity skeleton block, a bar frozen at a fixed fraction, dots at rest.
+So motion is switched off by construction rather than driven by hand. `HearthMotion` carries `animate` beside its durations; `StillMotion` is the same scale with `animate = false` and the time-gated beats collapsed to zero. Every animated component reads `HearthTheme.motion.animate` and draws its **resting frame** when it is false: a full-opacity skeleton block, a bar frozen at a fixed fraction, dots at rest.
+
+Tests reach it through one composable, `StillTheme`, and never compose `HearthTheme` directly — `StillMotionInTestsTest` fails the build otherwise. That guard exists because the first version of this relied on `TestApp` alone, and the tests that most needed the off switch turn out not to use `TestApp`: every `every_previewed_state_draws` mounts its screen's `Content` on a bare theme. The first busy state added to a preview provider would have hung a whole screen test rather than failing it. The theme's own tests are the one exception, since proving `HearthTheme` hands out `DefaultMotion` means composing the real thing.
 
 The rule that follows: a component that cannot stand still cannot be tested, so it does not ship. Nothing asserts on the motion itself — no test names a duration, an easing or a frame. The only timing test is `waitPhase`, which is arithmetic over two thresholds with no clock in it. The motion is checked by eye, once, on a real device against a real hub.
 
