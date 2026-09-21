@@ -1,6 +1,7 @@
 package com.homelab.household.data.network
 
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.dto.UserReadDto
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -40,6 +41,25 @@ class SignOutOnUnauthorizedTest {
         // THEN
         assertNull(tokens.getAccessToken())
         assertEquals(1, signedOut)
+    }
+
+    /**
+     * The stored member is forgotten with the token, and by the same call. Nothing keeps a copy in
+     * memory any more, so this is the only place a 401 can forget who was signed in.
+     */
+    @Test
+    fun `GIVEN a stored member WHEN a signed-in call comes back 401 THEN they are forgotten with the token`() = runTest {
+        // GIVEN
+        val tokens = InMemorySessionStorage().apply {
+            saveTokens("revoked-token")
+            saveUser(UserReadDto(id = "emma", full_name = "Emma", is_admin = true, is_active = true))
+        }
+
+        // WHEN
+        client(HttpStatusCode.Unauthorized, tokens) {}.get("$hub/api/v1/spaces/shared")
+
+        // THEN
+        assertNull(tokens.getUser())
     }
 
     @Test

@@ -32,7 +32,6 @@ import com.homelab.household.domain.usecase.LockSecretSessionsUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.LookUpInviteUseCase
-import com.homelab.household.domain.usecase.ObserveCurrentUserUseCase
 import com.homelab.household.domain.usecase.ObserveMessagesUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
 import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
@@ -81,7 +80,6 @@ import com.homelab.household.domain.usecase.impl.LockSecretSessionsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LoginUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LookUpInviteUseCaseImpl
-import com.homelab.household.domain.usecase.impl.ObserveCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
@@ -120,7 +118,6 @@ val domainModule = module {
     factory<CheckAuthStatusUseCase> { CheckAuthStatusUseCaseImpl(get()) }
     factory<GetCurrentUserUseCase> { GetCurrentUserUseCaseImpl(get()) }
     factory<LogoutUseCase> { LogoutUseCaseImpl(get()) }
-    factory<ObserveCurrentUserUseCase> { ObserveCurrentUserUseCaseImpl(get()) }
     factory<GetHubHostUseCase> { GetHubHostUseCaseImpl(get()) }
     factory<HasStoredSessionUseCase> { HasStoredSessionUseCaseImpl(get()) }
     factory<ObserveSignedOutUseCase> { ObserveSignedOutUseCaseImpl(get()) }

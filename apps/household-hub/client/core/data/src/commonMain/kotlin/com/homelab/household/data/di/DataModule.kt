@@ -1,7 +1,7 @@
 package com.homelab.household.data.di
 
 import com.homelab.household.data.BuildConfig
-import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.AuthEventsLocalDataSource
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
@@ -94,11 +94,11 @@ val dataModule = module {
                     sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
             }
-            val session: AuthSessionLocalDataSource = get()
-            signOutOnUnauthorized(storage) { session.raiseSignedOut() }
+            val events: AuthEventsLocalDataSource = get()
+            signOutOnUnauthorized(storage) { events.raiseSignedOut() }
         }
     }
-    single { AuthSessionLocalDataSource() }
+    single { AuthEventsLocalDataSource() }
     single { SessionCacheLocalDataSource() }
     single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
     single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }

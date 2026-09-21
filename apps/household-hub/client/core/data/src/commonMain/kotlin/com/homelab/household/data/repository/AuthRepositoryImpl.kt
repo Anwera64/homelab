@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
+import com.homelab.household.data.datasource.local.AuthEventsLocalDataSource
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.dto.TokenResponseDto
@@ -17,19 +17,18 @@ import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
  * Orchestration and mapping. Every call goes out through [remote], every DTO becomes a domain model
- * here, and what this phone keeps lives in [storage] and [session]. Nothing in this file knows
- * that the hub speaks HTTP.
+ * here, and what this phone keeps — its token and the member it belongs to — lives in [storage].
+ * Nothing in this file knows that the hub speaks HTTP.
  */
 class AuthRepositoryImpl(
     private val remote: AuthRemoteDataSource,
     private val storage: StoredSessionLocalDataSource,
-    private val session: AuthSessionLocalDataSource,
+    private val events: AuthEventsLocalDataSource,
     private val hubConfig: HubConfig,
 ) : AuthRepository {
 
@@ -58,32 +57,29 @@ class AuthRepositoryImpl(
         remote.checkStatus().let { AuthStatus(isInitialized = it.is_initialized, memberCount = it.member_count) }
 
     /**
-     * Whoever is signed in, asked of the hub only when this phone does not already know and has a
-     * token worth asking with. A hub that will not answer means nobody is signed in rather than an
-     * error, because every caller of this is deciding which screen to open.
+     * Whoever is signed in, as this phone recorded it the last time the hub said so. No hub is
+     * needed for that, which is the point: the profile has a name and a colour to draw on a cold
+     * start with nothing to ask.
+     *
+     * The hub is asked only when the phone has a token but no member beside it — an app updated
+     * from a version that kept only the token. A hub that will not answer then means nobody is
+     * signed in rather than an error, because every caller of this is deciding which screen to open.
      */
     override suspend fun getCurrentUser(): User? {
-        session.currentUser()?.let { return UserDataMapper.toDomain(it) }
         if (storage.getAccessToken() == null) return null
+        storage.getUser()?.let { return UserDataMapper.toDomain(it) }
 
-        return runCatchingSafe {
-            val dto = remote.fetchCurrentUser()
-            session.cacheCurrentUser(dto)
-            UserDataMapper.toDomain(dto)
-        }.getOrNull()
+        return runCatchingSafe { remote.fetchCurrentUser().also(storage::saveUser) }
+            .getOrNull()
+            ?.let(UserDataMapper::toDomain)
     }
 
     override fun hasStoredSession(): Boolean = storage.getAccessToken() != null
 
-    override suspend fun logout() {
-        storage.clear()
-        session.forgetCurrentUser()
-    }
+    /** One call: the token and the member it belongs to are kept in the same place. */
+    override suspend fun logout() = storage.clear()
 
-    override fun observeCurrentUser(): Flow<User?> =
-        session.observeCurrentUser().map { it?.let(UserDataMapper::toDomain) }
-
-    override fun observeSignedOut(): Flow<Unit> = session.observeSignedOut()
+    override fun observeSignedOut(): Flow<Unit> = events.observeSignedOut()
 
     /**
      * One renewal at a time: callers who ask while one is on its way wait for its answer. A failure
@@ -117,12 +113,15 @@ class AuthRepositoryImpl(
     override fun getHubHost(): String =
         hubConfig.baseUrl.substringAfter("://").substringBefore("/")
 
-    /** Keeps the token and remembers who it belongs to, for every way of signing in. */
+    /**
+     * Keeps the token and who it belongs to, for every way of signing in — and for renewal, which
+     * is why the stored member is refreshed whenever the hub hands over a new token.
+     */
     private fun signedIn(response: TokenResponseDto): User {
         storage.saveTokens(response.access_token)
         val user = response.user
             ?: throw UpstreamGatewayException(statusCode = 200, message = "The hub signed in without saying who")
-        session.cacheCurrentUser(user)
+        storage.saveUser(user)
         return UserDataMapper.toDomain(user)
     }
 }
