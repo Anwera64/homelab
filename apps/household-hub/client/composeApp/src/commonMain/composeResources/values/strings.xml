@@ -162,6 +162,7 @@
     <string name="invite_create_code_label">INVITE CODE</string>
     <string name="invite_create_expires">Expires in %1$s</string>
     <string name="invite_create_expired">Expired</string>
+    <string name="invite_create_making_new">Making a new code…</string>
     <string name="invite_create_instruction">Have %1$s open HyggeHub on their phone and enter this code.</string>
     <string name="invite_create_copy">Copy</string>
     <string name="invite_create_new_code">New code</string>
@@ -269,4 +270,29 @@
     <!-- Slice 2 · waiting. Screen readers only: what a busy control and a loading block announce. -->
     <string name="a11y_working">Working</string>
     <string name="a11y_loading">Loading</string>
+
+    <!-- Slice 2 · waiting · the quiet line at eight seconds. Not an error: nothing has failed. -->
+    <string name="wait_slow_hub">Your hub is taking longer than usual.</string>
+
+    <!-- Slice 2 · waiting · the verb in progress, on the button that was tapped. -->
+    <string name="invite_code_checking">Checking…</string>
+    <string name="join_joining">Joining…</string>
+    <string name="invite_create_making">Making a code…</string>
+    <string name="approve_checking">Checking…</string>
+    <string name="new_pin_setting">Setting your PIN…</string>
+    <string name="change_pin_saving">Saving…</string>
+    <string name="remove_removing">Removing…</string>
+    <string name="leave_deleting">Deleting your account…</string>
+
+    <!-- Slice 2 · waiting · what each of those waits announces. Screen readers only. -->
+    <string name="a11y_invite_code_checking">Checking your code</string>
+    <string name="a11y_join_joining">Joining the household</string>
+    <string name="a11y_invite_create_making">Making an invite code</string>
+    <string name="a11y_invite_create_remaking">Making a new invite code</string>
+    <string name="a11y_approve_checking">Checking your PIN</string>
+    <string name="a11y_pin_checking">Checking your PIN</string>
+    <string name="a11y_new_pin_setting">Setting your PIN</string>
+    <string name="a11y_change_pin_saving">Saving your new PIN</string>
+    <string name="a11y_remove_removing">Removing %1$s</string>
+    <string name="a11y_leave_deleting">Deleting your account</string>
 </resources>

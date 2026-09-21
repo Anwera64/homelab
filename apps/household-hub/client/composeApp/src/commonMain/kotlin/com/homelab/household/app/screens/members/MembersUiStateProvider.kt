@@ -18,6 +18,14 @@ class MembersUiStateProvider : PreviewParameterProvider<MembersUiState> {
             youAreAdmin = false,
             status = MembersStatus.Ready
         ),
+        // Arriving has no rows and no bottom button: whether this phone is the admin's is one of
+        // the things the hub has not said yet.
+        "Arriving" to MembersUiState(status = MembersStatus.Loading),
+        "Coming back" to MembersUiState(
+            rows = listOf(emma, liam),
+            youAreAdmin = true,
+            status = MembersStatus.Loading
+        ),
         "Hub unreachable" to MembersUiState(status = MembersStatus.Unreachable),
         "Hub answered badly" to MembersUiState(status = MembersStatus.Failed)
     )

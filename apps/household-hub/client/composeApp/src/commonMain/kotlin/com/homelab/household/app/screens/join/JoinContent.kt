@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.foundation.text.KeyboardOptions
 import com.homelab.household.app.components.ColourSwatches
 import com.homelab.household.app.components.HearthChip
 import com.homelab.household.app.components.HearthScaffold
@@ -23,13 +23,16 @@ import com.homelab.household.app.components.HearthTextField
 import com.homelab.household.app.components.MemberAvatar
 import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_join_joining
 import com.homelab.household.app.resources.join_colour_helper
 import com.homelab.household.app.resources.join_colour_label
 import com.homelab.household.app.resources.join_colour_swatch
 import com.homelab.household.app.resources.join_detail
 import com.homelab.household.app.resources.join_expired
 import com.homelab.household.app.resources.join_invited_by
+import com.homelab.household.app.resources.join_joining
 import com.homelab.household.app.resources.join_name_helper
 import com.homelab.household.app.resources.join_name_label
 import com.homelab.household.app.resources.join_name_missing
@@ -45,6 +48,8 @@ import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.firstrun.AvatarPalette
 import com.homelab.household.presentation.firstrun.NameError
 import com.homelab.household.presentation.firstrun.PinError
@@ -67,6 +72,9 @@ fun JoinContent(
     onJoin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == JoinStatus.Joining)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val inviter = state.preview.inviterName
@@ -80,10 +88,13 @@ fun JoinContent(
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
             ) {
                 PrimaryButton(
-                    text = stringResource(Res.string.join_submit),
+                    text = stringResource(if (waiting) Res.string.join_joining else Res.string.join_submit),
                     onClick = onJoin,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_join_joining),
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
                 Text(
                     text = stringResource(Res.string.join_privacy, inviter),
                     style = type.caption,

@@ -21,6 +21,8 @@ class ProfileUiStateProvider : PreviewParameterProvider<ProfileUiState> {
         "The only admin" to ProfileUiState(member = emma, isSoleAdmin = true, status = ProfileStatus.Ready),
         "An admin who can leave" to ProfileUiState(member = emma, isSoleAdmin = false, status = ProfileStatus.Ready),
         "A member" to ProfileUiState(member = liam, isSoleAdmin = false, status = ProfileStatus.Ready),
+        // Arriving knows nothing yet — not the name, not whether leaving is even possible.
+        "Arriving" to ProfileUiState(member = null, status = ProfileStatus.Loading),
         "Hub unreachable" to ProfileUiState(member = emma, status = ProfileStatus.Unreachable)
     )
 

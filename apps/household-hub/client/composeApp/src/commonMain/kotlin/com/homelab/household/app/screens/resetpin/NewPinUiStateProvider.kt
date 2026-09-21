@@ -11,6 +11,7 @@ class NewPinUiStateProvider : PreviewParameterProvider<NewPinUiState> {
     private val named = listOf(
         "Empty" to NewPinUiState(),
         "Filled in" to NewPinUiState(pin = "864209", again = "864209"),
+        "Setting it" to NewPinUiState(pin = "864209", again = "864209", status = NewPinStatus.Setting),
         "The two differ" to NewPinUiState(pin = "864209", again = "864200", againMismatch = true),
         "Not six digits" to NewPinUiState(pin = "864", pinError = PinError.NotSixDigits),
         "Code has gone" to NewPinUiState(pin = "864209", again = "864209", status = NewPinStatus.Invalid),

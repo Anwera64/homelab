@@ -39,6 +39,11 @@ data class HearthSizes(
     val avatarHero: Dp = 96.dp,
     /** One of the six dots over the PIN pad. */
     val pinDot: Dp = 16.dp,
+    /**
+     * One caption line, held open whether or not there are words in it. A fixed-shape screen
+     * cannot let a line arriving shove what is under it, so the PIN pad reserves this much.
+     */
+    val statusLine: Dp = 24.dp,
     /** Borders and dividers. */
     val hairline: Dp = 1.dp,
     /** A field's error edge. */

@@ -14,6 +14,8 @@ class PinForgotUiStateProvider : PreviewParameterProvider<PinForgotUiState> {
     private val named = listOf(
         "Somebody to ask" to PinForgotUiState(member = emma, others = listOf(liam), status = PinForgotStatus.Ready),
         "Nobody else here" to PinForgotUiState(member = emma, others = emptyList(), status = PinForgotStatus.Ready),
+        // Arriving does not know yet whether there is anybody here to ask.
+        "Arriving" to PinForgotUiState(member = emma, others = emptyList(), status = PinForgotStatus.Loading),
         "Hub unreachable" to PinForgotUiState(member = emma, status = PinForgotStatus.Unreachable)
     )
 

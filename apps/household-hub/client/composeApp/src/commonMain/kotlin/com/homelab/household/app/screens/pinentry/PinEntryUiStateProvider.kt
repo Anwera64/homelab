@@ -13,6 +13,8 @@ class PinEntryUiStateProvider : PreviewParameterProvider<PinEntryUiState> {
     private val named = listOf(
         "Empty" to PinEntryUiState(member = emma),
         "Three digits in" to PinEntryUiState(member = emma, entered = 3),
+        // Six digits are in and with the hub. The pad has no submit button, so the dots carry it.
+        "Checking" to PinEntryUiState(member = emma, entered = 6, status = PinStatus.Checking),
         "Two tries from a wait" to PinEntryUiState(member = emma, status = PinStatus.WrongPin(attemptsLeft = 2)),
         "A miss" to PinEntryUiState(member = emma, status = PinStatus.WrongPin(attemptsLeft = 4)),
         "Locked" to PinEntryUiState(member = emma, status = PinStatus.Locked(secondsLeft = 30)),

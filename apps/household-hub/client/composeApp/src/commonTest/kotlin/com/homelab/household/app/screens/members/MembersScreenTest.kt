@@ -3,10 +3,13 @@ package com.homelab.household.app.screens.members
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.SkeletonGroupTag
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_invite
 import com.homelab.household.app.resources.members_remove
@@ -19,6 +22,8 @@ import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
+import com.homelab.household.presentation.members.MembersStatus
+import com.homelab.household.presentation.members.MembersUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.jetbrains.compose.resources.getString
@@ -90,6 +95,57 @@ class MembersScreenTest {
             }
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.members_unreachable)), timeoutMillis = wait)
+        }
+    }
+
+    @Test
+    fun arriving_empty_draws_the_chrome_and_stands_blocks_where_the_members_will_be() {
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    MembersContent(
+                        state = MembersUiState(status = MembersStatus.Loading),
+                        onInvite = {},
+                        onResetPin = {},
+                        onRemove = {},
+                        onRetry = {},
+                        onBack = {}
+                    )
+                }
+            }
+
+            // The title and the lead need no hub, so they are there from the first frame.
+            onNodeWithText(getString(Res.string.members_title)).assertIsDisplayed()
+            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            // Whether this phone may invite anyone is one of the things the hub has not said yet.
+            onNodeWithText(getString(Res.string.members_invite)).assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun coming_back_keeps_the_rows_readable_and_puts_a_bar_under_the_header() {
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    MembersContent(
+                        state = MembersUiState(
+                            rows = MembersUiStateProvider().values.first().rows,
+                            youAreAdmin = true,
+                            status = MembersStatus.Loading
+                        ),
+                        onInvite = {},
+                        onResetPin = {},
+                        onRemove = {},
+                        onRetry = {},
+                        onBack = {}
+                    )
+                }
+            }
+
+            // Pattern 3: what is already on screen is never replaced by blocks.
+            onNodeWithText("Emma Larsson").assertIsDisplayed()
+            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(SkeletonGroupTag).assertDoesNotExist()
         }
     }
 

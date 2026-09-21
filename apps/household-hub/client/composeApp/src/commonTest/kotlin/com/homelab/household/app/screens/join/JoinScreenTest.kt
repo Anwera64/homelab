@@ -1,19 +1,31 @@
 package com.homelab.household.app.screens.join
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_join_joining
+import com.homelab.household.app.resources.join_joining
+import com.homelab.household.app.resources.join_submit
 import com.homelab.household.app.resources.join_title
 import com.homelab.household.app.testing.FakeJoinHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.InvitePreview
-import org.jetbrains.compose.resources.getString
+import com.homelab.household.presentation.firstrun.AvatarPalette
+import com.homelab.household.presentation.join.JoinStatus
+import com.homelab.household.presentation.join.JoinUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.jetbrains.compose.resources.getString
 
 /** Joining the household, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
@@ -91,6 +103,42 @@ class JoinScreenTest {
                 seesThatTheCodeExpired()
             }
         }
+    }
+
+    /**
+     * Joining sends one request and says so on the button that sent it.
+     * Nothing is dimmed: the button keeps its colour, stays enabled, and a screen reader hears what
+     * is happening rather than "Working" (design notes §2, §6.21).
+     */
+    @Test
+    fun joining_the_household_shows_on_the_button() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                JoinContent(
+                    state = JoinUiState(
+                        preview = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E"),
+                        colour = AvatarPalette.swatches.first(),
+                        pin = "975310",
+                        status = JoinStatus.Joining
+                    ),
+                    onNameChange = {},
+                    onPinChange = {},
+                    onColourSelect = {},
+                    onJoin = {}
+                )
+            }
+        }
+
+        onNodeWithText(getString(Res.string.join_joining))
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_join_joining)
+                )
+            )
+        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.join_submit)).assertDoesNotExist()
     }
 
     @Test

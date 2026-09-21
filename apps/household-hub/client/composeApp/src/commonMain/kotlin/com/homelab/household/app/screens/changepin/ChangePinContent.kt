@@ -19,9 +19,11 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.PrimaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_change_pin_saving
 import com.homelab.household.app.resources.change_pin_again
 import com.homelab.household.app.resources.change_pin_again_placeholder
 import com.homelab.household.app.resources.change_pin_back
@@ -32,6 +34,7 @@ import com.homelab.household.app.resources.change_pin_mismatch
 import com.homelab.household.app.resources.change_pin_new
 import com.homelab.household.app.resources.change_pin_new_helper
 import com.homelab.household.app.resources.change_pin_not_six_digits
+import com.homelab.household.app.resources.change_pin_saving
 import com.homelab.household.app.resources.change_pin_submit
 import com.homelab.household.app.resources.change_pin_title
 import com.homelab.household.app.resources.change_pin_unreachable
@@ -41,6 +44,8 @@ import com.homelab.household.app.resources.change_pin_wrong
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.changepin.ChangePinStatus
 import com.homelab.household.presentation.changepin.ChangePinUiState
 import com.homelab.household.presentation.changepin.CurrentPinError
@@ -63,6 +68,9 @@ fun ChangePinContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == ChangePinStatus.Saving)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
@@ -72,10 +80,15 @@ fun ChangePinContent(
         bottomBar = {
             Column(modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl)) {
                 PrimaryButton(
-                    text = stringResource(Res.string.change_pin_submit),
+                    text = stringResource(
+                        if (waiting) Res.string.change_pin_saving else Res.string.change_pin_submit
+                    ),
                     onClick = onChange,
+                    busy = waiting,
+                    busyDescription = stringResource(Res.string.a11y_change_pin_saving),
                     modifier = Modifier.fillMaxWidth()
                 )
+                SlowLine(wait)
             }
         }
     ) { padding ->

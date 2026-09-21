@@ -17,8 +17,11 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_invite_code_checking
 import com.homelab.household.app.resources.invite_code_back
+import com.homelab.household.app.resources.invite_code_checking
 import com.homelab.household.app.resources.invite_code_continue
 import com.homelab.household.app.resources.invite_code_detail
 import com.homelab.household.app.resources.invite_code_failed
@@ -33,6 +36,8 @@ import com.homelab.household.app.resources.invite_code_unreachable
 import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.invitecode.InviteCodeStatus
 import com.homelab.household.presentation.invitecode.InviteCodeUiState
 import org.jetbrains.compose.resources.stringResource
@@ -52,6 +57,9 @@ fun InviteCodeContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val wait = rememberWaitPhase(state.status == InviteCodeStatus.Checking)
+    val waiting = wait != WaitPhase.Hidden
+
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
@@ -97,11 +105,21 @@ fun InviteCodeContent(
                         .background(colors.surfaceAlt, HearthShapes.item)
                         .padding(HearthTheme.spacing.lg)
                 )
-                PrimaryButton(
-                    text = stringResource(Res.string.invite_code_continue),
-                    onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = HearthTheme.spacing.xl)
-                )
+                Column(
+                    modifier = Modifier.padding(bottom = HearthTheme.spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+                ) {
+                    PrimaryButton(
+                        text = stringResource(
+                            if (waiting) Res.string.invite_code_checking else Res.string.invite_code_continue
+                        ),
+                        onClick = onContinue,
+                        busy = waiting,
+                        busyDescription = stringResource(Res.string.a11y_invite_code_checking),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    SlowLine(wait)
+                }
             }
         }
     }

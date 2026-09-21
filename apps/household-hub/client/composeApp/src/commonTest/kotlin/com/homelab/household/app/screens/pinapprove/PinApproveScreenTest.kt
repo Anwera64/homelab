@@ -1,15 +1,23 @@
 package com.homelab.household.app.screens.pinapprove
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_approve_checking
+import com.homelab.household.app.resources.approve_checking
 import com.homelab.household.app.resources.approve_generate
 import com.homelab.household.app.resources.approve_pin_label
 import com.homelab.household.app.resources.approve_title
@@ -20,6 +28,8 @@ import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
+import com.homelab.household.presentation.pinapprove.PinApproveStatus
+import com.homelab.household.presentation.pinapprove.PinApproveUiState
 import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
 
@@ -61,6 +71,40 @@ class PinApproveScreenTest {
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.approve_wrong_pin, 3)), timeoutMillis = wait)
         }
+    }
+
+    /**
+     * Approving checks your own PIN first, and the button says which PIN is being checked.
+     * Nothing is dimmed: the button keeps its colour, stays enabled, and a screen reader hears what
+     * is happening rather than "Working" (design notes §2, §6.21).
+     */
+    @Test
+    fun checking_your_pin_shows_on_the_button() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                PinApproveContent(
+                    state = PinApproveUiState(
+                        member = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E"),
+                        pin = "246801",
+                        status = PinApproveStatus.Checking
+                    ),
+                    onPinChange = {},
+                    onApprove = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        onNodeWithText(getString(Res.string.approve_checking))
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_approve_checking)
+                )
+            )
+        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+        onNodeWithText(getString(Res.string.approve_generate)).assertDoesNotExist()
     }
 
     @Test

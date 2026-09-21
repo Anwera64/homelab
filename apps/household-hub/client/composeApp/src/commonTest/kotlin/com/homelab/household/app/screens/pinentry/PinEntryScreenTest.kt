@@ -1,15 +1,22 @@
 package com.homelab.household.app.screens.pinentry
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_pin_checking
 import com.homelab.household.app.resources.pin_title
 import com.homelab.household.app.testing.FakeSignInHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.Member
+import com.homelab.household.presentation.pinentry.PinEntryUiState
+import com.homelab.household.presentation.pinentry.PinStatus
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -121,10 +128,38 @@ class PinEntryScreenTest {
         }
     }
 
+    /**
+     * The pad has no submit button, so nothing here can carry a bar — the dots do it instead
+     * (design notes §6.21, pattern 5). This asserts the pad *says* it is working, never a frame of
+     * the wave: under `StillTheme` the dots stand still, which is the only reason the test can run
+     * at all.
+     */
+    @Test
+    fun checking_says_the_pin_is_with_the_hub() = runComposeUiTest {
+        setContent {
+            StillTheme {
+                PinEntryContent(
+                    state = PinEntryUiState(member = emma, entered = 6, status = PinStatus.Checking),
+                    onDigit = {},
+                    onDelete = {},
+                    onBack = {},
+                    onForgotten = {}
+                )
+            }
+        }
+
+        onNodeWithTag(PinDotsTag).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                getString(Res.string.a11y_pin_checking)
+            )
+        )
+    }
+
     @Test
     fun every_previewed_state_draws() {
         val states = PinEntryUiStateProvider().values.toList()
-        assertEquals(6, states.size)
+        assertEquals(7, states.size)
 
         states.forEach { state ->
             runComposeUiTest {
