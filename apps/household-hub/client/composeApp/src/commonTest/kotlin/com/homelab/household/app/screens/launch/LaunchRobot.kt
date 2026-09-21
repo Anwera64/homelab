@@ -1,15 +1,14 @@
 package com.homelab.household.app.screens.launch
 
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import com.homelab.household.app.components.HearthProgressBarTag
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
@@ -126,10 +125,11 @@ class LaunchRobot(private val test: ComposeUiTest) {
     private companion object {
         const val WAIT_MILLIS = 5_000L
 
-        val loading = SemanticsMatcher.expectValue(
-            SemanticsProperties.ProgressBarRangeInfo,
-            ProgressBarRangeInfo.Indeterminate
-        )
+        // The app's own bar, by name. It used to be matched as "some indeterminate progress bar",
+        // which stopped being true the moment `TestApp` turned the motion off: with no animation
+        // the bar rests at a fixed fraction, which is determinate. The tag is the better question
+        // anyway — it asks whether *this* bar is on screen.
+        val loading = hasTestTag(HearthProgressBarTag)
     }
 }
 
