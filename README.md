@@ -17,7 +17,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 ## 🌟 Key Features
 
 * **🧠 Local AI & Autonomous Research Engine:**
-  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen3:14b`, `deepseek-v4-flash`, and `bge-m3`.
+  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen3:14b` and `bge-m3`.
   * **SearXNG:** Self-hosted private search aggregator powering agent tools with real-time JSON search results (Brave, Wikipedia, Wikidata, Arxiv, Bing, WolframAlpha) without tracking or rate limits.
 * **🍿 Hardware-Accelerated Streaming:** **Jellyfin** with full NVIDIA NVENC/NVDEC hardware transcoding for 4K HDR/Dolby Vision playback.
 * **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
@@ -187,7 +187,7 @@ Run the automated startup script:
 
 * **Start Stack (with 24h Update Check & Auto-Prune):** `.\startup_homelab.ps1`
   * Fully initializes both the Media automation pipeline and the AI stack (`profiles: ["ai"]`).
-  * Automatically verifies and pulls required Ollama models (`qwen3:14b`, `deepseek-v4-flash`, `bge-m3`).
+  * Automatically verifies and pulls required Ollama models (`qwen3:14b`, `bge-m3`).
   * Automatically registers and activates the Open WebUI memory loading indicator filter.
 * **Start Media Stack Only (Without AI Services):** `.\startup_homelab.ps1 -DisableAI`
 * **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
