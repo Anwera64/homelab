@@ -2,6 +2,7 @@ package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.screens.changepin.ChangePinScreen
+import com.homelab.household.app.screens.chats.ChatsScreen
 import com.homelab.household.app.screens.firstrun.FirstRunScreen
 import com.homelab.household.app.screens.invitecode.InviteCodeScreen
 import com.homelab.household.app.screens.invitecreate.InviteCreateScreen
@@ -98,6 +99,7 @@ interface AppScreens {
     @Composable fun Chats(
         onProfile: () -> Unit,
         onOpen: (String) -> Unit,
+        onNewChat: () -> Unit,
         tabs: @Composable () -> Unit,
     )
 
@@ -252,9 +254,10 @@ object RealAppScreens : AppScreens {
     override fun Chats(
         onProfile: () -> Unit,
         onOpen: (String) -> Unit,
+        onNewChat: () -> Unit,
         tabs: @Composable () -> Unit,
     ) {
-        HomePlaceholderScreen(onProfile = onProfile, tabs = tabs)
+        ChatsScreen(onOpen = onOpen, onNewChat = onNewChat, tabs = tabs)
     }
 
     @Composable

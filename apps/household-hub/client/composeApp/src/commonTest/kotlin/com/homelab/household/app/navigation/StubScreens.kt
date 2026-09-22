@@ -164,11 +164,13 @@ class StubScreens : AppScreens {
     override fun Chats(
         onProfile: () -> Unit,
         onOpen: (String) -> Unit,
+        onNewChat: () -> Unit,
         tabs: @Composable () -> Unit,
     ) {
         Column {
             Text(CHATS)
             Text(OPEN_A_CHAT, modifier = Modifier.clickable { onOpen("s-1") })
+            Text(START_A_CHAT, modifier = Modifier.clickable { onNewChat() })
             tabs()
         }
     }
@@ -284,6 +286,7 @@ class StubScreens : AppScreens {
         const val CHATS = "chats screen"
         const val NEW_CONVERSATION = "new conversation screen"
         const val OPEN_A_CHAT = "open a chat"
+        const val START_A_CHAT = "start a chat"
 
         fun conversationOf(sessionId: String) = "conversation screen $sessionId"
 

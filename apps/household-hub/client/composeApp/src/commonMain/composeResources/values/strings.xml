@@ -295,4 +295,22 @@
     <string name="a11y_change_pin_saving">Saving your new PIN</string>
     <string name="a11y_remove_removing">Removing %1$s</string>
     <string name="a11y_leave_deleting">Deleting your account</string>
+
+    <!-- Chats -->
+    <string name="chats_title">HyggeHub · Chats</string>
+    <string name="chats_search_placeholder">Search chats</string>
+    <string name="chats_search_cancel">Cancel</string>
+    <string name="chats_search_footnote">Search looks at chat titles and agent names. Secret chats aren’t included.</string>
+    <plurals name="chats_search_count">
+        <item quantity="one">%1$d chat</item>
+        <item quantity="other">%1$d chats</item>
+    </plurals>
+    <string name="chats_no_matches_title">No chats called “%1$s”</string>
+    <string name="chats_no_matches_line">Search looks at chat titles and agent names, not what was said inside. Secret chats aren’t included.</string>
+    <string name="chats_empty_title">No chats yet</string>
+    <string name="chats_empty_line">Pick an agent and ask it anything. The rest of the house can’t read your chats.</string>
+    <string name="chats_empty_action">Start a chat</string>
+    <string name="chats_unreachable">Can’t reach your hub.</string>
+    <string name="chats_retry">Try again</string>
+    <string name="chats_agent_missing">Conversation</string>
 </resources>

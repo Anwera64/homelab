@@ -34,8 +34,9 @@ import com.homelab.household.app.theme.HearthTheme
 fun HearthTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    label: String?,
     modifier: Modifier = Modifier,
+    leadingIcon: HearthIcon? = null,
     placeholder: String? = null,
     contentDescription: String? = null,
     helper: String? = null,
@@ -51,7 +52,11 @@ fun HearthTextField(
     val fieldStyle = textStyle ?: type.bodyLarge
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-        Text(label, style = type.labelStrong, color = colors.textMuted)
+        // A search bar has no label: the placeholder and the magnifier already say what it is,
+        // and a heading above it would be a second voice saying the same thing.
+        if (label != null) {
+            Text(label, style = type.labelStrong, color = colors.textMuted)
+        }
 
         BasicTextField(
             value = value,
@@ -82,10 +87,25 @@ fun HearthTextField(
                             ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.isEmpty() && placeholder != null) {
-                        Text(placeholder, style = fieldStyle, color = colors.textMuted)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (leadingIcon != null) {
+                            HearthIconImage(
+                                icon = leadingIcon,
+                                contentDescription = null,
+                                size = HearthTheme.size.iconMd,
+                                tint = colors.textMuted,
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (value.isEmpty() && placeholder != null) {
+                                Text(placeholder, style = fieldStyle, color = colors.textMuted)
+                            }
+                            innerField()
+                        }
                     }
-                    innerField()
                 }
             },
         )

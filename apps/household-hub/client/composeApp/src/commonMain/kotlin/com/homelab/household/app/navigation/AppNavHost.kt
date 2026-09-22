@@ -141,6 +141,7 @@ fun AppNavHost(
                         screens.Chats(
                             onProfile = { backStack.add(Destination.Profile) },
                             onOpen = { sessionId -> backStack.add(Destination.Conversation(sessionId)) },
+                            onNewChat = { backStack.add(Destination.Conversation()) },
                             tabs = { backStack.Tabs(NavTab.Chats) },
                         )
                     }
