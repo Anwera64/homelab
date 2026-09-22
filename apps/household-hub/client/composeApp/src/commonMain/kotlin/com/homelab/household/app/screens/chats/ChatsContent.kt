@@ -4,9 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
@@ -74,7 +79,16 @@ fun ChatsContent(
         modifier = modifier,
         bottomBar = tabs,
         header = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        // Chats has no Material 3 top bar to inset it, so the header does it
+                        // itself; otherwise the title sits under the status bar.
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                        ),
+            ) {
                 Row(
                     modifier =
                         Modifier
@@ -125,7 +139,10 @@ fun ChatsContent(
             }
         },
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        // Anything that stands in for the list — the empty screen, a query that matched nothing, a
+        // hub that cannot be reached — sits in the middle of the space the list would have used.
+        // A list, and the blocks that stand in for one while it arrives, start at the top.
+        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             when {
                 state.errorMessage != null -> {
                     Column(
@@ -144,7 +161,7 @@ fun ChatsContent(
 
                 state.isLoading && state.visible.isEmpty() -> {
                     // Arriving empty: chrome is already drawn, so the rows breathe where they land.
-                    SkeletonGroup(modifier = Modifier.padding(HearthTheme.spacing.xl)) {
+                    SkeletonGroup(modifier = Modifier.align(Alignment.TopCenter).padding(HearthTheme.spacing.xl)) {
                         repeat(4) { SkeletonBlock(modifier = Modifier.fillMaxWidth()) }
                     }
                 }
@@ -172,7 +189,7 @@ fun ChatsContent(
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
                         contentPadding =
                             androidx.compose.foundation.layout
                                 .PaddingValues(HearthTheme.spacing.xl),
