@@ -4,10 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -25,9 +27,11 @@ import com.homelab.household.app.resources.conversation_failed_line
 import com.homelab.household.app.resources.conversation_failed_title
 import com.homelab.household.app.resources.conversation_not_sent
 import com.homelab.household.app.resources.conversation_reconnecting
+import com.homelab.household.app.resources.conversation_reconnecting_detail
 import com.homelab.household.app.resources.conversation_retry
 import com.homelab.household.app.resources.conversation_sent
 import com.homelab.household.app.resources.conversation_still_working
+import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
@@ -395,5 +399,52 @@ class ConversationScreenTest {
                 onNodeWithText("Home Coordinator").assertIsDisplayed()
             }
         }
+    }
+
+    // ---- how a waiting status is laid out -------------------------------------
+
+    @Test
+    fun `GIVEN a model thinking WHEN the dots show THEN the word sits under them`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            val dots = onNodeWithTag(THINKING_DOTS_TAG).getUnclippedBoundsInRoot()
+            val word =
+                onNodeWithText(getString(Res.string.conversation_thinking), useUnmergedTree = true)
+                    .getUnclippedBoundsInRoot()
+            assertEquals(dots.left, word.left, "the word starts where the dots do")
+            assertTrue(word.top > dots.top, "the word is below the dots, not beside them")
+        }
+
+    @Test
+    fun `GIVEN a dropped stream WHEN it reconnects THEN the detail sits under the label`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Stream dropped, reconnecting")))
+
+            assertStacked(
+                label = getString(Res.string.conversation_reconnecting),
+                detail = getString(Res.string.conversation_reconnecting_detail),
+            )
+        }
+
+    @Test
+    fun `GIVEN a turn past a minute WHEN it is still working THEN the detail sits under the label`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Still working after a minute")))
+
+            assertStacked(
+                label = getString(Res.string.conversation_still_working),
+                detail = getString(Res.string.conversation_still_working_detail),
+            )
+        }
+
+    private fun ComposeUiTest.assertStacked(
+        label: String,
+        detail: String,
+    ) {
+        val top = onNodeWithText(label).getUnclippedBoundsInRoot()
+        val under = onNodeWithText(detail).getUnclippedBoundsInRoot()
+        assertEquals(top.left, under.left, "label and detail share a left edge")
+        assertTrue(under.top >= top.bottom, "the detail is on its own row, under the label")
     }
 }

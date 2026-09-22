@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -49,14 +50,13 @@ const val THINKING_DOTS_TAG = "ThinkingDots"
  */
 @Composable
 fun ThinkingDots(modifier: Modifier = Modifier) {
-    Row(
+    Column(
         modifier =
             modifier
                 .testTag(THINKING_DOTS_TAG)
                 // One node, read once: the word is what a screen reader says, the dots are silent.
                 .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
@@ -73,7 +73,7 @@ fun ThinkingDots(modifier: Modifier = Modifier) {
                 )
             }
         }
-        // Said in words as well as drawn: dots alone were easy to read as a glitch.
+        // Said in words as well as drawn, under the dots: dots alone were easy to read as a glitch.
         Text(
             text = stringResource(Res.string.conversation_thinking),
             style = HearthTheme.typography.caption,
