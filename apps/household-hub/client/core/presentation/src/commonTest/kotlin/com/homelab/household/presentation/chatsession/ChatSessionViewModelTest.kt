@@ -8,10 +8,13 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
+import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import dev.mokkery.MockMode
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.every
@@ -46,6 +49,8 @@ class ChatSessionViewModelTest {
     private val streamChatTurnUseCase = mock<StreamChatTurnUseCase>()
     private val getSessionUseCase = mock<GetSessionUseCase>()
     private val regenerateAnswerUseCase = mock<RegenerateAnswerUseCase>()
+    private val listAgentsUseCase = mock<ListAgentsUseCase>(MockMode.autofill)
+    private val createSessionUseCase = mock<CreateSessionUseCase>(MockMode.autofill)
     private val approveToolProposalUseCase = mock<ApproveToolProposalUseCase>()
     private val toggleSecretModeUseCase = mock<ToggleSecretModeUseCase>()
 
@@ -58,6 +63,8 @@ class ChatSessionViewModelTest {
             ChatSessionViewModel(
                 streamChatTurnUseCase = streamChatTurnUseCase,
                 getSessionUseCase = getSessionUseCase,
+                listAgentsUseCase = listAgentsUseCase,
+                createSessionUseCase = createSessionUseCase,
                 regenerateAnswerUseCase = regenerateAnswerUseCase,
                 approveToolProposalUseCase = approveToolProposalUseCase,
                 toggleSecretModeUseCase = toggleSecretModeUseCase,
@@ -193,7 +200,10 @@ class ChatSessionViewModelTest {
                     )
                 }
 
+            // Each turn is let finish: the composer will not take a second message while one
+            // is being answered, which is the point of `canSend`.
             viewModel.sendMessage("First message")
+            advanceUntilIdle()
             viewModel.sendMessage("Second message")
             advanceUntilIdle()
 
@@ -207,8 +217,12 @@ class ChatSessionViewModelTest {
 
     /**
      * The ids only have to be unique, and "unique" cannot mean "the clock happened to tick between
-     * two sends". Sending a burst is how that difference shows: a clock-derived id collides here on
-     * a platform whose monotonic clock is coarser than the gap between two statements.
+     * two sends". A clock-derived id collides on a platform whose monotonic clock is coarser than
+     * the gap between two sends, and fifty in quick succession is how that shows.
+     *
+     * Each one waits for the last to be answered, because the composer does not take a message
+     * while a turn is live — but the turns still land back to back, which is the timing that
+     * matters here.
      */
     @Test
     fun a_burst_of_sends_gives_every_message_its_own_id() =
@@ -230,8 +244,10 @@ class ChatSessionViewModelTest {
                 }
 
             val sends = 50
-            repeat(sends) { viewModel.sendMessage("Message $it") }
-            advanceUntilIdle()
+            repeat(sends) {
+                viewModel.sendMessage("Message $it")
+                advanceUntilIdle()
+            }
 
             val ids =
                 viewModel.uiState.value.messages
@@ -432,6 +448,40 @@ class ChatSessionViewModelTest {
                 "regenerating must not add a second copy of the question",
             )
             assertEquals("Here is the week.", state.messages.last { it.role == MessageRole.ASSISTANT }.content)
+        }
+
+    // ---- what happens to what you typed ------------------------------------
+
+    @Test
+    fun a_message_that_was_taken_leaves_the_composer() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(ChatStreamEvent.Done(messageId = "m-1", assistantContent = "Hello back"))
+
+            viewModel.composerTextChanged("Hi")
+            viewModel.sendMessage("Hi")
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.uiState.value.composerText)
+        }
+
+    @Test
+    fun a_message_that_could_not_be_sent_stays_in_the_composer() =
+        runTest(testDispatcher) {
+            // A brand new chat, and the hub refuses to create one. Nothing typed is ever cleared
+            // (design notes §2): losing the message is worse than the failure that caused it.
+            everySuspend { listAgentsUseCase() } returns emptyList()
+
+            viewModel.open(null)
+            advanceUntilIdle()
+            viewModel.composerTextChanged("Hi")
+            viewModel.sendMessage("Hi")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("Hi", state.composerText)
+            assertNotNull(state.errorMessage, "a send that went nowhere has to say so")
         }
 
     @Test

@@ -24,7 +24,7 @@ import org.koin.dsl.module
 
 val presentationModule =
     module {
-        factory { ChatSessionViewModel(get(), get(), get(), get(), get()) }
+        factory { ChatSessionViewModel(get(), get(), get(), get(), get(), get(), get()) }
         factory { ChatsViewModel(get()) }
         factory { DashboardViewModel(get(), get(), get(), get(), get()) }
         factory { LaunchViewModel(get(), get()) }
