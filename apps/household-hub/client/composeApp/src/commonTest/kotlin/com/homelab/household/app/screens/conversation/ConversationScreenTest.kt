@@ -1,9 +1,13 @@
 package com.homelab.household.app.screens.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -12,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.components.SENT_GLYPH_TAG
 import com.homelab.household.app.components.THINKING_DOTS_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.conversation_composer_leave
@@ -34,6 +39,7 @@ import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * A conversation, in each of the four ways a turn can end.
@@ -255,6 +261,52 @@ class ConversationScreenTest {
 
             onNodeWithText(getString(Res.string.conversation_sent)).assertIsDisplayed()
         }
+
+    /**
+     * The check beside "Sent", seen by day and at night.
+     *
+     * The canvas drew it and the first build left it out, which on a dark phone read as a glyph
+     * that had vanished. Measured from the rendered pixels rather than read off the code: 3:1 is
+     * the floor for a graphic that carries meaning.
+     */
+    @Test
+    fun the_sent_check_can_be_seen_by_day_and_at_night() {
+        listOf(false, true).forEach { night ->
+            runComposeUiTest {
+                setContent {
+                    StillTheme(darkTheme = night) {
+                        ConversationContent(
+                            state = stateNamed("A finished exchange"),
+                            onComposerTextChange = {},
+                            onSend = {},
+                            onRetry = {},
+                            onTryAgain = {},
+                            onBack = {},
+                        )
+                    }
+                }
+
+                val contrast = contrastWithin(onNodeWithTag(SENT_GLYPH_TAG).captureToImage().toPixelMap())
+
+                val theme = if (night) "at night" else "by day"
+                assertTrue(contrast >= 3.0, "the check reads at only $contrast:1 $theme")
+            }
+        }
+    }
+
+    /** The contrast between the lightest and darkest pixels of an image: ink against its ground. */
+    private fun contrastWithin(pixels: PixelMap): Double {
+        var darkest = 1f
+        var lightest = 0f
+        for (x in 0 until pixels.width) {
+            for (y in 0 until pixels.height) {
+                val luminance = pixels[x, y].luminance()
+                darkest = minOf(darkest, luminance)
+                lightest = maxOf(lightest, luminance)
+            }
+        }
+        return (lightest + 0.05) / (darkest + 0.05)
+    }
 
     @Test
     fun a_question_that_never_landed_does_not_claim_to_have_been_sent() =

@@ -144,6 +144,10 @@ enum class HearthIcon(
             "m12.6 9.6 5 4.8M17.6 9.6l-5 4.8",
         ),
     ),
+
+    // Conversation - drawn on the Chat Turn States canvas rather than the sheet. A question the hub
+    // has; kept apart from `synced`, whose check in a circle already means the hub is in step.
+    Sent("sent", strokes("M5 12.5l4.5 4.5L19 7.5")),
     ;
 
     private val restingVector: ImageVector by lazy { build(strokeWidth = 1.5f) }
