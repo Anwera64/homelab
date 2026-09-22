@@ -37,11 +37,6 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         "Three things, in order of how much they'll bite. The panel review is tomorrow at 14:30 — " +
             "that's the one to protect. The print shop closes at 18:00 the same day, so if the boards aren't"
 
-    /** A model thinking, as qwen3 really does: first person, and naming the tool it means to use. */
-    private val thought =
-        "Okay, the user is asking what's on their calendar tomorrow. So tomorrow is Wednesday the 23rd. " +
-            "I should use calendar_read with that date in ISO format, then list the events in order."
-
     /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
     private val longAnswer =
         (1..40).joinToString(" ") { "Sentence $it of an answer that keeps going well past the fold." }
@@ -72,7 +67,7 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     messages = listOf(question),
                     streamingMessage = "",
                     turnState = TurnState.Streaming,
-                    reasoning = thought,
+                    isThinking = true,
                 ),
             "Using a tool" to
                 agent.copy(

@@ -28,6 +28,7 @@ import com.homelab.household.app.resources.conversation_reconnecting
 import com.homelab.household.app.resources.conversation_retry
 import com.homelab.household.app.resources.conversation_sent
 import com.homelab.household.app.resources.conversation_still_working
+import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
@@ -240,6 +241,7 @@ class ConversationScreenTest {
             setContent(conversation(stateNamed("Thinking, before the first word")))
 
             onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thinking)).assertIsDisplayed()
         }
 
     @Test
@@ -325,15 +327,19 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.conversation_composer_waiting)).assertIsDisplayed()
         }
 
+    /**
+     * A model's thoughts stream far faster than anyone reads, so showing them was a blur of
+     * letters. The screen says it is thinking, and nothing more.
+     */
     @Test
-    fun a_model_thinking_out_loud_is_shown_under_the_dots() =
+    fun a_model_thinking_shows_only_the_status() =
         runComposeUiTest {
             setContent(conversation(stateNamed("Thinking out loud")))
 
             onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
-            // Only its newest words — the start has scrolled away.
-            onNodeWithText("then list the events in order.", substring = true).assertIsDisplayed()
-            onNodeWithText("Okay, the user is asking", substring = true).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.conversation_thinking)).assertIsDisplayed()
+            onNodeWithText("the user is asking", substring = true).assertDoesNotExist()
+            onNodeWithText("list the events in order", substring = true).assertDoesNotExist()
         }
 
     @Test

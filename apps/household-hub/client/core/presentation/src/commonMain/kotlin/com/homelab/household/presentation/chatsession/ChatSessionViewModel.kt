@@ -296,12 +296,12 @@ class ChatSessionViewModel(
 
                         is ChatStreamEvent.Reasoning -> {
                             if (thinkingSince == null) thinkingSince = timeSource.markNow()
-                            _uiState.update { it.copy(reasoning = it.reasoning + event.content) }
+                            _uiState.update { it.copy(isThinking = true) }
                         }
 
                         is ChatStreamEvent.ToolExecuting -> {
                             stopThinking()
-                            _uiState.update { it.copy(activeTool = event.tool, reasoning = "", trail = trail()) }
+                            _uiState.update { it.copy(activeTool = event.tool, isThinking = false, trail = trail()) }
                         }
 
                         is ChatStreamEvent.ToolResult -> {
@@ -321,7 +321,7 @@ class ChatSessionViewModel(
                                 it.copy(
                                     streamingMessage = accumulated,
                                     turnState = TurnState.Streaming,
-                                    reasoning = "",
+                                    isThinking = false,
                                     trail = trail(),
                                 )
                             }
@@ -350,7 +350,7 @@ class ChatSessionViewModel(
                                         state.messages.map { msg ->
                                             if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
                                         } + assistantMsg,
-                                    reasoning = "",
+                                    isThinking = false,
                                     activeTool = null,
                                     trail = emptyList(),
                                     trails =
@@ -378,7 +378,7 @@ class ChatSessionViewModel(
                             _uiState.update {
                                 it.copy(
                                     turnState = TurnState.Failed,
-                                    reasoning = "",
+                                    isThinking = false,
                                     activeTool = null,
                                     trail = trail(),
                                 )
@@ -431,7 +431,7 @@ private fun ChatSessionUiState.startingTurn() =
         streamingMessage = "",
         turnState = TurnState.Streaming,
         errorMessage = null,
-        reasoning = "",
+        isThinking = false,
         activeTool = null,
         trail = emptyList(),
     )

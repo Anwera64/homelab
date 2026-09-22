@@ -22,8 +22,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.hideFromAccessibility
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.HearthScaffold
@@ -120,7 +118,14 @@ fun ConversationContent(
     // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this the
     // words land below the fold and the screen sits still while the agent talks.
     // Thinking, a tool and the trail grow the answer too, before a single word of it arrives.
-    LaunchedEffect(itemCount, state.streamingMessage, state.turnState, state.reasoning, state.activeTool, state.trail) {
+    LaunchedEffect(
+        itemCount,
+        state.streamingMessage,
+        state.turnState,
+        state.isThinking,
+        state.activeTool,
+        state.trail,
+    ) {
         if (itemCount == 0) return@LaunchedEffect
 
         // Were you at the end of what was already there? Asked against the count from before this
@@ -305,7 +310,7 @@ fun ConversationContent(
                                     // In the answer's place, because that is where the eye is waiting.
                                     tool != null -> ToolRunningChip(stringResource(toolLabel(tool).running))
 
-                                    thinking -> Thinking(state.reasoning, thinkingPhase, slowPhase)
+                                    thinking -> Thinking(thinkingPhase, slowPhase)
 
                                     else -> TurnStatus(state, onTryAgain)
                                 }
@@ -319,30 +324,16 @@ fun ConversationContent(
 }
 
 /**
- * A model working before its first word: the dots, its newest thoughts beneath them, and the slow
- * line only if it has said nothing at all for eight seconds.
+ * A model working before its first word: "Thinking…", and the slow line only if it has said
+ * nothing at all for eight seconds. Never its thoughts — they stream faster than anyone reads.
  */
 @Composable
 private fun Thinking(
-    reasoning: String,
     phase: WaitPhase,
     slowPhase: WaitPhase,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         if (phase != WaitPhase.Hidden) ThinkingDots()
-        if (reasoning.isNotEmpty()) {
-            Text(
-                text = reasoningTail(reasoning),
-                style = HearthTheme.typography.caption,
-                color = HearthTheme.colors.textMuted,
-                // Kept out of what a screen reader hears. It changes many times a second, and the
-                // dots already say "Thinking…" once, politely.
-                modifier =
-                    Modifier
-                        .widthIn(max = HearthTheme.size.readingWidth)
-                        .semantics { hideFromAccessibility() },
-            )
-        }
         SlowLine(slowPhase)
     }
 }

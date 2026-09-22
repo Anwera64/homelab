@@ -65,8 +65,11 @@ data class ChatSessionUiState(
      */
     val composerText: String = "",
     val turnState: TurnState = TurnState.Idle,
-    /** What the model has said to itself so far in this stretch of thinking. Never part of the answer. */
-    val reasoning: String = "",
+    /**
+     * Whether the model is thinking before it writes or picks a tool. Only the fact of it: its
+     * thoughts stream faster than anyone can read, so the phone never keeps a word of them.
+     */
+    val isThinking: Boolean = false,
     /** The tool running right now, by its backend name. */
     val activeTool: String? = null,
     /** What the turn being answered has done so far. */
@@ -112,7 +115,7 @@ data class ChatSessionUiState(
         get() =
             turnState == TurnState.Streaming &&
                 streamingMessage.isNullOrEmpty() &&
-                reasoning.isEmpty() &&
+                !isThinking &&
                 activeTool == null &&
                 trail.isEmpty()
 

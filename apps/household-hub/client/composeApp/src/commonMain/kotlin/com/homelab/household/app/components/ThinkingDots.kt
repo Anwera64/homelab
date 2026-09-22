@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -49,29 +49,36 @@ const val THINKING_DOTS_TAG = "ThinkingDots"
  */
 @Composable
 fun ThinkingDots(modifier: Modifier = Modifier) {
-    val thinking = stringResource(Res.string.conversation_thinking)
-
     Row(
         modifier =
             modifier
                 .testTag(THINKING_DOTS_TAG)
-                .semantics {
-                    contentDescription = thinking
-                    liveRegion = LiveRegionMode.Polite
-                },
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
+                // One node, read once: the word is what a screen reader says, the dots are silent.
+                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        repeat(DOTS) { index ->
-            Box(
-                modifier =
-                    Modifier
-                        .offset(y = lift(index))
-                        .size(HearthTheme.size.thinkingDot)
-                        .background(HearthTheme.colors.textMuted, CircleShape)
-                        .clearAndSetSemantics {},
-            )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(DOTS) { index ->
+                Box(
+                    modifier =
+                        Modifier
+                            .offset(y = lift(index))
+                            .size(HearthTheme.size.thinkingDot)
+                            .background(HearthTheme.colors.textMuted, CircleShape)
+                            .clearAndSetSemantics {},
+                )
+            }
         }
+        // Said in words as well as drawn: dots alone were easy to read as a glitch.
+        Text(
+            text = stringResource(Res.string.conversation_thinking),
+            style = HearthTheme.typography.caption,
+            color = HearthTheme.colors.textMuted,
+        )
     }
 }
 

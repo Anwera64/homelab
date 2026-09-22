@@ -435,7 +435,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun reasoning_gathers_while_the_model_thinks() =
+    fun reasoning_marks_the_model_as_thinking() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -445,7 +445,7 @@ class ChatSessionViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Okay, the user wants tomorrow.", state.reasoning)
+            assertTrue(state.isThinking)
             assertFalse(state.isSilent, "a model visibly thinking is not a silent hub")
         }
 
@@ -511,7 +511,7 @@ class ChatSessionViewModelTest {
 
             val state = viewModel.uiState.value
             assertEquals(listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")), state.trail)
-            assertEquals("", state.reasoning, "once the answer begins, the thinking steps aside")
+            assertFalse(state.isThinking, "once the answer begins, the thinking steps aside")
         }
 
     @Test
@@ -554,7 +554,7 @@ class ChatSessionViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("", state.reasoning)
+            assertFalse(state.isThinking)
             assertTrue(state.trail.isEmpty())
             assertTrue(state.isSilent, "a turn that has heard nothing yet is silent")
         }
