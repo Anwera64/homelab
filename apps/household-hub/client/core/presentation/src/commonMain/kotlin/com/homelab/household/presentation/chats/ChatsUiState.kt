@@ -7,8 +7,15 @@ data class ChatsUiState(
     val query: String = "",
     val visible: List<ConversationSession> = emptyList(),
     val errorMessage: String? = null,
-    private val loaded: Boolean = false,
-    private val total: Int = 0,
+    /**
+     * Whether a load has actually succeeded, and how many conversations it found.
+     *
+     * Both exist only to tell three things apart that all show no rows: still loading, a household
+     * with no chats, and a search that matched none. Screens read [isEmpty] and [hasNoMatches]
+     * rather than these.
+     */
+    val loaded: Boolean = false,
+    val total: Int = 0,
 ) {
     /**
      * A household that has never chatted, which is a screen of its own — no search, no secret bar,
