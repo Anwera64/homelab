@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +52,7 @@ import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
+import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -96,6 +98,13 @@ fun ConversationContent(
 
     LaunchedEffect(itemCount, state.streamingMessage, state.turnState) {
         if (!following || itemCount == 0) return@LaunchedEffect
+
+        // Wait until the list has actually measured these items. Opening a conversation delivers
+        // the whole transcript in one go, and a scroll asked for before there is any layout lands
+        // against a height of nothing — which is how a chat you have been having for weeks opens
+        // on its first message rather than its newest.
+        snapshotFlow { transcript.layoutInfo.totalItemsCount }.first { it >= itemCount }
+
         // The last item is the answer itself and grows as it arrives, so this asks for its end
         // rather than its start; the offset is clamped to however tall it has become.
         transcript.scrollToItem(itemCount - 1, Int.MAX_VALUE)
@@ -242,29 +251,6 @@ private fun TurnStatus(
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
-    val transcript = rememberLazyListState()
-
-    // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this
-    // the words land below the fold and the screen sits still while the agent talks.
-    //
-    // It follows only while you are already at the bottom. Scroll up to re-read something and the
-    // answer keeps arriving without dragging you back down; return to the bottom and it picks the
-    // thread up again. Forcing it unconditionally would make a long answer impossible to read back
-    // while it is still being written.
-    val following by remember { derivedStateOf { !transcript.canScrollForward } }
-
-    // Counted from the state rather than read off the layout, because the first pass runs before
-    // there is any layout to read and the answer is already on screen by then.
-    val turnIsDrawn = state.streamingMessage != null || state.turnState == TurnState.Failed
-    val itemCount = state.messages.size + if (turnIsDrawn) 1 else 0
-
-    LaunchedEffect(itemCount, state.streamingMessage, state.turnState) {
-        if (!following || itemCount == 0) return@LaunchedEffect
-        // The last item is the answer itself and grows as it arrives, so this asks for its end
-        // rather than its start; the offset is clamped to however tall it has become.
-        transcript.scrollToItem(itemCount - 1, Int.MAX_VALUE)
-    }
-
     when (state.turnState) {
         TurnState.Reconnecting -> {
             TurnStatusLine(

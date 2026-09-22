@@ -70,6 +70,22 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     streamingMessage = partialAnswer,
                     turnState = TurnState.StillWorking,
                 ),
+            // Opening a conversation that has been going a while: it starts at the newest, not
+            // at whatever was said first.
+            "A conversation opened again" to
+                agent.copy(
+                    messages =
+                        (1..20).flatMap { turn ->
+                            listOf(
+                                said("u-$turn", "Question $turn of a long-running conversation", MessageRole.USER),
+                                said(
+                                    "a-$turn",
+                                    "Answer $turn, at some length to fill the screen.",
+                                    MessageRole.ASSISTANT,
+                                ),
+                            )
+                        },
+                ),
             "A long answer arriving" to
                 agent.copy(
                     messages = listOf(question),
