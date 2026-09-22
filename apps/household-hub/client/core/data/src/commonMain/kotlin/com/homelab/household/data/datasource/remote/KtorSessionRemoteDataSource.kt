@@ -16,6 +16,7 @@ import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.patch
@@ -117,13 +118,21 @@ class KtorSessionRemoteDataSource(
         content: String,
         autoApproveWrites: Boolean,
     ): Flow<ChatStreamEvent> =
+        openTurnStream("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
+            contentType(ContentType.Application.Json)
+            setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
+        }
+
+    override fun openRegenerateStream(sessionId: String): Flow<ChatStreamEvent> =
+        openTurnStream("$baseUrl/api/v1/sessions/$sessionId/chat/regenerate") {}
+
+    private fun openTurnStream(
+        url: String,
+        configure: HttpRequestBuilder.() -> Unit,
+    ): Flow<ChatStreamEvent> =
         channelFlow {
             try {
-                val statement =
-                    client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
-                        contentType(ContentType.Application.Json)
-                        setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
-                    }
+                val statement = client.preparePost(url, configure)
                 statement.execute { response ->
                     when (response.status) {
                         HttpStatusCode.OK -> {

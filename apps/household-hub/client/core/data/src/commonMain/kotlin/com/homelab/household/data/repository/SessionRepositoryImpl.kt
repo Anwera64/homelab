@@ -93,28 +93,77 @@ class SessionRepositoryImpl(
     }
 
     /**
-     * `catch` only sees failures from upstream, so a conflict from the hub starts the recovery while
-     * a failure in whoever is collecting still reaches them untouched.
+     * Sends a turn, and decides what a broken stream means.
+     *
+     * The distinction that matters is *when* it broke. Nothing delivered — no delta ever arrived —
+     * means the question itself failed, and the failure is the caller's to show and to offer again.
+     * Once a single word has arrived the question is plainly on the hub, and durable execution
+     * means it is still being answered whether or not anyone is listening; the answer is then
+     * something to go and fetch, not something to report as broken.
+     *
+     * A 409 recovers the same way. It means a turn is already running on this conversation — in
+     * practice, the one whose stream just died — so waiting for it is the same act.
+     *
+     * `catch` only sees failures from upstream, so a failure in whoever is collecting still
+     * reaches them untouched.
      */
     override fun streamChatTurn(
         sessionId: String,
         content: String,
         autoApproveWrites: Boolean,
+        afterAssistantMessageId: String?,
     ): Flow<ChatStreamEvent> =
-        remote
-            .openChatStream(sessionId, content, autoApproveWrites)
-            .catch { cause ->
-                if (cause is SessionConflictException) emitAll(recoverReply(sessionId)) else throw cause
-            }
+        recoverable(remote.openChatStream(sessionId, content, autoApproveWrites), sessionId, afterAssistantMessageId)
+
+    override fun regenerateTurn(
+        sessionId: String,
+        afterAssistantMessageId: String?,
+    ): Flow<ChatStreamEvent> = recoverable(remote.openRegenerateStream(sessionId), sessionId, afterAssistantMessageId)
+
+    private fun recoverable(
+        turn: Flow<ChatStreamEvent>,
+        sessionId: String,
+        afterAssistantMessageId: String?,
+    ): Flow<ChatStreamEvent> =
+        flow {
+            var delivered = false
+            turn
+                .catch { cause ->
+                    val worthRecovering = cause is SessionConflictException || delivered
+                    if (!worthRecovering) throw cause
+                    emitAll(recoverReply(sessionId, afterAssistantMessageId))
+                }.collect { event ->
+                    if (event is ChatStreamEvent.Delta) delivered = true
+                    emit(event)
+                }
+        }
 
     /**
-     * The hub was busy, so the turn was never streamed. Read the conversation back, waiting longer
-     * each time, until the agent's reply has landed — then report it as the [ChatStreamEvent.Done]
-     * the collector was waiting for. A refusal along the way is not the end of the turn and is
-     * ignored, but a hub that has gone away is worth saying out loud.
+     * Wait for the answer the hub is still writing, and say which kind of ending this turn had.
+     *
+     * [afterAssistantMessageId] is the whole trick. A conversation that has run for a while
+     * already ends in an assistant message, so "the last assistant message" matches the *previous*
+     * answer on the very first read — a second after the stream died, with the real answer still
+     * being generated. Waiting for an id that is not that one is the difference between the answer
+     * and a stale one.
+     *
+     * Three ways out, and none of them is an exception. A new answer is [ChatStreamEvent.Done]. A
+     * hub that says no turn is running, with still no answer, means the turn died and is worth
+     * offering again — [ChatStreamEvent.TurnFailed]. Running past the ceiling is
+     * [ChatStreamEvent.StillWorking]: the wait ended, the turn did not, and telling someone their
+     * answer failed because we stopped watching would be a lie.
+     *
+     * A hub that has gone away entirely is still worth saying out loud, so that one throws.
      */
-    private fun recoverReply(sessionId: String): Flow<ChatStreamEvent> =
+    private fun recoverReply(
+        sessionId: String,
+        afterAssistantMessageId: String?,
+    ): Flow<ChatStreamEvent> =
         flow {
+            // Say so before the first wait: polling makes no sound of its own, and the phone is
+            // sitting on a half-written answer wondering whether anything is still happening.
+            emit(ChatStreamEvent.Reconnecting)
+
             var wait = pollDelayMs
             var waited = 0L
 
@@ -134,7 +183,12 @@ class SessionRepositoryImpl(
                             }
                         }.getOrNull()
 
-                val reply = detail?.messages?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
+                val reply =
+                    detail
+                        ?.messages
+                        ?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
+                        ?.takeIf { it.id != afterAssistantMessageId }
+
                 if (reply != null) {
                     emit(
                         ChatStreamEvent.Done(
@@ -145,9 +199,14 @@ class SessionRepositoryImpl(
                     )
                     return@flow
                 }
+
+                if (detail != null && !detail.turn_running) {
+                    emit(ChatStreamEvent.TurnFailed)
+                    return@flow
+                }
             }
 
-            throw DomainException("Session inference recovery timed out after ${MAX_RECOVERY_WAIT_MS / 1000}s")
+            emit(ChatStreamEvent.StillWorking)
         }
 
     private fun ConversationSession.withLockState(): ConversationSession =
