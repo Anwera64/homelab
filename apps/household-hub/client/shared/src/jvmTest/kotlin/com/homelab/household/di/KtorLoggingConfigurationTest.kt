@@ -23,7 +23,6 @@ import org.koin.test.KoinTest
 import org.koin.test.get
 
 class KtorLoggingConfigurationTest : KoinTest {
-
     @AfterEach
     fun tearDown() {
         stopKoin()
@@ -33,10 +32,11 @@ class KtorLoggingConfigurationTest : KoinTest {
     fun logs_all_when_isDebug_is_true() {
         startKoin {
             modules(
-                sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = true)) + module {
-                    single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
-                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
-                }
+                sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = true)) +
+                    module {
+                        single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
+                        single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
+                    },
             )
         }
 
@@ -49,10 +49,11 @@ class KtorLoggingConfigurationTest : KoinTest {
     fun logs_info_when_isDebug_is_false() {
         startKoin {
             modules(
-                sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = false)) + module {
-                    single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
-                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
-                }
+                sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = false)) +
+                    module {
+                        single<HttpClientEngine> { MockEngine { respond("{}", HttpStatusCode.OK) } }
+                        single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
+                    },
             )
         }
 

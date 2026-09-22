@@ -17,7 +17,6 @@ import kotlin.test.assertEquals
 /** "Who's here?" with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ProfilePickerScreenTest {
-
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
     private val liam = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
 

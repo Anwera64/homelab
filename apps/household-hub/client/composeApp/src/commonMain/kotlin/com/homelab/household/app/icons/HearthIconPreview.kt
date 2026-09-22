@@ -29,15 +29,16 @@ private fun HearthIconSetPreview() {
     HearthTheme {
         val cellWidth = HearthTheme.size.readingWidth / 3
         Column(
-            modifier = Modifier
-                .background(HearthTheme.colors.canvas)
-                .verticalScroll(rememberScrollState())
-                .padding(HearthTheme.spacing.xl)
+            modifier =
+                Modifier
+                    .background(HearthTheme.colors.canvas)
+                    .verticalScroll(rememberScrollState())
+                    .padding(HearthTheme.spacing.xl),
         ) {
             // Three cells to a row: the grid is as wide as the reading column, and cells carry no gap.
             FlowRow(
                 modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             ) {
                 HearthIcon.entries.forEach { icon ->
                     IconCell(icon = icon, modifier = Modifier.width(cellWidth))
@@ -48,11 +49,14 @@ private fun HearthIconSetPreview() {
 }
 
 @Composable
-private fun IconCell(icon: HearthIcon, modifier: Modifier) {
+private fun IconCell(
+    icon: HearthIcon,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
             HearthIconImage(
@@ -60,14 +64,14 @@ private fun IconCell(icon: HearthIcon, modifier: Modifier) {
                 contentDescription = null,
                 active = false,
                 size = HearthTheme.size.iconLg,
-                tint = HearthTheme.colors.textPrimary
+                tint = HearthTheme.colors.textPrimary,
             )
             HearthIconImage(
                 icon = icon,
                 contentDescription = null,
                 active = true,
                 size = HearthTheme.size.iconLg,
-                tint = HearthTheme.colors.textPrimary
+                tint = HearthTheme.colors.textPrimary,
             )
         }
         Text(text = icon.token, style = HearthTheme.typography.monoSm, color = HearthTheme.colors.textMuted)

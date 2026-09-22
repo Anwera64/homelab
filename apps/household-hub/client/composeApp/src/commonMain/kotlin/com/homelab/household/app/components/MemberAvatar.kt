@@ -25,16 +25,26 @@ fun MemberAvatar(
     colour: String,
     size: Dp,
     glyph: TextStyle,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     Box(
-        modifier = modifier
-            .size(size)
-            .background(hexColor(colour, fallback = colors.primary), CircleShape)
-            .clearAndSetSemantics {},
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(size)
+                .background(hexColor(colour, fallback = colors.primary), CircleShape)
+                .clearAndSetSemantics {},
+        contentAlignment = Alignment.Center,
     ) {
-        Text(text = name.trim().firstOrNull()?.uppercase().orEmpty(), style = glyph, color = colors.onPrimary)
+        Text(
+            text =
+                name
+                    .trim()
+                    .firstOrNull()
+                    ?.uppercase()
+                    .orEmpty(),
+            style = glyph,
+            color = colors.onPrimary,
+        )
     }
 }

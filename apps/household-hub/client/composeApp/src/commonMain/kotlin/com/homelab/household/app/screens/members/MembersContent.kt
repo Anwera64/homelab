@@ -62,7 +62,7 @@ fun MembersContent(
     onRemove: (MemberRow) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -91,16 +91,16 @@ fun MembersContent(
                     PrimaryButton(
                         text = stringResource(Res.string.members_invite),
                         onClick = onInvite,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
@@ -122,7 +122,7 @@ fun MembersContent(
                     row = row,
                     youAreAdmin = state.youAreAdmin,
                     onResetPin = { onResetPin(row) },
-                    onRemove = { onRemove(row) }
+                    onRemove = { onRemove(row) },
                 )
             }
 
@@ -145,12 +145,12 @@ private fun MemberCardSkeleton(position: Int) {
     BentoCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             SkeletonCircle(size = size.touchTarget, position = position)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             ) {
                 SkeletonBlock(widthFraction = NAME_WIDTH, position = position)
                 SkeletonBlock(widthFraction = ROLE_WIDTH, height = HearthTheme.spacing.md, position = position)
@@ -163,7 +163,7 @@ private fun MemberCardSkeleton(position: Int) {
                 SkeletonBlock(
                     modifier = Modifier.weight(1f),
                     height = size.control,
-                    position = position
+                    position = position,
                 )
             }
         }
@@ -171,23 +171,33 @@ private fun MemberCardSkeleton(position: Int) {
 }
 
 @Composable
-private fun MemberCard(row: MemberRow, youAreAdmin: Boolean, onResetPin: () -> Unit, onRemove: () -> Unit) {
+private fun MemberCard(
+    row: MemberRow,
+    youAreAdmin: Boolean,
+    onResetPin: () -> Unit,
+    onRemove: () -> Unit,
+) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     BentoCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            MemberAvatar(name = row.name, colour = row.avatarColor, size = HearthTheme.size.touchTarget, glyph = type.glyphMd)
+            MemberAvatar(
+                name = row.name,
+                colour = row.avatarColor,
+                size = HearthTheme.size.touchTarget,
+                glyph = type.glyphMd,
+            )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs),
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(row.name, style = type.bodyStrong, color = colors.textPrimary)
                     if (row.isYou) {
@@ -208,13 +218,13 @@ private fun MemberCard(row: MemberRow, youAreAdmin: Boolean, onResetPin: () -> U
                 SecondaryButton(
                     text = stringResource(Res.string.members_reset_pin),
                     onClick = onResetPin,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
                 if (youAreAdmin) {
                     DestructiveButton(
                         text = stringResource(Res.string.members_remove),
                         onClick = onRemove,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -229,22 +239,31 @@ private const val ARRIVING_CARDS = 2
 private const val NAME_WIDTH = 0.45f
 private const val ROLE_WIDTH = 0.25f
 
-private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(status: MembersStatus, onRetry: () -> Unit) {
+private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(
+    status: MembersStatus,
+    onRetry: () -> Unit,
+) {
     when (status) {
-        MembersStatus.Loading, MembersStatus.Ready -> Unit
-        else -> item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = HearthTheme.spacing.xl),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
-            ) {
-                val text = if (status is MembersStatus.Unreachable) {
-                    stringResource(Res.string.members_unreachable)
-                } else {
-                    stringResource(Res.string.members_failed)
+        MembersStatus.Loading, MembersStatus.Ready -> {
+            Unit
+        }
+
+        else -> {
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = HearthTheme.spacing.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+                ) {
+                    val text =
+                        if (status is MembersStatus.Unreachable) {
+                            stringResource(Res.string.members_unreachable)
+                        } else {
+                            stringResource(Res.string.members_failed)
+                        }
+                    Text(text, style = HearthTheme.typography.body, color = HearthTheme.colors.error)
+                    SecondaryButton(text = stringResource(Res.string.members_retry), onClick = onRetry)
                 }
-                Text(text, style = HearthTheme.typography.body, color = HearthTheme.colors.error)
-                SecondaryButton(text = stringResource(Res.string.members_retry), onClick = onRetry)
             }
         }
     }
@@ -253,7 +272,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(status: M
 @DayNightPreviews
 @Composable
 private fun MembersContentPreview(
-    @PreviewParameter(MembersUiStateProvider::class) state: MembersUiState
+    @PreviewParameter(MembersUiStateProvider::class) state: MembersUiState,
 ) {
     HearthTheme {
         MembersContent(state = state, onInvite = {}, onResetPin = {}, onRemove = {}, onRetry = {}, onBack = {})

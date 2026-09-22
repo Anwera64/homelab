@@ -35,7 +35,7 @@ fun CodeBoxes(
     onCodeChange: (String) -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
-    length: Int = 6
+    length: Int = 6,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -49,25 +49,42 @@ fun CodeBoxes(
         textStyle = type.codeHero,
         singleLine = true,
         cursorBrush = SolidColor(Color.Transparent),
-        keyboardOptions = KeyboardOptions(
-            capitalization = KeyboardCapitalization.Characters,
-            imeAction = ImeAction.Done
-        ),
+        keyboardOptions =
+            KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                imeAction = ImeAction.Done,
+            ),
         decorationBox = {
             Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
                 repeat(length) { index ->
                     val character = code.getOrNull(index)
                     Box(
-                        modifier = Modifier
-                            .width(HearthTheme.size.touchTarget)
-                            .height(HearthTheme.size.control)
-                            .background(if (character == null) colors.surfaceAlt else colors.surface, HearthShapes.item)
-                            .border(
-                                width = if (character == null) HearthTheme.size.hairline else HearthTheme.size.emphasis,
-                                color = if (character == null) colors.outlineSoft else colors.primary,
-                                shape = HearthShapes.item
-                            ),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .width(HearthTheme.size.touchTarget)
+                                .height(HearthTheme.size.control)
+                                .background(
+                                    if (character ==
+                                        null
+                                    ) {
+                                        colors.surfaceAlt
+                                    } else {
+                                        colors.surface
+                                    },
+                                    HearthShapes.item,
+                                ).border(
+                                    width =
+                                        if (character ==
+                                            null
+                                        ) {
+                                            HearthTheme.size.hairline
+                                        } else {
+                                            HearthTheme.size.emphasis
+                                        },
+                                    color = if (character == null) colors.outlineSoft else colors.primary,
+                                    shape = HearthShapes.item,
+                                ),
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (character != null) {
                             Text(character.toString(), style = type.codeHero, color = colors.textPrimary)
@@ -75,6 +92,6 @@ fun CodeBoxes(
                     }
                 }
             }
-        }
+        },
     )
 }

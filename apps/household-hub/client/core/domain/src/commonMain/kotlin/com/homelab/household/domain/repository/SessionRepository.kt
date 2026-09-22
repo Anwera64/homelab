@@ -7,14 +7,39 @@ import kotlinx.coroutines.flow.Flow
 
 interface SessionRepository {
     suspend fun listSessions(): List<ConversationSession>
+
     suspend fun getSession(sessionId: String): Pair<ConversationSession, List<ChatMessage>>
-    suspend fun createSession(agentId: String, title: String = "New Conversation", isSecret: Boolean = false): ConversationSession
+
+    suspend fun createSession(
+        agentId: String,
+        title: String = "New Conversation",
+        isSecret: Boolean = false,
+    ): ConversationSession
+
     suspend fun archiveSession(sessionId: String)
-    suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): ConversationSession
+
+    suspend fun toggleSecretMode(
+        sessionId: String,
+        isSecret: Boolean,
+    ): ConversationSession
+
     suspend fun deleteSession(sessionId: String)
-    fun streamChatTurn(sessionId: String, content: String, autoApproveWrites: Boolean = false): Flow<ChatStreamEvent>
-    suspend fun approveToolProposal(sessionId: String, toolCallId: String, approved: Boolean, modifiedArguments: Map<String, Any?>? = null): Boolean
+
+    fun streamChatTurn(
+        sessionId: String,
+        content: String,
+        autoApproveWrites: Boolean = false,
+    ): Flow<ChatStreamEvent>
+
+    suspend fun approveToolProposal(
+        sessionId: String,
+        toolCallId: String,
+        approved: Boolean,
+        modifiedArguments: Map<String, Any?>? = null,
+    ): Boolean
+
     suspend fun lockAllSecretSessions(): Int
+
     /**
      * Opens a locked secret conversation, answering whether this caller is the one that opened it.
      *
@@ -26,7 +51,12 @@ interface SessionRepository {
      * lands, only [UnlockSecretSessionUseCase]'s "you typed something" check stands between a
      * person and a secret conversation.
      */
-    suspend fun unlockSecretSession(sessionId: String, pinOrPassword: String): Boolean
+    suspend fun unlockSecretSession(
+        sessionId: String,
+        pinOrPassword: String,
+    ): Boolean
+
     fun observeMessages(sessionId: String): Flow<List<ChatMessage>>
+
     suspend fun retryMessage(messageId: String): Flow<ChatStreamEvent>
 }

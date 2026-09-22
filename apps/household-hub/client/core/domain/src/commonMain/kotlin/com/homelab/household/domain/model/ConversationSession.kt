@@ -9,5 +9,5 @@ data class ConversationSession(
     val isArchived: Boolean = false,
     val isSecretLocked: Boolean = false,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
 )

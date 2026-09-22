@@ -15,7 +15,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ProfilePickerScreen(
     onMemberSelected: (Member) -> Unit,
     onInviteCode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfilePickerViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -31,6 +31,6 @@ fun ProfilePickerScreen(
         onMemberSelected = viewModel::onMemberSelected,
         onRetry = viewModel::load,
         onInviteCode = onInviteCode,
-        modifier = modifier
+        modifier = modifier,
     )
 }

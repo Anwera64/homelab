@@ -14,7 +14,6 @@ import com.homelab.household.domain.repository.MemoryRepository
 class MemoryRepositoryImpl(
     private val remote: MemoryRemoteDataSource,
 ) : MemoryRepository {
-
     override suspend fun auditMemories(scope: MemoryScope?): List<AgentMemory> =
         remote.auditMemories(scope?.name?.lowercase()).map(MemoryDataMapper::toDomain)
 
@@ -24,11 +23,12 @@ class MemoryRepositoryImpl(
         memoryId: String,
         content: String?,
         confidence: Float?,
-        isActive: Boolean?
-    ): AgentMemory = MemoryDataMapper.toDomain(
-        remote.updateMemory(
-            memoryId,
-            MemoryUpdateDto(content = content, confidence = confidence, is_active = isActive)
+        isActive: Boolean?,
+    ): AgentMemory =
+        MemoryDataMapper.toDomain(
+            remote.updateMemory(
+                memoryId,
+                MemoryUpdateDto(content = content, confidence = confidence, is_active = isActive),
+            ),
         )
-    )
 }

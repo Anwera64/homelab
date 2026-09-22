@@ -5,40 +5,42 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 class CleanArchitectureBoundaryTest {
-
-    private val clientRootDir = File(System.getProperty("user.dir")).let { dir ->
-        if (dir.name == "shared") dir.parentFile else dir
-    }
+    private val clientRootDir =
+        File(System.getProperty("user.dir")).let { dir ->
+            if (dir.name == "shared") dir.parentFile else dir
+        }
 
     private val domainDir = File(clientRootDir, "core/domain/src/commonMain/kotlin")
     private val dataDir = File(clientRootDir, "core/data/src/commonMain/kotlin")
     private val presentationDir = File(clientRootDir, "core/presentation/src/commonMain/kotlin")
     private val uiDir = File(clientRootDir, "composeApp/src/commonMain/kotlin")
 
-    private val commonMainDirs = listOf("core/domain", "core/data", "core/presentation", "shared", "composeApp")
-        .map { File(clientRootDir, "$it/src/commonMain/kotlin") }
-        .filter { it.exists() }
+    private val commonMainDirs =
+        listOf("core/domain", "core/data", "core/presentation", "shared", "composeApp")
+            .map { File(clientRootDir, "$it/src/commonMain/kotlin") }
+            .filter { it.exists() }
 
     @Test
     fun domain_layer_has_zero_external_or_outer_layer_dependencies() {
         assertTrue(domainDir.exists(), "Domain directory must exist at: ${domainDir.absolutePath}")
 
-        val violations = importViolations(
-            domainDir,
-            listOf(
-                "com.homelab.household.data",
-                "com.homelab.household.presentation",
-                "com.homelab.household.di",
-                "io.ktor",
-                "kotlinx.serialization",
-                "androidx",
-                "org.koin"
+        val violations =
+            importViolations(
+                domainDir,
+                listOf(
+                    "com.homelab.household.data",
+                    "com.homelab.household.presentation",
+                    "com.homelab.household.di",
+                    "io.ktor",
+                    "kotlinx.serialization",
+                    "androidx",
+                    "org.koin",
+                ),
             )
-        )
 
         assertTrue(
             violations.isEmpty(),
-            "Clean Architecture Violation in :core:domain:\n" + violations.joinToString("\n")
+            "Clean Architecture Violation in :core:domain:\n" + violations.joinToString("\n"),
         )
     }
 
@@ -50,7 +52,7 @@ class CleanArchitectureBoundaryTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Clean Architecture Violation in :core:presentation:\n" + violations.joinToString("\n")
+            "Clean Architecture Violation in :core:presentation:\n" + violations.joinToString("\n"),
         )
     }
 
@@ -62,7 +64,7 @@ class CleanArchitectureBoundaryTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Clean Architecture Violation in :core:data:\n" + violations.joinToString("\n")
+            "Clean Architecture Violation in :core:data:\n" + violations.joinToString("\n"),
         )
     }
 
@@ -75,24 +77,25 @@ class CleanArchitectureBoundaryTest {
      */
     @Test
     fun common_main_has_no_platform_imports() {
-        val violations = commonMainDirs.flatMap {
-            importViolations(
-                it,
-                listOf(
-                    "java.",
-                    "javax.",
-                    "android.",
-                    "platform.",
-                    "io.ktor.client.engine.cio",
-                    "io.ktor.client.engine.okhttp",
-                    "io.ktor.client.engine.darwin"
+        val violations =
+            commonMainDirs.flatMap {
+                importViolations(
+                    it,
+                    listOf(
+                        "java.",
+                        "javax.",
+                        "android.",
+                        "platform.",
+                        "io.ktor.client.engine.cio",
+                        "io.ktor.client.engine.okhttp",
+                        "io.ktor.client.engine.darwin",
+                    ),
                 )
-            )
-        }
+            }
 
         assertTrue(
             violations.isEmpty(),
-            "Platform API in commonMain (must stay iOS-compatible):\n" + violations.joinToString("\n")
+            "Platform API in commonMain (must stay iOS-compatible):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -100,19 +103,20 @@ class CleanArchitectureBoundaryTest {
     fun ui_layer_imports_only_presentation_and_domain() {
         assertTrue(uiDir.exists(), "UI directory must exist at: ${uiDir.absolutePath}")
 
-        val violations = importViolations(
-            uiDir,
-            listOf(
-                "com.homelab.household.data",
-                "com.homelab.household.di",
-                "com.homelab.household.sdk",
-                "io.ktor"
+        val violations =
+            importViolations(
+                uiDir,
+                listOf(
+                    "com.homelab.household.data",
+                    "com.homelab.household.di",
+                    "com.homelab.household.sdk",
+                    "io.ktor",
+                ),
             )
-        )
 
         assertTrue(
             violations.isEmpty(),
-            "Clean Architecture Violation in :composeApp:\n" + violations.joinToString("\n")
+            "Clean Architecture Violation in :composeApp:\n" + violations.joinToString("\n"),
         )
     }
 
@@ -127,14 +131,15 @@ class CleanArchitectureBoundaryTest {
         val outsideDomainDirs = commonMainDirs.filterNot { it == domainDir }
         assertTrue(outsideDomainDirs.isNotEmpty(), "No commonMain directories found outside :core:domain")
 
-        val violations = outsideDomainDirs
-            .flatMap { importViolations(it, listOf("com.homelab.household.domain.usecase.impl")) }
-            .filterNot { it.startsWith("DomainModule.kt:") }
+        val violations =
+            outsideDomainDirs
+                .flatMap { importViolations(it, listOf("com.homelab.household.domain.usecase.impl")) }
+                .filterNot { it.startsWith("DomainModule.kt:") }
 
         assertTrue(
             violations.isEmpty(),
             "Use case implementation imported outside :core:domain (depend on the protocol instead, " +
-                "only DomainModule.kt may name an implementation):\n" + violations.joinToString("\n")
+                "only DomainModule.kt may name an implementation):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -145,24 +150,26 @@ class CleanArchitectureBoundaryTest {
      */
     @Test
     fun module_dependencies_point_inward() {
-        val allowedProjectDependencies = mapOf(
-            "core/domain" to emptySet(),
-            "core/data" to setOf(":core:domain"),
-            "core/presentation" to setOf(":core:domain"),
-            "composeApp" to setOf(":core:domain", ":core:presentation")
-        )
+        val allowedProjectDependencies =
+            mapOf(
+                "core/domain" to emptySet(),
+                "core/data" to setOf(":core:domain"),
+                "core/presentation" to setOf(":core:domain"),
+                "composeApp" to setOf(":core:domain", ":core:presentation"),
+            )
 
-        val violations = allowedProjectDependencies.flatMap { (module, allowed) ->
-            val buildFile = File(clientRootDir, "$module/build.gradle.kts")
-            assertTrue(buildFile.exists(), "Build file must exist at: ${buildFile.absolutePath}")
-            projectDependencies(buildFile)
-                .filterNot { it in allowed }
-                .map { "$module depends on $it (allowed: ${allowed.ifEmpty { setOf("none") }})" }
-        }
+        val violations =
+            allowedProjectDependencies.flatMap { (module, allowed) ->
+                val buildFile = File(clientRootDir, "$module/build.gradle.kts")
+                assertTrue(buildFile.exists(), "Build file must exist at: ${buildFile.absolutePath}")
+                projectDependencies(buildFile)
+                    .filterNot { it in allowed }
+                    .map { "$module depends on $it (allowed: ${allowed.ifEmpty { setOf("none") }})" }
+            }
 
         assertTrue(
             violations.isEmpty(),
-            "Production module dependency points outward:\n" + violations.joinToString("\n")
+            "Production module dependency points outward:\n" + violations.joinToString("\n"),
         )
     }
 
@@ -199,15 +206,19 @@ class CleanArchitectureBoundaryTest {
         return dependencies
     }
 
-    private fun importViolations(sourceDir: File, forbiddenImports: List<String>): List<String> =
-        sourceDir.walkTopDown()
+    private fun importViolations(
+        sourceDir: File,
+        forbiddenImports: List<String>,
+    ): List<String> =
+        sourceDir
+            .walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .flatMap { file ->
                 file.readLines().mapIndexedNotNull { index, line ->
                     val trimmed = line.trim()
-                    forbiddenImports.firstOrNull { trimmed.startsWith("import $it") }
+                    forbiddenImports
+                        .firstOrNull { trimmed.startsWith("import $it") }
                         ?.let { "${file.name}:${index + 1} imports forbidden dependency '$it'" }
                 }
-            }
-            .toList()
+            }.toList()
 }

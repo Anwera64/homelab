@@ -13,7 +13,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun InviteCreateScreen(
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: InviteCreateViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -28,6 +28,6 @@ fun InviteCreateScreen(
         // For a code that is easier sent over chat than read across a room.
         onCopy = { state.invite?.let { clipboard.setText(AnnotatedString(it.code)) } },
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

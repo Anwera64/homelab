@@ -31,18 +31,19 @@ fun CodeCard(
     code: String,
     expiry: String,
     modifier: Modifier = Modifier,
-    loading: Boolean = false
+    loading: Boolean = false,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(colors.surface, HearthShapes.bento)
-            .padding(HearthTheme.spacing.xl),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(colors.surface, HearthShapes.bento)
+                .padding(HearthTheme.spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         Text(label, style = type.overline, color = colors.textMuted)
         if (loading) {
@@ -53,7 +54,7 @@ fun CodeCard(
         Text(
             text = if (loading) stringResource(Res.string.invite_create_making_new) else expiry,
             style = type.caption,
-            color = if (loading) colors.textMuted else colors.secondary
+            color = if (loading) colors.textMuted else colors.secondary,
         )
     }
 }
@@ -70,7 +71,7 @@ private fun ArrivingCode() {
                 SkeletonBlock(
                     modifier = Modifier.width(HearthTheme.size.iconLg),
                     height = HearthTheme.spacing.xxl,
-                    position = position
+                    position = position,
                 )
             }
         }

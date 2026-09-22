@@ -21,9 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChangePinViewModel(
-    private val changePin: ChangePinUseCase
+    private val changePin: ChangePinUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ChangePinUiState())
     val uiState: StateFlow<ChangePinUiState> = _uiState.asStateFlow()
 
@@ -69,18 +68,29 @@ class ChangePinViewModel(
                 },
                 onFailure = { error ->
                     when (error) {
-                        is PinLockedException -> countDown(error.retryAfterSeconds)
-                        is WrongPinException -> _uiState.update {
-                            it.copy(
-                                current = "",
-                                currentError = CurrentPinError.Wrong(error.attemptsLeft),
-                                status = ChangePinStatus.Idle
-                            )
+                        is PinLockedException -> {
+                            countDown(error.retryAfterSeconds)
                         }
-                        is ServerOfflineException -> _uiState.update { it.copy(status = ChangePinStatus.Unreachable) }
-                        else -> _uiState.update { it.copy(status = ChangePinStatus.Failed) }
+
+                        is WrongPinException -> {
+                            _uiState.update {
+                                it.copy(
+                                    current = "",
+                                    currentError = CurrentPinError.Wrong(error.attemptsLeft),
+                                    status = ChangePinStatus.Idle,
+                                )
+                            }
+                        }
+
+                        is ServerOfflineException -> {
+                            _uiState.update { it.copy(status = ChangePinStatus.Unreachable) }
+                        }
+
+                        else -> {
+                            _uiState.update { it.copy(status = ChangePinStatus.Failed) }
+                        }
                     }
-                }
+                },
             )
         }
     }
@@ -89,12 +99,13 @@ class ChangePinViewModel(
 
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(current = "", status = ChangePinStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(current = "", status = ChangePinStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = ChangePinStatus.Idle) }
             }
-            _uiState.update { it.copy(status = ChangePinStatus.Idle) }
-        }
     }
 }

@@ -22,7 +22,7 @@ fun HearthTopBar(
     onBack: () -> Unit,
     backDescription: String,
     modifier: Modifier = Modifier,
-    title: String? = null
+    title: String? = null,
 ) {
     val colors = HearthTheme.colors
 
@@ -39,9 +39,10 @@ fun HearthTopBar(
                 HearthIconImage(icon = HearthIcon.Back, contentDescription = backDescription, tint = colors.textMuted)
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = colors.canvas,
-            scrolledContainerColor = colors.canvas
-        )
+        colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = colors.canvas,
+                scrolledContainerColor = colors.canvas,
+            ),
     )
 }

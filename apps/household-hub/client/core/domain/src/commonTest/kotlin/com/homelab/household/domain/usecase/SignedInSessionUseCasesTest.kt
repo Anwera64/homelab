@@ -20,36 +20,39 @@ import kotlin.test.assertEquals
 
 /** Staying signed in on this phone: renewing the token, and hearing when the hub stopped accepting it. */
 class SignedInSessionUseCasesTest {
-
     private val authRepo = mock<AuthRepository>()
 
     @Test
-    fun a_sign_out_from_the_hub_reaches_whoever_is_watching() = runTest {
-        every { authRepo.observeSignedOut() } returns flowOf(Unit)
+    fun a_sign_out_from_the_hub_reaches_whoever_is_watching() =
+        runTest {
+            every { authRepo.observeSignedOut() } returns flowOf(Unit)
 
-        assertEquals(listOf(Unit), ObserveSignedOutUseCaseImpl(authRepo)().toList())
-    }
-
-    @Test
-    fun renewing_asks_the_hub_for_a_fresh_token() = runTest {
-        everySuspend { authRepo.refreshToken() } returns "fresh-token"
-
-        RenewSessionUseCaseImpl(authRepo)()
-
-        verifySuspend(VerifyMode.exactly(1)) { authRepo.refreshToken() }
-    }
+            assertEquals(listOf(Unit), ObserveSignedOutUseCaseImpl(authRepo)().toList())
+        }
 
     @Test
-    fun renewing_with_the_hub_unreachable_quietly_keeps_the_token_it_has() = runTest {
-        everySuspend { authRepo.refreshToken() } throws ServerOfflineException()
+    fun renewing_asks_the_hub_for_a_fresh_token() =
+        runTest {
+            everySuspend { authRepo.refreshToken() } returns "fresh-token"
 
-        RenewSessionUseCaseImpl(authRepo)()
-    }
+            RenewSessionUseCaseImpl(authRepo)()
+
+            verifySuspend(VerifyMode.exactly(1)) { authRepo.refreshToken() }
+        }
 
     @Test
-    fun renewing_a_token_the_hub_refused_leaves_the_sign_out_to_the_signal() = runTest {
-        everySuspend { authRepo.refreshToken() } throws UnauthorizedException("Token no longer accepted")
+    fun renewing_with_the_hub_unreachable_quietly_keeps_the_token_it_has() =
+        runTest {
+            everySuspend { authRepo.refreshToken() } throws ServerOfflineException()
 
-        RenewSessionUseCaseImpl(authRepo)()
-    }
+            RenewSessionUseCaseImpl(authRepo)()
+        }
+
+    @Test
+    fun renewing_a_token_the_hub_refused_leaves_the_sign_out_to_the_signal() =
+        runTest {
+            everySuspend { authRepo.refreshToken() } throws UnauthorizedException("Token no longer accepted")
+
+            RenewSessionUseCaseImpl(authRepo)()
+        }
 }

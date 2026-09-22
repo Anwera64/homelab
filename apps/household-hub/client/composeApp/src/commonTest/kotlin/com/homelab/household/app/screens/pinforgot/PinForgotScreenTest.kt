@@ -22,13 +22,12 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.pinforgot.PinForgotStatus
 import com.homelab.household.presentation.pinforgot.PinForgotUiState
-import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
+import kotlin.test.Test
 
 /** A forgotten PIN, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class PinForgotScreenTest {
-
     private val emma = Member(id = "emma", name = "Emma Larsson", avatarColor = "#3C6E4E")
     private val wait = 5_000L
 
@@ -40,7 +39,12 @@ class PinForgotScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = {}) }
+            }
 
             waitUntilExactlyOneExists(hasText(getString(Res.string.forgot_ask, "Liam")), timeoutMillis = wait)
             onNodeWithText(getString(Res.string.forgot_alone_title)).assertIsDisplayed()
@@ -53,7 +57,11 @@ class PinForgotScreenTest {
         var code = 0
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = { code++ }) } }
+            setContent {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
+                    PinForgotScreen(member = emma, onBack = {}, onHaveCode = { code++ })
+                }
+            }
 
             onNodeWithText(getString(Res.string.forgot_have_code)).performClick()
             waitUntil(timeoutMillis = wait) { code == 1 }
@@ -68,7 +76,7 @@ class PinForgotScreenTest {
                     PinForgotContent(
                         state = PinForgotUiState(member = emma, others = emptyList(), status = PinForgotStatus.Loading),
                         onHaveCode = {},
-                        onBack = {}
+                        onBack = {},
                     )
                 }
             }

@@ -7,5 +7,5 @@ data class ChatMessage(
     val content: String,
     val status: MessageStatus = MessageStatus.SENT,
     val metadata: Map<String, Any?> = emptyMap(),
-    val createdAt: String? = null
+    val createdAt: String? = null,
 )

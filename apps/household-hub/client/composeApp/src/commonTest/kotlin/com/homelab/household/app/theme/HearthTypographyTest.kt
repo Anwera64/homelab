@@ -23,13 +23,13 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class HearthTypographyTest {
-
     /** Three families that are merely distinct: the test is about the roles, not the fonts. */
-    private val fonts = HearthFonts(
-        outfit = FontFamily.SansSerif,
-        inter = FontFamily.Default,
-        jetBrainsMono = FontFamily.Monospace
-    )
+    private val fonts =
+        HearthFonts(
+            outfit = FontFamily.SansSerif,
+            inter = FontFamily.Default,
+            jetBrainsMono = FontFamily.Monospace,
+        )
     private val type = hearthTypography(fonts)
 
     @Test
@@ -66,10 +66,16 @@ class HearthTypographyTest {
      */
     @Test
     fun glyph_roles_climb_one_step_per_circle() {
-        val steps = listOf(
-            type.glyphXs to 10, type.glyphSm to 14, type.glyphMd to 18, type.glyphLg to 22,
-            type.glyphXl to 26, type.glyphXxl to 30, type.glyphHero to 36
-        )
+        val steps =
+            listOf(
+                type.glyphXs to 10,
+                type.glyphSm to 14,
+                type.glyphMd to 18,
+                type.glyphLg to 22,
+                type.glyphXl to 26,
+                type.glyphXxl to 30,
+                type.glyphHero to 36,
+            )
         steps.forEach { (style, size) ->
             assertEquals(size.sp, style.fontSize, "glyph $size size")
             assertEquals(1f.em, style.lineHeight, "glyph $size line height")
@@ -98,17 +104,25 @@ class HearthTypographyTest {
     fun material_display_slots_are_outfit_and_text_slots_are_inter() {
         val m = type.material
         listOf(
-            "displayLarge" to m.displayLarge, "displayMedium" to m.displayMedium,
-            "displaySmall" to m.displaySmall, "headlineLarge" to m.headlineLarge,
-            "headlineMedium" to m.headlineMedium, "headlineSmall" to m.headlineSmall,
-            "titleLarge" to m.titleLarge
+            "displayLarge" to m.displayLarge,
+            "displayMedium" to m.displayMedium,
+            "displaySmall" to m.displaySmall,
+            "headlineLarge" to m.headlineLarge,
+            "headlineMedium" to m.headlineMedium,
+            "headlineSmall" to m.headlineSmall,
+            "titleLarge" to m.titleLarge,
         ).forEach { (role, style) ->
             assertTrue(style.fontFamily === fonts.outfit, "$role should use Outfit")
         }
         listOf(
-            "titleMedium" to m.titleMedium, "titleSmall" to m.titleSmall,
-            "bodyLarge" to m.bodyLarge, "bodyMedium" to m.bodyMedium, "bodySmall" to m.bodySmall,
-            "labelLarge" to m.labelLarge, "labelMedium" to m.labelMedium, "labelSmall" to m.labelSmall
+            "titleMedium" to m.titleMedium,
+            "titleSmall" to m.titleSmall,
+            "bodyLarge" to m.bodyLarge,
+            "bodyMedium" to m.bodyMedium,
+            "bodySmall" to m.bodySmall,
+            "labelLarge" to m.labelLarge,
+            "labelMedium" to m.labelMedium,
+            "labelSmall" to m.labelSmall,
         ).forEach { (role, style) ->
             assertTrue(style.fontFamily === fonts.inter, "$role should use Inter")
         }
@@ -120,65 +134,68 @@ class HearthTypographyTest {
     }
 
     @Test
-    fun the_theme_hands_out_the_type_scale() = runComposeUiTest {
-        var seen: HearthTypography? = null
-        var material: TextStyle? = null
+    fun the_theme_hands_out_the_type_scale() =
+        runComposeUiTest {
+            var seen: HearthTypography? = null
+            var material: TextStyle? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                seen = HearthTheme.typography
-                material = MaterialTheme.typography.bodyMedium
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    seen = HearthTheme.typography
+                    material = MaterialTheme.typography.bodyMedium
+                }
             }
-        }
 
-        waitForIdle()
-        assertEquals(14.sp, seen?.body?.fontSize, "body size off the theme")
-        assertEquals(14.sp, material?.fontSize, "Material body size off the theme")
-    }
+            waitForIdle()
+            assertEquals(14.sp, seen?.body?.fontSize, "body size off the theme")
+            assertEquals(14.sp, material?.fontSize, "Material body size off the theme")
+        }
 
     /** Type doesn't change with the palette: the same role reads the same in either. */
     @Test
-    fun the_type_scale_is_the_same_in_both_palettes() = runComposeUiTest {
-        var day: HearthTypography? = null
-        var night: HearthTypography? = null
+    fun the_type_scale_is_the_same_in_both_palettes() =
+        runComposeUiTest {
+            var day: HearthTypography? = null
+            var night: HearthTypography? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) { day = HearthTheme.typography }
-            HearthTheme(darkTheme = true) { night = HearthTheme.typography }
+            setContent {
+                HearthTheme(darkTheme = false) { day = HearthTheme.typography }
+                HearthTheme(darkTheme = true) { night = HearthTheme.typography }
+            }
+
+            waitForIdle()
+            assertEquals(day?.body, night?.body)
+            assertEquals(day?.hero, night?.hero)
         }
-
-        waitForIdle()
-        assertEquals(day?.body, night?.body)
-        assertEquals(day?.hero, night?.hero)
-    }
 
     /**
      * The point of putting type behind a local: a tighter or looser scale — a tablet, a later size
      * class, an accessibility pass — can be provided once and every screen under it follows.
      */
     @Test
-    fun a_provided_type_scale_reaches_the_screens_under_it() = runComposeUiTest {
-        var seen: TextStyle? = null
+    fun a_provided_type_scale_reaches_the_screens_under_it() =
+        runComposeUiTest {
+            var seen: TextStyle? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                val roomier = HearthTheme.typography.let { it.copy(body = it.bodyLarge) }
-                CompositionLocalProvider(LocalHearthTypography provides roomier) {
-                    seen = HearthTheme.typography.body
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    val roomier = HearthTheme.typography.let { it.copy(body = it.bodyLarge) }
+                    CompositionLocalProvider(LocalHearthTypography provides roomier) {
+                        seen = HearthTheme.typography.body
+                    }
                 }
             }
-        }
 
-        waitForIdle()
-        assertEquals(15.sp, seen?.fontSize)
-    }
+            waitForIdle()
+            assertEquals(15.sp, seen?.fontSize)
+        }
 
     private fun TextStyle.assertIs(
         family: Any?,
         size: TextUnit,
         weight: FontWeight,
         lineHeight: TextUnit,
-        tracking: TextUnit = TextUnit.Unspecified
+        tracking: TextUnit = TextUnit.Unspecified,
     ) {
         assertTrue(fontFamily === family, "family of the ${size.value.toInt()}sp role")
         assertEquals(size, fontSize, "size")

@@ -13,5 +13,5 @@ data class PinRefusalDto(
     val detail: String? = null,
     val code: String? = null,
     @SerialName("attempts_left") val attempts_left: Int? = null,
-    @SerialName("retry_after_seconds") val retry_after_seconds: Int? = null
+    @SerialName("retry_after_seconds") val retry_after_seconds: Int? = null,
 )

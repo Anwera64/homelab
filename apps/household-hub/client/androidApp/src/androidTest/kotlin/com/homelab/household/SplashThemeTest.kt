@@ -16,14 +16,14 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class SplashThemeTest {
-
     @Test
     fun main_activity_opens_with_the_splash_theme() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val activity = context.packageManager.getActivityInfo(
-            ComponentName(context, MainActivity::class.java),
-            0
-        )
+        val activity =
+            context.packageManager.getActivityInfo(
+                ComponentName(context, MainActivity::class.java),
+                0,
+            )
 
         assertEquals(R.style.Theme_HyggeHub_Starting, activity.themeResource)
     }

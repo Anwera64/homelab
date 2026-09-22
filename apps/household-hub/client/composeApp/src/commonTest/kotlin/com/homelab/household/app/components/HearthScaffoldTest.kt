@@ -36,82 +36,85 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class HearthScaffoldTest {
-
     @Test
-    fun header_and_bottom_bar_stay_while_the_content_scrolls() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                HearthScaffold(
-                    header = { Text("HyggeHub · Household") },
-                    bottomBar = { Text("Bottom bar") }
-                ) { padding ->
-                    Column(Modifier.verticalScroll(rememberScrollState()).padding(padding)) {
-                        repeat(120) { Text("Row $it") }
+    fun header_and_bottom_bar_stay_while_the_content_scrolls() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    HearthScaffold(
+                        header = { Text("HyggeHub · Household") },
+                        bottomBar = { Text("Bottom bar") },
+                    ) { padding ->
+                        Column(Modifier.verticalScroll(rememberScrollState()).padding(padding)) {
+                            repeat(120) { Text("Row $it") }
+                        }
                     }
                 }
             }
+
+            onNodeWithText("Row 119").performScrollTo().assertIsDisplayed()
+
+            onNodeWithText("Row 0").assertIsNotDisplayed()
+            onNodeWithText("HyggeHub · Household").assertIsDisplayed()
+            onNodeWithText("Bottom bar").assertIsDisplayed()
         }
 
-        onNodeWithText("Row 119").performScrollTo().assertIsDisplayed()
-
-        onNodeWithText("Row 0").assertIsNotDisplayed()
-        onNodeWithText("HyggeHub · Household").assertIsDisplayed()
-        onNodeWithText("Bottom bar").assertIsDisplayed()
-    }
-
     @Test
-    fun a_lazy_list_scrolls_inside() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                HearthScaffold(header = { Text("Chats") }) { padding ->
-                    LazyColumn(modifier = Modifier.testTag("list"), contentPadding = padding) {
-                        items(500) { Text("Chat $it") }
+    fun a_lazy_list_scrolls_inside() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    HearthScaffold(header = { Text("Chats") }) { padding ->
+                        LazyColumn(modifier = Modifier.testTag("list"), contentPadding = padding) {
+                            items(500) { Text("Chat $it") }
+                        }
                     }
                 }
             }
+
+            onNodeWithTag("list").performScrollToIndex(499)
+
+            onNodeWithText("Chat 499").assertIsDisplayed()
+            onNodeWithText("Chats").assertIsDisplayed()
         }
-
-        onNodeWithTag("list").performScrollToIndex(499)
-
-        onNodeWithText("Chat 499").assertIsDisplayed()
-        onNodeWithText("Chats").assertIsDisplayed()
-    }
 
     @Test
-    fun the_content_starts_under_the_header_and_ends_above_the_bottom_bar() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                HearthScaffold(
-                    header = { Box(Modifier.fillMaxWidth().height(BAR)) },
-                    bottomBar = { Box(Modifier.fillMaxWidth().height(BAR)) },
-                    contentWindowInsets = WindowInsets(0.dp)
-                ) { padding ->
-                    Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+    fun the_content_starts_under_the_header_and_ends_above_the_bottom_bar() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    HearthScaffold(
+                        header = { Box(Modifier.fillMaxWidth().height(BAR)) },
+                        bottomBar = { Box(Modifier.fillMaxWidth().height(BAR)) },
+                        contentWindowInsets = WindowInsets(0.dp),
+                    ) { padding ->
+                        Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+                    }
                 }
             }
+
+            val root = onRoot().getBoundsInRoot()
+            val content = onNodeWithTag("content").getBoundsInRoot()
+
+            assertEquals(BAR, content.top)
+            assertEquals(root.bottom - BAR, content.bottom)
         }
-
-        val root = onRoot().getBoundsInRoot()
-        val content = onNodeWithTag("content").getBoundsInRoot()
-
-        assertEquals(BAR, content.top)
-        assertEquals(root.bottom - BAR, content.bottom)
-    }
 
     @Test
-    fun without_bars_the_window_insets_and_the_gutter_reach_the_content() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                HearthScaffold(contentWindowInsets = WindowInsets(top = STATUS_BAR)) { padding ->
-                    Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+    fun without_bars_the_window_insets_and_the_gutter_reach_the_content() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    HearthScaffold(contentWindowInsets = WindowInsets(top = STATUS_BAR)) { padding ->
+                        Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+                    }
                 }
             }
-        }
 
-        onNodeWithTag("content")
-            .assertTopPositionInRootIsEqualTo(STATUS_BAR)
-            .assertLeftPositionInRootIsEqualTo(20.dp)
-    }
+            onNodeWithTag("content")
+                .assertTopPositionInRootIsEqualTo(STATUS_BAR)
+                .assertLeftPositionInRootIsEqualTo(20.dp)
+        }
 
     private companion object {
         val BAR = 56.dp

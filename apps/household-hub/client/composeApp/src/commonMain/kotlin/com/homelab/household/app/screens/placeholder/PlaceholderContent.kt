@@ -26,29 +26,30 @@ import org.jetbrains.compose.resources.stringResource
 fun PlaceholderContent(
     title: String,
     detail: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(HearthTheme.spacing.huge),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(HearthTheme.spacing.huge),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm, Alignment.CenterVertically),
     ) {
         Text(
             text = title,
             style = HearthTheme.typography.hero,
             color = colors.textPrimary,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
         Text(
             text = detail,
             style = HearthTheme.typography.body,
             color = colors.textMuted,
             textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
         )
     }
 }
@@ -59,7 +60,7 @@ private fun PlaceholderContentPreview() {
     HearthTheme {
         PlaceholderContent(
             title = stringResource(Res.string.home_title),
-            detail = stringResource(Res.string.home_detail)
+            detail = stringResource(Res.string.home_detail),
         )
     }
 }

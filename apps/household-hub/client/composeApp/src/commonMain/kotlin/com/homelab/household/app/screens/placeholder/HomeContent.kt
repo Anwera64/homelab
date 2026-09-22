@@ -26,41 +26,44 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun HomePlaceholderContent(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     member: User?,
     onProfile: () -> Unit,
-    description: String
+    description: String,
 ) {
     HearthScaffold(
         modifier = modifier,
         header = {
             Box(
-                modifier = Modifier
-                    .safeContentPadding()
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.CenterEnd
+                modifier =
+                    Modifier
+                        .safeContentPadding()
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.CenterEnd,
             ) {
                 MemberAvatar(
                     name = member?.fullName.orEmpty(),
                     colour = member?.avatarColor ?: DEFAULT_COLOUR,
                     size = HearthTheme.size.touchTarget,
                     glyph = HearthTheme.typography.glyphMd,
-                    modifier = Modifier
-                        .clickable(onClick = onProfile)
-                        .semantics { contentDescription = description }
+                    modifier =
+                        Modifier
+                            .clickable(onClick = onProfile)
+                            .semantics { contentDescription = description },
                 )
             }
-        }
+        },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-            verticalArrangement = Arrangement.Center
+            modifier =
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
         ) {
             PlaceholderContent(
                 title = stringResource(Res.string.home_title),
-                detail = stringResource(Res.string.home_detail)
+                detail = stringResource(Res.string.home_detail),
             )
         }
     }
@@ -71,17 +74,19 @@ private const val DEFAULT_COLOUR = "#3C6E4E"
 
 @DayNightPreviews
 @Composable
-private fun HomePlaceHolderPreview() = HearthTheme {
-    HomePlaceholderContent(
-        modifier = Modifier,
-        member = User(
-            id = "",
-            fullName = "Full name",
-            avatarColor = DEFAULT_COLOUR,
-            isAdmin = false,
-            isActive = true
-        ),
-        onProfile = {},
-        description = stringResource(Res.string.profile_open)
-    )
-}
+private fun HomePlaceHolderPreview() =
+    HearthTheme {
+        HomePlaceholderContent(
+            modifier = Modifier,
+            member =
+                User(
+                    id = "",
+                    fullName = "Full name",
+                    avatarColor = DEFAULT_COLOUR,
+                    isAdmin = false,
+                    isActive = true,
+                ),
+            onProfile = {},
+            description = stringResource(Res.string.profile_open),
+        )
+    }

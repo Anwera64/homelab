@@ -54,7 +54,7 @@ fun PinForgotContent(
     state: PinForgotUiState,
     onHaveCode: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -62,11 +62,11 @@ fun PinForgotContent(
 
     HearthScaffold(
         modifier = modifier,
-        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.forgot_back)) }
+        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.forgot_back)) },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
                 Text(stringResource(Res.string.forgot_title), style = type.hero, color = colors.textPrimary)
@@ -81,21 +81,25 @@ fun PinForgotContent(
                 } else if (vouching != null) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MemberAvatar(
                             name = vouching.name,
                             colour = vouching.avatarColor,
                             size = HearthTheme.size.touchTarget,
-                            glyph = type.glyphMd
+                            glyph = type.glyphMd,
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)) {
                             Text(
                                 stringResource(Res.string.forgot_ask, vouching.name),
                                 style = type.bodyStrong,
-                                color = colors.textPrimary
+                                color = colors.textPrimary,
                             )
-                            Text(stringResource(Res.string.forgot_ask_detail), style = type.caption, color = colors.textMuted)
+                            Text(
+                                stringResource(Res.string.forgot_ask_detail),
+                                style = type.caption,
+                                color = colors.textMuted,
+                            )
                         }
                     }
                     Step(number = 1, text = stringResource(Res.string.forgot_step_one, vouching.name))
@@ -105,7 +109,7 @@ fun PinForgotContent(
                 PrimaryButton(
                     text = stringResource(Res.string.forgot_have_code),
                     onClick = onHaveCode,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -116,10 +120,11 @@ fun PinForgotContent(
                     text = stringResource(Res.string.forgot_alone_command, state.member.name),
                     style = type.monoSm,
                     color = colors.textMuted,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.surfaceAlt, HearthShapes.item)
-                        .padding(HearthTheme.spacing.md)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(colors.surfaceAlt, HearthShapes.item)
+                            .padding(HearthTheme.spacing.md),
                 )
             }
 
@@ -127,7 +132,7 @@ fun PinForgotContent(
                 text = stringResource(Res.string.forgot_footnote),
                 style = type.caption,
                 color = colors.textMuted,
-                modifier = Modifier.padding(bottom = HearthTheme.spacing.xxl)
+                modifier = Modifier.padding(bottom = HearthTheme.spacing.xxl),
             )
         }
     }
@@ -142,12 +147,12 @@ private fun ArrivingVouch() {
     SkeletonGroup {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             SkeletonCircle(size = HearthTheme.size.touchTarget)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
             ) {
                 SkeletonBlock(widthFraction = ASK_WIDTH)
                 SkeletonBlock(widthFraction = ASK_DETAIL_WIDTH, height = HearthTheme.spacing.md)
@@ -157,7 +162,7 @@ private fun ArrivingVouch() {
             SkeletonBlock(
                 widthFraction = STEP_WIDTHS[position],
                 height = HearthTheme.spacing.md,
-                position = position
+                position = position,
             )
         }
     }
@@ -170,13 +175,16 @@ private const val STEPS = 3
 private val STEP_WIDTHS = listOf(0.9f, 0.75f, 0.8f)
 
 @Composable
-private fun Step(number: Int, text: String) {
+private fun Step(
+    number: Int,
+    text: String,
+) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.Top,
     ) {
         Text(number.toString(), style = type.monoSm, color = colors.primary)
         Text(text, style = type.label, color = colors.textMuted)
@@ -186,7 +194,7 @@ private fun Step(number: Int, text: String) {
 @DayNightPreviews
 @Composable
 private fun PinForgotContentPreview(
-    @PreviewParameter(PinForgotUiStateProvider::class) state: PinForgotUiState
+    @PreviewParameter(PinForgotUiStateProvider::class) state: PinForgotUiState,
 ) {
     HearthTheme {
         PinForgotContent(state = state, onHaveCode = {}, onBack = {})

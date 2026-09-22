@@ -6,8 +6,13 @@ import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.usecase.LoginUseCase
 
-class LoginUseCaseImpl(private val authRepository: AuthRepository) : LoginUseCase {
-    override suspend operator fun invoke(memberId: String, pin: String): User {
+class LoginUseCaseImpl(
+    private val authRepository: AuthRepository,
+) : LoginUseCase {
+    override suspend operator fun invoke(
+        memberId: String,
+        pin: String,
+    ): User {
         if (!Pin.isValid(pin)) {
             throw ValidationException("A PIN is ${Pin.LENGTH} digits")
         }

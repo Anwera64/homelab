@@ -8,5 +8,6 @@ package com.homelab.household.presentation.launch
  */
 sealed interface LaunchEvent {
     data object GoToSignIn : LaunchEvent
+
     data object GoToFirstRun : LaunchEvent
 }

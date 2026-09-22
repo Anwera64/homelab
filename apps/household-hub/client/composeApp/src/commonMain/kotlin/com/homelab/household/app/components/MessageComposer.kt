@@ -23,9 +23,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
-import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
@@ -40,7 +40,7 @@ fun MessageComposer(
     onSend: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
-    leading: (@Composable () -> Unit)? = null
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val colors = HearthTheme.colors
     val textStyle = HearthTheme.typography.label
@@ -48,14 +48,15 @@ fun MessageComposer(
     Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
-            modifier = Modifier.padding(
-                start = HearthTheme.spacing.lg,
-                top = HearthTheme.spacing.md,
-                end = HearthTheme.spacing.lg,
-                bottom = HearthTheme.spacing.lg
-            ),
+            modifier =
+                Modifier.padding(
+                    start = HearthTheme.spacing.lg,
+                    top = HearthTheme.spacing.md,
+                    end = HearthTheme.spacing.lg,
+                    bottom = HearthTheme.spacing.lg,
+                ),
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             leading?.invoke()
             BasicTextField(
@@ -67,32 +68,34 @@ fun MessageComposer(
                 cursorBrush = SolidColor(colors.primary),
                 decorationBox = { innerField ->
                     Box(
-                        modifier = Modifier
-                            .background(colors.canvas, HearthShapes.pill)
-                            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
-                            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md)
+                        modifier =
+                            Modifier
+                                .background(colors.canvas, HearthShapes.pill)
+                                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
+                                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     ) {
                         if (value.isEmpty()) {
                             Text(placeholder, style = textStyle, color = colors.textMuted)
                         }
                         innerField()
                     }
-                }
+                },
             )
             Box(
-                modifier = Modifier
-                    .size(HearthTheme.size.touchTarget)
-                    .clip(CircleShape)
-                    .background(colors.primary)
-                    .clickable(role = Role.Button) { onSend(value) },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(HearthTheme.size.touchTarget)
+                        .clip(CircleShape)
+                        .background(colors.primary)
+                        .clickable(role = Role.Button) { onSend(value) },
+                contentAlignment = Alignment.Center,
             ) {
                 HearthIconImage(
                     icon = HearthIcon.Send,
                     contentDescription = stringResource(Res.string.send_message),
                     active = true,
                     size = HearthTheme.size.iconMd,
-                    tint = colors.onPrimary
+                    tint = colors.onPrimary,
                 )
             }
         }

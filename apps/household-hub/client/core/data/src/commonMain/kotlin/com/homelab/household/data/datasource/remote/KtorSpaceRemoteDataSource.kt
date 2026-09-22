@@ -17,20 +17,26 @@ class KtorSpaceRemoteDataSource(
     private val client: HttpClient,
     private val baseUrl: String,
 ) : SpaceRemoteDataSource {
-
-    override suspend fun getPersonalSpace(): SpaceReadDto = reachingHub {
-        client.get("$baseUrl/api/v1/spaces/personal").ensureJsonSuccess().body()
-    }
-
-    override suspend fun getHouseholdSpace(): SpaceReadDto = reachingHub {
-        client.get("$baseUrl/api/v1/spaces/shared").ensureJsonSuccess().body()
-    }
-
-    override suspend fun updateSpaceSettings(spaceId: String, settings: Map<String, String>): SpaceReadDto =
+    override suspend fun getPersonalSpace(): SpaceReadDto =
         reachingHub {
-            client.put("$baseUrl/api/v1/spaces/$spaceId/settings") {
-                contentType(ContentType.Application.Json)
-                setBody(SpaceUpdateDto(settings = settings))
-            }.ensureJsonSuccess().body()
+            client.get("$baseUrl/api/v1/spaces/personal").ensureJsonSuccess().body()
+        }
+
+    override suspend fun getHouseholdSpace(): SpaceReadDto =
+        reachingHub {
+            client.get("$baseUrl/api/v1/spaces/shared").ensureJsonSuccess().body()
+        }
+
+    override suspend fun updateSpaceSettings(
+        spaceId: String,
+        settings: Map<String, String>,
+    ): SpaceReadDto =
+        reachingHub {
+            client
+                .put("$baseUrl/api/v1/spaces/$spaceId/settings") {
+                    contentType(ContentType.Application.Json)
+                    setBody(SpaceUpdateDto(settings = settings))
+                }.ensureJsonSuccess()
+                .body()
         }
 }

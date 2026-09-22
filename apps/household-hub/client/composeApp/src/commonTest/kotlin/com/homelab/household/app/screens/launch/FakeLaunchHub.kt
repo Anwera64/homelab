@@ -21,14 +21,16 @@ import kotlinx.coroutines.awaitCancellation
  * which "Try again" needs.
  */
 class FakeLaunchHub {
-
     private var answer: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData = {
         respond("The test did not say what the hub should answer", HttpStatusCode.NotImplemented)
     }
 
     val engine: HttpClientEngine = MockEngine { request -> answer(request) }
 
-    fun respondsWith(initialized: Boolean, members: Int) {
+    fun respondsWith(
+        initialized: Boolean,
+        members: Int,
+    ) {
         answer = { json("""{"is_initialized":$initialized,"member_count":$members}""") }
     }
 
@@ -43,7 +45,7 @@ class FakeLaunchHub {
             respond(
                 content = "<html><body>Sign in to the network</body></html>",
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString()),
             )
         }
     }
@@ -63,20 +65,27 @@ class FakeLaunchHub {
     }
 
     /** The hub behaviour that produces a given status, for walking every previewed state. */
-    fun producing(status: HubStatus) = when (status) {
-        HubStatus.Checking -> neverAnswers()
-        is HubStatus.Unavailable -> when (val reason = status.reason) {
-            HubFailure.NoRoute -> isOffline()
-            HubFailure.AddressNotFound -> fails(HttpStatusCode.NotFound)
-            is HubFailure.Upstream -> fails(HttpStatusCode.fromValue(reason.statusCode))
-            is HubFailure.NotJson -> answersWithHtml()
-            HubFailure.Unknown -> answersWithNonsense()
-        }
-    }
+    fun producing(status: HubStatus) =
+        when (status) {
+            HubStatus.Checking -> {
+                neverAnswers()
+            }
 
-    private fun MockRequestHandleScope.json(content: String) = respond(
-        content = content,
-        status = HttpStatusCode.OK,
-        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-    )
+            is HubStatus.Unavailable -> {
+                when (val reason = status.reason) {
+                    HubFailure.NoRoute -> isOffline()
+                    HubFailure.AddressNotFound -> fails(HttpStatusCode.NotFound)
+                    is HubFailure.Upstream -> fails(HttpStatusCode.fromValue(reason.statusCode))
+                    is HubFailure.NotJson -> answersWithHtml()
+                    HubFailure.Unknown -> answersWithNonsense()
+                }
+            }
+        }
+
+    private fun MockRequestHandleScope.json(content: String) =
+        respond(
+            content = content,
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+        )
 }

@@ -14,8 +14,11 @@ sealed interface InviteCodeStatus {
     data object Invalid : InviteCodeStatus
 
     /** Too many wrong codes across the whole hub; [secondsLeft] counts down. */
-    data class Locked(val secondsLeft: Int) : InviteCodeStatus
+    data class Locked(
+        val secondsLeft: Int,
+    ) : InviteCodeStatus
 
     data object Unreachable : InviteCodeStatus
+
     data object Failed : InviteCodeStatus
 }

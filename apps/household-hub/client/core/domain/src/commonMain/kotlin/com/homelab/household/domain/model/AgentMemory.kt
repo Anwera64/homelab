@@ -10,5 +10,5 @@ data class AgentMemory(
     val confidence: Float = 1.0f,
     val isActive: Boolean = true,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
 )

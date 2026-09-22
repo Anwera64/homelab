@@ -9,5 +9,5 @@ import com.homelab.household.domain.model.Member
 data class PinEntryUiState(
     val member: Member,
     val entered: Int = 0,
-    val status: PinStatus = PinStatus.Idle
+    val status: PinStatus = PinStatus.Idle,
 )

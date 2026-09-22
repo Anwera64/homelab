@@ -8,5 +8,5 @@ data class FirstRunUiState(
     val nameError: NameError? = null,
     val pinError: PinError? = null,
     val isCreating: Boolean = false,
-    val failure: FirstRunFailure? = null
+    val failure: FirstRunFailure? = null,
 )

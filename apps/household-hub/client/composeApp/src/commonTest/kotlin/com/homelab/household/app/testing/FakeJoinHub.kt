@@ -16,7 +16,6 @@ import io.ktor.http.headersOf
  * join screen reads to see which colours are taken. Every redeem body it was sent is kept.
  */
 class FakeJoinHub {
-
     private val sent = mutableListOf<String>()
     val joins: List<String> get() = sent.toList()
 
@@ -24,30 +23,50 @@ class FakeJoinHub {
     private var redeem: suspend MockRequestHandleScope.() -> HttpResponseData = { notSaid() }
     private var members: suspend MockRequestHandleScope.() -> HttpResponseData = { json("[]") }
 
-    val engine: HttpClientEngine = MockEngine { request ->
-        val path = request.url.encodedPath
-        when {
-            path == "/api/v1/auth/members" -> members()
-            path.endsWith("/redeem") -> {
-                sent += (request.body as TextContent).text
-                redeem()
-            }
-            path.startsWith("/api/v1/invites/") -> lookUp()
-            else -> respond("", HttpStatusCode.NotFound)
-        }
-    }
+    val engine: HttpClientEngine =
+        MockEngine { request ->
+            val path = request.url.encodedPath
+            when {
+                path == "/api/v1/auth/members" -> {
+                    members()
+                }
 
-    fun knowsTheCodeOf(invitedName: String, inviterName: String, inviterColour: String = "#3C6E4E") {
+                path.endsWith("/redeem") -> {
+                    sent += (request.body as TextContent).text
+                    redeem()
+                }
+
+                path.startsWith("/api/v1/invites/") -> {
+                    lookUp()
+                }
+
+                else -> {
+                    respond("", HttpStatusCode.NotFound)
+                }
+            }
+        }
+
+    fun knowsTheCodeOf(
+        invitedName: String,
+        inviterName: String,
+        inviterColour: String = "#3C6E4E",
+    ) {
         lookUp = {
             json(
                 """{"invited_name":"$invitedName","inviter_name":"$inviterName",
-                    "inviter_avatar_color":"$inviterColour"}"""
+                    "inviter_avatar_color":"$inviterColour"}""",
             )
         }
     }
 
     fun knowsNoSuchCode() {
-        lookUp = { json("""{"detail":"That invite code isn't valid.","code":"invite_invalid"}""", HttpStatusCode.BadRequest) }
+        lookUp =
+            {
+                json(
+                    """{"detail":"That invite code isn't valid.","code":"invite_invalid"}""",
+                    HttpStatusCode.BadRequest,
+                )
+            }
     }
 
     fun hasHadEnoughGuessing(seconds: Int) {
@@ -56,13 +75,17 @@ class FakeJoinHub {
         redeem = { json(body, HttpStatusCode.TooManyRequests) }
     }
 
-    fun letsThemJoinAs(memberId: String, fullName: String, colour: String = "#C05638") {
+    fun letsThemJoinAs(
+        memberId: String,
+        fullName: String,
+        colour: String = "#C05638",
+    ) {
         redeem = {
             json(
                 """{"access_token":"joined-token","token_type":"bearer","user":{"id":"$memberId",
                     "full_name":"$fullName","avatar_color":"$colour","is_admin":false,"is_active":true,
                     "created_at":"2026-09-16T00:00:00Z"}}""",
-                HttpStatusCode.Created
+                HttpStatusCode.Created,
             )
         }
     }
@@ -71,20 +94,28 @@ class FakeJoinHub {
         redeem = {
             json(
                 """{"detail":"Someone in the household already has that name.","code":"name_taken"}""",
-                HttpStatusCode.Conflict
+                HttpStatusCode.Conflict,
             )
         }
     }
 
     fun saysTheCodeHasGone() {
-        redeem = { json("""{"detail":"That invite code isn't valid.","code":"invite_invalid"}""", HttpStatusCode.BadRequest) }
+        redeem =
+            {
+                json(
+                    """{"detail":"That invite code isn't valid.","code":"invite_invalid"}""",
+                    HttpStatusCode.BadRequest,
+                )
+            }
     }
 
     /** Who already lives here, so the join screen can grey out the colours they wear. */
     fun listsMembers(vararg colours: String) {
-        val body = colours.mapIndexed { index, colour ->
-            """{"id":"m$index","full_name":"Member $index","avatar_color":"$colour"}"""
-        }.joinToString(prefix = "[", postfix = "]")
+        val body =
+            colours
+                .mapIndexed { index, colour ->
+                    """{"id":"m$index","full_name":"Member $index","avatar_color":"$colour"}"""
+                }.joinToString(prefix = "[", postfix = "]")
         members = { json(body) }
     }
 
@@ -98,9 +129,12 @@ class FakeJoinHub {
     private fun MockRequestHandleScope.notSaid() =
         respond("The test did not say what the hub should answer", HttpStatusCode.NotImplemented)
 
-    private fun MockRequestHandleScope.json(content: String, status: HttpStatusCode = HttpStatusCode.OK) = respond(
+    private fun MockRequestHandleScope.json(
+        content: String,
+        status: HttpStatusCode = HttpStatusCode.OK,
+    ) = respond(
         content = content,
         status = status,
-        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 }

@@ -18,9 +18,8 @@ class MemoryAuditViewModel(
     private val auditMemoriesUseCase: AuditMemoriesUseCase,
     private val deleteMemoryUseCase: RevokeMemoryUseCase,
     private val updateMemoryUseCase: UpdateMemoryUseCase,
-    private val revokeMilestoneUseCase: RevokeMilestoneUseCase
+    private val revokeMilestoneUseCase: RevokeMilestoneUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(MemoryAuditUiState())
     val uiState: StateFlow<MemoryAuditUiState> = _uiState.asStateFlow()
 
@@ -32,14 +31,14 @@ class MemoryAuditViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        memories = memories
+                        memories = memories,
                     )
                 }
             } catch (e: Throwable) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Failed to load memories"
+                        errorMessage = e.message ?: "Failed to load memories",
                     )
                 }
             }

@@ -56,7 +56,7 @@ data class HearthSizes(
     /** The hub address pill's status dot. */
     val dot: Dp = 8.dp,
     /** Shadow blur under the primary button and the raised +. */
-    val raised: Dp = 10.dp
+    val raised: Dp = 10.dp,
 )
 
 /** The phone scale, and the only one there is until tablets land. */

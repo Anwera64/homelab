@@ -19,7 +19,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun LaunchScreen(
     onSignIn: () -> Unit,
     onFirstRun: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: LaunchViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -36,6 +36,6 @@ fun LaunchScreen(
         state = state,
         onRetry = viewModel::checkHub,
         onOpenTailscale = externalApps::openTailscale,
-        modifier = modifier
+        modifier = modifier,
     )
 }

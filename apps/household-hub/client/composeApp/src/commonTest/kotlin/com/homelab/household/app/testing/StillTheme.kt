@@ -18,7 +18,10 @@ import com.homelab.household.app.theme.StillMotion
  * `TestApp` composes this too, so there is one definition of "the theme, but still".
  */
 @Composable
-fun StillTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
+fun StillTheme(
+    darkTheme: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     HearthTheme(darkTheme = darkTheme) {
         CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
             content()

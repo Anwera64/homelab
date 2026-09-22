@@ -6,9 +6,19 @@ import com.homelab.household.domain.model.MemberName
 import com.homelab.household.domain.repository.MembersRepository
 import com.homelab.household.domain.usecase.CreateInviteUseCase
 
-class CreateInviteUseCaseImpl(private val membersRepository: MembersRepository) : CreateInviteUseCase {
-    override suspend operator fun invoke(invitedName: String, isAdmin: Boolean): Invite {
-        if (!MemberName.isValid(invitedName)) throw ValidationException("A name is 1 to ${MemberName.MAX_LENGTH} characters")
+class CreateInviteUseCaseImpl(
+    private val membersRepository: MembersRepository,
+) : CreateInviteUseCase {
+    override suspend operator fun invoke(
+        invitedName: String,
+        isAdmin: Boolean,
+    ): Invite {
+        if (!MemberName.isValid(
+                invitedName,
+            )
+        ) {
+            throw ValidationException("A name is 1 to ${MemberName.MAX_LENGTH} characters")
+        }
         return membersRepository.createInvite(invitedName.trim(), isAdmin)
     }
 }

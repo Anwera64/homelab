@@ -12,7 +12,6 @@ import org.junit.runner.RunWith
 /** The app starts, Koin wires up and the launch screen composes without crashing. */
 @RunWith(AndroidJUnit4::class)
 class LaunchSmokeTest {
-
     @Test
     fun main_activity_reaches_resumed() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->

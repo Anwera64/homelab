@@ -22,8 +22,9 @@ import org.jetbrains.compose.resources.getString
 
 /** Everything "Who's here?" says and does, named as the resources the screen reads. */
 @OptIn(ExperimentalTestApi::class)
-class ProfilePickerRobot(private val test: ComposeUiTest) {
-
+class ProfilePickerRobot(
+    private val test: ComposeUiTest,
+) {
     suspend fun seesTheHousehold(vararg names: String) {
         seesText(getString(Res.string.picker_title))
         seesText(getPluralString(Res.plurals.picker_member_count, names.size, names.size))
@@ -68,7 +69,7 @@ suspend fun ComposeUiTest.onProfilePicker(block: suspend ProfilePickerRobot.() -
 fun ComposeUiTest.profilePickerScreen(
     hub: FakeSignInHub,
     onMemberSelected: (Member) -> Unit = {},
-    onInviteCode: () -> Unit = {}
+    onInviteCode: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {

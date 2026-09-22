@@ -24,7 +24,7 @@ enum class WaitPhase {
     Showing,
 
     /** Still waiting, longer than usual. The pattern stays and a quiet line joins it; nothing has failed. */
-    Slow
+    Slow,
 }
 
 /**
@@ -33,11 +33,16 @@ enum class WaitPhase {
  * Deliberately a plain function over [Duration] — no clock, no coroutines, no Compose — so the
  * rule can be tested exactly. `rememberWaitPhase` is what drives it from a real elapsed time.
  */
-fun waitPhase(elapsed: Duration, hold: Duration, slow: Duration): WaitPhase = when {
-    elapsed < hold -> WaitPhase.Hidden
-    elapsed < slow -> WaitPhase.Showing
-    else -> WaitPhase.Slow
-}
+fun waitPhase(
+    elapsed: Duration,
+    hold: Duration,
+    slow: Duration,
+): WaitPhase =
+    when {
+        elapsed < hold -> WaitPhase.Hidden
+        elapsed < slow -> WaitPhase.Showing
+        else -> WaitPhase.Slow
+    }
 
 /**
  * [waitPhase] driven by a real clock, for a screen that is [busy].

@@ -31,27 +31,36 @@ class AuthRepositoryImpl(
     private val events: AuthEventsLocalDataSource,
     private val hubConfig: HubConfig,
 ) : AuthRepository {
-
     private val refreshMutex = Mutex()
     private var activeRefresh: CompletableDeferred<String>? = null
 
-    override suspend fun login(memberId: String, pin: String): User =
-        signedIn(remote.login(memberId, pin))
+    override suspend fun login(
+        memberId: String,
+        pin: String,
+    ): User = signedIn(remote.login(memberId, pin))
 
-    override suspend fun onboard(name: String, pin: String, avatarColor: String): User =
-        signedIn(remote.onboard(name, pin, avatarColor))
+    override suspend fun onboard(
+        name: String,
+        pin: String,
+        avatarColor: String,
+    ): User = signedIn(remote.onboard(name, pin, avatarColor))
 
-    override suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): User =
-        signedIn(remote.joinHousehold(code, fullName, pin, avatarColor))
+    override suspend fun joinHousehold(
+        code: String,
+        fullName: String,
+        pin: String,
+        avatarColor: String,
+    ): User = signedIn(remote.joinHousehold(code, fullName, pin, avatarColor))
 
-    override suspend fun redeemPinReset(code: String, pin: String): User =
-        signedIn(remote.redeemPinReset(code, pin))
+    override suspend fun redeemPinReset(
+        code: String,
+        pin: String,
+    ): User = signedIn(remote.redeemPinReset(code, pin))
 
     override suspend fun lookUpInvite(code: String): InvitePreview =
         InviteDataMapper.toPreview(remote.lookUpInvite(code))
 
-    override suspend fun listMembers(): List<Member> =
-        remote.listMembers().map(UserDataMapper::toMember)
+    override suspend fun listMembers(): List<Member> = remote.listMembers().map(UserDataMapper::toMember)
 
     override suspend fun checkStatus(): AuthStatus =
         remote.checkStatus().let { AuthStatus(isInitialized = it.is_initialized, memberCount = it.member_count) }
@@ -86,10 +95,11 @@ class AuthRepositoryImpl(
      * reaches every caller through the shared answer, without cancelling whoever started it.
      */
     override suspend fun refreshToken(): String {
-        val (renewal, startedHere) = refreshMutex.withLock {
-            activeRefresh?.let { it to false }
-                ?: CompletableDeferred<String>().also { activeRefresh = it }.let { it to true }
-        }
+        val (renewal, startedHere) =
+            refreshMutex.withLock {
+                activeRefresh?.let { it to false }
+                    ?: CompletableDeferred<String>().also { activeRefresh = it }.let { it to true }
+            }
         if (startedHere) {
             try {
                 renewal.complete(renew())
@@ -103,15 +113,15 @@ class AuthRepositoryImpl(
     }
 
     private suspend fun renew(): String {
-        val kept = storage.getAccessToken()
-            ?: throw UnauthorizedException("Nobody is signed in on this phone")
+        val kept =
+            storage.getAccessToken()
+                ?: throw UnauthorizedException("Nobody is signed in on this phone")
         val fresh = remote.renew(kept)
         signedIn(fresh)
         return fresh.access_token
     }
 
-    override fun getHubHost(): String =
-        hubConfig.baseUrl.substringAfter("://").substringBefore("/")
+    override fun getHubHost(): String = hubConfig.baseUrl.substringAfter("://").substringBefore("/")
 
     /**
      * Keeps the token and who it belongs to, for every way of signing in — and for renewal, which
@@ -119,8 +129,9 @@ class AuthRepositoryImpl(
      */
     private fun signedIn(response: TokenResponseDto): User {
         storage.saveTokens(response.access_token)
-        val user = response.user
-            ?: throw UpstreamGatewayException(statusCode = 200, message = "The hub signed in without saying who")
+        val user =
+            response.user
+                ?: throw UpstreamGatewayException(statusCode = 200, message = "The hub signed in without saying who")
         storage.saveUser(user)
         return UserDataMapper.toDomain(user)
     }

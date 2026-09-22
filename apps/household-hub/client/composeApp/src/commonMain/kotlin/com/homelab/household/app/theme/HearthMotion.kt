@@ -42,7 +42,7 @@ data class HearthMotion(
     /** How far a dot lifts at the top of the wave. A [Dp], which is why it lives here. */
     val waveLift: Dp = 4.dp,
     /** False draws every animated component's resting frame instead of starting it. */
-    val animate: Boolean = true
+    val animate: Boolean = true,
 )
 
 /** The app's own scale, and the only one there is outside tests. */
@@ -53,9 +53,10 @@ val DefaultMotion = HearthMotion()
  * a screen test never waits on a clock; [slow] keeps its 8 seconds so the slow line cannot turn up
  * by accident in a test that never meant to reach it.
  */
-val StillMotion = HearthMotion(
-    hold = Duration.ZERO,
-    minimumVisible = Duration.ZERO,
-    breatheStagger = Duration.ZERO,
-    animate = false
-)
+val StillMotion =
+    HearthMotion(
+        hold = Duration.ZERO,
+        minimumVisible = Duration.ZERO,
+        breatheStagger = Duration.ZERO,
+        animate = false,
+    )

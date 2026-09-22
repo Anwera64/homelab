@@ -7,5 +7,5 @@ data class PinApproveUiState(
     val member: Member,
     val pin: String = "",
     val secondsLeft: Int = 0,
-    val status: PinApproveStatus = PinApproveStatus.Idle
+    val status: PinApproveStatus = PinApproveStatus.Idle,
 )

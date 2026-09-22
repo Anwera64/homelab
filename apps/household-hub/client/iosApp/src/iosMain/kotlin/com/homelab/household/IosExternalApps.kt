@@ -18,17 +18,17 @@ import platform.UIKit.UIApplication
  * calls this from the composition, so that already holds.
  */
 class IosExternalApps : ExternalApps {
-
     override fun openTailscale() {
         val application = UIApplication.sharedApplication
         val tailscale = NSURL.URLWithString(TAILSCALE_SCHEME)
-        val target = if (tailscale != null && application.canOpenURL(tailscale)) {
-            tailscale
-        } else {
-            // Not installed, or the scheme was not declared: fall back to its store page, the same
-            // way Android falls back to the Play listing.
-            NSURL.URLWithString(TAILSCALE_STORE_URL)
-        } ?: return
+        val target =
+            if (tailscale != null && application.canOpenURL(tailscale)) {
+                tailscale
+            } else {
+                // Not installed, or the scheme was not declared: fall back to its store page, the same
+                // way Android falls back to the Play listing.
+                NSURL.URLWithString(TAILSCALE_STORE_URL)
+            } ?: return
 
         application.openURL(target, options = emptyMap<Any?, Any?>(), completionHandler = null)
     }

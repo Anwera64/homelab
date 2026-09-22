@@ -10,5 +10,5 @@ data class SpaceReadDto(
     val type: String,
     @SerialName("owner_id") val owner_id: String? = null,
     val settings: Map<String, String> = emptyMap(),
-    @SerialName("created_at") val created_at: String? = null
+    @SerialName("created_at") val created_at: String? = null,
 )

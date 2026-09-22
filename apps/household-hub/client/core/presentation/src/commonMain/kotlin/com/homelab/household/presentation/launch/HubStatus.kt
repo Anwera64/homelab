@@ -8,5 +8,7 @@ sealed interface HubStatus {
     data object Checking : HubStatus
 
     /** The hub couldn't be read. Every reason gets the offline screen, and is asked again by itself. */
-    data class Unavailable(val reason: HubFailure) : HubStatus
+    data class Unavailable(
+        val reason: HubFailure,
+    ) : HubStatus
 }

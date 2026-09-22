@@ -9,16 +9,16 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NetworkExceptionHelperTest {
-
     @Test
     fun `GIVEN the failures Ktor raises when it cannot reach a server WHEN each is classified THEN all of them read as offline`() {
         // GIVEN
-        val failures = listOf(
-            IOException("IO failed"),
-            SocketTimeoutException("Timeout"),
-            ConnectTimeoutException("Connect timeout"),
-            HttpRequestTimeoutException("http://localhost", 1000L),
-        )
+        val failures =
+            listOf(
+                IOException("IO failed"),
+                SocketTimeoutException("Timeout"),
+                ConnectTimeoutException("Connect timeout"),
+                HttpRequestTimeoutException("http://localhost", 1000L),
+            )
 
         // WHEN / THEN
         failures.forEach { failure ->

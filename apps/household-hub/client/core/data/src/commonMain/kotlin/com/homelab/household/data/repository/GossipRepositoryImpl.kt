@@ -12,7 +12,6 @@ import com.homelab.household.domain.repository.GossipRepository
 class GossipRepositoryImpl(
     private val remote: GossipRemoteDataSource,
 ) : GossipRepository {
-
     override suspend fun listHouseholdMilestones(limit: Int): List<HouseholdMilestone> =
         remote.listHouseholdMilestones(limit).map(GossipDataMapper::toDomain)
 

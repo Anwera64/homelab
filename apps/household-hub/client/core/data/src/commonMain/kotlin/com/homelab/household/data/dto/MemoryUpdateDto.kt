@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class MemoryUpdateDto(
     val content: String? = null,
     val confidence: Float? = null,
-    @SerialName("is_active") val is_active: Boolean? = null
+    @SerialName("is_active") val is_active: Boolean? = null,
 )

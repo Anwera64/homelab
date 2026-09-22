@@ -19,9 +19,8 @@ import kotlinx.coroutines.launch
 class ProfileViewModel(
     private val getCurrentUser: GetCurrentUserUseCase,
     private val listHouseholdMembers: ListHouseholdMembersUseCase,
-    private val logout: LogoutUseCase
+    private val logout: LogoutUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
@@ -43,8 +42,9 @@ class ProfileViewModel(
     fun load() {
         _uiState.update { it.copy(status = ProfileStatus.Loading) }
         viewModelScope.launch {
-            val member = runCatchingSafe { getCurrentUser() }
-                .onSuccess { _uiState.update { state -> state.copy(member = it) } }
+            val member =
+                runCatchingSafe { getCurrentUser() }
+                    .onSuccess { _uiState.update { state -> state.copy(member = it) } }
 
             runCatchingSafe { listHouseholdMembers() }.fold(
                 onSuccess = { household ->
@@ -52,7 +52,7 @@ class ProfileViewModel(
                     val soleAdmin = member.getOrNull()?.isAdmin == true && household.count { it.isAdmin } <= 1
                     _uiState.update { it.copy(isSoleAdmin = soleAdmin, status = ProfileStatus.Ready) }
                 },
-                onFailure = { error -> _uiState.update { it.copy(status = failureOf(error)) } }
+                onFailure = { error -> _uiState.update { it.copy(status = failureOf(error)) } },
             )
 
             // A member this phone could not name is a failure of its own, whatever the household did.

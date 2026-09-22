@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SpaceUpdateDto(
-    val settings: Map<String, String> = emptyMap()
+    val settings: Map<String, String> = emptyMap(),
 )

@@ -20,7 +20,6 @@ private const val CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
  * the new PIN it sets, so nothing is spent by looking at it.
  */
 class ResetCodeViewModel : ViewModel() {
-
     private val _uiState = MutableStateFlow(ResetCodeUiState())
     val uiState: StateFlow<ResetCodeUiState> = _uiState.asStateFlow()
 

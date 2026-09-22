@@ -14,7 +14,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun LeaveHouseholdScreen(
     onBack: () -> Unit,
     onLeft: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: LeaveHouseholdViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -30,6 +30,6 @@ fun LeaveHouseholdScreen(
         onPinChange = viewModel::onPinChange,
         onLeave = viewModel::leave,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

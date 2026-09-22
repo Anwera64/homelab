@@ -18,7 +18,7 @@ fun JoinScreen(
     code: String,
     onJoined: () -> Unit,
     onExpired: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: JoinViewModel = koinViewModel(parameters = { parametersOf(preview, code) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -35,6 +35,6 @@ fun JoinScreen(
         onPinChange = viewModel::onPinChange,
         onColourSelect = viewModel::onColourSelect,
         onJoin = viewModel::join,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -33,7 +33,7 @@ data class HearthSpacing(
     /** Around a fixed-shape screen's hero. */
     val xxxl: Dp = 32.dp,
     /** The outer padding of a full-screen state. */
-    val huge: Dp = 40.dp
+    val huge: Dp = 40.dp,
 )
 
 /** The phone scale, and the only one there is until tablets land. */

@@ -16,10 +16,10 @@ import java.io.File
  * assertions are free to name real numbers.
  */
 class DesignSystemTokenTest {
-
-    private val clientRootDir = File(System.getProperty("user.dir")).let { dir ->
-        if (dir.name == "shared") dir.parentFile else dir
-    }
+    private val clientRootDir =
+        File(System.getProperty("user.dir")).let { dir ->
+            if (dir.name == "shared") dir.parentFile else dir
+        }
 
     private val uiDir = File(clientRootDir, "composeApp/src/commonMain/kotlin")
 
@@ -40,22 +40,23 @@ class DesignSystemTokenTest {
         val allowed = setOf("HearthIcon.kt")
         val defaultInstance = Regex("""\bDefault(Spacing|Sizes)\b""")
 
-        val violations = uiDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themePackage) || it.name in allowed }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    defaultInstance.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} reads '${it.value}' " +
-                            "— read HearthTheme.spacing or HearthTheme.size instead"
+        val violations =
+            uiDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themePackage) || it.name in allowed }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        defaultInstance.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} reads '${it.value}' " +
+                                "— read HearthTheme.spacing or HearthTheme.size instead"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "The scale was read past the theme (${violations.size}):\n" + violations.joinToString("\n")
+            "The scale was read past the theme (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -66,22 +67,23 @@ class DesignSystemTokenTest {
 
         val literal = Regex("""(?<![\w.])\d+(\.\d+)?\.dp\b""")
 
-        val violations = uiDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themePackage) }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    literal.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
-                            "— take the step from HearthSpacing or HearthSize instead"
+        val violations =
+            uiDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themePackage) }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        literal.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
+                                "— take the step from HearthSpacing or HearthSize instead"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "Raw dp outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
+            "Raw dp outside app/theme (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -94,22 +96,23 @@ class DesignSystemTokenTest {
     fun no_screen_or_component_writes_a_raw_sp() {
         val literal = Regex("""(?<![\w.])\d+(\.\d+)?\.sp\b""")
 
-        val violations = uiDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themePackage) }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    literal.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
-                            "— take the role from HearthTheme.typography instead"
+        val violations =
+            uiDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themePackage) }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        literal.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
+                                "— take the role from HearthTheme.typography instead"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "Raw sp outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
+            "Raw sp outside app/theme (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -123,22 +126,23 @@ class DesignSystemTokenTest {
     fun no_screen_or_component_writes_a_raw_duration() {
         val literal = Regex("""(?<![\w.])(durationMillis\s*=\s*\d+|\d+(\.\d+)?\.(milliseconds|seconds))\b""")
 
-        val violations = uiDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themePackage) }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    literal.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
-                            "— take the beat from HearthTheme.motion instead"
+        val violations =
+            uiDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themePackage) }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        literal.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} writes '${it.value}' " +
+                                "— take the beat from HearthTheme.motion instead"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "Raw duration outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
+            "Raw duration outside app/theme (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 
@@ -151,22 +155,23 @@ class DesignSystemTokenTest {
     fun no_screen_or_component_applies_a_font_weight_by_hand() {
         val weight = Regex("""\bFontWeight\.""")
 
-        val violations = uiDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themePackage) }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    weight.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} applies a FontWeight " +
-                            "by hand — the role already carries one"
+        val violations =
+            uiDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themePackage) }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        weight.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} applies a FontWeight " +
+                                "by hand — the role already carries one"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "FontWeight outside app/theme (${violations.size}):\n" + violations.joinToString("\n")
+            "FontWeight outside app/theme (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 }

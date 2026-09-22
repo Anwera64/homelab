@@ -20,5 +20,5 @@ data class AgentReadDto(
     @SerialName("owner_id") val owner_id: String? = null,
     @SerialName("deleted_at") val deleted_at: String? = null,
     @SerialName("created_at") val created_at: String? = null,
-    @SerialName("updated_at") val updated_at: String? = null
+    @SerialName("updated_at") val updated_at: String? = null,
 )

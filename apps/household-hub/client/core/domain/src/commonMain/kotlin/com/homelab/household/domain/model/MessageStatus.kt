@@ -4,5 +4,5 @@ enum class MessageStatus {
     SENDING,
     SENT,
     FAILED_OFFLINE,
-    FAILED_ERROR
+    FAILED_ERROR,
 }

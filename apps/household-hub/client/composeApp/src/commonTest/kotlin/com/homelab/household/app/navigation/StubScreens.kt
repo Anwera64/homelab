@@ -13,9 +13,11 @@ import com.homelab.household.domain.model.Member
  * the real screen decides between.
  */
 class StubScreens : AppScreens {
-
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
+    override fun Launch(
+        onSignIn: () -> Unit,
+        onFirstRun: () -> Unit,
+    ) {
         Column {
             Text(LAUNCH)
             Text(GO_TO_SIGN_IN, modifier = Modifier.clickable { onSignIn() })
@@ -24,7 +26,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun SignIn(onMemberSelected: (Member) -> Unit, onInviteCode: () -> Unit) {
+    override fun SignIn(
+        onMemberSelected: (Member) -> Unit,
+        onInviteCode: () -> Unit,
+    ) {
         Column {
             Text(SIGN_IN)
             Text(PICK_EMMA, modifier = Modifier.clickable { onMemberSelected(EMMA) })
@@ -33,7 +38,12 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit, onForgotten: () -> Unit) {
+    override fun Pin(
+        member: Member,
+        onSignedIn: () -> Unit,
+        onBack: () -> Unit,
+        onForgotten: () -> Unit,
+    ) {
         Column {
             Text(pinOf(member))
             Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
@@ -43,7 +53,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit) {
+    override fun FirstRun(
+        onCreated: () -> Unit,
+        onSignIn: () -> Unit,
+    ) {
         Column {
             Text(FIRST_RUN)
             Text(CREATED, modifier = Modifier.clickable { onCreated() })
@@ -52,7 +65,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun InviteCode(onBack: () -> Unit, onInvite: (InvitePreview, String) -> Unit) {
+    override fun InviteCode(
+        onBack: () -> Unit,
+        onInvite: (InvitePreview, String) -> Unit,
+    ) {
         Column {
             Text(INVITE_CODE)
             Text(CODE_ACCEPTED, modifier = Modifier.clickable { onInvite(INVITE, "K7M2QP") })
@@ -61,7 +77,12 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun Join(preview: InvitePreview, code: String, onJoined: () -> Unit, onExpired: () -> Unit) {
+    override fun Join(
+        preview: InvitePreview,
+        code: String,
+        onJoined: () -> Unit,
+        onExpired: () -> Unit,
+    ) {
         Column {
             Text(joinOf(preview))
             Text(JOINED, modifier = Modifier.clickable { onJoined() })
@@ -70,7 +91,11 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun PinForgot(member: Member, onBack: () -> Unit, onHaveCode: () -> Unit) {
+    override fun PinForgot(
+        member: Member,
+        onBack: () -> Unit,
+        onHaveCode: () -> Unit,
+    ) {
         Column {
             Text(forgotOf(member))
             Text(HAVE_A_RESET_CODE, modifier = Modifier.clickable { onHaveCode() })
@@ -79,7 +104,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun ResetCode(onBack: () -> Unit, onCode: (String) -> Unit) {
+    override fun ResetCode(
+        onBack: () -> Unit,
+        onCode: (String) -> Unit,
+    ) {
         Column {
             Text(RESET_CODE)
             Text(RESET_CODE_TYPED, modifier = Modifier.clickable { onCode("P4XN7T") })
@@ -88,7 +116,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun NewPin(code: String, onSignedIn: () -> Unit) {
+    override fun NewPin(
+        code: String,
+        onSignedIn: () -> Unit,
+    ) {
         Column {
             Text(newPinFor(code))
             Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
@@ -109,7 +140,7 @@ class StubScreens : AppScreens {
         onMembers: () -> Unit,
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
-        onSignedOut: () -> Unit
+        onSignedOut: () -> Unit,
     ) {
         Column {
             Text(PROFILE)
@@ -126,7 +157,7 @@ class StubScreens : AppScreens {
         onBack: () -> Unit,
         onInvite: () -> Unit,
         onResetPin: (Member) -> Unit,
-        onRemove: (Member) -> Unit
+        onRemove: (Member) -> Unit,
     ) {
         Column {
             Text(MEMBERS)
@@ -146,7 +177,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun PinApprove(member: Member, onBack: () -> Unit) {
+    override fun PinApprove(
+        member: Member,
+        onBack: () -> Unit,
+    ) {
         Column {
             Text(approveOf(member))
             Text(BACK, modifier = Modifier.clickable { onBack() })
@@ -154,7 +188,11 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun RemoveMember(member: Member, onBack: () -> Unit, onRemoved: () -> Unit) {
+    override fun RemoveMember(
+        member: Member,
+        onBack: () -> Unit,
+        onRemoved: () -> Unit,
+    ) {
         Column {
             Text(removeOf(member))
             Text(REMOVED, modifier = Modifier.clickable { onRemoved() })
@@ -163,7 +201,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun LeaveHousehold(onBack: () -> Unit, onLeft: () -> Unit) {
+    override fun LeaveHousehold(
+        onBack: () -> Unit,
+        onLeft: () -> Unit,
+    ) {
         Column {
             Text(LEAVE)
             Text(LEFT, modifier = Modifier.clickable { onLeft() })
@@ -172,7 +213,10 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun ChangePin(onBack: () -> Unit, onChanged: () -> Unit) {
+    override fun ChangePin(
+        onBack: () -> Unit,
+        onChanged: () -> Unit,
+    ) {
         Column {
             Text(CHANGE_PIN)
             Text(PIN_CHANGED, modifier = Modifier.clickable { onChanged() })
@@ -223,10 +267,15 @@ class StubScreens : AppScreens {
         val INVITE = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E")
 
         fun pinOf(member: Member) = "pin pad of ${member.name}"
+
         fun forgotOf(member: Member) = "forgotten pin of ${member.name}"
+
         fun approveOf(member: Member) = "approve reset for ${member.name}"
+
         fun removeOf(member: Member) = "remove ${member.name}"
+
         fun joinOf(preview: InvitePreview) = "join as ${preview.invitedName}"
+
         fun newPinFor(code: String) = "new pin for $code"
     }
 }

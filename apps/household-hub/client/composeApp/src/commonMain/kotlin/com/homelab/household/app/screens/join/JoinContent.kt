@@ -70,7 +70,7 @@ fun JoinContent(
     onPinChange: (String) -> Unit,
     onColourSelect: (String) -> Unit,
     onJoin: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val wait = rememberWaitPhase(state.status == JoinStatus.Joining)
     val waiting = wait != WaitPhase.Hidden
@@ -85,43 +85,47 @@ fun JoinContent(
         bottomBar = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
                     text = stringResource(if (waiting) Res.string.join_joining else Res.string.join_submit),
                     onClick = onJoin,
                     busy = waiting,
                     busyDescription = stringResource(Res.string.a11y_join_joining),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SlowLine(wait)
                 Text(
                     text = stringResource(Res.string.join_privacy, inviter),
                     style = type.caption,
-                    color = colors.textMuted
+                    color = colors.textMuted,
                 )
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
                 modifier = Modifier.padding(top = HearthTheme.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     MemberAvatar(
                         name = inviter,
                         colour = state.preview.inviterAvatarColor,
                         size = HearthTheme.spacing.xxxl,
-                        glyph = type.glyphMd
+                        glyph = type.glyphMd,
                     )
-                    Text(stringResource(Res.string.join_invited_by, inviter), style = type.label, color = colors.textMuted)
+                    Text(
+                        stringResource(Res.string.join_invited_by, inviter),
+                        style = type.label,
+                        color = colors.textMuted,
+                    )
                 }
                 Text(stringResource(Res.string.join_title), style = type.hero, color = colors.textPrimary)
                 Text(stringResource(Res.string.join_detail, inviter), style = type.body, color = colors.textMuted)
@@ -134,10 +138,11 @@ fun JoinContent(
                 contentDescription = stringResource(Res.string.join_name_label),
                 helper = if (state.nameError == null) stringResource(Res.string.join_name_helper, inviter) else null,
                 error = state.nameError?.let { nameErrorText(it) },
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Next
-                )
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Next,
+                    ),
             )
 
             PinField(
@@ -146,7 +151,7 @@ fun JoinContent(
                 label = stringResource(Res.string.join_pin_label),
                 contentDescription = stringResource(Res.string.join_pin_label),
                 helper = if (state.pinError == null) stringResource(Res.string.join_pin_helper) else null,
-                error = state.pinError?.let { pinErrorText(it) }
+                error = state.pinError?.let { pinErrorText(it) },
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
@@ -156,7 +161,7 @@ fun JoinContent(
                     selected = state.colour,
                     taken = state.takenColours,
                     onSelect = onColourSelect,
-                    swatchDescription = { index -> stringResource(Res.string.join_colour_swatch, index + 1, count) }
+                    swatchDescription = { index -> stringResource(Res.string.join_colour_swatch, index + 1, count) },
                 )
                 Text(stringResource(Res.string.join_colour_helper), style = type.caption, color = colors.textMuted)
             }
@@ -169,29 +174,32 @@ fun JoinContent(
 }
 
 @Composable
-private fun nameErrorText(error: NameError): String = when (error) {
-    NameError.Missing -> stringResource(Res.string.join_name_missing)
-    NameError.TooLong -> stringResource(Res.string.join_name_too_long)
-    NameError.Taken -> stringResource(Res.string.join_name_taken)
-}
+private fun nameErrorText(error: NameError): String =
+    when (error) {
+        NameError.Missing -> stringResource(Res.string.join_name_missing)
+        NameError.TooLong -> stringResource(Res.string.join_name_too_long)
+        NameError.Taken -> stringResource(Res.string.join_name_taken)
+    }
 
 @Composable
-private fun pinErrorText(error: PinError): String = when (error) {
-    PinError.NotSixDigits -> stringResource(Res.string.join_pin_not_six_digits)
-}
+private fun pinErrorText(error: PinError): String =
+    when (error) {
+        PinError.NotSixDigits -> stringResource(Res.string.join_pin_not_six_digits)
+    }
 
 @Composable
-private fun refusal(status: JoinStatus): String? = when (status) {
-    JoinStatus.Idle, JoinStatus.Joining -> null
-    JoinStatus.Expired -> stringResource(Res.string.join_expired)
-    JoinStatus.Unreachable -> stringResource(Res.string.members_unreachable)
-    JoinStatus.Failed -> stringResource(Res.string.members_failed)
-}
+private fun refusal(status: JoinStatus): String? =
+    when (status) {
+        JoinStatus.Idle, JoinStatus.Joining -> null
+        JoinStatus.Expired -> stringResource(Res.string.join_expired)
+        JoinStatus.Unreachable -> stringResource(Res.string.members_unreachable)
+        JoinStatus.Failed -> stringResource(Res.string.members_failed)
+    }
 
 @DayNightPreviews
 @Composable
 private fun JoinContentPreview(
-    @PreviewParameter(JoinUiStateProvider::class) state: JoinUiState
+    @PreviewParameter(JoinUiStateProvider::class) state: JoinUiState,
 ) {
     HearthTheme {
         JoinContent(state = state, onNameChange = {}, onPinChange = {}, onColourSelect = {}, onJoin = {})

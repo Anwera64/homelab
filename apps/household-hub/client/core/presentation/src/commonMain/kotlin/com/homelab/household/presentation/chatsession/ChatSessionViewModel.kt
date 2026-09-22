@@ -23,9 +23,8 @@ class ChatSessionViewModel(
     private val streamChatTurnUseCase: StreamChatTurnUseCase,
     private val getSessionUseCase: GetSessionUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
-    private val toggleSecretModeUseCase: ToggleSecretModeUseCase
+    private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ChatSessionUiState())
     val uiState: StateFlow<ChatSessionUiState> = _uiState.asStateFlow()
 
@@ -50,36 +49,40 @@ class ChatSessionViewModel(
                         isLoading = false,
                         session = session,
                         messages = messages,
-                        isSecretLocked = session.isSecretLocked
+                        isSecretLocked = session.isSecretLocked,
                     )
                 }
             } catch (e: Throwable) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Failed to load session"
+                        errorMessage = e.message ?: "Failed to load session",
                     )
                 }
             }
         }
     }
 
-    fun sendMessage(content: String, autoApproveWrites: Boolean = false) {
+    fun sendMessage(
+        content: String,
+        autoApproveWrites: Boolean = false,
+    ) {
         val currentSession = _uiState.value.session ?: return
         val tempMessageId = "temp-user-${currentSession.id}-${nextTempMessageNumber++}"
-        val userMsg = ChatMessage(
-            id = tempMessageId,
-            sessionId = currentSession.id,
-            role = MessageRole.USER,
-            content = content,
-            status = MessageStatus.SENDING
-        )
+        val userMsg =
+            ChatMessage(
+                id = tempMessageId,
+                sessionId = currentSession.id,
+                role = MessageRole.USER,
+                content = content,
+                status = MessageStatus.SENDING,
+            )
 
         _uiState.update {
             it.copy(
                 messages = it.messages + userMsg,
                 streamingMessage = "",
-                errorMessage = null
+                errorMessage = null,
             )
         }
 
@@ -87,54 +90,64 @@ class ChatSessionViewModel(
             var accumulated = ""
             streamChatTurnUseCase(currentSession.id, content, autoApproveWrites)
                 .catch { e ->
-                    val failedStatus = if (e is ServerOfflineException) {
-                        MessageStatus.FAILED_OFFLINE
-                    } else {
-                        MessageStatus.FAILED_ERROR
-                    }
+                    val failedStatus =
+                        if (e is ServerOfflineException) {
+                            MessageStatus.FAILED_OFFLINE
+                        } else {
+                            MessageStatus.FAILED_ERROR
+                        }
                     _uiState.update { state ->
                         state.copy(
                             streamingMessage = null,
                             errorMessage = e.message ?: "Streaming failed",
-                            messages = state.messages.map { msg ->
-                                if (msg.id == tempMessageId) msg.copy(status = failedStatus) else msg
-                            }
+                            messages =
+                                state.messages.map { msg ->
+                                    if (msg.id == tempMessageId) msg.copy(status = failedStatus) else msg
+                                },
                         )
                     }
-                }
-                .collect { event ->
+                }.collect { event ->
                     when (event) {
                         is ChatStreamEvent.Delta -> {
                             accumulated += event.content
                             _uiState.update { it.copy(streamingMessage = accumulated) }
                         }
+
                         is ChatStreamEvent.ToolApprovalProposal -> {
                             _uiState.update { it.copy(pendingToolProposal = event) }
                         }
+
                         is ChatStreamEvent.Done -> {
-                            val assistantMsg = ChatMessage(
-                                id = event.messageId,
-                                sessionId = currentSession.id,
-                                role = MessageRole.ASSISTANT,
-                                content = event.assistantContent,
-                                status = MessageStatus.SENT
-                            )
+                            val assistantMsg =
+                                ChatMessage(
+                                    id = event.messageId,
+                                    sessionId = currentSession.id,
+                                    role = MessageRole.ASSISTANT,
+                                    content = event.assistantContent,
+                                    status = MessageStatus.SENT,
+                                )
                             _uiState.update { state ->
                                 state.copy(
                                     streamingMessage = null,
-                                    messages = state.messages.map { msg ->
-                                        if (msg.id == tempMessageId) msg.copy(status = MessageStatus.SENT) else msg
-                                    } + assistantMsg
+                                    messages =
+                                        state.messages.map { msg ->
+                                            if (msg.id == tempMessageId) msg.copy(status = MessageStatus.SENT) else msg
+                                        } + assistantMsg,
                                 )
                             }
                         }
+
                         else -> {}
                     }
                 }
         }
     }
 
-    fun approveTool(toolCallId: String, approved: Boolean, modifiedArguments: Map<String, Any?>? = null) {
+    fun approveTool(
+        toolCallId: String,
+        approved: Boolean,
+        modifiedArguments: Map<String, Any?>? = null,
+    ) {
         val currentSession = _uiState.value.session ?: return
         viewModelScope.launch {
             try {

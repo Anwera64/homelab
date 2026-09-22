@@ -6,12 +6,6 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.ServerSocket
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,6 +14,12 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.ServerSocket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * Proves token-by-token SSE on the Android engine:
@@ -28,7 +28,6 @@ import org.koin.core.context.GlobalContext
  */
 @RunWith(AndroidJUnit4::class)
 class SseStreamingDeviceTest {
-
     private lateinit var server: ServerSocket
     private val firstDeltaReceived = CountDownLatch(1)
 
@@ -58,7 +57,7 @@ class SseStreamingDeviceTest {
                             "Content-Type: text/event-stream\r\n" +
                             "Cache-Control: no-cache\r\n" +
                             "Connection: close\r\n\r\n"
-                        ).toByteArray()
+                    ).toByteArray(),
                 )
                 out.flush()
 
@@ -68,7 +67,7 @@ class SseStreamingDeviceTest {
                 // Nothing else is written until the client has really received the first delta.
                 assertTrue(
                     "Client never received the first delta — the engine is buffering",
-                    firstDeltaReceived.await(20, TimeUnit.SECONDS)
+                    firstDeltaReceived.await(20, TimeUnit.SECONDS),
                 )
 
                 Thread.sleep(15_000)

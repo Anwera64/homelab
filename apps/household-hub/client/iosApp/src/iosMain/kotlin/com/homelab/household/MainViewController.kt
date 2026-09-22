@@ -25,10 +25,11 @@ import kotlin.experimental.ExperimentalNativeApi
 @OptIn(ExperimentalNativeApi::class)
 private val koin by lazy {
     HouseholdHubSdk.init(
-        hubConfig = HubConfig(
-            baseUrl = DEFAULT_BASE_URL,
-            isDebug = Platform.isDebugBinary
-        )
+        hubConfig =
+            HubConfig(
+                baseUrl = DEFAULT_BASE_URL,
+                isDebug = Platform.isDebugBinary,
+            ),
     )
 }
 

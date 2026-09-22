@@ -13,12 +13,19 @@ import com.homelab.household.data.dto.UserReadDto
  * that cannot read its own session is a phone nobody is signed in on, not a crash.
  */
 interface StoredSessionLocalDataSource {
-    fun saveTokens(accessToken: String, refreshToken: String? = null)
+    fun saveTokens(
+        accessToken: String,
+        refreshToken: String? = null,
+    )
+
     fun getAccessToken(): String?
+
     fun getRefreshToken(): String?
 
     /** Who the kept token belongs to; `null` forgets them and leaves the token alone. */
     fun saveUser(user: UserReadDto?)
+
     fun getUser(): UserReadDto?
+
     fun clear()
 }

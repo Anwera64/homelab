@@ -30,13 +30,12 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.removemember.RemoveMemberStatus
 import com.homelab.household.presentation.removemember.RemoveMemberUiState
-import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
+import kotlin.test.Test
 
 /** Removing a member, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class RemoveMemberScreenTest {
-
     private val liam = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
     private val wait = 5_000L
 
@@ -51,7 +50,9 @@ class RemoveMemberScreenTest {
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = { removed++ }) }
+                TestApp(hub.engine, sessionStorage = signedIn()) {
+                    RemoveMemberScreen(member = liam, onBack = {}, onRemoved = { removed++ })
+                }
             }
 
             onNodeWithContentDescription(getString(Res.string.remove_confirm_label, "Liam")).performTextInput("Liam")
@@ -66,7 +67,12 @@ class RemoveMemberScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.remove_confirm_label, "Liam")).performTextInput("Li")
             onNodeWithText(getString(Res.string.remove_submit, "Liam")).performClick()
@@ -81,33 +87,35 @@ class RemoveMemberScreenTest {
      * about.
      */
     @Test
-    fun removing_them_shows_on_the_button_and_names_them() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                RemoveMemberContent(
-                    state = RemoveMemberUiState(
-                        member = liam,
-                        typedName = "Liam",
-                        status = RemoveMemberStatus.Removing
-                    ),
-                    onNameChange = {},
-                    onRemove = {},
-                    onBack = {}
-                )
+    fun removing_them_shows_on_the_button_and_names_them() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    RemoveMemberContent(
+                        state =
+                            RemoveMemberUiState(
+                                member = liam,
+                                typedName = "Liam",
+                                status = RemoveMemberStatus.Removing,
+                            ),
+                        onNameChange = {},
+                        onRemove = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.remove_removing))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_remove_removing, "Liam")
+            onNodeWithText(getString(Res.string.remove_removing))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_remove_removing, "Liam"),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.remove_submit, "Liam")).assertDoesNotExist()
-    }
+            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.remove_submit, "Liam")).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {

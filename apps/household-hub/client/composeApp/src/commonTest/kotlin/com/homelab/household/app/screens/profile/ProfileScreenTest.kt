@@ -20,15 +20,14 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.jetbrains.compose.resources.getString
 
 /** Your own account, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ProfileScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -45,7 +44,7 @@ class ProfileScreenTest {
                         onMembers = {},
                         onChangePin = {},
                         onLeave = {},
-                        onSignOut = {}
+                        onSignOut = {},
                     )
                 }
             }
@@ -83,7 +82,13 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(onBack = {}, onMembers = { members++ }, onChangePin = {}, onLeave = {}, onSignedOut = {})
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = { members++ },
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                    )
                 }
             }
 
@@ -102,7 +107,13 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = tokens) {
-                    ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = { signedOut++ })
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = { signedOut++ },
+                    )
                 }
             }
 
@@ -129,7 +140,7 @@ class ProfileScreenTest {
                             onMembers = {},
                             onChangePin = {},
                             onLeave = {},
-                            onSignOut = {}
+                            onSignOut = {},
                         )
                     }
                 }

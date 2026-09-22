@@ -18,7 +18,6 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class EntryViewModelsTest {
-
     private class Counting : ViewModel() {
         var cleared = false
             private set
@@ -29,28 +28,29 @@ class EntryViewModelsTest {
     }
 
     @Test
-    fun leaving_clears_the_view_models_and_coming_back_makes_new_ones() = runComposeUiTest {
-        var shown by mutableStateOf(true)
-        val seen = mutableListOf<Counting>()
+    fun leaving_clears_the_view_models_and_coming_back_makes_new_ones() =
+        runComposeUiTest {
+            var shown by mutableStateOf(true)
+            val seen = mutableListOf<Counting>()
 
-        setContent {
-            if (shown) {
-                WithEntryViewModels {
-                    val vm = viewModel { Counting() }
-                    if (seen.lastOrNull() !== vm) seen += vm
-                    Text("entry")
+            setContent {
+                if (shown) {
+                    WithEntryViewModels {
+                        val vm = viewModel { Counting() }
+                        if (seen.lastOrNull() !== vm) seen += vm
+                        Text("entry")
+                    }
                 }
             }
+            waitForIdle()
+
+            shown = false
+            waitForIdle()
+            assertEquals(true, seen.single().cleared)
+
+            shown = true
+            waitForIdle()
+            assertEquals(2, seen.size)
+            assertEquals(false, seen.last().cleared)
         }
-        waitForIdle()
-
-        shown = false
-        waitForIdle()
-        assertEquals(true, seen.single().cleared)
-
-        shown = true
-        waitForIdle()
-        assertEquals(2, seen.size)
-        assertEquals(false, seen.last().cleared)
-    }
 }

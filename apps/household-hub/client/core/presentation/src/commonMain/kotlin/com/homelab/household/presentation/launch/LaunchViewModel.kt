@@ -22,9 +22,8 @@ import kotlinx.coroutines.launch
 
 class LaunchViewModel(
     private val checkAuthStatusUseCase: CheckAuthStatusUseCase,
-    private val getHubHostUseCase: GetHubHostUseCase
+    private val getHubHostUseCase: GetHubHostUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(LaunchUiState(hubAddress = getHubHostUseCase()))
     val uiState: StateFlow<LaunchUiState> = _uiState.asStateFlow()
 
@@ -47,31 +46,32 @@ class LaunchViewModel(
             runCatchingSafe { checkAuthStatusUseCase() }
                 .onSuccess { authStatus ->
                     _events.send(if (authStatus.isInitialized) LaunchEvent.GoToSignIn else LaunchEvent.GoToFirstRun)
-                }
-                .onFailure { error ->
+                }.onFailure { error ->
                     _uiState.update { it.copy(status = HubStatus.Unavailable(whyUnavailable(error))) }
                     countDownToAskingAgain()
                 }
         }
     }
 
-    private fun whyUnavailable(error: Throwable): HubFailure = when (error) {
-        is ServerOfflineException -> HubFailure.NoRoute
-        is NotFoundException -> HubFailure.AddressNotFound
-        is UpstreamGatewayException -> HubFailure.Upstream(error.statusCode)
-        is UnexpectedContentTypeException -> HubFailure.NotJson(error.contentType)
-        else -> HubFailure.Unknown
-    }
+    private fun whyUnavailable(error: Throwable): HubFailure =
+        when (error) {
+            is ServerOfflineException -> HubFailure.NoRoute
+            is NotFoundException -> HubFailure.AddressNotFound
+            is UpstreamGatewayException -> HubFailure.Upstream(error.statusCode)
+            is UnexpectedContentTypeException -> HubFailure.NotJson(error.contentType)
+            else -> HubFailure.Unknown
+        }
 
     private fun countDownToAskingAgain() {
-        autoRetry = viewModelScope.launch {
-            for (left in AUTO_RETRY_SECONDS downTo 1) {
-                _uiState.update { it.copy(retryInSeconds = left) }
-                delay(1_000)
+        autoRetry =
+            viewModelScope.launch {
+                for (left in AUTO_RETRY_SECONDS downTo 1) {
+                    _uiState.update { it.copy(retryInSeconds = left) }
+                    delay(1_000)
+                }
+                autoRetry = null
+                checkHub()
             }
-            autoRetry = null
-            checkHub()
-        }
     }
 
     private companion object {

@@ -18,15 +18,15 @@ import kotlinx.coroutines.flow.asSharedFlow
  * is atomic, and there is no state left to guard.
  */
 class AuthEventsLocalDataSource {
-
     /**
      * Nothing is replayed: a sign-out is an event, and a screen collecting later must not be sent
      * back to "Who's here?" for an old one.
      */
-    private val signedOut = MutableSharedFlow<Unit>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
+    private val signedOut =
+        MutableSharedFlow<Unit>(
+            extraBufferCapacity = 1,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
 
     fun observeSignedOut(): Flow<Unit> = signedOut.asSharedFlow()
 

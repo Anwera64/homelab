@@ -32,7 +32,6 @@ class SessionRepositoryImpl(
     private val cache: SessionCacheLocalDataSource,
     private val pollDelayMs: Long = 1000L,
 ) : SessionRepository {
-
     override suspend fun listSessions(): List<ConversationSession> =
         remote.listSessions().map { SessionDataMapper.toDomain(it).withLockState() }
 
@@ -43,13 +42,18 @@ class SessionRepositoryImpl(
             detail.messages.map(ChatMessageDataMapper::toDomain)
     }
 
-    override suspend fun createSession(agentId: String, title: String, isSecret: Boolean): ConversationSession =
-        SessionDataMapper.toDomain(remote.createSession(agentId, title, isSecret))
+    override suspend fun createSession(
+        agentId: String,
+        title: String,
+        isSecret: Boolean,
+    ): ConversationSession = SessionDataMapper.toDomain(remote.createSession(agentId, title, isSecret))
 
     override suspend fun archiveSession(sessionId: String) = remote.archiveSession(sessionId)
 
-    override suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): ConversationSession =
-        SessionDataMapper.toDomain(remote.toggleSecretMode(sessionId, isSecret))
+    override suspend fun toggleSecretMode(
+        sessionId: String,
+        isSecret: Boolean,
+    ): ConversationSession = SessionDataMapper.toDomain(remote.toggleSecretMode(sessionId, isSecret))
 
     override suspend fun deleteSession(sessionId: String) = remote.deleteSession(sessionId)
 
@@ -73,15 +77,18 @@ class SessionRepositoryImpl(
      * the old version returned true for any non-blank string, which read like verification and was
      * not.
      */
-    override suspend fun unlockSecretSession(sessionId: String, pinOrPassword: String): Boolean =
-        cache.unlockSecretSession(sessionId)
+    override suspend fun unlockSecretSession(
+        sessionId: String,
+        pinOrPassword: String,
+    ): Boolean = cache.unlockSecretSession(sessionId)
 
     override fun observeMessages(sessionId: String): Flow<List<ChatMessage>> =
         cache.observeMessages(sessionId).map { it.map(ChatMessageDataMapper::toDomain) }
 
     override suspend fun retryMessage(messageId: String): Flow<ChatStreamEvent> {
-        val (sessionId, message) = cache.sessionHolding(messageId)
-            ?: throw DomainException("Message with id $messageId not found to retry")
+        val (sessionId, message) =
+            cache.sessionHolding(messageId)
+                ?: throw DomainException("Message with id $messageId not found to retry")
         return streamChatTurn(sessionId = sessionId, content = message.content)
     }
 
@@ -94,7 +101,8 @@ class SessionRepositoryImpl(
         content: String,
         autoApproveWrites: Boolean,
     ): Flow<ChatStreamEvent> =
-        remote.openChatStream(sessionId, content, autoApproveWrites)
+        remote
+            .openChatStream(sessionId, content, autoApproveWrites)
             .catch { cause ->
                 if (cause is SessionConflictException) emitAll(recoverReply(sessionId)) else throw cause
             }
@@ -105,38 +113,42 @@ class SessionRepositoryImpl(
      * the collector was waiting for. A refusal along the way is not the end of the turn and is
      * ignored, but a hub that has gone away is worth saying out loud.
      */
-    private fun recoverReply(sessionId: String): Flow<ChatStreamEvent> = flow {
-        var wait = pollDelayMs
-        var waited = 0L
+    private fun recoverReply(sessionId: String): Flow<ChatStreamEvent> =
+        flow {
+            var wait = pollDelayMs
+            var waited = 0L
 
-        while (waited < MAX_RECOVERY_WAIT_MS) {
-            delay(wait)
-            waited += wait
-            wait = (wait * 1.5).toLong()
+            while (waited < MAX_RECOVERY_WAIT_MS) {
+                delay(wait)
+                waited += wait
+                wait = (wait * 1.5).toLong()
 
-            val detail = runCatchingSafe { remote.fetchSession(sessionId) }
-                .onFailure { failure ->
-                    if (failure is ServerOfflineException) {
-                        throw ServerOfflineException(message = "Server connection lost while polling", cause = failure)
-                    }
-                }
-                .getOrNull()
+                val detail =
+                    runCatchingSafe { remote.fetchSession(sessionId) }
+                        .onFailure { failure ->
+                            if (failure is ServerOfflineException) {
+                                throw ServerOfflineException(
+                                    message = "Server connection lost while polling",
+                                    cause = failure,
+                                )
+                            }
+                        }.getOrNull()
 
-            val reply = detail?.messages?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
-            if (reply != null) {
-                emit(
-                    ChatStreamEvent.Done(
-                        messageId = reply.id,
-                        assistantContent = reply.content,
-                        agentName = "Assistant",
+                val reply = detail?.messages?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
+                if (reply != null) {
+                    emit(
+                        ChatStreamEvent.Done(
+                            messageId = reply.id,
+                            assistantContent = reply.content,
+                            agentName = "Assistant",
+                        ),
                     )
-                )
-                return@flow
+                    return@flow
+                }
             }
-        }
 
-        throw DomainException("Session inference recovery timed out after ${MAX_RECOVERY_WAIT_MS / 1000}s")
-    }
+            throw DomainException("Session inference recovery timed out after ${MAX_RECOVERY_WAIT_MS / 1000}s")
+        }
 
     private fun ConversationSession.withLockState(): ConversationSession =
         if (isSecret && cache.isLocked(id)) copy(isSecretLocked = true) else this

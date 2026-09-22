@@ -7,7 +7,10 @@ class InMemorySessionStorage : StoredSessionLocalDataSource {
     private var refreshToken: String? = null
     private var user: UserReadDto? = null
 
-    override fun saveTokens(accessToken: String, refreshToken: String?) {
+    override fun saveTokens(
+        accessToken: String,
+        refreshToken: String?,
+    ) {
         this.accessToken = accessToken
         if (refreshToken != null) {
             this.refreshToken = refreshToken

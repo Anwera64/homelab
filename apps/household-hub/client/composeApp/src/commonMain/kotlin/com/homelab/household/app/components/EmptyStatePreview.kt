@@ -13,7 +13,7 @@ private fun EmptyStateWithActionPreview() {
             icon = HearthIcon.Chats,
             title = "No chats yet",
             line = "Conversations you start will appear here.",
-            action = EmptyStateAction(label = "Start a chat", onClick = {})
+            action = EmptyStateAction(label = "Start a chat", onClick = {}),
         )
     }
 }
@@ -26,7 +26,7 @@ private fun EmptyStateWithoutActionPreview() {
         EmptyState(
             icon = HearthIcon.Schedule,
             title = "Nothing scheduled",
-            line = "Plans the household shares will show up here."
+            line = "Plans the household shares will show up here.",
         )
     }
 }

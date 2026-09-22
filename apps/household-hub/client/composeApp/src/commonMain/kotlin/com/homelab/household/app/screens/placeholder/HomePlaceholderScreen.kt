@@ -17,7 +17,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HomePlaceholderScreen(
     onProfile: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()

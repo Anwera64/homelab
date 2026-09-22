@@ -20,16 +20,15 @@ import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.DarwinClientEngineConfig
+import org.koin.core.context.stopKoin
+import org.koin.test.KoinTest
+import org.koin.test.get
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import org.koin.core.context.stopKoin
-import org.koin.test.KoinTest
-import org.koin.test.get
 
 class IosPlatformModuleTest : KoinTest {
-
     @AfterTest
     fun tearDown() {
         stopKoin()
@@ -42,7 +41,7 @@ class IosPlatformModuleTest : KoinTest {
         val engine = get<HttpClientEngine>()
         assertTrue(
             engine.config is DarwinClientEngineConfig,
-            "Expected a Darwin engine on iOS, got ${engine::class.simpleName}"
+            "Expected a Darwin engine on iOS, got ${engine::class.simpleName}",
         )
         assertTrue(get<StoredSessionLocalDataSource>() is KeychainSessionStorage)
     }

@@ -12,13 +12,13 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class HearthChipTest {
-
     @Test
-    fun shows_its_label() = runComposeUiTest {
-        setContent { StillTheme { HearthChip(label = "Read only") } }
+    fun shows_its_label() =
+        runComposeUiTest {
+            setContent { StillTheme { HearthChip(label = "Read only") } }
 
-        onNodeWithText("Read only").assertIsDisplayed()
-    }
+            onNodeWithText("Read only").assertIsDisplayed()
+        }
 
     @Test
     fun secret_chip_is_a_ghost_tuned_per_palette() {

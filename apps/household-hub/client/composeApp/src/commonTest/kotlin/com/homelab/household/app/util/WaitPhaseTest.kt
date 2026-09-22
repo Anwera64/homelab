@@ -14,7 +14,6 @@ import kotlin.time.Duration.Companion.seconds
  * fast hub flash a loading state.
  */
 class WaitPhaseTest {
-
     private val hold = 250.milliseconds
     private val slow = 8.seconds
 

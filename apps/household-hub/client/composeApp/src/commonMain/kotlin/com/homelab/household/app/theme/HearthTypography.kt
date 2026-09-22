@@ -67,42 +67,56 @@ data class HearthTypography(
     /** 80dp and up — [HearthSizes.tileHero]. */
     val glyphHero: TextStyle,
     /** The same roles, wired into Material's slots. */
-    val material: Typography
+    val material: Typography,
 )
 
 internal fun hearthTypography(fonts: HearthFonts): HearthTypography {
-    fun outfit(size: Int, lineHeight: Int, tracking: Double, weight: FontWeight = FontWeight.SemiBold) =
-        TextStyle(
-            fontFamily = fonts.outfit,
-            fontWeight = weight,
-            fontSize = size.sp,
-            lineHeight = lineHeight.sp,
-            letterSpacing = tracking.em
-        )
+    fun outfit(
+        size: Int,
+        lineHeight: Int,
+        tracking: Double,
+        weight: FontWeight = FontWeight.SemiBold,
+    ) = TextStyle(
+        fontFamily = fonts.outfit,
+        fontWeight = weight,
+        fontSize = size.sp,
+        lineHeight = lineHeight.sp,
+        letterSpacing = tracking.em,
+    )
 
-    fun inter(size: Int, lineHeight: Int, weight: FontWeight, tracking: Double? = null) = TextStyle(
+    fun inter(
+        size: Int,
+        lineHeight: Int,
+        weight: FontWeight,
+        tracking: Double? = null,
+    ) = TextStyle(
         fontFamily = fonts.inter,
         fontWeight = weight,
         fontSize = size.sp,
         lineHeight = lineHeight.sp,
-        letterSpacing = tracking?.em ?: TextStyle.Default.letterSpacing
+        letterSpacing = tracking?.em ?: TextStyle.Default.letterSpacing,
     )
 
-    fun mono(size: Int, lineHeight: Int, tracking: Double? = null) = TextStyle(
+    fun mono(
+        size: Int,
+        lineHeight: Int,
+        tracking: Double? = null,
+    ) = TextStyle(
         fontFamily = fonts.jetBrainsMono,
         fontWeight = FontWeight.Medium,
         fontSize = size.sp,
         lineHeight = lineHeight.sp,
-        letterSpacing = tracking?.em ?: TextStyle.Default.letterSpacing
+        letterSpacing = tracking?.em ?: TextStyle.Default.letterSpacing,
     )
 
     // A glyph sits on its own cap height so the circle around it does the centring.
-    fun glyph(size: Int) = TextStyle(
-        fontFamily = fonts.outfit,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = size.sp,
-        lineHeight = 1f.em
-    )
+    fun glyph(size: Int) =
+        TextStyle(
+            fontFamily = fonts.outfit,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = size.sp,
+            lineHeight = 1f.em,
+        )
 
     val hero = outfit(size = 28, lineHeight = 32, tracking = -0.015)
     val title = outfit(size = 21, lineHeight = 25, tracking = -0.012)
@@ -145,24 +159,25 @@ internal fun hearthTypography(fonts: HearthFonts): HearthTypography {
         glyphXl = glyph(26),
         glyphXxl = glyph(30),
         glyphHero = glyph(36),
-        material = Typography(
-            // Three display slots, one hero: the app has one size of full-screen title.
-            displayLarge = hero,
-            displayMedium = hero,
-            displaySmall = hero,
-            headlineLarge = title,
-            headlineMedium = title,
-            headlineSmall = heading,
-            titleLarge = heading,
-            titleMedium = bodyStrong,
-            titleSmall = label,
-            bodyLarge = bodyLarge,
-            bodyMedium = body,
-            bodySmall = caption,
-            // Material puts a button's label in labelLarge.
-            labelLarge = bodyStrong,
-            labelMedium = labelStrong,
-            labelSmall = micro
-        )
+        material =
+            Typography(
+                // Three display slots, one hero: the app has one size of full-screen title.
+                displayLarge = hero,
+                displayMedium = hero,
+                displaySmall = hero,
+                headlineLarge = title,
+                headlineMedium = title,
+                headlineSmall = heading,
+                titleLarge = heading,
+                titleMedium = bodyStrong,
+                titleSmall = label,
+                bodyLarge = bodyLarge,
+                bodyMedium = body,
+                bodySmall = caption,
+                // Material puts a button's label in labelLarge.
+                labelLarge = bodyStrong,
+                labelMedium = labelStrong,
+                labelSmall = micro,
+            ),
     )
 }

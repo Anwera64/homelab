@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.local
 
+import com.homelab.household.data.dto.UserReadDto
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.COpaquePointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -12,7 +13,6 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.set
 import kotlinx.cinterop.value
-import com.homelab.household.data.dto.UserReadDto
 import kotlinx.serialization.json.Json
 import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
@@ -70,11 +70,13 @@ import platform.Security.kSecValueData
  * unreadable is deleted and reads as signed out.
  */
 class KeychainSessionStorage : StoredSessionLocalDataSource {
-
     private val json = Json { ignoreUnknownKeys = true }
     private val lock = NSLock()
 
-    override fun saveTokens(accessToken: String, refreshToken: String?) {
+    override fun saveTokens(
+        accessToken: String,
+        refreshToken: String?,
+    ) {
         locked {
             // A null refresh token means "leave the stored one alone", and the member is never
             // this call's business, so merge both before writing.
@@ -83,8 +85,8 @@ class KeychainSessionStorage : StoredSessionLocalDataSource {
                 SessionDiskPayload(
                     accessToken = accessToken,
                     refreshToken = refreshToken ?: stored?.refreshToken,
-                    user = stored?.user
-                )
+                    user = stored?.user,
+                ),
             )
         }
     }
@@ -100,8 +102,8 @@ class KeychainSessionStorage : StoredSessionLocalDataSource {
                 SessionDiskPayload(
                     accessToken = stored?.accessToken,
                     refreshToken = stored?.refreshToken,
-                    user = user
-                )
+                    user = user,
+                ),
             )
         }
     }
@@ -127,11 +129,12 @@ class KeychainSessionStorage : StoredSessionLocalDataSource {
 
     /** Reads the stored payload, deleting (and reporting signed out) anything unreadable. */
     private fun readPayload(): SessionDiskPayload? {
-        val bytes = try {
-            Keychain.read()
-        } catch (_: Throwable) {
-            null
-        } ?: return null
+        val bytes =
+            try {
+                Keychain.read()
+            } catch (_: Throwable) {
+                null
+            } ?: return null
 
         return try {
             json.decodeFromString<SessionDiskPayload>(bytes.decodeToString())
@@ -165,85 +168,90 @@ class KeychainSessionStorage : StoredSessionLocalDataSource {
  */
 @OptIn(ExperimentalForeignApi::class)
 internal object Keychain {
-
     private const val SERVICE = "com.homelab.household.tokens"
     private const val ACCOUNT = "auth_tokens"
 
-    fun read(): ByteArray? = memScoped {
-        val query = cfDictionary(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to cfString(SERVICE),
-            kSecAttrAccount to cfString(ACCOUNT),
-            kSecReturnData to kCFBooleanTrue,
-            kSecMatchLimit to kSecMatchLimitOne
-        )
-        val result = alloc<CFTypeRefVar>()
-        val status = SecItemCopyMatching(query, result.ptr)
-        if (status != errSecSuccess) return@memScoped null
+    fun read(): ByteArray? =
+        memScoped {
+            val query =
+                cfDictionary(
+                    kSecClass to kSecClassGenericPassword,
+                    kSecAttrService to cfString(SERVICE),
+                    kSecAttrAccount to cfString(ACCOUNT),
+                    kSecReturnData to kCFBooleanTrue,
+                    kSecMatchLimit to kSecMatchLimitOne,
+                )
+            val result = alloc<CFTypeRefVar>()
+            val status = SecItemCopyMatching(query, result.ptr)
+            if (status != errSecSuccess) return@memScoped null
 
-        // SecItemCopyMatching returns a +1 reference that we own.
-        val data = result.value ?: return@memScoped null
-        try {
-            @Suppress("UNCHECKED_CAST")
-            (data as CFDataRef).toByteArray()
-        } finally {
-            CFBridgingRelease(data)
+            // SecItemCopyMatching returns a +1 reference that we own.
+            val data = result.value ?: return@memScoped null
+            try {
+                @Suppress("UNCHECKED_CAST")
+                (data as CFDataRef).toByteArray()
+            } finally {
+                CFBridgingRelease(data)
+            }
         }
-    }
 
     /** Adds the item, or replaces the data of the one already there. */
-    fun write(value: ByteArray): Boolean = memScoped {
-        val data = cfData(value)
-        val query = cfDictionary(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to cfString(SERVICE),
-            kSecAttrAccount to cfString(ACCOUNT)
-        )
-        val updated = SecItemUpdate(query, cfDictionary(kSecValueData to data))
-        if (updated == errSecSuccess) return@memScoped true
-        if (updated != errSecItemNotFound) return@memScoped false
+    fun write(value: ByteArray): Boolean =
+        memScoped {
+            val data = cfData(value)
+            val query =
+                cfDictionary(
+                    kSecClass to kSecClassGenericPassword,
+                    kSecAttrService to cfString(SERVICE),
+                    kSecAttrAccount to cfString(ACCOUNT),
+                )
+            val updated = SecItemUpdate(query, cfDictionary(kSecValueData to data))
+            if (updated == errSecSuccess) return@memScoped true
+            if (updated != errSecItemNotFound) return@memScoped false
 
-        val attributes = cfDictionary(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to cfString(SERVICE),
-            kSecAttrAccount to cfString(ACCOUNT),
-            kSecAttrAccessible to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-            kSecValueData to data
-        )
-        SecItemAdd(attributes, null) == errSecSuccess
-    }
+            val attributes =
+                cfDictionary(
+                    kSecClass to kSecClassGenericPassword,
+                    kSecAttrService to cfString(SERVICE),
+                    kSecAttrAccount to cfString(ACCOUNT),
+                    kSecAttrAccessible to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                    kSecValueData to data,
+                )
+            SecItemAdd(attributes, null) == errSecSuccess
+        }
 
-    fun delete(): Boolean = memScoped {
-        val query = cfDictionary(
-            kSecClass to kSecClassGenericPassword,
-            kSecAttrService to cfString(SERVICE),
-            kSecAttrAccount to cfString(ACCOUNT)
-        )
-        val status = SecItemDelete(query)
-        status == errSecSuccess || status == errSecItemNotFound
-    }
+    fun delete(): Boolean =
+        memScoped {
+            val query =
+                cfDictionary(
+                    kSecClass to kSecClassGenericPassword,
+                    kSecAttrService to cfString(SERVICE),
+                    kSecAttrAccount to cfString(ACCOUNT),
+                )
+            val status = SecItemDelete(query)
+            status == errSecSuccess || status == errSecItemNotFound
+        }
 
     /**
      * Builds a CFDictionary whose keys and values are borrowed: `kCFType*CallBacks` makes the
      * dictionary retain them for its own lifetime, and the dictionary itself is released on exit.
      */
-    private fun MemScope.cfDictionary(
-        vararg entries: Pair<CFStringRef?, COpaquePointer?>
-    ): CFDictionaryRef? {
+    private fun MemScope.cfDictionary(vararg entries: Pair<CFStringRef?, COpaquePointer?>): CFDictionaryRef? {
         val keys = allocArray<COpaquePointerVar>(entries.size)
         val values = allocArray<COpaquePointerVar>(entries.size)
         entries.forEachIndexed { index, (key, value) ->
             keys[index] = key
             values[index] = value
         }
-        val dictionary = CFDictionaryCreate(
-            null,
-            keys,
-            values,
-            entries.size.toLong(),
-            kCFTypeDictionaryKeyCallBacks.ptr,
-            kCFTypeDictionaryValueCallBacks.ptr
-        )
+        val dictionary =
+            CFDictionaryCreate(
+                null,
+                keys,
+                values,
+                entries.size.toLong(),
+                kCFTypeDictionaryKeyCallBacks.ptr,
+                kCFTypeDictionaryValueCallBacks.ptr,
+            )
         defer { CFBridgingRelease(dictionary) }
         return dictionary
     }
@@ -268,5 +276,4 @@ internal object Keychain {
         val bytes = CFDataGetBytePtr(this) ?: return ByteArray(0)
         return ByteArray(length) { bytes[it].toByte() }
     }
-
 }

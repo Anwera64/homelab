@@ -19,10 +19,10 @@ import java.io.File
  * It is the same theme with the motion off, and `TestApp` is built from it too.
  */
 class StillMotionInTestsTest {
-
-    private val clientRootDir = File(System.getProperty("user.dir")).let { dir ->
-        if (dir.name == "shared") dir.parentFile else dir
-    }
+    private val clientRootDir =
+        File(System.getProperty("user.dir")).let { dir ->
+            if (dir.name == "shared") dir.parentFile else dir
+        }
 
     private val testDir = File(clientRootDir, "composeApp/src/commonTest/kotlin")
 
@@ -41,23 +41,24 @@ class StillMotionInTestsTest {
 
         val liveTheme = Regex("""\bHearthTheme\s*\(""")
 
-        val violations = testDir.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.startsWith(themeOwnTests) || it.name in allowed }
-            .flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    liveTheme.find(line)?.let {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1} composes HearthTheme " +
-                            "directly — compose StillTheme instead, or the motion stays on and a " +
-                            "failing test hangs rather than failing"
+        val violations =
+            testDir
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .filterNot { it.startsWith(themeOwnTests) || it.name in allowed }
+                .flatMap { file ->
+                    file.readLines().mapIndexedNotNull { index, line ->
+                        liveTheme.find(line)?.let {
+                            "${file.toRelativeString(clientRootDir)}:${index + 1} composes HearthTheme " +
+                                "directly — compose StillTheme instead, or the motion stays on and a " +
+                                "failing test hangs rather than failing"
+                        }
                     }
-                }
-            }
-            .toList()
+                }.toList()
 
         assertTrue(
             violations.isEmpty(),
-            "The live theme was composed in a test (${violations.size}):\n" + violations.joinToString("\n")
+            "The live theme was composed in a test (${violations.size}):\n" + violations.joinToString("\n"),
         )
     }
 }

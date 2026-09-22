@@ -30,7 +30,10 @@ private fun MemberAvatarTilePreview() {
 }
 
 @Composable
-private fun AvatarRow(size: Dp, glyph: TextStyle) {
+private fun AvatarRow(
+    size: Dp,
+    glyph: TextStyle,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
         SampleNames.zip(AvatarPalette.swatches).forEach { (name, colour) ->
             MemberAvatar(name = name, colour = colour, size = size, glyph = glyph)

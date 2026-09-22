@@ -40,66 +40,67 @@ import kotlin.time.TimeSource
  * Fast (~2s of fixture-imposed delay); runs on every `iosSimulatorArm64Test`.
  */
 class DarwinSseLockstepStreamingTest : KoinTest {
-
     @AfterTest
     fun tearDown() {
         stopKoin()
     }
 
     @Test
-    fun darwin_delivers_each_sse_delta_before_the_server_is_allowed_to_write_the_next() = runBlocking {
-        HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
-        val repository = get<SessionRepository>()
-        val acks = SseFixture.ackClient()
+    fun darwin_delivers_each_sse_delta_before_the_server_is_allowed_to_write_the_next() =
+        runBlocking {
+            HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
+            val repository = get<SessionRepository>()
+            val acks = SseFixture.ackClient()
 
-        val events = mutableListOf<ChatStreamEvent>()
-        val deltaArrivals = mutableListOf<Duration>()
-        val clock = TimeSource.Monotonic.markNow()
+            val events = mutableListOf<ChatStreamEvent>()
+            val deltaArrivals = mutableListOf<Duration>()
+            val clock = TimeSource.Monotonic.markNow()
 
-        try {
-            withTimeout(90.seconds) {
-                // The engine hands bytes over on NSURLSession's own queue; collecting on
-                // Dispatchers.Default forces every event across a dispatcher boundary, exactly
-                // as the app does. `streamChatTurn` is a channelFlow for this reason.
-                withContext(Dispatchers.Default) {
-                    repository.streamChatTurn(
-                        sessionId = SseFixture.SCENARIO_LOCKSTEP,
-                        content = "prove incremental delivery"
-                    ).collect { event ->
-                        events += event
-                        if (event is ChatStreamEvent.Delta) {
-                            deltaArrivals += clock.elapsedNow()
-                            acks.ack(SseFixture.SCENARIO_LOCKSTEP, deltaArrivals.size)
-                        }
+            try {
+                withTimeout(90.seconds) {
+                    // The engine hands bytes over on NSURLSession's own queue; collecting on
+                    // Dispatchers.Default forces every event across a dispatcher boundary, exactly
+                    // as the app does. `streamChatTurn` is a channelFlow for this reason.
+                    withContext(Dispatchers.Default) {
+                        repository
+                            .streamChatTurn(
+                                sessionId = SseFixture.SCENARIO_LOCKSTEP,
+                                content = "prove incremental delivery",
+                            ).collect { event ->
+                                events += event
+                                if (event is ChatStreamEvent.Delta) {
+                                    deltaArrivals += clock.elapsedNow()
+                                    acks.ack(SseFixture.SCENARIO_LOCKSTEP, deltaArrivals.size)
+                                }
+                            }
                     }
                 }
+            } finally {
+                acks.close()
             }
-        } finally {
-            acks.close()
-        }
 
-        assertEquals(
-            listOf("alpha ", "beta ", "gamma"),
-            events.filterIsInstance<ChatStreamEvent.Delta>().map { it.content },
-            "Deltas did not arrive intact; got $events"
-        )
-        assertEquals(4, events.size, "Expected three deltas and one done event, got $events")
-
-        val done = events.last()
-        assertTrue(done is ChatStreamEvent.Done, "Stream did not end with a Done event: $done")
-        assertEquals("alpha beta gamma", done.assistantContent)
-        assertEquals("msg-lockstep", done.messageId)
-
-        // Independent of the handshake: a buffered body would deliver these microseconds apart.
-        val floor = (SseFixture.GAP_MILLIS - 150).milliseconds
-        for (index in 1 until deltaArrivals.size) {
-            val gap = deltaArrivals[index] - deltaArrivals[index - 1]
-            assertTrue(
-                gap >= floor,
-                "Delta ${index + 1} arrived only $gap after delta $index; the fixture sleeps " +
-                    "${SseFixture.GAP_MILLIS}ms between them, so anything under $floor means the " +
-                    "engine had already buffered them. Arrivals: $deltaArrivals"
+            assertEquals(
+                listOf("alpha ", "beta ", "gamma"),
+                events.filterIsInstance<ChatStreamEvent.Delta>().map { it.content },
+                "Deltas did not arrive intact; got $events",
             )
+            assertEquals(4, events.size, "Expected three deltas and one done event, got $events")
+
+            val done = events.last()
+            assertTrue(done is ChatStreamEvent.Done, "Stream did not end with a Done event: $done")
+            assertEquals("alpha beta gamma", done.assistantContent)
+            assertEquals("msg-lockstep", done.messageId)
+
+            // Independent of the handshake: a buffered body would deliver these microseconds apart.
+            val floor = (SseFixture.GAP_MILLIS - 150).milliseconds
+            for (index in 1 until deltaArrivals.size) {
+                val gap = deltaArrivals[index] - deltaArrivals[index - 1]
+                assertTrue(
+                    gap >= floor,
+                    "Delta ${index + 1} arrived only $gap after delta $index; the fixture sleeps " +
+                        "${SseFixture.GAP_MILLIS}ms between them, so anything under $floor means the " +
+                        "engine had already buffered them. Arrivals: $deltaArrivals",
+                )
+            }
         }
-    }
 }

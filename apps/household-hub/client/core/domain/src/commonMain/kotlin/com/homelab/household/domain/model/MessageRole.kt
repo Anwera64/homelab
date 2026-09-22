@@ -4,5 +4,5 @@ enum class MessageRole {
     USER,
     ASSISTANT,
     SYSTEM,
-    TOOL
+    TOOL,
 }

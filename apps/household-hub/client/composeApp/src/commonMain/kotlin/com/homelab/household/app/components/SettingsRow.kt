@@ -33,27 +33,28 @@ fun SettingsRow(
     caption: String? = null,
     icon: HearthIcon? = null,
     enabled: Boolean = true,
-    trailing: @Composable (RowScope.() -> Unit)? = null
+    trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val ink = if (enabled) colors.textPrimary else colors.textMuted.copy(alpha = CLOSED_ALPHA)
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = HearthTheme.size.touchTarget)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = HearthTheme.size.touchTarget)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         if (icon != null) {
             HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconLg, tint = ink)
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs),
         ) {
             Text(label, style = type.bodyStrong, color = ink)
             if (caption != null) {
@@ -61,13 +62,18 @@ fun SettingsRow(
             }
         }
         when {
-            trailing != null -> trailing()
-            enabled -> HearthIconImage(
-                icon = HearthIcon.ChevronRight,
-                contentDescription = null,
-                size = HearthTheme.size.iconMd,
-                tint = colors.textMuted
-            )
+            trailing != null -> {
+                trailing()
+            }
+
+            enabled -> {
+                HearthIconImage(
+                    icon = HearthIcon.ChevronRight,
+                    contentDescription = null,
+                    size = HearthTheme.size.iconMd,
+                    tint = colors.textMuted,
+                )
+            }
         }
     }
 }

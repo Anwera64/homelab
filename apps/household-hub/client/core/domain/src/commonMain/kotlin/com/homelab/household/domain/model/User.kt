@@ -7,5 +7,5 @@ data class User(
     val isActive: Boolean,
     val personalSpaceId: String? = null,
     val avatarColor: String? = null,
-    val createdAt: String? = null
+    val createdAt: String? = null,
 )

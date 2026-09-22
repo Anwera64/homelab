@@ -17,7 +17,6 @@ import kotlin.time.Duration.Companion.seconds
 /** Values come from the palette proof, sections 04 (Copenhagen Day) and 05 (Midnight Espresso). */
 @OptIn(ExperimentalTestApi::class)
 class HearthThemeTest {
-
     @Test
     fun day_palette_matches_the_palette_proof() {
         with(DayColors) {
@@ -83,107 +82,113 @@ class HearthThemeTest {
     }
 
     @Test
-    fun dark_theme_provides_night_tokens_to_hearth_and_material() = runComposeUiTest {
-        var hearth: HearthColors? = null
-        var materialPrimary: Color? = null
-        var materialBackground: Color? = null
+    fun dark_theme_provides_night_tokens_to_hearth_and_material() =
+        runComposeUiTest {
+            var hearth: HearthColors? = null
+            var materialPrimary: Color? = null
+            var materialBackground: Color? = null
 
-        setContent {
-            HearthTheme(darkTheme = true) {
-                hearth = HearthTheme.colors
-                materialPrimary = MaterialTheme.colorScheme.primary
-                materialBackground = MaterialTheme.colorScheme.background
+            setContent {
+                HearthTheme(darkTheme = true) {
+                    hearth = HearthTheme.colors
+                    materialPrimary = MaterialTheme.colorScheme.primary
+                    materialBackground = MaterialTheme.colorScheme.background
+                }
             }
-        }
 
-        waitForIdle()
-        assertEquals(NightColors, hearth)
-        assertEquals(NightColors.primary, materialPrimary)
-        assertEquals(NightColors.canvas, materialBackground)
-    }
+            waitForIdle()
+            assertEquals(NightColors, hearth)
+            assertEquals(NightColors.primary, materialPrimary)
+            assertEquals(NightColors.canvas, materialBackground)
+        }
 
     @Test
-    fun light_theme_provides_day_tokens_to_hearth_and_material() = runComposeUiTest {
-        var hearth: HearthColors? = null
-        var materialPrimary: Color? = null
+    fun light_theme_provides_day_tokens_to_hearth_and_material() =
+        runComposeUiTest {
+            var hearth: HearthColors? = null
+            var materialPrimary: Color? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                hearth = HearthTheme.colors
-                materialPrimary = MaterialTheme.colorScheme.primary
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    hearth = HearthTheme.colors
+                    materialPrimary = MaterialTheme.colorScheme.primary
+                }
             }
-        }
 
-        waitForIdle()
-        assertEquals(DayColors, hearth)
-        assertEquals(DayColors.primary, materialPrimary)
-    }
+            waitForIdle()
+            assertEquals(DayColors, hearth)
+            assertEquals(DayColors.primary, materialPrimary)
+        }
 
     @Test
-    fun the_theme_hands_out_the_scale_beside_the_palette() = runComposeUiTest {
-        var spacing: HearthSpacing? = null
-        var size: HearthSizes? = null
+    fun the_theme_hands_out_the_scale_beside_the_palette() =
+        runComposeUiTest {
+            var spacing: HearthSpacing? = null
+            var size: HearthSizes? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                spacing = HearthTheme.spacing
-                size = HearthTheme.size
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    spacing = HearthTheme.spacing
+                    size = HearthTheme.size
+                }
             }
-        }
 
-        waitForIdle()
-        assertEquals(DefaultSpacing, spacing)
-        assertEquals(DefaultSizes, size)
-    }
+            waitForIdle()
+            assertEquals(DefaultSpacing, spacing)
+            assertEquals(DefaultSizes, size)
+        }
 
     /** Space doesn't change with the palette: a screen reads the same step in either theme. */
     @Test
-    fun the_scale_is_the_same_in_both_palettes() = runComposeUiTest {
-        var day: HearthSpacing? = null
-        var night: HearthSpacing? = null
+    fun the_scale_is_the_same_in_both_palettes() =
+        runComposeUiTest {
+            var day: HearthSpacing? = null
+            var night: HearthSpacing? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) { day = HearthTheme.spacing }
-            HearthTheme(darkTheme = true) { night = HearthTheme.spacing }
+            setContent {
+                HearthTheme(darkTheme = false) { day = HearthTheme.spacing }
+                HearthTheme(darkTheme = true) { night = HearthTheme.spacing }
+            }
+
+            waitForIdle()
+            assertEquals(day, night)
         }
-
-        waitForIdle()
-        assertEquals(day, night)
-    }
 
     /**
      * The point of putting the scale behind a local: a denser or looser variant — a tablet, a
      * later size class — can be provided once, and every screen follows without being touched.
      */
     @Test
-    fun a_provided_scale_reaches_the_screens_under_it() = runComposeUiTest {
-        val roomier = DefaultSpacing.copy(xl = 32.dp)
-        var seen: Dp? = null
+    fun a_provided_scale_reaches_the_screens_under_it() =
+        runComposeUiTest {
+            val roomier = DefaultSpacing.copy(xl = 32.dp)
+            var seen: Dp? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthSpacing provides roomier) {
-                    seen = HearthTheme.spacing.xl
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    CompositionLocalProvider(LocalHearthSpacing provides roomier) {
+                        seen = HearthTheme.spacing.xl
+                    }
                 }
             }
-        }
 
-        waitForIdle()
-        assertEquals(32.dp, seen)
-    }
+            waitForIdle()
+            assertEquals(32.dp, seen)
+        }
 
     @Test
-    fun the_theme_hands_out_the_motion_scale_too() = runComposeUiTest {
-        var motion: HearthMotion? = null
+    fun the_theme_hands_out_the_motion_scale_too() =
+        runComposeUiTest {
+            var motion: HearthMotion? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) { motion = HearthTheme.motion }
+            setContent {
+                HearthTheme(darkTheme = false) { motion = HearthTheme.motion }
+            }
+
+            waitForIdle()
+            assertEquals(DefaultMotion, motion)
+            assertTrue(motion!!.animate, "the app's own scale animates")
         }
-
-        waitForIdle()
-        assertEquals(DefaultMotion, motion)
-        assertTrue(motion!!.animate, "the app's own scale animates")
-    }
 
     /**
      * The off switch every screen test depends on. A subtree given [StillMotion] reports
@@ -191,20 +196,21 @@ class HearthThemeTest {
      * endless one — without which the composition never goes idle and the test hangs.
      */
     @Test
-    fun a_subtree_given_the_still_scale_stops_animating() = runComposeUiTest {
-        var seen: HearthMotion? = null
+    fun a_subtree_given_the_still_scale_stops_animating() =
+        runComposeUiTest {
+            var seen: HearthMotion? = null
 
-        setContent {
-            HearthTheme(darkTheme = false) {
-                CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
-                    seen = HearthTheme.motion
+            setContent {
+                HearthTheme(darkTheme = false) {
+                    CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
+                        seen = HearthTheme.motion
+                    }
                 }
             }
-        }
 
-        waitForIdle()
-        assertFalse(seen!!.animate, "StillMotion must not animate")
-    }
+            waitForIdle()
+            assertFalse(seen!!.animate, "StillMotion must not animate")
+        }
 
     /** Nothing is time-gated when motion is off, so a screen test never waits on the hold. */
     @Test
@@ -214,7 +220,11 @@ class HearthThemeTest {
         assertEquals(8.seconds, StillMotion.slow, "the slow line must never appear by accident")
     }
 
-    private fun assertColor(expectedRgb: Long, actual: Color, token: String) {
+    private fun assertColor(
+        expectedRgb: Long,
+        actual: Color,
+        token: String,
+    ) {
         assertEquals(Color(0xFF000000 or expectedRgb), actual, "Token '$token'")
     }
 }

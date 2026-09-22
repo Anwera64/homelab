@@ -39,7 +39,7 @@ fun ResetCodeContent(
     onCodeChange: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -52,14 +52,14 @@ fun ResetCodeContent(
                 PrimaryButton(
                     text = stringResource(Res.string.invite_code_continue),
                     onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
                 Text(stringResource(Res.string.reset_code_title), style = type.hero, color = colors.textPrimary)
@@ -69,19 +69,19 @@ fun ResetCodeContent(
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             ) {
                 CodeBoxes(
                     code = state.code,
                     onCodeChange = onCodeChange,
-                    contentDescription = stringResource(Res.string.reset_code_field)
+                    contentDescription = stringResource(Res.string.reset_code_field),
                 )
                 if (state.incomplete) {
                     Text(
                         stringResource(Res.string.invite_code_incomplete),
                         style = type.caption,
                         color = colors.error,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -92,7 +92,7 @@ fun ResetCodeContent(
 @DayNightPreviews
 @Composable
 private fun ResetCodeContentPreview(
-    @PreviewParameter(ResetCodeUiStateProvider::class) state: ResetCodeUiState
+    @PreviewParameter(ResetCodeUiStateProvider::class) state: ResetCodeUiState,
 ) {
     HearthTheme {
         ResetCodeContent(state = state, onCodeChange = {}, onContinue = {}, onBack = {})

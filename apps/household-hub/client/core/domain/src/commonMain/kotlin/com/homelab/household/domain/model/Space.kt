@@ -6,5 +6,5 @@ data class Space(
     val type: SpaceType,
     val ownerId: String? = null,
     val settings: Map<String, Any?> = emptyMap(),
-    val createdAt: String? = null
+    val createdAt: String? = null,
 )

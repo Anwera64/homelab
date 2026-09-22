@@ -30,13 +30,12 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdUiState
-import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
+import kotlin.test.Test
 
 /** Leaving the household, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class LeaveHouseholdScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -49,7 +48,12 @@ class LeaveHouseholdScreenTest {
         var left = 0
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = { left++ }) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { LeaveHouseholdScreen(onBack = {}, onLeft = { left++ }) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("135790")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
@@ -64,7 +68,12 @@ class LeaveHouseholdScreenTest {
         hub.refusesThePin(attemptsLeft = 4)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("000000")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
@@ -79,7 +88,12 @@ class LeaveHouseholdScreenTest {
         hub.refusesTheOnlyAdmin()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("135790")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
@@ -94,29 +108,30 @@ class LeaveHouseholdScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun deleting_the_account_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                LeaveHouseholdContent(
-                    state = LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
-                    onPinChange = {},
-                    onLeave = {},
-                    onBack = {}
-                )
+    fun deleting_the_account_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    LeaveHouseholdContent(
+                        state = LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
+                        onPinChange = {},
+                        onLeave = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.leave_deleting))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_leave_deleting)
+            onNodeWithText(getString(Res.string.leave_deleting))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_leave_deleting),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.leave_submit)).assertDoesNotExist()
-    }
+            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.leave_submit)).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {

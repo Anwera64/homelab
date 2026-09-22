@@ -1,7 +1,7 @@
 package com.homelab.household.data.network
 
-import co.touchlab.kermit.Logger as KermitLogger
 import io.ktor.client.plugins.logging.Logger
+import co.touchlab.kermit.Logger as KermitLogger
 
 /**
  * Ktor [Logger] adapter that delegates HTTP network log messages to [co.touchlab.kermit.Logger].
@@ -11,9 +11,8 @@ import io.ktor.client.plugins.logging.Logger
  */
 class KermitKtorLogger(
     private val tag: String = "HttpClient",
-    private val kermit: KermitLogger = KermitLogger
+    private val kermit: KermitLogger = KermitLogger,
 ) : Logger {
-
     override fun log(message: String) {
         kermit.d(tag = tag) { message }
     }

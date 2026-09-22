@@ -17,9 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class InviteCreateViewModel(
-    private val createInvite: CreateInviteUseCase
+    private val createInvite: CreateInviteUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(InviteCreateUiState())
     val uiState: StateFlow<InviteCreateUiState> = _uiState.asStateFlow()
 
@@ -38,11 +37,12 @@ class InviteCreateViewModel(
         val state = _uiState.value
         if (state.status is InviteCreateStatus.Creating) return
 
-        val nameError = when {
-            state.name.isBlank() -> NameError.Missing
-            !MemberName.isValid(state.name) -> NameError.TooLong
-            else -> null
-        }
+        val nameError =
+            when {
+                state.name.isBlank() -> NameError.Missing
+                !MemberName.isValid(state.name) -> NameError.TooLong
+                else -> null
+            }
         if (nameError != null) {
             _uiState.update { it.copy(nameError = nameError) }
             return
@@ -57,13 +57,19 @@ class InviteCreateViewModel(
                 },
                 onFailure = { error ->
                     when (error) {
-                        is NameTakenException ->
+                        is NameTakenException -> {
                             _uiState.update { it.copy(status = InviteCreateStatus.Idle, nameError = NameError.Taken) }
-                        is ServerOfflineException ->
+                        }
+
+                        is ServerOfflineException -> {
                             _uiState.update { it.copy(status = InviteCreateStatus.Unreachable) }
-                        else -> _uiState.update { it.copy(status = InviteCreateStatus.Failed) }
+                        }
+
+                        else -> {
+                            _uiState.update { it.copy(status = InviteCreateStatus.Failed) }
+                        }
                     }
-                }
+                },
             )
         }
     }
@@ -80,12 +86,13 @@ class InviteCreateViewModel(
      */
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(secondsLeft = left) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(secondsLeft = left) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(secondsLeft = 0, status = InviteCreateStatus.Expired) }
             }
-            _uiState.update { it.copy(secondsLeft = 0, status = InviteCreateStatus.Expired) }
-        }
     }
 }

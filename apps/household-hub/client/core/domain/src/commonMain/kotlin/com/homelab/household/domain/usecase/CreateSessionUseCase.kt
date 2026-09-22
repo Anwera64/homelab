@@ -6,6 +6,6 @@ interface CreateSessionUseCase {
     suspend operator fun invoke(
         agentId: String,
         title: String = "New Conversation",
-        isSecret: Boolean = false
+        isSecret: Boolean = false,
     ): ConversationSession
 }

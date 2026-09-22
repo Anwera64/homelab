@@ -25,7 +25,6 @@ import kotlin.test.assertTrue
 /** The PIN pad with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class PinEntryScreenTest {
-
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
 
     @Test
@@ -135,26 +134,27 @@ class PinEntryScreenTest {
      * at all.
      */
     @Test
-    fun checking_says_the_pin_is_with_the_hub() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                PinEntryContent(
-                    state = PinEntryUiState(member = emma, entered = 6, status = PinStatus.Checking),
-                    onDigit = {},
-                    onDelete = {},
-                    onBack = {},
-                    onForgotten = {}
-                )
+    fun checking_says_the_pin_is_with_the_hub() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    PinEntryContent(
+                        state = PinEntryUiState(member = emma, entered = 6, status = PinStatus.Checking),
+                        onDigit = {},
+                        onDelete = {},
+                        onBack = {},
+                        onForgotten = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithTag(PinDotsTag).assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.StateDescription,
-                getString(Res.string.a11y_pin_checking)
+            onNodeWithTag(PinDotsTag).assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_pin_checking),
+                ),
             )
-        )
-    }
+        }
 
     @Test
     fun every_previewed_state_draws() {

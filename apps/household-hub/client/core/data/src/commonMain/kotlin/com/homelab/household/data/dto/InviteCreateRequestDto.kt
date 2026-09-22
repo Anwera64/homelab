@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class InviteCreateRequestDto(
     @SerialName("invited_name") val invitedName: String,
-    @SerialName("is_admin") val isAdmin: Boolean
+    @SerialName("is_admin") val isAdmin: Boolean,
 )

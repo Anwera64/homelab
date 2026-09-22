@@ -72,18 +72,23 @@ fun LaunchContent(
     state: LaunchUiState,
     onRetry: () -> Unit,
     onOpenTailscale: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     when (val status = state.status) {
-        HubStatus.Checking -> CheckingContent(hubAddress = state.hubAddress, modifier = modifier)
-        is HubStatus.Unavailable -> OfflineContent(
-            reason = status.reason,
-            hubAddress = state.hubAddress,
-            retryInSeconds = state.retryInSeconds,
-            onRetry = onRetry,
-            onOpenTailscale = onOpenTailscale,
-            modifier = modifier
-        )
+        HubStatus.Checking -> {
+            CheckingContent(hubAddress = state.hubAddress, modifier = modifier)
+        }
+
+        is HubStatus.Unavailable -> {
+            OfflineContent(
+                reason = status.reason,
+                hubAddress = state.hubAddress,
+                retryInSeconds = state.retryInSeconds,
+                onRetry = onRetry,
+                onOpenTailscale = onOpenTailscale,
+                modifier = modifier,
+            )
+        }
     }
 }
 
@@ -92,54 +97,60 @@ fun LaunchContent(
  * the only frame they see on the way to signing in or setting up.
  */
 @Composable
-private fun CheckingContent(hubAddress: String, modifier: Modifier) {
+private fun CheckingContent(
+    hubAddress: String,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
 
     HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.huge) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(vertical = HearthTheme.spacing.huge),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(
-                HearthTheme.spacing.xxxl,
-                Alignment.CenterVertically
-            )
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    HearthTheme.spacing.xxxl,
+                    Alignment.CenterVertically,
+                ),
         ) {
             Box(
-                modifier = Modifier
-                    .size(HearthTheme.size.tileHero)
-                    .background(
-                        color = colors.primary,
-                        shape = HearthShapes.tile
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(HearthTheme.size.tileHero)
+                        .background(
+                            color = colors.primary,
+                            shape = HearthShapes.tile,
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 HearthIconImage(
                     icon = HearthIcon.Household,
                     contentDescription = null,
                     size = HearthTheme.size.iconHero,
-                    tint = colors.onPrimary
+                    tint = colors.onPrimary,
                 )
             }
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             ) {
                 Text(
                     text = stringResource(Res.string.app_name),
                     style = HearthTheme.typography.hero,
                     color = colors.textPrimary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Text(
                     text = stringResource(Res.string.launch_checking),
                     style = HearthTheme.typography.body,
                     color = colors.textMuted,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
                 )
             }
 
@@ -149,7 +160,7 @@ private fun CheckingContent(hubAddress: String, modifier: Modifier) {
             Text(
                 text = stringResource(Res.string.launch_action_description),
                 style = HearthTheme.typography.monoSm,
-                color = colors.textMuted
+                color = colors.textMuted,
             )
         }
     }
@@ -167,7 +178,7 @@ private fun OfflineContent(
     retryInSeconds: Int?,
     onRetry: () -> Unit,
     onOpenTailscale: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -177,45 +188,46 @@ private fun OfflineContent(
         // Fixed shape by design, but a short phone or a large font would clip the buttons: it scrolls
         // only then, and stays centred otherwise.
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(padding)
-                .padding(vertical = HearthTheme.spacing.huge),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding)
+                    .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically),
         ) {
             OfflineTile()
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 Text(
                     text = words.title,
                     style = type.title,
                     color = colors.textPrimary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Text(
                     text = words.detail,
                     style = type.body,
                     color = colors.textMuted,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+                    modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
                 )
             }
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                 ) {
                     Text(
                         text = hubAddress,
                         style = type.monoSm,
                         color = colors.textMuted,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                     HearthChip(label = words.chip, variant = ChipVariant.Error)
                 }
@@ -223,18 +235,18 @@ private fun OfflineContent(
                     HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                     ) {
                         Text(
                             text = stringResource(Res.string.launch_retrying_in),
                             style = type.monoSm,
                             color = colors.textMuted,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         Text(
                             text = stringResource(Res.string.launch_retrying_seconds, seconds),
                             style = type.monoSm,
-                            color = colors.textPrimary
+                            color = colors.textPrimary,
                         )
                     }
                 }
@@ -242,18 +254,18 @@ private fun OfflineContent(
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
                     text = stringResource(Res.string.launch_retry),
                     onClick = onRetry,
                     icon = HearthIcon.Retry,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SecondaryButton(
                     text = stringResource(Res.string.launch_open_tailscale),
                     onClick = onOpenTailscale,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -261,62 +273,82 @@ private fun OfflineContent(
                 text = stringResource(Res.string.launch_offline_hint),
                 style = type.caption,
                 color = colors.textMuted,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
     }
 }
 
 /** What the offline screen says about one reason. */
-private class OfflineWords(val title: String, val detail: String, val chip: String)
+private class OfflineWords(
+    val title: String,
+    val detail: String,
+    val chip: String,
+)
 
 /** The reason in the user's own language; the hub's own words are English and technical. */
 @Composable
-private fun wordsFor(reason: HubFailure): OfflineWords = when (reason) {
-    HubFailure.NoRoute -> OfflineWords(
-        title = stringResource(Res.string.launch_no_route_title),
-        detail = stringResource(Res.string.launch_no_route_detail),
-        chip = stringResource(Res.string.launch_no_route_chip)
-    )
-    is HubFailure.Upstream -> OfflineWords(
-        title = stringResource(Res.string.launch_upstream_title),
-        detail = stringResource(Res.string.launch_upstream_detail, reason.statusCode),
-        chip = stringResource(Res.string.launch_upstream_chip, reason.statusCode)
-    )
-    is HubFailure.NotJson -> OfflineWords(
-        title = stringResource(Res.string.launch_web_page_title),
-        detail = stringResource(Res.string.launch_web_page_detail),
-        chip = stringResource(Res.string.launch_web_page_chip)
-    )
-    HubFailure.AddressNotFound -> OfflineWords(
-        title = stringResource(Res.string.launch_not_found_title),
-        detail = stringResource(Res.string.launch_not_found_detail),
-        chip = stringResource(Res.string.launch_not_found_chip)
-    )
-    HubFailure.Unknown -> OfflineWords(
-        title = stringResource(Res.string.launch_unknown_title),
-        detail = stringResource(Res.string.launch_unknown_detail),
-        chip = stringResource(Res.string.launch_unknown_chip)
-    )
-}
+private fun wordsFor(reason: HubFailure): OfflineWords =
+    when (reason) {
+        HubFailure.NoRoute -> {
+            OfflineWords(
+                title = stringResource(Res.string.launch_no_route_title),
+                detail = stringResource(Res.string.launch_no_route_detail),
+                chip = stringResource(Res.string.launch_no_route_chip),
+            )
+        }
+
+        is HubFailure.Upstream -> {
+            OfflineWords(
+                title = stringResource(Res.string.launch_upstream_title),
+                detail = stringResource(Res.string.launch_upstream_detail, reason.statusCode),
+                chip = stringResource(Res.string.launch_upstream_chip, reason.statusCode),
+            )
+        }
+
+        is HubFailure.NotJson -> {
+            OfflineWords(
+                title = stringResource(Res.string.launch_web_page_title),
+                detail = stringResource(Res.string.launch_web_page_detail),
+                chip = stringResource(Res.string.launch_web_page_chip),
+            )
+        }
+
+        HubFailure.AddressNotFound -> {
+            OfflineWords(
+                title = stringResource(Res.string.launch_not_found_title),
+                detail = stringResource(Res.string.launch_not_found_detail),
+                chip = stringResource(Res.string.launch_not_found_chip),
+            )
+        }
+
+        HubFailure.Unknown -> {
+            OfflineWords(
+                title = stringResource(Res.string.launch_unknown_title),
+                detail = stringResource(Res.string.launch_unknown_detail),
+                chip = stringResource(Res.string.launch_unknown_chip),
+            )
+        }
+    }
 
 @Composable
 private fun OfflineTile() {
     val colors = HearthTheme.colors
     Box(
-        modifier = Modifier
-            .size(HearthTheme.size.tile)
-            .background(
-                color = colors.errorContainer,
-                shape = HearthShapes.tile
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .size(HearthTheme.size.tile)
+                .background(
+                    color = colors.errorContainer,
+                    shape = HearthShapes.tile,
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         HearthIconImage(
             icon = HearthIcon.HubOffline,
             contentDescription = null,
             size = HearthTheme.size.iconXxl,
-            tint = colors.onErrorContainer
+            tint = colors.onErrorContainer,
         )
     }
 }
@@ -325,22 +357,23 @@ private fun OfflineTile() {
 private fun HubAddressPill(hubAddress: String) {
     val colors = HearthTheme.colors
     Row(
-        modifier = Modifier
-            .background(colors.surface, HearthShapes.pill)
-            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
-            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.sm),
+        modifier =
+            Modifier
+                .background(colors.surface, HearthShapes.pill)
+                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
+                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .size(HearthTheme.size.dot)
-                .background(colors.primary, HearthShapes.pill)
+                .background(colors.primary, HearthShapes.pill),
         )
         Text(
             text = hubAddress,
             style = HearthTheme.typography.mono,
-            color = colors.textMuted
+            color = colors.textMuted,
         )
     }
 }
@@ -348,7 +381,7 @@ private fun HubAddressPill(hubAddress: String) {
 @DayNightPreviews
 @Composable
 private fun LaunchContentPreview(
-    @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState
+    @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState,
 ) {
     HearthTheme {
         LaunchContent(state = state, onRetry = {}, onOpenTailscale = {})

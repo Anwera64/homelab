@@ -15,7 +15,7 @@ fun PinForgotScreen(
     member: Member,
     onBack: () -> Unit,
     onHaveCode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: PinForgotViewModel = koinViewModel(parameters = { parametersOf(member) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()

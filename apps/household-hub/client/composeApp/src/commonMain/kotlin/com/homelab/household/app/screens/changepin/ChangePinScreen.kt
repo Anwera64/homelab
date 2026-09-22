@@ -14,7 +14,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ChangePinScreen(
     onBack: () -> Unit,
     onChanged: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ChangePinViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -32,6 +32,6 @@ fun ChangePinScreen(
         onAgainChange = viewModel::onAgainChange,
         onChange = viewModel::change,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

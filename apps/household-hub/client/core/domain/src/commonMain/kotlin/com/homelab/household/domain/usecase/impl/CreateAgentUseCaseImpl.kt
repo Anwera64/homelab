@@ -5,7 +5,9 @@ import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.usecase.CreateAgentUseCase
 
-class CreateAgentUseCaseImpl(private val agentRepository: AgentRepository) : CreateAgentUseCase {
+class CreateAgentUseCaseImpl(
+    private val agentRepository: AgentRepository,
+) : CreateAgentUseCase {
     override suspend operator fun invoke(agent: AgentPersonality): AgentPersonality {
         if (agent.slug.isBlank()) throw ValidationException("Agent slug cannot be blank")
         if (agent.name.isBlank()) throw ValidationException("Agent name cannot be blank")

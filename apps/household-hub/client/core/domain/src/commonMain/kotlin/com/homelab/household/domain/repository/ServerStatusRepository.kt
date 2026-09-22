@@ -5,5 +5,6 @@ import kotlinx.coroutines.flow.Flow
 
 interface ServerStatusRepository {
     fun observeServerStatus(): Flow<ServerStatus>
+
     suspend fun checkHealth(): ServerStatus
 }

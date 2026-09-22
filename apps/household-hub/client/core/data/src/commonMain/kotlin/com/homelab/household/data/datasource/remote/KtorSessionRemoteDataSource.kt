@@ -38,47 +38,66 @@ class KtorSessionRemoteDataSource(
     private val baseUrl: String,
     private val sseStreamReader: DefensiveSseStreamReader = DefensiveSseStreamReader(),
 ) : SessionRemoteDataSource {
+    override suspend fun listSessions(): List<SessionReadDto> =
+        reachingHub {
+            client.get("$baseUrl/api/v1/sessions").ensureJsonSuccess().body()
+        }
 
-    override suspend fun listSessions(): List<SessionReadDto> = reachingHub {
-        client.get("$baseUrl/api/v1/sessions").ensureJsonSuccess().body()
-    }
+    override suspend fun fetchSession(sessionId: String): SessionDetailReadDto =
+        reachingHub {
+            client.get("$baseUrl/api/v1/sessions/$sessionId").ensureJsonSuccess().body()
+        }
 
-    override suspend fun fetchSession(sessionId: String): SessionDetailReadDto = reachingHub {
-        client.get("$baseUrl/api/v1/sessions/$sessionId").ensureJsonSuccess().body()
-    }
+    override suspend fun createSession(
+        agentId: String,
+        title: String,
+        isSecret: Boolean,
+    ): SessionReadDto =
+        reachingHub {
+            client
+                .post("$baseUrl/api/v1/sessions") {
+                    contentType(ContentType.Application.Json)
+                    setBody(SessionCreateDto(agent_id = agentId, title = title, is_secret = isSecret))
+                }.ensureJsonSuccess()
+                .body()
+        }
 
-    override suspend fun createSession(agentId: String, title: String, isSecret: Boolean): SessionReadDto = reachingHub {
-        client.post("$baseUrl/api/v1/sessions") {
-            contentType(ContentType.Application.Json)
-            setBody(SessionCreateDto(agent_id = agentId, title = title, is_secret = isSecret))
-        }.ensureJsonSuccess().body()
-    }
+    override suspend fun archiveSession(sessionId: String): Unit =
+        reachingHub {
+            client.post("$baseUrl/api/v1/sessions/$sessionId/archive").ensureJsonSuccess()
+        }
 
-    override suspend fun archiveSession(sessionId: String): Unit = reachingHub {
-        client.post("$baseUrl/api/v1/sessions/$sessionId/archive").ensureJsonSuccess()
-    }
+    override suspend fun toggleSecretMode(
+        sessionId: String,
+        isSecret: Boolean,
+    ): SessionReadDto =
+        reachingHub {
+            client
+                .patch("$baseUrl/api/v1/sessions/$sessionId/secret") {
+                    contentType(ContentType.Application.Json)
+                    setBody(SessionSecretToggleDto(is_secret = isSecret))
+                }.ensureJsonSuccess()
+                .body()
+        }
 
-    override suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): SessionReadDto = reachingHub {
-        client.patch("$baseUrl/api/v1/sessions/$sessionId/secret") {
-            contentType(ContentType.Application.Json)
-            setBody(SessionSecretToggleDto(is_secret = isSecret))
-        }.ensureJsonSuccess().body()
-    }
-
-    override suspend fun deleteSession(sessionId: String): Unit = reachingHub {
-        client.delete("$baseUrl/api/v1/sessions/$sessionId").ensureJsonSuccess()
-    }
+    override suspend fun deleteSession(sessionId: String): Unit =
+        reachingHub {
+            client.delete("$baseUrl/api/v1/sessions/$sessionId").ensureJsonSuccess()
+        }
 
     override suspend fun approveToolProposal(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-    ): Boolean = reachingHub {
-        client.post("$baseUrl/api/v1/sessions/$sessionId/tools/approve") {
-            contentType(ContentType.Application.Json)
-            setBody(ToolApprovalRequestDto(tool_call_id = toolCallId, approved = approved))
-        }.status.isSuccess()
-    }
+    ): Boolean =
+        reachingHub {
+            client
+                .post("$baseUrl/api/v1/sessions/$sessionId/tools/approve") {
+                    contentType(ContentType.Application.Json)
+                    setBody(ToolApprovalRequestDto(tool_call_id = toolCallId, approved = approved))
+                }.status
+                .isSuccess()
+        }
 
     /**
      * The only streamed call in the client, and the only place the dispatcher matters.
@@ -97,27 +116,34 @@ class KtorSessionRemoteDataSource(
         sessionId: String,
         content: String,
         autoApproveWrites: Boolean,
-    ): Flow<ChatStreamEvent> = channelFlow {
-        try {
-            val statement = client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
-                contentType(ContentType.Application.Json)
-                setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
-            }
-            statement.execute { response ->
-                when (response.status) {
-                    HttpStatusCode.OK ->
-                        sseStreamReader.readEvents(response.bodyAsChannel()).collect { send(it) }
-                    HttpStatusCode.Conflict ->
-                        throw SessionConflictException()
-                    else ->
-                        throw UpstreamGatewayException(statusCode = response.status.value)
+    ): Flow<ChatStreamEvent> =
+        channelFlow {
+            try {
+                val statement =
+                    client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
+                        contentType(ContentType.Application.Json)
+                        setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
+                    }
+                statement.execute { response ->
+                    when (response.status) {
+                        HttpStatusCode.OK -> {
+                            sseStreamReader.readEvents(response.bodyAsChannel()).collect { send(it) }
+                        }
+
+                        HttpStatusCode.Conflict -> {
+                            throw SessionConflictException()
+                        }
+
+                        else -> {
+                            throw UpstreamGatewayException(statusCode = response.status.value)
+                        }
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Network failures become ServerOfflineException; the refusals above pass through.
+                NetworkExceptionHelper.rethrowAsDomain(e)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // Network failures become ServerOfflineException; the refusals above pass through.
-            NetworkExceptionHelper.rethrowAsDomain(e)
-        }
-    }.buffer(Channel.RENDEZVOUS)
+        }.buffer(Channel.RENDEZVOUS)
 }

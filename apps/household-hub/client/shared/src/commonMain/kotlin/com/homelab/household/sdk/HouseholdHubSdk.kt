@@ -9,18 +9,15 @@ import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.module
 
-fun sdkModules(hubConfig: HubConfig): List<Module> =
-    listOf(module { single { hubConfig } }) + appModules
+fun sdkModules(hubConfig: HubConfig): List<Module> = listOf(module { single { hubConfig } }) + appModules
 
 object HouseholdHubSdk {
-
     fun init(
         hubConfig: HubConfig = HubConfig(DEFAULT_BASE_URL),
-        appDeclaration: KoinAppDeclaration? = null
-    ): KoinApplication {
-        return startKoin {
+        appDeclaration: KoinAppDeclaration? = null,
+    ): KoinApplication =
+        startKoin {
             appDeclaration?.invoke(this)
             modules(sdkModules(hubConfig))
         }
-    }
 }

@@ -9,5 +9,5 @@ data class MemoryAuditUiState(
     val memories: List<AgentMemory> = emptyList(),
     val userMilestones: List<HouseholdMilestone> = emptyList(),
     val selectedScope: MemoryScope? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )

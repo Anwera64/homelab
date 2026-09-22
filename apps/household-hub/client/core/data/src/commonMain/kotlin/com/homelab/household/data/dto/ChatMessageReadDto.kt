@@ -9,5 +9,5 @@ data class ChatMessageReadDto(
     @SerialName("session_id") val session_id: String,
     val role: String,
     val content: String,
-    @SerialName("created_at") val created_at: String? = null
+    @SerialName("created_at") val created_at: String? = null,
 )

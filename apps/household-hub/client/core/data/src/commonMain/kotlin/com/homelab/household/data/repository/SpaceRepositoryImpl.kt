@@ -12,13 +12,12 @@ import com.homelab.household.domain.repository.SpaceRepository
 class SpaceRepositoryImpl(
     private val remote: SpaceRemoteDataSource,
 ) : SpaceRepository {
+    override suspend fun getPersonalSpace(): Space = SpaceDataMapper.toDomain(remote.getPersonalSpace())
 
-    override suspend fun getPersonalSpace(): Space =
-        SpaceDataMapper.toDomain(remote.getPersonalSpace())
+    override suspend fun getHouseholdSpace(): Space = SpaceDataMapper.toDomain(remote.getHouseholdSpace())
 
-    override suspend fun getHouseholdSpace(): Space =
-        SpaceDataMapper.toDomain(remote.getHouseholdSpace())
-
-    override suspend fun updateSpaceSettings(spaceId: String, settings: Map<String, Any?>): Space =
-        SpaceDataMapper.toDomain(remote.updateSpaceSettings(spaceId, SpaceDataMapper.toWireSettings(settings)))
+    override suspend fun updateSpaceSettings(
+        spaceId: String,
+        settings: Map<String, Any?>,
+    ): Space = SpaceDataMapper.toDomain(remote.updateSpaceSettings(spaceId, SpaceDataMapper.toWireSettings(settings)))
 }

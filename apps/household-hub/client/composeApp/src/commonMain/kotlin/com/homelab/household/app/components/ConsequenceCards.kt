@@ -22,7 +22,7 @@ fun ConsequenceCards(
     erased: List<String>,
     staysTitle: String,
     stays: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
 
@@ -31,27 +31,33 @@ fun ConsequenceCards(
             title = erasedTitle,
             lines = erased,
             background = colors.errorContainer,
-            ink = colors.onErrorContainer
+            ink = colors.onErrorContainer,
         )
         ConsequenceCard(
             title = staysTitle,
             lines = stays,
             background = colors.surface,
-            ink = colors.textPrimary
+            ink = colors.textPrimary,
         )
     }
 }
 
 @Composable
-private fun ConsequenceCard(title: String, lines: List<String>, background: Color, ink: Color) {
+private fun ConsequenceCard(
+    title: String,
+    lines: List<String>,
+    background: Color,
+    ink: Color,
+) {
     val type = HearthTheme.typography
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(background, HearthShapes.bento)
-            .padding(HearthTheme.spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(background, HearthShapes.bento)
+                .padding(HearthTheme.spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
     ) {
         Text(title, style = type.overline, color = ink)
         lines.forEach { line ->

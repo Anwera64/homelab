@@ -6,19 +6,21 @@ import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.User
 
 object UserDataMapper {
-    fun toDomain(dto: UserReadDto): User = User(
-        id = dto.id,
-        fullName = dto.full_name,
-        isAdmin = dto.is_admin,
-        isActive = dto.is_active,
-        personalSpaceId = dto.personal_space_id,
-        avatarColor = dto.avatar_color,
-        createdAt = dto.created_at
-    )
+    fun toDomain(dto: UserReadDto): User =
+        User(
+            id = dto.id,
+            fullName = dto.full_name,
+            isAdmin = dto.is_admin,
+            isActive = dto.is_active,
+            personalSpaceId = dto.personal_space_id,
+            avatarColor = dto.avatar_color,
+            createdAt = dto.created_at,
+        )
 
-    fun toMember(dto: MemberProfileDto): Member = Member(
-        id = dto.id,
-        name = dto.full_name,
-        avatarColor = dto.avatar_color
-    )
+    fun toMember(dto: MemberProfileDto): Member =
+        Member(
+            id = dto.id,
+            name = dto.full_name,
+            avatarColor = dto.avatar_color,
+        )
 }

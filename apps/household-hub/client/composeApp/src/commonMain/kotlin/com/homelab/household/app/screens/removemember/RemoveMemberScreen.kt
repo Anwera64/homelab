@@ -17,7 +17,7 @@ fun RemoveMemberScreen(
     member: Member,
     onBack: () -> Unit,
     onRemoved: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: RemoveMemberViewModel = koinViewModel(parameters = { parametersOf(member) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -33,6 +33,6 @@ fun RemoveMemberScreen(
         onNameChange = viewModel::onNameChange,
         onRemove = viewModel::remove,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

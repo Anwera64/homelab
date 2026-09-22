@@ -21,10 +21,10 @@ import java.io.File
  * sets use `GIVEN_..._WHEN_..._THEN_...` instead, and are checked here for the opposite thing.
  */
 class TestNameCompatibilityTest {
-
-    private val clientRootDir = File(System.getProperty("user.dir")).let { dir ->
-        if (dir.name == "shared") dir.parentFile else dir
-    }
+    private val clientRootDir =
+        File(System.getProperty("user.dir")).let { dir ->
+            if (dir.name == "shared") dir.parentFile else dir
+        }
 
     private val modules = listOf("core/domain", "core/data", "core/presentation", "shared", "composeApp", "androidApp")
 
@@ -35,40 +35,47 @@ class TestNameCompatibilityTest {
 
     @Test
     fun a_backticked_test_name_uses_no_character_a_target_rejects() {
-        val violations = sourceFiles { it !in instrumentedSourceSets }.flatMap { file ->
-            file.namedTests().mapNotNull { (line, name) ->
-                val bad = name.filter { it in illegalInAnyTarget }.toSortedSet()
-                if (bad.isEmpty()) null
-                else "${file.name}:$line uses ${bad.joinToString(" ") { "'$it'" }} in `$name`"
+        val violations =
+            sourceFiles { it !in instrumentedSourceSets }.flatMap { file ->
+                file.namedTests().mapNotNull { (line, name) ->
+                    val bad = name.filter { it in illegalInAnyTarget }.toSortedSet()
+                    if (bad.isEmpty()) {
+                        null
+                    } else {
+                        "${file.name}:$line uses ${bad.joinToString(" ") { "'$it'" }} in `$name`"
+                    }
+                }
             }
-        }
 
         assertTrue(
             violations.isEmpty(),
             "A test name contains a character some target rejects — Kotlin/Native fails the build " +
-                "on these and a JVM run will not tell you:\n" + violations.joinToString("\n")
+                "on these and a JVM run will not tell you:\n" + violations.joinToString("\n"),
         )
     }
 
     @Test
     fun an_android_instrumented_test_name_has_no_spaces() {
-        val violations = sourceFiles { it in instrumentedSourceSets }.flatMap { file ->
-            file.namedTests()
-                .filter { (_, name) -> ' ' in name }
-                .map { (line, _) -> "${file.name}:$line is backticked with spaces" }
-        }
+        val violations =
+            sourceFiles { it in instrumentedSourceSets }.flatMap { file ->
+                file
+                    .namedTests()
+                    .filter { (_, name) -> ' ' in name }
+                    .map { (line, _) -> "${file.name}:$line is backticked with spaces" }
+            }
 
         assertTrue(
             violations.isEmpty(),
             "An Android instrumented test cannot have a space in its method name below minSdk 30; " +
-                "use GIVEN_..._WHEN_..._THEN_... there:\n" + violations.joinToString("\n")
+                "use GIVEN_..._WHEN_..._THEN_... there:\n" + violations.joinToString("\n"),
         )
     }
 
     private val instrumentedSourceSets = setOf("androidDeviceTest", "androidTest")
 
     private fun sourceFiles(sourceSet: (String) -> Boolean): List<File> =
-        modules.map { File(clientRootDir, "$it/src") }
+        modules
+            .map { File(clientRootDir, "$it/src") }
             .filter { it.exists() }
             .flatMap { src ->
                 (src.listFiles() ?: emptyArray())

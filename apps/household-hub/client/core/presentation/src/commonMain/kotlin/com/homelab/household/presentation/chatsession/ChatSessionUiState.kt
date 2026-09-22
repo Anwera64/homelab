@@ -11,5 +11,5 @@ data class ChatSessionUiState(
     val streamingMessage: String? = null,
     val pendingToolProposal: ChatStreamEvent.ToolApprovalProposal? = null,
     val errorMessage: String? = null,
-    val isSecretLocked: Boolean = false
+    val isSecretLocked: Boolean = false,
 )

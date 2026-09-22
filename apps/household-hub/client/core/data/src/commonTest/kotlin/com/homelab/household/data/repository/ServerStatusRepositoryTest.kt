@@ -19,35 +19,37 @@ import kotlin.test.assertEquals
  * rework, which is where the shape came from.
  */
 class ServerStatusRepositoryTest {
+    @Test
+    fun `GIVEN a hub that answers WHEN its health is checked THEN the answer is passed straight through`() =
+        runTest {
+            // GIVEN
+            val remote = mock<ServerStatusRemoteDataSource>()
+            everySuspend { remote.checkHealth() } returns ServerStatus.Online(latencyMs = 12)
+
+            // WHEN
+            val status = ServerStatusRepositoryImpl(remote).checkHealth()
+
+            // THEN
+            assertEquals(ServerStatus.Online(latencyMs = 12), status)
+        }
 
     @Test
-    fun `GIVEN a hub that answers WHEN its health is checked THEN the answer is passed straight through`() = runTest {
-        // GIVEN
-        val remote = mock<ServerStatusRemoteDataSource>()
-        everySuspend { remote.checkHealth() } returns ServerStatus.Online(latencyMs = 12)
+    fun `GIVEN a hub going down and coming back WHEN its status is watched THEN every change is passed straight through`() =
+        runTest {
+            // GIVEN
+            val remote = mock<ServerStatusRemoteDataSource>()
+            val changes =
+                listOf(
+                    ServerStatus.Online(latencyMs = 8),
+                    ServerStatus.Offline(reason = "Connection refused"),
+                    ServerStatus.Online(latencyMs = 40),
+                )
+            every { remote.observeStatus(any()) } returns flowOf(*changes.toTypedArray())
 
-        // WHEN
-        val status = ServerStatusRepositoryImpl(remote).checkHealth()
+            // WHEN
+            val seen = ServerStatusRepositoryImpl(remote).observeServerStatus().toList()
 
-        // THEN
-        assertEquals(ServerStatus.Online(latencyMs = 12), status)
-    }
-
-    @Test
-    fun `GIVEN a hub going down and coming back WHEN its status is watched THEN every change is passed straight through`() = runTest {
-        // GIVEN
-        val remote = mock<ServerStatusRemoteDataSource>()
-        val changes = listOf(
-            ServerStatus.Online(latencyMs = 8),
-            ServerStatus.Offline(reason = "Connection refused"),
-            ServerStatus.Online(latencyMs = 40),
-        )
-        every { remote.observeStatus(any()) } returns flowOf(*changes.toTypedArray())
-
-        // WHEN
-        val seen = ServerStatusRepositoryImpl(remote).observeServerStatus().toList()
-
-        // THEN
-        assertEquals(changes, seen)
-    }
+            // THEN
+            assertEquals(changes, seen)
+        }
 }

@@ -38,26 +38,28 @@ fun TestApp(
     engine: HttpClientEngine,
     sessionStorage: StoredSessionLocalDataSource = InMemorySessionStorage(),
     externalApps: ExternalApps = FakeExternalApps(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val viewModelStoreOwner = remember {
-        object : ViewModelStoreOwner {
-            override val viewModelStore = ViewModelStore()
+    val viewModelStoreOwner =
+        remember {
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
         }
-    }
 
     KoinApplication(application = {
         allowOverride(true)
         modules(
-            sdkModules(HubConfig(TEST_HUB_URL)) + module {
-                single<HttpClientEngine> { engine }
-                single<StoredSessionLocalDataSource> { sessionStorage }
-            }
+            sdkModules(HubConfig(TEST_HUB_URL)) +
+                module {
+                    single<HttpClientEngine> { engine }
+                    single<StoredSessionLocalDataSource> { sessionStorage }
+                },
         )
     }) {
         CompositionLocalProvider(
             LocalViewModelStoreOwner provides viewModelStoreOwner,
-            LocalExternalApps provides externalApps
+            LocalExternalApps provides externalApps,
         ) {
             StillTheme {
                 content()

@@ -6,5 +6,5 @@ package com.homelab.household.domain.exception
  */
 class UnexpectedContentTypeException(
     val contentType: String,
-    message: String = "Expected JSON but the hub sent $contentType"
+    message: String = "Expected JSON but the hub sent $contentType",
 ) : DomainException(message)

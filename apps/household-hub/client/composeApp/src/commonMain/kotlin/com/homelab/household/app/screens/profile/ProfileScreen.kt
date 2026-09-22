@@ -17,7 +17,7 @@ fun ProfileScreen(
     onChangePin: () -> Unit,
     onLeave: () -> Unit,
     onSignedOut: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -35,6 +35,6 @@ fun ProfileScreen(
         onChangePin = onChangePin,
         onLeave = onLeave,
         onSignOut = viewModel::onSignOut,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -8,5 +8,5 @@ import kotlinx.serialization.json.JsonObject
 data class ToolApprovalResponseDto(
     val status: String,
     @SerialName("tool_call_id") val tool_call_id: String? = null,
-    val result: JsonObject? = null
+    val result: JsonObject? = null,
 )

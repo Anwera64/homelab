@@ -19,9 +19,8 @@ class DashboardViewModel(
     private val listRecentSessionsUseCase: ListSessionsUseCase,
     private val listHouseholdMilestonesUseCase: ListHouseholdMilestonesUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
-    private val logoutUseCase: LogoutUseCase
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
@@ -49,14 +48,14 @@ class DashboardViewModel(
                         isLoading = false,
                         currentUser = user,
                         recentSessions = sessions,
-                        householdMilestones = milestones
+                        householdMilestones = milestones,
                     )
                 }
             } catch (e: Throwable) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Failed to load dashboard"
+                        errorMessage = e.message ?: "Failed to load dashboard",
                     )
                 }
             }

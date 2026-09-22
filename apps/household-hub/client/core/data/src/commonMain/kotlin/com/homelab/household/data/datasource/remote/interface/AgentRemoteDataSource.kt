@@ -10,7 +10,6 @@ import com.homelab.household.data.dto.AgentUpdateDto
  * `AgentRepositoryImpl` maps those DTOs to and from `AgentPersonality`.
  */
 interface AgentRemoteDataSource {
-
     suspend fun listAgents(): List<AgentReadDto>
 
     suspend fun getAgent(agentId: String): AgentReadDto
@@ -18,7 +17,10 @@ interface AgentRemoteDataSource {
     suspend fun createAgent(agent: AgentCreateDto): AgentReadDto
 
     /** [agentId] is passed separately because the DTO the hub expects for an update carries no id. */
-    suspend fun updateAgent(agentId: String, agent: AgentUpdateDto): AgentReadDto
+    suspend fun updateAgent(
+        agentId: String,
+        agent: AgentUpdateDto,
+    ): AgentReadDto
 
     suspend fun deleteAgent(agentId: String)
 

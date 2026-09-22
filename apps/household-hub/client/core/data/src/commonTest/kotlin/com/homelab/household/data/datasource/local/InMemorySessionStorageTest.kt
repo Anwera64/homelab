@@ -15,14 +15,14 @@ import kotlin.test.assertNull
  * the profile on the next cold start without anything else going wrong.
  */
 class InMemorySessionStorageTest {
-
-    private val emma = UserReadDto(
-        id = "emma",
-        full_name = "Emma",
-        is_admin = true,
-        is_active = true,
-        avatar_color = "#3C6E4E",
-    )
+    private val emma =
+        UserReadDto(
+            id = "emma",
+            full_name = "Emma",
+            is_admin = true,
+            is_active = true,
+            avatar_color = "#3C6E4E",
+        )
 
     private fun storage() = InMemorySessionStorage()
 
@@ -41,10 +41,11 @@ class InMemorySessionStorageTest {
     @Test
     fun `GIVEN a saved member WHEN only a token is saved THEN the member is left alone`() {
         // GIVEN
-        val storage = storage().apply {
-            saveTokens("access-123")
-            saveUser(emma)
-        }
+        val storage =
+            storage().apply {
+                saveTokens("access-123")
+                saveUser(emma)
+            }
 
         // WHEN
         storage.saveTokens("access-789")
@@ -57,10 +58,11 @@ class InMemorySessionStorageTest {
     @Test
     fun `GIVEN a saved member WHEN the storage is cleared THEN the member and the token are both gone`() {
         // GIVEN
-        val storage = storage().apply {
-            saveTokens("access-123", "refresh-456")
-            saveUser(emma)
-        }
+        val storage =
+            storage().apply {
+                saveTokens("access-123", "refresh-456")
+                saveUser(emma)
+            }
 
         // WHEN
         storage.clear()
@@ -74,10 +76,11 @@ class InMemorySessionStorageTest {
     @Test
     fun `GIVEN a saved member WHEN nobody is saved over them THEN they are forgotten`() {
         // GIVEN
-        val storage = storage().apply {
-            saveTokens("access-123")
-            saveUser(emma)
-        }
+        val storage =
+            storage().apply {
+                saveTokens("access-123")
+                saveUser(emma)
+            }
 
         // WHEN
         storage.saveUser(null)

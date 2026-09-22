@@ -6,5 +6,5 @@ import com.homelab.household.domain.model.Member
 data class PinForgotUiState(
     val member: Member,
     val others: List<Member> = emptyList(),
-    val status: PinForgotStatus = PinForgotStatus.Loading
+    val status: PinForgotStatus = PinForgotStatus.Loading,
 )

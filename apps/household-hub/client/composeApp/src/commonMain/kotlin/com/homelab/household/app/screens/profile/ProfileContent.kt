@@ -15,9 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.BentoCard
+import com.homelab.household.app.components.ChipVariant
 import com.homelab.household.app.components.DestructiveButton
 import com.homelab.household.app.components.HearthChip
-import com.homelab.household.app.components.ChipVariant
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
@@ -59,7 +59,7 @@ fun ProfileContent(
     onChangePin: () -> Unit,
     onLeave: () -> Unit,
     onSignOut: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -67,11 +67,11 @@ fun ProfileContent(
 
     HearthScaffold(
         modifier = modifier,
-        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.profile_back)) }
+        header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.profile_back)) },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             // Only the header depends on the hub. Everything below it is this screen's own copy,
             // so it draws from the first frame rather than waiting to be told (§6.21, pattern 2).
@@ -80,13 +80,13 @@ fun ProfileContent(
             } else {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     MemberAvatar(
                         name = member.fullName,
                         colour = member.avatarColor ?: DEFAULT_COLOUR,
                         size = HearthTheme.size.tile,
-                        glyph = type.glyphXxl
+                        glyph = type.glyphXxl,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
                         Text(member.fullName, style = type.title, color = colors.textPrimary)
@@ -101,13 +101,13 @@ fun ProfileContent(
                 SettingsRow(
                     label = stringResource(Res.string.profile_members),
                     icon = HearthIcon.Shared,
-                    onClick = onMembers
+                    onClick = onMembers,
                 )
                 HorizontalDivider(color = colors.outlineSoft)
                 SettingsRow(
                     label = stringResource(Res.string.profile_change_pin),
                     icon = HearthIcon.SecretLocked,
-                    onClick = onChangePin
+                    onClick = onChangePin,
                 )
                 HorizontalDivider(color = colors.outlineSoft)
                 // Dimming is for what cannot be opened, and the caption says why (design notes §2).
@@ -116,7 +116,7 @@ fun ProfileContent(
                     icon = HearthIcon.Delete,
                     caption = if (state.isSoleAdmin) stringResource(Res.string.profile_delete_blocked) else null,
                     enabled = !state.isSoleAdmin,
-                    onClick = onLeave
+                    onClick = onLeave,
                 )
             }
 
@@ -128,7 +128,7 @@ fun ProfileContent(
                 text = stringResource(Res.string.profile_sign_out),
                 onClick = onSignOut,
                 icon = HearthIcon.SignOut,
-                modifier = Modifier.fillMaxWidth().padding(bottom = HearthTheme.spacing.xxl)
+                modifier = Modifier.fillMaxWidth().padding(bottom = HearthTheme.spacing.xxl),
             )
         }
     }
@@ -144,12 +144,12 @@ private fun ArrivingHeader() {
     SkeletonGroup {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             SkeletonCircle(size = HearthTheme.size.tile)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             ) {
                 SkeletonBlock(widthFraction = NAME_WIDTH, height = HearthTheme.spacing.xl)
                 SkeletonBlock(widthFraction = CHIP_WIDTH, height = HearthTheme.spacing.lg)
@@ -163,16 +163,17 @@ private const val NAME_WIDTH = 0.6f
 private const val CHIP_WIDTH = 0.3f
 
 @Composable
-private fun failure(status: ProfileStatus): String? = when (status) {
-    ProfileStatus.Loading, ProfileStatus.Ready -> null
-    ProfileStatus.Unreachable -> stringResource(Res.string.members_unreachable)
-    ProfileStatus.Failed -> stringResource(Res.string.members_failed)
-}
+private fun failure(status: ProfileStatus): String? =
+    when (status) {
+        ProfileStatus.Loading, ProfileStatus.Ready -> null
+        ProfileStatus.Unreachable -> stringResource(Res.string.members_unreachable)
+        ProfileStatus.Failed -> stringResource(Res.string.members_failed)
+    }
 
 @DayNightPreviews
 @Composable
 private fun ProfileContentPreview(
-    @PreviewParameter(ProfileUiStateProvider::class) state: ProfileUiState
+    @PreviewParameter(ProfileUiStateProvider::class) state: ProfileUiState,
 ) {
     HearthTheme {
         ProfileContent(
@@ -181,7 +182,7 @@ private fun ProfileContentPreview(
             onMembers = {},
             onChangePin = {},
             onLeave = {},
-            onSignOut = {}
+            onSignOut = {},
         )
     }
 }

@@ -11,5 +11,5 @@ data class UserReadDto(
     @SerialName("is_active") val is_active: Boolean,
     @SerialName("personal_space_id") val personal_space_id: String? = null,
     @SerialName("avatar_color") val avatar_color: String? = null,
-    @SerialName("created_at") val created_at: String? = null
+    @SerialName("created_at") val created_at: String? = null,
 )

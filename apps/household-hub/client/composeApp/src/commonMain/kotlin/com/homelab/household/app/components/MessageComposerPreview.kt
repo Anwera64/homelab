@@ -24,7 +24,7 @@ private fun MessageComposerWithTextPreview() {
             value = "Can you add milk and eggs to the shopping list?",
             onValueChange = {},
             onSend = {},
-            placeholder = "Message the household"
+            placeholder = "Message the household",
         )
     }
 }

@@ -15,7 +15,7 @@ private fun HearthTextFieldEmptyPreview() {
             onValueChange = {},
             label = "Household name",
             placeholder = "The Soares home",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -30,7 +30,7 @@ private fun HearthTextFieldHelperPreview() {
             label = "Your name",
             placeholder = "Emma",
             helper = "This is how the household sees you",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -45,7 +45,7 @@ private fun HearthTextFieldErrorPreview() {
             label = "Invite code",
             placeholder = "K7M2QP",
             error = "Invite codes are 6 characters",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -60,7 +60,7 @@ private fun HearthTextFieldFilledPreview() {
             label = "Your name",
             placeholder = "Emma",
             helper = "This is how the household sees you",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

@@ -17,7 +17,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun FirstRunScreen(
     onCreated: () -> Unit,
     onSignIn: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: FirstRunViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -35,6 +35,6 @@ fun FirstRunScreen(
         onColourSelect = viewModel::onColourSelect,
         onCreate = viewModel::create,
         onSignIn = onSignIn,
-        modifier = modifier
+        modifier = modifier,
     )
 }

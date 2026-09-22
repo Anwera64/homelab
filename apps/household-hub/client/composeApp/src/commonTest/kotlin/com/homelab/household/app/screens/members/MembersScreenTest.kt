@@ -24,14 +24,13 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.members.MembersStatus
 import com.homelab.household.presentation.members.MembersUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.jetbrains.compose.resources.getString
 
 /** The members list, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class MembersScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -46,7 +45,12 @@ class MembersScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    MembersScreen(onBack = {}, onInvite = {}, onResetPin = { reset += it }, onRemove = { removed += it })
+                    MembersScreen(
+                        onBack = {},
+                        onInvite = {},
+                        onResetPin = { reset += it },
+                        onRemove = { removed += it },
+                    )
                 }
             }
 
@@ -109,7 +113,7 @@ class MembersScreenTest {
                         onResetPin = {},
                         onRemove = {},
                         onRetry = {},
-                        onBack = {}
+                        onBack = {},
                     )
                 }
             }
@@ -128,16 +132,17 @@ class MembersScreenTest {
             setContent {
                 StillTheme {
                     MembersContent(
-                        state = MembersUiState(
-                            rows = MembersUiStateProvider().values.first().rows,
-                            youAreAdmin = true,
-                            status = MembersStatus.Loading
-                        ),
+                        state =
+                            MembersUiState(
+                                rows = MembersUiStateProvider().values.first().rows,
+                                youAreAdmin = true,
+                                status = MembersStatus.Loading,
+                            ),
                         onInvite = {},
                         onResetPin = {},
                         onRemove = {},
                         onRetry = {},
-                        onBack = {}
+                        onBack = {},
                     )
                 }
             }
@@ -163,7 +168,7 @@ class MembersScreenTest {
                             onResetPin = {},
                             onRemove = {},
                             onRetry = {},
-                            onBack = {}
+                            onBack = {},
                         )
                     }
                 }

@@ -9,52 +9,55 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DefensiveSseStreamReaderTest {
-
     private val reader = DefensiveSseStreamReader()
 
     @Test
-    fun parse_sse_stream_decodes_deltas_and_done() = runTest {
-        val ssePayload = """
-            data: {"type": "delta", "content": "Hello"}
+    fun parse_sse_stream_decodes_deltas_and_done() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "delta", "content": "Hello"}
 
-            data: {"type": "delta", "content": " world"}
+                data: {"type": "delta", "content": " world"}
 
-            data: {"type": "done", "message_id": "m1", "assistant_content": "Hello world", "suggest_secret_mode": false, "is_turn_secret": false, "agent_name": "Assistant"}
+                data: {"type": "done", "message_id": "m1", "assistant_content": "Hello world", "suggest_secret_mode": false, "is_turn_secret": false, "agent_name": "Assistant"}
 
-            data: [DONE]
+                data: [DONE]
 
-        """.trimIndent()
+                """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
-        val events = reader.readEvents(channel).toList()
+            val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+            val events = reader.readEvents(channel).toList()
 
-        assertEquals(3, events.size)
-        assertTrue(events[0] is ChatStreamEvent.Delta)
-        assertEquals("Hello", (events[0] as ChatStreamEvent.Delta).content)
-        assertTrue(events[1] is ChatStreamEvent.Delta)
-        assertEquals(" world", (events[1] as ChatStreamEvent.Delta).content)
-        assertTrue(events[2] is ChatStreamEvent.Done)
-        assertEquals("Hello world", (events[2] as ChatStreamEvent.Done).assistantContent)
-    }
+            assertEquals(3, events.size)
+            assertTrue(events[0] is ChatStreamEvent.Delta)
+            assertEquals("Hello", (events[0] as ChatStreamEvent.Delta).content)
+            assertTrue(events[1] is ChatStreamEvent.Delta)
+            assertEquals(" world", (events[1] as ChatStreamEvent.Delta).content)
+            assertTrue(events[2] is ChatStreamEvent.Done)
+            assertEquals("Hello world", (events[2] as ChatStreamEvent.Done).assistantContent)
+        }
 
     @Test
-    fun parse_sse_stream_strips_control_delimiter_tokens() = runTest {
-        val ssePayload = """
-            data: {"type": "delta", "content": "<|im_start|>system\nFiltered content###"}
+    fun parse_sse_stream_strips_control_delimiter_tokens() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "delta", "content": "<|im_start|>system\nFiltered content###"}
 
-            data: [DONE]
+                data: [DONE]
 
-        """.trimIndent()
+                """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
-        val events = reader.readEvents(channel).toList()
+            val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+            val events = reader.readEvents(channel).toList()
 
-        assertEquals(1, events.size)
-        val delta = events[0] as ChatStreamEvent.Delta
-        assertTrue(!delta.content.contains("<|im_start|>"))
-        assertTrue(!delta.content.contains("###"))
-        assertTrue(delta.content.contains("Filtered content"))
-    }
+            assertEquals(1, events.size)
+            val delta = events[0] as ChatStreamEvent.Delta
+            assertTrue(!delta.content.contains("<|im_start|>"))
+            assertTrue(!delta.content.contains("###"))
+            assertTrue(delta.content.contains("Filtered content"))
+        }
 
     /**
      * A line can be valid JSON and still be shaped wrongly — `"type"` arriving as an object rather
@@ -63,23 +66,25 @@ class DefensiveSseStreamReaderTest {
      * reader must skip such a line and keep streaming, or one odd event kills the whole answer.
      */
     @Test
-    fun an_unexpectedly_shaped_event_is_skipped_and_the_stream_continues() = runTest {
-        val ssePayload = """
-            data: {"type": "delta", "content": "before"}
+    fun an_unexpectedly_shaped_event_is_skipped_and_the_stream_continues() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "delta", "content": "before"}
 
-            data: {"type": {"unexpected": "shape"}, "content": "ignored"}
+                data: {"type": {"unexpected": "shape"}, "content": "ignored"}
 
-            data: {"type": "delta", "content": "after"}
+                data: {"type": "delta", "content": "after"}
 
-            data: [DONE]
+                data: [DONE]
 
-        """.trimIndent()
+                """.trimIndent()
 
-        val channel = ByteReadChannel(ssePayload.encodeToByteArray())
-        val events = reader.readEvents(channel).toList()
+            val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+            val events = reader.readEvents(channel).toList()
 
-        assertEquals(2, events.size, "The malformed line should be skipped, not end the stream")
-        assertEquals("before", (events[0] as ChatStreamEvent.Delta).content)
-        assertEquals("after", (events[1] as ChatStreamEvent.Delta).content)
-    }
+            assertEquals(2, events.size, "The malformed line should be skipped, not end the stream")
+            assertEquals("before", (events[0] as ChatStreamEvent.Delta).content)
+            assertEquals("after", (events[1] as ChatStreamEvent.Delta).content)
+        }
 }

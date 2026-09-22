@@ -13,7 +13,6 @@ import org.koin.test.KoinTest
 import org.koin.test.get
 
 class PlatformModuleTest : KoinTest {
-
     @AfterEach
     fun tearDown() {
         stopKoin()
@@ -24,7 +23,10 @@ class PlatformModuleTest : KoinTest {
         HouseholdHubSdk.init()
 
         val engine = get<HttpClientEngine>()
-        assertTrue(engine.config is CIOEngineConfig, "Expected a CIO engine on the JVM, got ${engine::class.simpleName}")
+        assertTrue(
+            engine.config is CIOEngineConfig,
+            "Expected a CIO engine on the JVM, got ${engine::class.simpleName}",
+        )
         assertTrue(get<StoredSessionLocalDataSource>() is FileSessionStorage)
     }
 }

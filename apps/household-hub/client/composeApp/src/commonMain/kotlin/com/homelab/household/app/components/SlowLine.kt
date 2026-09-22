@@ -24,7 +24,10 @@ import org.jetbrains.compose.resources.stringResource
  * over when there really is one.
  */
 @Composable
-fun SlowLine(phase: WaitPhase, modifier: Modifier = Modifier) {
+fun SlowLine(
+    phase: WaitPhase,
+    modifier: Modifier = Modifier,
+) {
     if (phase != WaitPhase.Slow) return
 
     Text(
@@ -32,6 +35,6 @@ fun SlowLine(phase: WaitPhase, modifier: Modifier = Modifier) {
         style = HearthTheme.typography.caption,
         color = HearthTheme.colors.textMuted,
         textAlign = TextAlign.Center,
-        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
     )
 }

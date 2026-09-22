@@ -10,5 +10,5 @@ data class InviteCreateUiState(
     val nameError: NameError? = null,
     val invite: Invite? = null,
     val secondsLeft: Int = 0,
-    val status: InviteCreateStatus = InviteCreateStatus.Idle
+    val status: InviteCreateStatus = InviteCreateStatus.Idle,
 )

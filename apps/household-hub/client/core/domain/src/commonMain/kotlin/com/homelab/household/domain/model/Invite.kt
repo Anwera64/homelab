@@ -5,5 +5,5 @@ data class Invite(
     val code: String,
     val invitedName: String,
     val isAdmin: Boolean,
-    val expiresInSeconds: Int
+    val expiresInSeconds: Int,
 )

@@ -20,7 +20,6 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class FirstRunScreenTest {
-
     @Test
     fun creating_with_nothing_filled_in_says_what_is_missing_under_each_field() {
         val hub = FakeFirstRunHub()
@@ -145,7 +144,7 @@ class FirstRunScreenTest {
                             onPinChange = {},
                             onColourSelect = {},
                             onCreate = {},
-                            onSignIn = {}
+                            onSignIn = {},
                         )
                     }
                 }
