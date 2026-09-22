@@ -3,15 +3,19 @@ package com.homelab.household.presentation.chatsession
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
+import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import com.homelab.household.domain.util.runCatchingSafe
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +28,8 @@ import kotlinx.coroutines.launch
 class ChatSessionViewModel(
     private val streamChatTurnUseCase: StreamChatTurnUseCase,
     private val getSessionUseCase: GetSessionUseCase,
+    private val listAgentsUseCase: ListAgentsUseCase,
+    private val createSessionUseCase: CreateSessionUseCase,
     private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
@@ -42,16 +48,67 @@ class ChatSessionViewModel(
      */
     private var nextTempMessageNumber = 0L
 
+    /**
+     * Opens a conversation, or prepares one that does not exist yet.
+     *
+     * A null [sessionId] is the hero + : the screen shows the agent's greeting and nothing is
+     * created on the hub until the first message is sent, so a chat nobody spoke in is never left
+     * behind. Slice 3 always answers with the built-in coordinator; choosing an agent arrives with
+     * the Agents screen, and a session is bound to one agent for its life either way.
+     */
+    fun open(sessionId: String?) {
+        if (sessionId != null) {
+            loadSession(sessionId)
+        } else {
+            startNewChat()
+        }
+    }
+
+    private fun startNewChat() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val agent = defaultAgent()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        session = null,
+                        messages = emptyList(),
+                        agentName = agent?.name.orEmpty(),
+                        agentAvatar = agent?.avatar.orEmpty(),
+                        agentTagline = agent?.description.orEmpty(),
+                    )
+                }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Failed to start a chat") }
+            }
+        }
+    }
+
+    private suspend fun defaultAgent(): AgentPersonality? {
+        val agents = listAgentsUseCase()
+        return agents.firstOrNull { it.slug == BUILT_IN_AGENT_SLUG } ?: agents.firstOrNull()
+    }
+
     fun loadSession(sessionId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 val (session, messages) = getSessionUseCase(sessionId)
+                // The agent is chrome, not the conversation: failing to name it must not stop the
+                // transcript being read.
+                val agent =
+                    runCatchingSafe { listAgentsUseCase() }
+                        .getOrNull()
+                        ?.firstOrNull { it.id == session.agentId }
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         session = session,
                         messages = messages,
+                        agentName = agent?.name ?: session.agentName.orEmpty(),
+                        agentAvatar = agent?.avatar ?: session.agentAvatar.orEmpty(),
+                        agentTagline = agent?.description.orEmpty(),
                         isSecretLocked = session.isSecretLocked,
                     )
                 }
@@ -69,6 +126,31 @@ class ChatSessionViewModel(
     fun sendMessage(
         content: String,
         autoApproveWrites: Boolean = false,
+    ) {
+        if (!_uiState.value.canSend) return
+
+        val existing = _uiState.value.session
+        if (existing == null) {
+            // The conversation is created by the first thing said in it, not by opening the screen.
+            viewModelScope.launch {
+                try {
+                    val agent = defaultAgent() ?: error("No agent to talk to")
+                    val created = createSessionUseCase(agentId = agent.id)
+                    _uiState.update { it.copy(session = created) }
+                    send(content, autoApproveWrites)
+                } catch (e: Throwable) {
+                    _uiState.update { it.copy(errorMessage = e.message ?: "Failed to start a chat") }
+                }
+            }
+            return
+        }
+
+        send(content, autoApproveWrites)
+    }
+
+    private fun send(
+        content: String,
+        autoApproveWrites: Boolean,
     ) {
         val currentSession = _uiState.value.session ?: return
         val lastAssistantId = _uiState.value.lastAssistantMessageId
@@ -236,6 +318,11 @@ class ChatSessionViewModel(
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to approve tool") }
             }
         }
+    }
+
+    private companion object {
+        /** The seeded Home & Life Coordinator. Slice 7 lets you pick a different one. */
+        const val BUILT_IN_AGENT_SLUG = "assistant"
     }
 
     fun toggleSecret(isSecret: Boolean) {

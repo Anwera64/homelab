@@ -313,4 +313,20 @@
     <string name="chats_unreachable">Can’t reach your hub.</string>
     <string name="chats_retry">Try again</string>
     <string name="chats_agent_missing">Conversation</string>
+
+    <!-- Conversation -->
+    <string name="conversation_back">Back to chats</string>
+    <string name="conversation_greeting">Evening, %1$s</string>
+    <string name="conversation_composer_idle">Message the %1$s…</string>
+    <string name="conversation_composer_waiting">Waiting for this answer to finish…</string>
+    <string name="conversation_composer_leave">You can leave — the answer will wait for you</string>
+    <string name="conversation_not_sent">Not sent — the hub didn’t get it</string>
+    <string name="conversation_retry">Retry</string>
+    <string name="conversation_reconnecting">Reconnecting…</string>
+    <string name="conversation_reconnecting_detail">the rest is still being written on the hub</string>
+    <string name="conversation_still_working">Still working on this.</string>
+    <string name="conversation_still_working_detail">It’ll appear here when it’s done.</string>
+    <string name="conversation_failed_title">Couldn’t finish an answer</string>
+    <string name="conversation_failed_line">The model took too long on this one. Your question arrived — trying again just asks for a fresh answer.</string>
+    <string name="conversation_try_again">Try again</string>
 </resources>
