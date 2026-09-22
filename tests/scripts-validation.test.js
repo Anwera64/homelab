@@ -61,6 +61,17 @@ test('PowerShell Automation Scripts Suite', async (t) => {
     );
   });
 
+  await t.test('startup_homelab.ps1 requires only the Ollama models the apps use', () => {
+    assert.ok(
+      startupContent.includes('$requiredModels = @("qwen3:14b", "bge-m3")'),
+      'startup_homelab.ps1 must require exactly qwen3:14b and bge-m3'
+    );
+    assert.ok(
+      !startupContent.includes('deepseek-v4-flash'),
+      'startup_homelab.ps1 must not require the unused deepseek-v4-flash model'
+    );
+  });
+
   await t.test('stop_homelab.ps1 terminates Docker stack and legacy processes', () => {
     // Verifies docker compose down invocation
     assert.ok(
