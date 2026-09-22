@@ -7,11 +7,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
@@ -53,7 +58,18 @@ fun HearthBottomNav(
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
-    Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(colors.surface)
+                // The bar pays for its own insets, as Material 3's do: `Scaffold` gives the content
+                // this bar's height and nothing more, so without this the tabs sit under the
+                // gesture bar.
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                ),
+    ) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
             modifier =
