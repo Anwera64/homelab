@@ -127,15 +127,37 @@ class SessionRepositoryImpl(
     ): Flow<ChatStreamEvent> =
         flow {
             var delivered = false
+            var ended = false
             turn
                 .catch { cause ->
                     val worthRecovering = cause is SessionConflictException || delivered
                     if (!worthRecovering) throw cause
                     emitAll(recoverReply(sessionId, afterAssistantMessageId))
+                    ended = true
                 }.collect { event ->
-                    if (event is ChatStreamEvent.Delta) delivered = true
+                    when (event) {
+                        is ChatStreamEvent.Delta -> delivered = true
+
+                        // The hub refused the turn before the question was written down, and
+                        // said why. Thrown from the collector, which — as above — goes straight
+                        // past the recovery to the caller, and that is the point: there is no
+                        // answer on its way to wait for, so the words belong under the composer
+                        // and the question belongs marked as never sent.
+                        is ChatStreamEvent.StreamError -> throw DomainException(event.message)
+
+                        is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed -> ended = true
+
+                        else -> Unit
+                    }
                     emit(event)
                 }
+
+            // A stream that stopped without saying how it ended. It used to be taken for a finished
+            // turn, which left the screen waiting on a word that was never coming and the composer
+            // refusing every later message, since a turn it believes is running blocks one. Nothing
+            // here knows what happened, so it goes and asks — and comes back with one of the three
+            // endings, every one of which is something a person can read.
+            if (!ended) emitAll(recoverReply(sessionId, afterAssistantMessageId))
         }
 
     /**

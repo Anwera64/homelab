@@ -6,11 +6,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import com.homelab.household.app.components.THINKING_DOTS_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.conversation_composer_leave
 import com.homelab.household.app.resources.conversation_composer_waiting
@@ -214,6 +216,38 @@ class ConversationScreenTest {
             // Silence here is what made a failed send look like nothing happening at all.
             onNodeWithText("Can't reach your hub").assertIsDisplayed()
             onNode(hasSetTextAction()).assertTextContains("Hi")
+        }
+
+    /**
+     * The silence between sending and the first word, which is the longest in the app: a model
+     * being loaded into memory, or one that thinks before it writes. It used to be an empty bubble
+     * and nothing else, which reads as nothing having happened at all.
+     */
+    @Test
+    fun before_the_first_word_arrives_the_screen_says_it_is_thinking() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+        }
+
+    @Test
+    fun the_first_word_takes_the_dots_place() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Answering")))
+
+            // Words are their own sign that something is happening; two at once is noise.
+            onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
+            onNodeWithText("Three things, in order of how much ", substring = true).assertIsDisplayed()
+        }
+
+    /** A failed turn has a card of its own to show; the dots would say it was still coming. */
+    @Test
+    fun an_answer_that_failed_shows_no_dots() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("The answer failed")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
         }
 
     @Test

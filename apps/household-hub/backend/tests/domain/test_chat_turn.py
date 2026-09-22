@@ -16,6 +16,7 @@ from app.domain.exceptions import (
     EntityNotFoundException,
     ZeroLeakViolationException,
     InvalidOperationException,
+    LLMInferenceException,
 )
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 
@@ -458,3 +459,98 @@ async def test_regenerate_stream_keeps_the_privacy_the_question_was_asked_with()
     done = [ev for ev in events if ev["type"] == "done"][0]
     assert done["is_turn_secret"] is True
     assert done["suggest_secret_mode"] is True
+
+
+class ExplodingLLMClient(FakeLLMClient):
+    """A model that dies once the turn is already under way."""
+
+    async def stream_chat_completion(self, messages, model, temperature=0.7, top_p=0.9, tools=None):
+        self.stream_calls.append({"messages": messages, "model": model, "tools": tools})
+        raise LLMInferenceException("LLM inference stream returned HTTP 500")
+        yield  # pragma: no cover - makes this an async generator
+
+
+@pytest.mark.asyncio
+async def test_an_answer_that_dies_is_reported_as_the_answer_and_not_the_question():
+    """
+    The question is written down before the model is asked, so a model that dies afterwards has
+    not lost it. Saying so is the whole point: this ending offers a fresh answer, while the one
+    that means the question never landed offers to send it again. Reporting the wrong one is how
+    people end up asking twice.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=ExplodingLLMClient(),
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev
+        async for ev in use_case.execute_stream(
+            session_id="s1", current_user=user, content="What's left before Friday?"
+        )
+    ]
+
+    assert events[-1]["type"] == "turn_failed"
+    # The question is on the hub, which is what makes this the answer's failure and not its own.
+    assert session_repo.messages[-1].content == "What's left before Friday?"
+
+
+@pytest.mark.asyncio
+async def test_regenerating_an_answer_that_dies_also_says_the_answer_failed():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+    asked = ChatMessage(id="m1", session_id="s1", role="user", content="Plan meals")
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=FakeSessionRepository(sessions=[session], messages=[asked]),
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=ExplodingLLMClient(),
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev async for ev in use_case.regenerate_stream(session_id="s1", current_user=user)
+    ]
+
+    assert events[-1]["type"] == "turn_failed"
+
+
+@pytest.mark.asyncio
+async def test_a_turn_that_never_opens_is_not_reported_as_a_failed_answer():
+    """
+    Nothing was written down, so there is no answer to ask for again. This one has to keep
+    reaching the caller as an exception, which the hub reports as the other kind of failure.
+    """
+    user = User(id="u1", full_name="Alex")
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=FakeSessionRepository(sessions=[]),
+        agent_repo=FakeAgentRepository(agents=[]),
+        llm_client=FakeLLMClient(),
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    with pytest.raises(EntityNotFoundException):
+        [
+            ev
+            async for ev in use_case.execute_stream(
+                session_id="nowhere", current_user=user, content="Hello"
+            )
+        ]

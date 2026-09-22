@@ -52,6 +52,20 @@ sealed interface ChatStreamEvent {
     data object StillWorking : ChatStreamEvent
 
     /**
+     * The turn never got as far as an answer, and the question is not on the hub either.
+     *
+     * The hub says this when a turn fails before the question is written down — an archived
+     * conversation, an agent that has been deactivated, a session that is not yours. Distinct from
+     * [TurnFailed], which is the opposite case and the reason both exist: one is worth asking for
+     * the answer again, the other is worth marking on the question and sending it once more.
+     *
+     * Carries the hub's own words, for the line under the composer.
+     */
+    data class StreamError(
+        val message: String,
+    ) : ChatStreamEvent
+
+    /**
      * The hub is not working on this conversation and no answer arrived, so the turn died.
      *
      * Distinct from [StillWorking] because only this one is worth offering to do again, and

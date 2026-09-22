@@ -29,6 +29,8 @@ import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MessageBubble
 import com.homelab.household.app.components.MessageComposer
 import com.homelab.household.app.components.SecondaryButton
+import com.homelab.household.app.components.SlowLine
+import com.homelab.household.app.components.ThinkingDots
 import com.homelab.household.app.components.TurnStatusLine
 import com.homelab.household.app.components.TurnStatusTone
 import com.homelab.household.app.resources.Res
@@ -48,6 +50,8 @@ import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
+import com.homelab.household.app.util.WaitPhase
+import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
@@ -83,6 +87,12 @@ fun ConversationContent(
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val transcript = rememberLazyListState()
+
+    // Sent, and not a word back yet — the hub loading a model, or the model thinking before it
+    // writes. It obeys the same four beats as every other wait (design notes §6.21), so a hub that
+    // answers quickly draws none of it.
+    val thinking = state.turnState == TurnState.Streaming && state.streamingMessage.isNullOrEmpty()
+    val thinkingPhase = rememberWaitPhase(thinking)
 
     // How many messages the list was last laid out around, so that "were you at the bottom?" can
     // be asked about what was there before this change.
@@ -255,7 +265,16 @@ fun ConversationContent(
                     MessageBubble(
                         content = state.streamingMessage.orEmpty(),
                         fromMe = false,
-                        status = { TurnStatus(state, onTryAgain) },
+                        status = {
+                            if (thinking) {
+                                Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                                    if (thinkingPhase != WaitPhase.Hidden) ThinkingDots()
+                                    SlowLine(thinkingPhase)
+                                }
+                            } else {
+                                TurnStatus(state, onTryAgain)
+                            }
+                        },
                     )
                 }
             }

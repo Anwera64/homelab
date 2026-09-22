@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,9 @@ from app.domain.exceptions import (
     ZeroLeakViolationException,
     InvalidOperationException,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -326,7 +330,7 @@ class ProcessChatTurnUseCase:
             (last_message.metadata_json or {}).get("privacy_trigger_detected", False)
         )
 
-        async for event in self._stream_answer(
+        async for event in self._answer_or_say_it_failed(
             session=session,
             agent=agent,
             current_user=current_user,
@@ -361,7 +365,7 @@ class ProcessChatTurnUseCase:
 
         recent_messages = await self.session_repo.get_messages(session.id, limit=30)
 
-        async for event in self._stream_answer(
+        async for event in self._answer_or_say_it_failed(
             session=session,
             agent=agent,
             current_user=current_user,
@@ -370,6 +374,29 @@ class ProcessChatTurnUseCase:
             auto_approve_writes=auto_approve_writes,
         ):
             yield event
+
+    async def _answer_or_say_it_failed(self, **kwargs):
+        """
+        [_stream_answer], and the one ending it cannot reach on its own.
+
+        By the time this runs the question is on the hub — both callers write it down first, and
+        regenerating reads one that was written down long ago. So a model that dies here has lost
+        the answer and nothing else, and that is a different sentence on screen from a question
+        that never arrived: this one offers a fresh answer, the other offers to send it again.
+        Telling someone the wrong one is what sends them into asking twice.
+
+        A turn refused before any of that — an archived conversation, an agent in the trash, a
+        session that is not yours — raises out of `_open_turn` instead and never reaches here.
+        """
+        session = kwargs["session"]
+        try:
+            async for event in self._stream_answer(**kwargs):
+                yield event
+        except Exception as exc:
+            logger.error(
+                "Answer failed for session %s: %s", session.id, exc, exc_info=True
+            )
+            yield {"type": "turn_failed", "error": str(exc)}
 
     async def _stream_answer(
         self,

@@ -87,6 +87,17 @@ class DefensiveSseStreamReader(
                 ChatStreamEvent.ToolApprovalProposal(tool = tool, message = message)
             }
 
+            // The two ways the hub says a turn went wrong. Dropping these as unknown types is
+            // what left a failed turn looking exactly like one that had not started yet.
+            "turn_failed" -> {
+                ChatStreamEvent.TurnFailed
+            }
+
+            "error" -> {
+                val message = element["error"]?.jsonPrimitive?.content ?: ""
+                ChatStreamEvent.StreamError(message)
+            }
+
             "done" -> {
                 val messageId = element["message_id"]?.jsonPrimitive?.content ?: ""
                 val assistantContent = sanitizeContent(element["assistant_content"]?.jsonPrimitive?.content ?: "")

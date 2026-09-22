@@ -87,4 +87,46 @@ class DefensiveSseStreamReaderTest {
             assertEquals("before", (events[0] as ChatStreamEvent.Delta).content)
             assertEquals("after", (events[1] as ChatStreamEvent.Delta).content)
         }
+
+    /**
+     * The hub's two ways of saying a turn went wrong, which the reader used to drop on the floor.
+     *
+     * `turn_failed` means the question is on the hub and only the answer is missing; `error` means
+     * the turn never got that far. Skipping them left the stream ending with nothing terminal in
+     * it at all, and a screen that waits forever for a word that is never coming.
+     */
+    @Test
+    fun the_two_ways_a_turn_fails_are_both_read() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "turn_failed", "error": "model timed out"}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+            val events = reader.readEvents(channel).toList()
+
+            assertEquals(listOf(ChatStreamEvent.TurnFailed), events)
+        }
+
+    @Test
+    fun a_turn_that_never_opened_is_read_as_an_error_carrying_its_reason() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "error", "error": "Agent personality not found"}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val channel = ByteReadChannel(ssePayload.encodeToByteArray())
+            val events = reader.readEvents(channel).toList()
+
+            assertEquals(1, events.size)
+            assertEquals("Agent personality not found", (events[0] as ChatStreamEvent.StreamError).message)
+        }
 }

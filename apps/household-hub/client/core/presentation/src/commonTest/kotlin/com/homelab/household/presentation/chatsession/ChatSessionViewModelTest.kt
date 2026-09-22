@@ -398,6 +398,45 @@ class ChatSessionViewModelTest {
             assertTrue(state.canSend, "the turn is over, so the composer is free again")
         }
 
+    /**
+     * The turn that answered nothing at all, and then would not let go.
+     *
+     * A stream that finished without saying how left the composer believing a turn was still
+     * running, so it refused every later message — silently, since a send it will not take clears
+     * nothing and says nothing. Two messages typed, neither sent, and an empty bubble on screen.
+     */
+    @Test
+    fun a_turn_that_ends_without_a_word_frees_the_composer_rather_than_holding_it() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.TurnFailed)
+
+            viewModel.sendMessage("What's left before Friday?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.Failed, state.turnState)
+            assertTrue(state.canSend, "a turn that is over must not go on blocking the composer")
+        }
+
+    @Test
+    fun a_second_message_is_taken_once_a_failed_turn_has_ended() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.TurnFailed)
+            viewModel.sendMessage("The first one")
+            advanceUntilIdle()
+
+            viewModel.sendMessage("And the second")
+            advanceUntilIdle()
+
+            val asked =
+                viewModel.uiState.value.messages
+                    .filter { it.role == MessageRole.USER }
+                    .map { it.content }
+            assertEquals(listOf("The first one", "And the second"), asked)
+        }
+
     @Test
     fun the_recovery_is_told_which_answer_is_already_on_screen() =
         runTest(testDispatcher) {

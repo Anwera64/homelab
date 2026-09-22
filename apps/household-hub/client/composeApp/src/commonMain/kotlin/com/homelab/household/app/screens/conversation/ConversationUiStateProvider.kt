@@ -52,6 +52,14 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             said("m-2", "The panel review is tomorrow at 14:30.", MessageRole.ASSISTANT),
                         ),
                 ),
+            // Sent, and nothing back yet: the model is being loaded or is thinking. The longest
+            // silence in the app, and the one that used to draw an empty bubble.
+            "Thinking, before the first word" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                ),
             "Answering" to
                 agent.copy(
                     messages = listOf(question),

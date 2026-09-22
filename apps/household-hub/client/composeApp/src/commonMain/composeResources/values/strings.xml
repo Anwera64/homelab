@@ -322,6 +322,7 @@
     <string name="conversation_composer_leave">You can leave — the answer will wait for you</string>
     <string name="conversation_not_sent">Not sent — the hub didn’t get it</string>
     <string name="conversation_retry">Retry</string>
+    <string name="conversation_thinking">Thinking…</string>
     <string name="conversation_reconnecting">Reconnecting…</string>
     <string name="conversation_reconnecting_detail">the rest is still being written on the hub</string>
     <string name="conversation_still_working">Still working on this.</string>
