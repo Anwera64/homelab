@@ -11,12 +11,16 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Home is still the placeholder slice 3 replaces — but the profile is reached from the avatar on a
- * dashboard, so the avatar is here already.
+ * The dashboards slice 3 does not build: Household, Schedule and My Space.
+ *
+ * Everything drawn on them — the morning briefing, both calendars, Notes — belongs to slices 8, 9
+ * and 11, and none of it has an endpoint yet. They are reachable so the daily loop can be walked
+ * end to end, and they carry the tab bar and the avatar, which do work.
  */
 @Composable
 fun HomePlaceholderScreen(
     onProfile: () -> Unit,
+    tabs: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
@@ -24,5 +28,5 @@ fun HomePlaceholderScreen(
     val member = state.member
     val description = stringResource(Res.string.profile_open)
 
-    HomePlaceholderContent(member, onProfile, description, modifier)
+    HomePlaceholderContent(member, onProfile, description, tabs, modifier)
 }

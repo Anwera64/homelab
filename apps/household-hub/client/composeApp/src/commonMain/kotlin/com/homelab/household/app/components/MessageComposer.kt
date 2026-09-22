@@ -7,9 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
@@ -45,7 +50,17 @@ fun MessageComposer(
     val colors = HearthTheme.colors
     val textStyle = HearthTheme.typography.label
 
-    Column(modifier = modifier.fillMaxWidth().background(colors.surface)) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(colors.surface)
+                // Bottom and horizontal only: the keyboard is already in `safeDrawing`, so this
+                // rises above it rather than hiding underneath.
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                ),
+    ) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
             modifier =

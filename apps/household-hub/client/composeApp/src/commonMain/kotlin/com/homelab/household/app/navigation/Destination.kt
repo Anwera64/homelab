@@ -40,8 +40,31 @@ sealed interface Destination : NavKey {
         val code: String,
     ) : Destination
 
+    /**
+     * The four tabs. Each is a root: switching tabs replaces the stack rather than stacking on it,
+     * so Back from a tab leaves the app instead of walking backwards through the ones you visited.
+     */
+    sealed interface Tab : Destination
+
     /** Where a signed-in member lands. */
-    data object Home : Destination
+    data object Home : Tab
+
+    data object Schedule : Tab
+
+    data object Chats : Tab
+
+    data object MySpace : Tab
+
+    /**
+     * A conversation, or a new one.
+     *
+     * [sessionId] is null when the hero + opens one that does not exist yet: the screen shows the
+     * agent's greeting and the session is created on the first send, so a chat nobody spoke in is
+     * never left behind on the hub.
+     */
+    data class Conversation(
+        val sessionId: String? = null,
+    ) : Destination
 
     data object Profile : Destination
 

@@ -1,6 +1,7 @@
 package com.homelab.household.presentation.di
 
 import com.homelab.household.presentation.changepin.ChangePinViewModel
+import com.homelab.household.presentation.chats.ChatsViewModel
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.dashboard.DashboardViewModel
 import com.homelab.household.presentation.firstrun.FirstRunViewModel
@@ -24,6 +25,7 @@ import org.koin.dsl.module
 val presentationModule =
     module {
         factory { ChatSessionViewModel(get(), get(), get(), get(), get()) }
+        factory { ChatsViewModel(get()) }
         factory { DashboardViewModel(get(), get(), get(), get(), get()) }
         factory { LaunchViewModel(get(), get()) }
         factory { MemoryAuditViewModel(get(), get(), get(), get()) }
