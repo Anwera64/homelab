@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
 
 from app.data.models.base import Base
@@ -36,7 +36,13 @@ class SessionModel(Base):
 
 class MessageModel(Base):
     __tablename__ = "chat_messages"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        # SQLite does not index a foreign key on its own, so without this every read of a
+        # conversation — and every preview on the Chats list — scans the whole message table.
+        # Ordered by created_at as well as session_id so "the newest message here" is a seek.
+        Index("ix_chat_messages_session_created", "session_id", "created_at"),
+        {"extend_existing": True},
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = Column(String(36), ForeignKey("conversation_sessions.id", ondelete="CASCADE"), nullable=False)

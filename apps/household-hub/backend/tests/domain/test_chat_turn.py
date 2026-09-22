@@ -344,3 +344,117 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
     done_ev = [ev for ev in events if ev["type"] == "done"][0]
     assert done_ev["assistant_content"] == "You have 2 meetings."
 
+
+
+@pytest.mark.asyncio
+async def test_regenerate_stream_answers_again_without_asking_again():
+    """
+    GIVEN a question whose answer never arrived WHEN it is regenerated THEN no second question.
+
+    The screen promises "trying again just asks for a fresh answer". Writing the user's message a
+    second time would make that a lie and leave the transcript stuttering.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    session_repo.messages.append(
+        ChatMessage(id="m1", session_id="s1", role="user", content="Plan meals for the week")
+    )
+
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Here is the week.")]]
+    )
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=llm_client,
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev async for ev in use_case.regenerate_stream(session_id="s1", current_user=user)
+    ]
+
+    done = [ev for ev in events if ev["type"] == "done"][0]
+    assert done["assistant_content"] == "Here is the week."
+
+    user_messages = [m for m in session_repo.messages if m.role == "user"]
+    assert len(user_messages) == 1
+    assert session_repo.messages[-1].role == "assistant"
+
+
+@pytest.mark.asyncio
+async def test_regenerate_stream_refuses_when_the_last_turn_was_answered():
+    """GIVEN an answered conversation THEN there is nothing to regenerate."""
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    session_repo.messages.append(
+        ChatMessage(id="m1", session_id="s1", role="user", content="Plan meals")
+    )
+    session_repo.messages.append(
+        ChatMessage(id="m2", session_id="s1", role="assistant", content="Here it is.")
+    )
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="again")]]),
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    with pytest.raises(InvalidOperationException):
+        [ev async for ev in use_case.regenerate_stream(session_id="s1", current_user=user)]
+
+
+@pytest.mark.asyncio
+async def test_regenerate_stream_keeps_the_privacy_the_question_was_asked_with():
+    """
+    GIVEN a question that tripped a privacy phrase THEN the regenerated turn is secret too.
+
+    The trigger was detected and stored when the question was asked; re-running the regex would
+    work, but reading back what was decided the first time cannot disagree with it.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1", is_secret=False)
+
+    session_repo = FakeSessionRepository(sessions=[session])
+    session_repo.messages.append(
+        ChatMessage(
+            id="m1",
+            session_id="s1",
+            role="user",
+            content="Don't tell Liam about the party",
+            metadata_json={"privacy_trigger_detected": True},
+        )
+    )
+
+    use_case = ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Secret.")]]),
+        context_assembler=FakeContextAssembler(),
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+    events = [
+        ev async for ev in use_case.regenerate_stream(session_id="s1", current_user=user)
+    ]
+
+    done = [ev for ev in events if ev["type"] == "done"][0]
+    assert done["is_turn_secret"] is True
+    assert done["suggest_secret_mode"] is True

@@ -11,8 +11,8 @@ class SessionRepositoryImpl(ISessionRepository):
         self.mapper = mapper
 
     async def list_by_user_id(self, user_id: str) -> List[ConversationSession]:
-        models = await self.data_source.list_by_user_id(user_id)
-        return [self.mapper.to_domain_session(m) for m in models]
+        rows = await self.data_source.list_by_user_id(user_id)
+        return [self.mapper.to_domain_session_row(row) for row in rows]
 
     async def get_by_id(self, session_id: str) -> Optional[ConversationSession]:
         model = await self.data_source.get_by_id(session_id)

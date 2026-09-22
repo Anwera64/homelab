@@ -15,6 +15,9 @@ class SessionPresentationMapper:
             is_archived=entity.is_archived,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
+            last_message_preview=entity.last_message_preview,
+            agent_name=entity.agent_name,
+            agent_avatar=entity.agent_avatar,
         )
 
     @staticmethod

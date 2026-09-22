@@ -29,5 +29,12 @@ class ConversationSession:
     created_at: datetime = field(default_factory=get_utc_now)
     updated_at: datetime = field(default_factory=get_utc_now)
 
+    # What a Chats row draws beside the title. They belong to the agent and the newest message
+    # rather than to the session itself, which is why they are read-only here: nothing sets them
+    # on the way in, and the list query fills them on the way out.
+    last_message_preview: str | None = None
+    agent_name: str | None = None
+    agent_avatar: str | None = None
+
     def touch(self) -> None:
         self.updated_at = get_utc_now()

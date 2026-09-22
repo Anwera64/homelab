@@ -30,6 +30,20 @@ class SessionLockRegistry:
             await lock.acquire()
             return True
 
+    def is_locked(self, session_id: str) -> bool:
+        """
+        Whether a turn is being generated for this session right now.
+
+        Read-only and synchronous on purpose: it takes no lock of its own, so a read can never
+        queue behind the turn it is asking about. It is a snapshot — the turn may finish the
+        instant after — which is all the client needs, because it polls.
+
+        Per-process, like the registry it reads. Behind `uvicorn --workers N` a turn on one worker
+        would look idle to another; the hub is single-process and has no worker configuration.
+        """
+        lock = self._locks.get(session_id)
+        return lock is not None and lock.locked()
+
     async def release(self, session_id: str) -> None:
         """
         Releases the lock on session_id and removes it from the registry
