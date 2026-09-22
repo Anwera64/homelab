@@ -13,8 +13,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.homelab.household.app.components.HearthBottomNav
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.MemberAvatar
+import com.homelab.household.app.components.NavTab
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
@@ -29,10 +31,12 @@ internal fun HomePlaceholderContent(
     member: User?,
     onProfile: () -> Unit,
     description: String,
+    tabs: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HearthScaffold(
         modifier = modifier,
+        bottomBar = tabs,
         header = {
             Box(
                 modifier =
@@ -88,5 +92,8 @@ private fun HomePlaceHolderPreview() =
                 ),
             onProfile = {},
             description = stringResource(Res.string.profile_open),
+            tabs = {
+                HearthBottomNav(selected = NavTab.Household, onSelect = {}, onNewChat = {})
+            },
         )
     }

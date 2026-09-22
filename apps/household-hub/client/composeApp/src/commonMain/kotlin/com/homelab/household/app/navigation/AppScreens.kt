@@ -13,6 +13,7 @@ import com.homelab.household.app.screens.pinapprove.PinApproveScreen
 import com.homelab.household.app.screens.pinentry.PinEntryScreen
 import com.homelab.household.app.screens.pinforgot.PinForgotScreen
 import com.homelab.household.app.screens.placeholder.HomePlaceholderScreen
+import com.homelab.household.app.screens.placeholder.PlaceholderContent
 import com.homelab.household.app.screens.profile.ProfileScreen
 import com.homelab.household.app.screens.profilepicker.ProfilePickerScreen
 import com.homelab.household.app.screens.removemember.RemoveMemberScreen
@@ -79,7 +80,31 @@ interface AppScreens {
         onSignedIn: () -> Unit,
     )
 
-    @Composable fun Home(onProfile: () -> Unit)
+    @Composable fun Home(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    )
+
+    @Composable fun Schedule(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    )
+
+    @Composable fun MySpace(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    )
+
+    @Composable fun Chats(
+        onProfile: () -> Unit,
+        onOpen: (String) -> Unit,
+        tabs: @Composable () -> Unit,
+    )
+
+    @Composable fun Conversation(
+        sessionId: String?,
+        onBack: () -> Unit,
+    )
 
     @Composable fun Profile(
         onBack: () -> Unit,
@@ -200,8 +225,44 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun Home(onProfile: () -> Unit) {
-        HomePlaceholderScreen(onProfile = onProfile)
+    override fun Home(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        HomePlaceholderScreen(onProfile = onProfile, tabs = tabs)
+    }
+
+    @Composable
+    override fun Schedule(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        HomePlaceholderScreen(onProfile = onProfile, tabs = tabs)
+    }
+
+    @Composable
+    override fun MySpace(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        HomePlaceholderScreen(onProfile = onProfile, tabs = tabs)
+    }
+
+    @Composable
+    override fun Chats(
+        onProfile: () -> Unit,
+        onOpen: (String) -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        HomePlaceholderScreen(onProfile = onProfile, tabs = tabs)
+    }
+
+    @Composable
+    override fun Conversation(
+        sessionId: String?,
+        onBack: () -> Unit,
+    ) {
+        PlaceholderContent(title = "Conversation", detail = sessionId ?: "New chat")
     }
 
     @Composable

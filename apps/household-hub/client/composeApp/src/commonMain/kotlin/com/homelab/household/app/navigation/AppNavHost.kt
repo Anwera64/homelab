@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import com.homelab.household.app.components.HearthBottomNav
+import com.homelab.household.app.components.NavTab
 import com.homelab.household.domain.usecase.HasStoredSessionUseCase
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
@@ -120,7 +122,43 @@ fun AppNavHost(
                 }
                 entry<Destination.Home> {
                     WithEntryViewModels {
-                        screens.Home(onProfile = { backStack.add(Destination.Profile) })
+                        screens.Home(
+                            onProfile = { backStack.add(Destination.Profile) },
+                            tabs = { backStack.Tabs(NavTab.Household) },
+                        )
+                    }
+                }
+                entry<Destination.Schedule> {
+                    WithEntryViewModels {
+                        screens.Schedule(
+                            onProfile = { backStack.add(Destination.Profile) },
+                            tabs = { backStack.Tabs(NavTab.Schedule) },
+                        )
+                    }
+                }
+                entry<Destination.Chats> {
+                    WithEntryViewModels {
+                        screens.Chats(
+                            onProfile = { backStack.add(Destination.Profile) },
+                            onOpen = { sessionId -> backStack.add(Destination.Conversation(sessionId)) },
+                            tabs = { backStack.Tabs(NavTab.Chats) },
+                        )
+                    }
+                }
+                entry<Destination.MySpace> {
+                    WithEntryViewModels {
+                        screens.MySpace(
+                            onProfile = { backStack.add(Destination.Profile) },
+                            tabs = { backStack.Tabs(NavTab.MySpace) },
+                        )
+                    }
+                }
+                entry<Destination.Conversation> { destination ->
+                    WithEntryViewModels {
+                        screens.Conversation(
+                            sessionId = destination.sessionId,
+                            onBack = { backStack.removeLastOrNull() },
+                        )
                     }
                 }
                 entry<Destination.Profile> {
@@ -201,4 +239,29 @@ fun rememberAppBackStack(): SnapshotStateList<NavKey> {
 private fun SnapshotStateList<NavKey>.startOver(destination: Destination) {
     clear()
     add(destination)
+}
+
+/**
+ * The bottom bar, wired to the back stack.
+ *
+ * Each tab is a root rather than a push: moving between them replaces the stack, so Back from a
+ * tab leaves the app instead of retracing the tabs you happened to visit. The raised + always
+ * opens a conversation with no session — one is created on the first send.
+ */
+@Composable
+private fun SnapshotStateList<NavKey>.Tabs(selected: NavTab) {
+    HearthBottomNav(
+        selected = selected,
+        onSelect = { tab ->
+            startOver(
+                when (tab) {
+                    NavTab.Household -> Destination.Home
+                    NavTab.Schedule -> Destination.Schedule
+                    NavTab.Chats -> Destination.Chats
+                    NavTab.MySpace -> Destination.MySpace
+                },
+            )
+        },
+        onNewChat = { add(Destination.Conversation()) },
+    )
 }

@@ -127,10 +127,60 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun Home(onProfile: () -> Unit) {
+    override fun Home(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
         Column {
             Text(HOME)
             Text(GO_TO_PROFILE, modifier = Modifier.clickable { onProfile() })
+            tabs()
+        }
+    }
+
+    @Composable
+    override fun Schedule(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        Column {
+            Text(SCHEDULE)
+            tabs()
+        }
+    }
+
+    @Composable
+    override fun MySpace(
+        onProfile: () -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        Column {
+            Text(MY_SPACE)
+            tabs()
+        }
+    }
+
+    @Composable
+    override fun Chats(
+        onProfile: () -> Unit,
+        onOpen: (String) -> Unit,
+        tabs: @Composable () -> Unit,
+    ) {
+        Column {
+            Text(CHATS)
+            Text(OPEN_A_CHAT, modifier = Modifier.clickable { onOpen("s-1") })
+            tabs()
+        }
+    }
+
+    @Composable
+    override fun Conversation(
+        sessionId: String?,
+        onBack: () -> Unit,
+    ) {
+        Column {
+            Text(if (sessionId == null) NEW_CONVERSATION else conversationOf(sessionId))
+            Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
 
@@ -229,6 +279,14 @@ class StubScreens : AppScreens {
         const val SIGN_IN = "sign in screen"
         const val FIRST_RUN = "first run screen"
         const val HOME = "home screen"
+        const val SCHEDULE = "schedule screen"
+        const val MY_SPACE = "my space screen"
+        const val CHATS = "chats screen"
+        const val NEW_CONVERSATION = "new conversation screen"
+        const val OPEN_A_CHAT = "open a chat"
+
+        fun conversationOf(sessionId: String) = "conversation screen $sessionId"
+
         const val INVITE_CODE = "invite code screen"
         const val RESET_CODE = "reset code screen"
         const val PROFILE = "profile screen"
