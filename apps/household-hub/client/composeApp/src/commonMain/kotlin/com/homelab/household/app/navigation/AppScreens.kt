@@ -35,7 +35,7 @@ interface AppScreens {
     )
 
     @Composable fun SignIn(
-        onMemberSelected: (Member) -> Unit,
+        onSelectMember: (Member) -> Unit,
         onInviteCode: () -> Unit,
     )
 
@@ -43,11 +43,11 @@ interface AppScreens {
         member: Member,
         onSignedIn: () -> Unit,
         onBack: () -> Unit,
-        onForgotten: () -> Unit,
+        onForget: () -> Unit,
     )
 
     @Composable fun FirstRun(
-        onCreated: () -> Unit,
+        onCreate: () -> Unit,
         onSignIn: () -> Unit,
     )
 
@@ -59,8 +59,8 @@ interface AppScreens {
     @Composable fun Join(
         preview: InvitePreview,
         code: String,
-        onJoined: () -> Unit,
-        onExpired: () -> Unit,
+        onJoin: () -> Unit,
+        onExpire: () -> Unit,
     )
 
     @Composable fun PinForgot(
@@ -106,7 +106,7 @@ interface AppScreens {
     @Composable fun RemoveMember(
         member: Member,
         onBack: () -> Unit,
-        onRemoved: () -> Unit,
+        onRemove: () -> Unit,
     )
 
     @Composable fun LeaveHousehold(
@@ -116,7 +116,7 @@ interface AppScreens {
 
     @Composable fun ChangePin(
         onBack: () -> Unit,
-        onChanged: () -> Unit,
+        onChange: () -> Unit,
     )
 }
 
@@ -132,10 +132,10 @@ object RealAppScreens : AppScreens {
 
     @Composable
     override fun SignIn(
-        onMemberSelected: (Member) -> Unit,
+        onSelectMember: (Member) -> Unit,
         onInviteCode: () -> Unit,
     ) {
-        ProfilePickerScreen(onMemberSelected = onMemberSelected, onInviteCode = onInviteCode)
+        ProfilePickerScreen(onSelectMember = onSelectMember, onInviteCode = onInviteCode)
     }
 
     @Composable
@@ -143,17 +143,17 @@ object RealAppScreens : AppScreens {
         member: Member,
         onSignedIn: () -> Unit,
         onBack: () -> Unit,
-        onForgotten: () -> Unit,
+        onForget: () -> Unit,
     ) {
-        PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack, onForgotten = onForgotten)
+        PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack, onForget = onForget)
     }
 
     @Composable
     override fun FirstRun(
-        onCreated: () -> Unit,
+        onCreate: () -> Unit,
         onSignIn: () -> Unit,
     ) {
-        FirstRunScreen(onCreated = onCreated, onSignIn = onSignIn)
+        FirstRunScreen(onCreate = onCreate, onSignIn = onSignIn)
     }
 
     @Composable
@@ -168,10 +168,10 @@ object RealAppScreens : AppScreens {
     override fun Join(
         preview: InvitePreview,
         code: String,
-        onJoined: () -> Unit,
-        onExpired: () -> Unit,
+        onJoin: () -> Unit,
+        onExpire: () -> Unit,
     ) {
-        JoinScreen(preview = preview, code = code, onJoined = onJoined, onExpired = onExpired)
+        JoinScreen(preview = preview, code = code, onJoin = onJoin, onExpire = onExpire)
     }
 
     @Composable
@@ -248,9 +248,9 @@ object RealAppScreens : AppScreens {
     override fun RemoveMember(
         member: Member,
         onBack: () -> Unit,
-        onRemoved: () -> Unit,
+        onRemove: () -> Unit,
     ) {
-        RemoveMemberScreen(member = member, onBack = onBack, onRemoved = onRemoved)
+        RemoveMemberScreen(member = member, onBack = onBack, onRemove = onRemove)
     }
 
     @Composable
@@ -264,8 +264,8 @@ object RealAppScreens : AppScreens {
     @Composable
     override fun ChangePin(
         onBack: () -> Unit,
-        onChanged: () -> Unit,
+        onChange: () -> Unit,
     ) {
-        ChangePinScreen(onBack = onBack, onChanged = onChanged)
+        ChangePinScreen(onBack = onBack, onChange = onChange)
     }
 }

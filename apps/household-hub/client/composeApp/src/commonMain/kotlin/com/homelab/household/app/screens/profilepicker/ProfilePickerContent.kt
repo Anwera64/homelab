@@ -32,9 +32,9 @@ import com.homelab.household.app.resources.picker_member_description
 import com.homelab.household.app.resources.picker_retry
 import com.homelab.household.app.resources.picker_title
 import com.homelab.household.app.resources.picker_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.profilepicker.PickerStatus
 import com.homelab.household.presentation.profilepicker.ProfilePickerUiState
@@ -50,7 +50,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ProfilePickerContent(
     state: ProfilePickerUiState,
-    onMemberSelected: (Member) -> Unit,
+    onSelectMember: (Member) -> Unit,
     onRetry: () -> Unit,
     onInviteCode: () -> Unit,
     modifier: Modifier = Modifier,
@@ -120,7 +120,7 @@ fun ProfilePickerContent(
                         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
                     ) {
                         status.members.forEach { member ->
-                            Face(member = member, onClick = { onMemberSelected(member) })
+                            Face(member = member, onClick = { onSelectMember(member) })
                         }
                     }
                     Text(
@@ -197,12 +197,12 @@ private fun Problem(
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ProfilePickerContentPreview(
     @PreviewParameter(ProfilePickerUiStateProvider::class) state: ProfilePickerUiState,
 ) {
     HearthTheme {
-        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
+        ProfilePickerContent(state = state, onSelectMember = {}, onRetry = {}, onInviteCode = {})
     }
 }

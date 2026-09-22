@@ -16,7 +16,7 @@ import org.koin.core.parameter.parametersOf
 fun RemoveMemberScreen(
     member: Member,
     onBack: () -> Unit,
-    onRemoved: () -> Unit,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: RemoveMemberViewModel = koinViewModel(parameters = { parametersOf(member) })
@@ -24,7 +24,7 @@ fun RemoveMemberScreen(
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            RemoveMemberEvent.Removed -> onRemoved()
+            RemoveMemberEvent.Removed -> onRemove()
         }
     }
 

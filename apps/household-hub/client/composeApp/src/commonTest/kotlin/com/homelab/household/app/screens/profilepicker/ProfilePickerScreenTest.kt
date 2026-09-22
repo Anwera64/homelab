@@ -39,7 +39,7 @@ class ProfilePickerScreenTest {
         val picked = mutableListOf<Member>()
 
         runScreenTest {
-            profilePickerScreen(hub, onMemberSelected = { picked += it })
+            profilePickerScreen(hub, onSelectMember = { picked += it })
 
             onProfilePicker {
                 seesTheHousehold("Emma", "Liam")
@@ -92,7 +92,7 @@ class ProfilePickerScreenTest {
             runComposeUiTest {
                 setContent {
                     StillTheme {
-                        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
+                        ProfilePickerContent(state = state, onSelectMember = {}, onRetry = {}, onInviteCode = {})
                     }
                 }
 

@@ -13,7 +13,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ChangePinScreen(
     onBack: () -> Unit,
-    onChanged: () -> Unit,
+    onChange: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: ChangePinViewModel = koinViewModel()
@@ -21,7 +21,7 @@ fun ChangePinScreen(
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            ChangePinEvent.Changed -> onChanged()
+            ChangePinEvent.Changed -> onChange()
         }
     }
 

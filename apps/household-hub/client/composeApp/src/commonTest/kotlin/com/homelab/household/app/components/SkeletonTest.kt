@@ -47,7 +47,7 @@ class SkeletonTest {
                 }
             }
 
-            onNodeWithTag(SkeletonGroupTag)
+            onNodeWithTag(SKELETON_GROUP_TAG)
                 .assertIsDisplayed()
                 .assert(
                     SemanticsMatcher.expectValue(
@@ -87,7 +87,7 @@ class SkeletonTest {
                 ).map { it.name }
 
             val exposed =
-                onNodeWithTag(SkeletonGroupTag, useUnmergedTree = true)
+                onNodeWithTag(SKELETON_GROUP_TAG, useUnmergedTree = true)
                     .fetchSemanticsNode()
                     .descendants()
                     .flatMap { node -> node.config.map { it.key.name } }

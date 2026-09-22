@@ -24,5 +24,5 @@ fun HomePlaceholderScreen(
     val member = state.member
     val description = stringResource(Res.string.profile_open)
 
-    HomePlaceholderContent(modifier, member, onProfile, description)
+    HomePlaceholderContent(member, onProfile, description, modifier)
 }

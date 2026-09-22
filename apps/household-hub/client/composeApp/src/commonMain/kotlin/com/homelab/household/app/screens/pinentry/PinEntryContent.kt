@@ -56,9 +56,9 @@ import com.homelab.household.app.resources.pin_locked_countdown
 import com.homelab.household.app.resources.pin_title
 import com.homelab.household.app.resources.pin_unreachable
 import com.homelab.household.app.resources.pin_wrong
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.Pin
@@ -79,7 +79,7 @@ fun PinEntryContent(
     onDigit: (Char) -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
-    onForgotten: () -> Unit,
+    onForget: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HearthScaffold(
@@ -91,7 +91,7 @@ fun PinEntryContent(
             state = state,
             onDigit = onDigit,
             onDelete = onDelete,
-            onForgotten = onForgotten,
+            onForget = onForget,
             modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
@@ -102,7 +102,7 @@ private fun PinPad(
     state: PinEntryUiState,
     onDigit: (Char) -> Unit,
     onDelete: () -> Unit,
-    onForgotten: () -> Unit,
+    onForget: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
@@ -161,7 +161,7 @@ private fun PinPad(
             modifier =
                 Modifier
                     .align(Alignment.CenterHorizontally)
-                    .clickable(onClick = onForgotten)
+                    .clickable(onClick = onForget)
                     .padding(horizontal = spacing.md, vertical = spacing.sm),
         )
 
@@ -177,7 +177,7 @@ private fun PinPad(
     }
 }
 
-const val PinDotsTag = "PinDots"
+const val PIN_DOTS_TAG = "PinDots"
 
 /**
  * The six dots, and while the hub has the PIN, the wave (design notes §6.21, pattern 5).
@@ -204,7 +204,7 @@ private fun Dots(
     Row(
         modifier =
             modifier
-                .testTag(PinDotsTag)
+                .testTag(PIN_DOTS_TAG)
                 .clearAndSetSemantics {
                     contentDescription = description
                     if (waving) {
@@ -394,12 +394,12 @@ private fun DigitKey(
 
 private const val WARN_FROM_ATTEMPTS_LEFT = 2
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PinEntryContentPreview(
     @PreviewParameter(PinEntryUiStateProvider::class) state: PinEntryUiState,
 ) {
     HearthTheme {
-        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForgotten = {})
+        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForget = {})
     }
 }

@@ -22,8 +22,8 @@ import com.homelab.household.app.resources.reset_code_back
 import com.homelab.household.app.resources.reset_code_detail
 import com.homelab.household.app.resources.reset_code_field
 import com.homelab.household.app.resources.reset_code_title
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.resetpin.ResetCodeUiState
 import org.jetbrains.compose.resources.stringResource
 
@@ -89,7 +89,7 @@ fun ResetCodeContent(
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ResetCodeContentPreview(
     @PreviewParameter(ResetCodeUiStateProvider::class) state: ResetCodeUiState,

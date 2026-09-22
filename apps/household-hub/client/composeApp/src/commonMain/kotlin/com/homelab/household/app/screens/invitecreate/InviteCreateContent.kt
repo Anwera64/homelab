@@ -48,8 +48,8 @@ import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.resources.join_name_too_long
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.asCountdown
 import com.homelab.household.app.util.rememberWaitPhase
@@ -218,7 +218,7 @@ private fun failure(status: InviteCreateStatus): String? =
         else -> null
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun InviteCreateContentPreview(
     @PreviewParameter(InviteCreateUiStateProvider::class) state: InviteCreateUiState,

@@ -22,4 +22,4 @@ private const val UI_MODE_NIGHT_YES = 0x20
     uiMode = UI_MODE_NIGHT_YES,
     showBackground = true,
 )
-annotation class DayNightPreviews
+annotation class PreviewDayNight

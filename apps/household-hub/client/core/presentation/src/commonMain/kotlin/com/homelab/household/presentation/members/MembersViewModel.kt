@@ -47,7 +47,8 @@ class MembersViewModel(
                     }
                 },
                 onFailure = { error ->
-                    val status = if (error is ServerOfflineException) MembersStatus.Unreachable else MembersStatus.Failed
+                    val status =
+                        if (error is ServerOfflineException) MembersStatus.Unreachable else MembersStatus.Failed
                     _uiState.update { it.copy(status = status) }
                 },
             )

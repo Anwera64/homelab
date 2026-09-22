@@ -1,10 +1,4 @@
-plugins {
-    alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.compose.multiplatform)
-    alias(libs.plugins.kotlin.compose)
-}
-
-/**
+/*
  * The iOS application module — the twin of `:androidApp`.
  *
  * Like `:androidApp`, this is the only module on its platform allowed to depend on **both**
@@ -16,6 +10,13 @@ plugins {
  * dynamic framework to embed or sign, and `embedAndSignAppleFrameworkForXcode` (the script phase
  * `project.yml` installs) reduces to a build-and-copy.
  */
+
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.kotlin.compose)
+}
+
 kotlin {
     listOf(
         iosArm64(),

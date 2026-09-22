@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_change_pin_saving
 import com.homelab.household.app.resources.change_pin_again
@@ -54,7 +54,7 @@ class ChangePinScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = tokens) {
-                    ChangePinScreen(onBack = {}, onChanged = { changed++ })
+                    ChangePinScreen(onBack = {}, onChange = { changed++ })
                 }
             }
 
@@ -79,7 +79,7 @@ class ChangePinScreenTest {
                 TestApp(
                     hub.engine,
                     sessionStorage = signedIn(),
-                ) { ChangePinScreen(onBack = {}, onChanged = {}) }
+                ) { ChangePinScreen(onBack = {}, onChange = {}) }
             }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("000000")
@@ -100,7 +100,7 @@ class ChangePinScreenTest {
                 TestApp(
                     hub.engine,
                     sessionStorage = signedIn(),
-                ) { ChangePinScreen(onBack = {}, onChanged = {}) }
+                ) { ChangePinScreen(onBack = {}, onChange = {}) }
             }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("135790")
@@ -147,7 +147,7 @@ class ChangePinScreenTest {
                         getString(Res.string.a11y_change_pin_saving),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.change_pin_submit)).assertDoesNotExist()
         }
 

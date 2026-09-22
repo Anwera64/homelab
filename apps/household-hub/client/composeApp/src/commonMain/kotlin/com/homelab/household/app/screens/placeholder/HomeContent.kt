@@ -19,17 +19,17 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
 import com.homelab.household.app.resources.profile_open
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.User
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun HomePlaceholderContent(
-    modifier: Modifier = Modifier,
     member: User?,
     onProfile: () -> Unit,
     description: String,
+    modifier: Modifier = Modifier,
 ) {
     HearthScaffold(
         modifier = modifier,
@@ -72,7 +72,7 @@ internal fun HomePlaceholderContent(
 /** The default colour a member wears when the hub hasn't said. */
 private const val DEFAULT_COLOUR = "#3C6E4E"
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HomePlaceHolderPreview() =
     HearthTheme {

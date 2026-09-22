@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.width
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_invite_code_checking
 import com.homelab.household.app.resources.invite_code_checking
@@ -158,7 +158,7 @@ class InviteCodeScreenTest {
                         getString(Res.string.a11y_invite_code_checking),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
         }
 

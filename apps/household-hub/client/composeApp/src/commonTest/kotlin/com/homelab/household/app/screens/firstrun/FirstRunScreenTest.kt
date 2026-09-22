@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 /**
  * First run with the real stack under it, down to the Ktor client; only the hub is faked.
- * Where `onCreated` and `onSignIn` take the user is `AppNavHostTest`.
+ * Where `onCreate` and `onSignIn` take the user is `AppNavHostTest`.
  */
 @OptIn(ExperimentalTestApi::class)
 class FirstRunScreenTest {
@@ -46,7 +46,7 @@ class FirstRunScreenTest {
         var created = 0
 
         runScreenTest {
-            firstRunScreen(hub, onCreated = { created++ })
+            firstRunScreen(hub, onCreate = { created++ })
 
             onFirstRun {
                 typesName("Emma")
@@ -70,7 +70,7 @@ class FirstRunScreenTest {
         var created = 0
 
         runScreenTest {
-            firstRunScreen(hub, onCreated = { created++ })
+            firstRunScreen(hub, onCreate = { created++ })
 
             onFirstRun {
                 typesName("Emma")

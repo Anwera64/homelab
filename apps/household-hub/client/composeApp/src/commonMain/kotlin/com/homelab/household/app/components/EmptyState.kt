@@ -19,7 +19,7 @@ import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 
-const val EmptyStateIconTag = "EmptyStateIcon"
+const val EMPTY_STATE_ICON_TAG = "EmptyStateIcon"
 
 class EmptyStateAction(
     val label: String,
@@ -55,7 +55,7 @@ fun EmptyState(
                 Modifier
                     .size(HearthTheme.size.tile)
                     .background(colors.outlineSoft, HearthShapes.tile)
-                    .testTag(EmptyStateIconTag),
+                    .testTag(EMPTY_STATE_ICON_TAG),
             contentAlignment = Alignment.Center,
         ) {
             HearthIconImage(

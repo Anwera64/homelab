@@ -1,3 +1,9 @@
+/*
+ * Where the hub's HTTP answers become domain exceptions, named once for every remote data source.
+ *
+ * Nothing above the data sources sees an [HttpStatusCode]: a data source reaches the hub inside
+ * [reachingHub], checks the refusals its endpoint can return, and then calls [ensureJsonSuccess].
+ */
 package com.homelab.household.data.network
 
 import com.homelab.household.data.dto.PinRefusalDto
@@ -18,13 +24,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-
-/**
- * Where the hub's HTTP answers become domain exceptions, named once for every remote data source.
- *
- * Nothing above the data sources sees an [HttpStatusCode]: a data source reaches the hub inside
- * [reachingHub], checks the refusals its endpoint can return, and then calls [ensureJsonSuccess].
- */
 
 /** Network failures become [ServerOfflineException]; everything else passes through as thrown. */
 suspend fun <T> reachingHub(block: suspend () -> T): T =

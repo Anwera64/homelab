@@ -85,12 +85,12 @@ fun ComposeUiTest.joinScreen(
     hub: FakeJoinHub,
     preview: InvitePreview,
     code: String = "K7M2QP",
-    onJoined: () -> Unit = {},
-    onExpired: () -> Unit = {},
+    onJoin: () -> Unit = {},
+    onExpire: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
-            JoinScreen(preview = preview, code = code, onJoined = onJoined, onExpired = onExpired)
+            JoinScreen(preview = preview, code = code, onJoin = onJoin, onExpire = onExpire)
         }
     }
 }

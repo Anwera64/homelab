@@ -128,15 +128,15 @@ fun SecondaryButton(
 ) {
     val colors = HearthTheme.colors
     OutlinedActionButton(
-        text,
-        onClick,
-        modifier,
-        icon,
-        busy,
-        busyDescription,
-        colors.outline,
-        colors.textMuted,
-        BusyBar.outlined(colors),
+        text = text,
+        onClick = onClick,
+        icon = icon,
+        busy = busy,
+        busyDescription = busyDescription,
+        borderColor = colors.outline,
+        contentColor = colors.textMuted,
+        busyBar = BusyBar.outlined(colors),
+        modifier = modifier,
     )
 }
 
@@ -168,13 +168,13 @@ fun DestructiveButton(
 private fun OutlinedActionButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     icon: HearthIcon?,
     busy: Boolean,
     busyDescription: String?,
     borderColor: Color,
     contentColor: Color,
     busyBar: BusyBar,
+    modifier: Modifier = Modifier,
 ) {
     WithBusyBar(modifier = modifier, busy = busy, busyBar = busyBar) {
         OutlinedButton(
@@ -212,9 +212,9 @@ private fun OutlinedActionButton(
  */
 @Composable
 private fun WithBusyBar(
-    modifier: Modifier = Modifier,
     busy: Boolean,
     busyBar: BusyBar,
+    modifier: Modifier = Modifier,
     button: @Composable () -> Unit,
 ) {
     Box(modifier = modifier, propagateMinConstraints = true) {

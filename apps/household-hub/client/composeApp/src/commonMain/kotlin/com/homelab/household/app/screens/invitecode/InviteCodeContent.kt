@@ -33,9 +33,9 @@ import com.homelab.household.app.resources.invite_code_note
 import com.homelab.household.app.resources.invite_code_paste
 import com.homelab.household.app.resources.invite_code_title
 import com.homelab.household.app.resources.invite_code_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.invitecode.InviteCodeStatus
@@ -139,7 +139,7 @@ private fun refusal(status: InviteCodeStatus): String? =
         InviteCodeStatus.Failed -> stringResource(Res.string.invite_code_failed)
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun InviteCodeContentPreview(
     @PreviewParameter(InviteCodeUiStateProvider::class) state: InviteCodeUiState,

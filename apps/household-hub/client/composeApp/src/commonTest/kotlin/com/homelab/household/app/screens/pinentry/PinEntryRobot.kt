@@ -84,7 +84,7 @@ fun ComposeUiTest.pinEntryScreen(
     member: Member,
     onSignedIn: () -> Unit = {},
     onBack: () -> Unit = {},
-    onForgotten: () -> Unit = {},
+    onForget: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
@@ -92,7 +92,7 @@ fun ComposeUiTest.pinEntryScreen(
                 member = member,
                 onSignedIn = onSignedIn,
                 onBack = onBack,
-                onForgotten = onForgotten,
+                onForget = onForget,
             )
         }
     }

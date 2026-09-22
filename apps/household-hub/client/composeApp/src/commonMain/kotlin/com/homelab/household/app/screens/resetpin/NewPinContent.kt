@@ -28,8 +28,8 @@ import com.homelab.household.app.resources.new_pin_setting
 import com.homelab.household.app.resources.new_pin_submit
 import com.homelab.household.app.resources.new_pin_title
 import com.homelab.household.app.resources.reset_code_invalid
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.resetpin.NewPinStatus
@@ -116,7 +116,7 @@ private fun failure(status: NewPinStatus): String? =
         else -> null
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun NewPinContentPreview(
     @PreviewParameter(NewPinUiStateProvider::class) state: NewPinUiState,

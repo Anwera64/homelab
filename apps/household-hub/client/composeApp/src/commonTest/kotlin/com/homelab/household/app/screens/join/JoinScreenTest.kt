@@ -9,7 +9,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_join_joining
 import com.homelab.household.app.resources.join_joining
@@ -39,7 +39,7 @@ class JoinScreenTest {
         var joined = 0
 
         runScreenTest {
-            joinScreen(hub, invite, onJoined = { joined++ })
+            joinScreen(hub, invite, onJoin = { joined++ })
 
             onJoin {
                 seesTheInvitationFrom("Emma")
@@ -143,7 +143,7 @@ class JoinScreenTest {
                         getString(Res.string.a11y_join_joining),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.join_submit)).assertDoesNotExist()
         }
 

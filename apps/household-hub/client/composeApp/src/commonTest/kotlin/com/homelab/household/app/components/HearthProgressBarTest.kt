@@ -69,7 +69,7 @@ class HearthProgressBarTest {
                 }
             }
 
-            onNodeWithTag(HearthProgressBarTag)
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG)
                 .assertIsDisplayed()
                 .assert(
                     SemanticsMatcher.expectValue(

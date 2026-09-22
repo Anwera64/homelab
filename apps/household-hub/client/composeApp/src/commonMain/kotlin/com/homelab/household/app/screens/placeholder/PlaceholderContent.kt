@@ -14,8 +14,8 @@ import androidx.compose.ui.text.style.TextAlign
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -54,7 +54,7 @@ fun PlaceholderContent(
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PlaceholderContentPreview() {
     HearthTheme {

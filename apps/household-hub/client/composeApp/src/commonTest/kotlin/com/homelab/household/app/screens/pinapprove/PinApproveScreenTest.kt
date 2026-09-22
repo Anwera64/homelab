@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_approve_checking
 import com.homelab.household.app.resources.approve_checking
@@ -114,7 +114,7 @@ class PinApproveScreenTest {
                         getString(Res.string.a11y_approve_checking),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.approve_generate)).assertDoesNotExist()
         }
 

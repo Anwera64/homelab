@@ -46,8 +46,8 @@ import com.homelab.household.app.resources.join_submit
 import com.homelab.household.app.resources.join_title
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.firstrun.AvatarPalette
@@ -196,7 +196,7 @@ private fun refusal(status: JoinStatus): String? =
         JoinStatus.Failed -> stringResource(Res.string.members_failed)
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun JoinContentPreview(
     @PreviewParameter(JoinUiStateProvider::class) state: JoinUiState,

@@ -5,14 +5,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.firstrun.AvatarPalette
 
 private val SampleNames = listOf("Emma", "Anton", "Lucia", "Marc", "Nora")
 
 /** The size "Who's here?" draws, once per palette colour. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun MemberAvatarHeroPreview() {
     ComponentPreview {
@@ -21,7 +21,7 @@ private fun MemberAvatarHeroPreview() {
 }
 
 /** The size the PIN pad draws, once per palette colour. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun MemberAvatarTilePreview() {
     ComponentPreview {

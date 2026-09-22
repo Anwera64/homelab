@@ -67,8 +67,8 @@ import com.homelab.household.app.resources.first_run_pin_not_six_digits
 import com.homelab.household.app.resources.first_run_sign_in_instead
 import com.homelab.household.app.resources.first_run_title
 import com.homelab.household.app.resources.join_name_taken
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.hexColor
 import com.homelab.household.domain.model.MemberName
 import com.homelab.household.presentation.firstrun.AvatarPalette
@@ -254,7 +254,7 @@ private fun failureText(failure: FirstRunFailure): String =
         FirstRunFailure.Unknown -> stringResource(Res.string.first_run_failed_unknown)
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun FirstRunContentPreview(
     @PreviewParameter(FirstRunUiStateProvider::class) state: FirstRunUiState,

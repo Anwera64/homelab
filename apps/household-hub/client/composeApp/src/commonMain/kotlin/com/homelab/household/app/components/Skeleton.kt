@@ -33,7 +33,7 @@ import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
-const val SkeletonGroupTag = "SkeletonGroup"
+const val SKELETON_GROUP_TAG = "SkeletonGroup"
 
 /**
  * The blocks that stand where an answer will land while the hub is asked for it (design notes
@@ -53,7 +53,7 @@ fun SkeletonGroup(
     Column(
         modifier =
             modifier
-                .testTag(SkeletonGroupTag)
+                .testTag(SKELETON_GROUP_TAG)
                 .semantics {
                     stateDescription = loading
                     liveRegion = LiveRegionMode.Polite
@@ -75,7 +75,7 @@ fun SkeletonBlock(
     shape: Shape = HearthShapes.skeleton,
     position: Int = 0,
 ) {
-    Skeleton(modifier.fillMaxWidth(widthFraction).height(height), shape, position)
+    Skeleton(shape, position, modifier.fillMaxWidth(widthFraction).height(height))
 }
 
 /** An avatar that hasn't arrived. */
@@ -85,14 +85,14 @@ fun SkeletonCircle(
     size: Dp = HearthTheme.size.touchTarget,
     position: Int = 0,
 ) {
-    Skeleton(modifier.size(size), CircleShape, position)
+    Skeleton(CircleShape, position, modifier.size(size))
 }
 
 @Composable
 private fun Skeleton(
-    modifier: Modifier = Modifier,
     shape: Shape,
     position: Int,
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier =

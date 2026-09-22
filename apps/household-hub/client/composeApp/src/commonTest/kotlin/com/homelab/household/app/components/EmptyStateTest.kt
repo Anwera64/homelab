@@ -27,7 +27,7 @@ class EmptyStateTest {
                 }
             }
 
-            onNodeWithTag(EmptyStateIconTag).assertIsDisplayed()
+            onNodeWithTag(EMPTY_STATE_ICON_TAG).assertIsDisplayed()
             onNodeWithText("Nothing remembered yet").assertIsDisplayed()
             onNodeWithText("What agents learn about you will appear here.").assertIsDisplayed()
         }

@@ -15,7 +15,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun FirstRunScreen(
-    onCreated: () -> Unit,
+    onCreate: () -> Unit,
     onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -24,7 +24,7 @@ fun FirstRunScreen(
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            FirstRunEvent.GoToHome -> onCreated()
+            FirstRunEvent.GoToHome -> onCreate()
         }
     }
 

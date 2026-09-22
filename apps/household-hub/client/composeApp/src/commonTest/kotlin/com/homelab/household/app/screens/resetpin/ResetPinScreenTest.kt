@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_new_pin_setting
 import com.homelab.household.app.resources.change_pin_mismatch
@@ -141,7 +141,7 @@ class ResetPinScreenTest {
                         getString(Res.string.a11y_new_pin_setting),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.new_pin_submit)).assertDoesNotExist()
         }
 

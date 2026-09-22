@@ -36,9 +36,9 @@ import com.homelab.household.app.resources.forgot_step_one
 import com.homelab.household.app.resources.forgot_step_three
 import com.homelab.household.app.resources.forgot_step_two
 import com.homelab.household.app.resources.forgot_title
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.pinforgot.PinForgotStatus
 import com.homelab.household.presentation.pinforgot.PinForgotUiState
 import org.jetbrains.compose.resources.stringResource
@@ -191,7 +191,7 @@ private fun Step(
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PinForgotContentPreview(
     @PreviewParameter(PinForgotUiStateProvider::class) state: PinForgotUiState,

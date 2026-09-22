@@ -27,12 +27,12 @@ class StubScreens : AppScreens {
 
     @Composable
     override fun SignIn(
-        onMemberSelected: (Member) -> Unit,
+        onSelectMember: (Member) -> Unit,
         onInviteCode: () -> Unit,
     ) {
         Column {
             Text(SIGN_IN)
-            Text(PICK_EMMA, modifier = Modifier.clickable { onMemberSelected(EMMA) })
+            Text(PICK_EMMA, modifier = Modifier.clickable { onSelectMember(EMMA) })
             Text(HAVE_AN_INVITE, modifier = Modifier.clickable { onInviteCode() })
         }
     }
@@ -42,24 +42,24 @@ class StubScreens : AppScreens {
         member: Member,
         onSignedIn: () -> Unit,
         onBack: () -> Unit,
-        onForgotten: () -> Unit,
+        onForget: () -> Unit,
     ) {
         Column {
             Text(pinOf(member))
             Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
-            Text(FORGOTTEN, modifier = Modifier.clickable { onForgotten() })
+            Text(FORGOTTEN, modifier = Modifier.clickable { onForget() })
         }
     }
 
     @Composable
     override fun FirstRun(
-        onCreated: () -> Unit,
+        onCreate: () -> Unit,
         onSignIn: () -> Unit,
     ) {
         Column {
             Text(FIRST_RUN)
-            Text(CREATED, modifier = Modifier.clickable { onCreated() })
+            Text(CREATED, modifier = Modifier.clickable { onCreate() })
             Text(SIGN_IN_INSTEAD, modifier = Modifier.clickable { onSignIn() })
         }
     }
@@ -80,13 +80,13 @@ class StubScreens : AppScreens {
     override fun Join(
         preview: InvitePreview,
         code: String,
-        onJoined: () -> Unit,
-        onExpired: () -> Unit,
+        onJoin: () -> Unit,
+        onExpire: () -> Unit,
     ) {
         Column {
             Text(joinOf(preview))
-            Text(JOINED, modifier = Modifier.clickable { onJoined() })
-            Text(CODE_EXPIRED, modifier = Modifier.clickable { onExpired() })
+            Text(JOINED, modifier = Modifier.clickable { onJoin() })
+            Text(CODE_EXPIRED, modifier = Modifier.clickable { onExpire() })
         }
     }
 
@@ -191,11 +191,11 @@ class StubScreens : AppScreens {
     override fun RemoveMember(
         member: Member,
         onBack: () -> Unit,
-        onRemoved: () -> Unit,
+        onRemove: () -> Unit,
     ) {
         Column {
             Text(removeOf(member))
-            Text(REMOVED, modifier = Modifier.clickable { onRemoved() })
+            Text(REMOVED, modifier = Modifier.clickable { onRemove() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -215,11 +215,11 @@ class StubScreens : AppScreens {
     @Composable
     override fun ChangePin(
         onBack: () -> Unit,
-        onChanged: () -> Unit,
+        onChange: () -> Unit,
     ) {
         Column {
             Text(CHANGE_PIN)
-            Text(PIN_CHANGED, modifier = Modifier.clickable { onChanged() })
+            Text(PIN_CHANGED, modifier = Modifier.clickable { onChange() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }

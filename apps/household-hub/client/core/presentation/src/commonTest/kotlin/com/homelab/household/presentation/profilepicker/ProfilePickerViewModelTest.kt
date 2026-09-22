@@ -94,7 +94,7 @@ class ProfilePickerViewModelTest {
             advanceUntilIdle()
 
             viewModel.events.test {
-                viewModel.onMemberSelected(liam)
+                viewModel.onSelectMember(liam)
                 advanceUntilIdle()
 
                 assertEquals(ProfilePickerEvent.GoToPin(liam), awaitItem())

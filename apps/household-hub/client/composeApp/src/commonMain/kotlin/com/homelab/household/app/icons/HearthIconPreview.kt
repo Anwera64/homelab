@@ -15,15 +15,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 
 /**
  * The whole icon set, each drawn resting and active side by side, named by its sheet token. Put
  * next to the sheet, a path copied wrong or a stroke that doesn't thicken stands out.
  */
 @OptIn(ExperimentalLayoutApi::class)
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthIconSetPreview() {
     HearthTheme {

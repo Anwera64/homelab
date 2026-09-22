@@ -106,7 +106,7 @@ class ButtonsTest {
                         getString(Res.string.a11y_working),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
         }
 
     /**
@@ -143,7 +143,7 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithTag(HearthProgressBarTag).assertDoesNotExist()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertDoesNotExist()
         }
 
     /**

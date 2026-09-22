@@ -68,12 +68,12 @@ suspend fun ComposeUiTest.onProfilePicker(block: suspend ProfilePickerRobot.() -
 @OptIn(ExperimentalTestApi::class)
 fun ComposeUiTest.profilePickerScreen(
     hub: FakeSignInHub,
-    onMemberSelected: (Member) -> Unit = {},
+    onSelectMember: (Member) -> Unit = {},
     onInviteCode: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
-            ProfilePickerScreen(onMemberSelected = onMemberSelected, onInviteCode = onInviteCode)
+            ProfilePickerScreen(onSelectMember = onSelectMember, onInviteCode = onInviteCode)
         }
     }
 }

@@ -19,7 +19,7 @@ import com.homelab.household.app.theme.HearthColors
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
-const val HearthProgressBarTag = "HearthProgressBar"
+const val HEARTH_PROGRESS_BAR_TAG = "HearthProgressBar"
 
 /** Where a bar is running, which is the only thing that changes between its three uses. */
 enum class HearthProgressBarWidth {
@@ -60,7 +60,7 @@ fun HearthProgressBar(
             HearthProgressBarWidth.Track -> modifier.width(size.progressTrack)
             HearthProgressBarWidth.FullBleed, HearthProgressBarWidth.Inset -> modifier.fillMaxWidth()
         }.height(size.progressHeight)
-            .testTag(HearthProgressBarTag)
+            .testTag(HEARTH_PROGRESS_BAR_TAG)
             .semantics {
                 stateDescription = working
                 liveRegion = LiveRegionMode.Polite

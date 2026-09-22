@@ -41,8 +41,8 @@ import com.homelab.household.app.resources.members_retry
 import com.homelab.household.app.resources.members_title
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.resources.members_you
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.members.MemberRow
 import com.homelab.household.presentation.members.MembersStatus
 import com.homelab.household.presentation.members.MembersUiState
@@ -269,7 +269,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun MembersContentPreview(
     @PreviewParameter(MembersUiStateProvider::class) state: MembersUiState,

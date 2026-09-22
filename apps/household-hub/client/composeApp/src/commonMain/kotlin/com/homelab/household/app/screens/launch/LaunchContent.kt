@@ -53,9 +53,9 @@ import com.homelab.household.app.resources.launch_upstream_title
 import com.homelab.household.app.resources.launch_web_page_chip
 import com.homelab.household.app.resources.launch_web_page_detail
 import com.homelab.household.app.resources.launch_web_page_title
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import com.homelab.household.presentation.launch.LaunchUiState
@@ -378,7 +378,7 @@ private fun HubAddressPill(hubAddress: String) {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun LaunchContentPreview(
     @PreviewParameter(LaunchUiStateProvider::class) state: LaunchUiState,

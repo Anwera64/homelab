@@ -8,7 +8,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.platform.ExternalApps
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.app_name
@@ -149,7 +149,7 @@ class LaunchRobot(
         // which stopped being true the moment `TestApp` turned the motion off: with no animation
         // the bar rests at a fixed fraction, which is determinate. The tag is the better question
         // anyway — it asks whether *this* bar is on screen.
-        val loading = hasTestTag(HearthProgressBarTag)
+        val loading = hasTestTag(HEARTH_PROGRESS_BAR_TAG)
     }
 }
 

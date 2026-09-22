@@ -36,8 +36,8 @@ import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
 import org.jetbrains.compose.resources.stringResource
@@ -170,7 +170,7 @@ private fun failure(status: ProfileStatus): String? =
         ProfileStatus.Failed -> stringResource(Res.string.members_failed)
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ProfileContentPreview(
     @PreviewParameter(ProfileUiStateProvider::class) state: ProfileUiState,

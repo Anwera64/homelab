@@ -8,11 +8,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** Header and nav stay put while more cards than fit pass between them. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthScaffoldPreview() {
     HearthTheme {

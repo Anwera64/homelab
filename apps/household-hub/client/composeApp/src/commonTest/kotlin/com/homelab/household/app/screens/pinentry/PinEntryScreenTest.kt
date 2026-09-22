@@ -143,12 +143,12 @@ class PinEntryScreenTest {
                         onDigit = {},
                         onDelete = {},
                         onBack = {},
-                        onForgotten = {},
+                        onForget = {},
                     )
                 }
             }
 
-            onNodeWithTag(PinDotsTag).assert(
+            onNodeWithTag(PIN_DOTS_TAG).assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.StateDescription,
                     getString(Res.string.a11y_pin_checking),
@@ -165,7 +165,7 @@ class PinEntryScreenTest {
             runComposeUiTest {
                 setContent {
                     StillTheme {
-                        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForgotten = {})
+                        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForget = {})
                     }
                 }
 
@@ -180,7 +180,7 @@ class PinEntryScreenTest {
         var forgotten = 0
 
         runScreenTest {
-            pinEntryScreen(hub, emma, onForgotten = { forgotten++ })
+            pinEntryScreen(hub, emma, onForget = { forgotten++ })
 
             onPinPad { tapsForgotten() }
             waitUntil(timeoutMillis = WAIT_MILLIS) { forgotten == 1 }

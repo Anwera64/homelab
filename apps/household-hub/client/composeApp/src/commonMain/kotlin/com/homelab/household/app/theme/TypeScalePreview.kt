@@ -19,7 +19,7 @@ import androidx.compose.ui.text.TextStyle
  * next to the tokens: a role that looks wrong next to its neighbours is easier to see than to
  * argue about.
  */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun TypeScalePreview() {
     HearthTheme {

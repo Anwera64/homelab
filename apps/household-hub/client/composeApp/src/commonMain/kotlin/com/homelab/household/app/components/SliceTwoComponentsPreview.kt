@@ -3,12 +3,12 @@ package com.homelab.household.app.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** Sample copy lives here, not in strings.xml: none of it ever reaches the app. */
 private val PALETTE = listOf("#3C6E4E", "#C05638", "#6B655F", "#7A6672", "#A33B2A")
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PinFieldPreview() {
     ComponentPreview {
@@ -25,7 +25,7 @@ private fun PinFieldPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun CodeBoxesPreview() {
     ComponentPreview {
@@ -35,7 +35,7 @@ private fun CodeBoxesPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun CodeCardPreview() {
     ComponentPreview {
@@ -44,7 +44,7 @@ private fun CodeCardPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ConsequenceCardsPreview() {
     ComponentPreview {
@@ -62,7 +62,7 @@ private fun ConsequenceCardsPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthSwitchPreview() {
     ComponentPreview {
@@ -71,7 +71,7 @@ private fun HearthSwitchPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun SettingsRowPreview() {
     ComponentPreview {
@@ -88,7 +88,7 @@ private fun SettingsRowPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ColourSwatchesPreview() {
     ComponentPreview {

@@ -39,9 +39,9 @@ fun HearthSwitch(
             modifier
                 .width(track)
                 .height(HearthTheme.spacing.xxl + HearthTheme.spacing.xs)
-                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
                 .semantics { this.contentDescription = contentDescription }
                 .background(if (checked) colors.primary else colors.outline, HearthShapes.pill)
+                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
                 .padding(HearthTheme.spacing.xs),
         contentAlignment = Alignment.CenterStart,
     ) {

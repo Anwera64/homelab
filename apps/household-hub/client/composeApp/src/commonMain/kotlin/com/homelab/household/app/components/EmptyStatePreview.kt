@@ -2,10 +2,10 @@ package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.icons.HearthIcon
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** A screen you're expected to act on, with its action. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun EmptyStateWithActionPreview() {
     ComponentPreview {
@@ -19,7 +19,7 @@ private fun EmptyStateWithActionPreview() {
 }
 
 /** A screen that fills itself in, so no action. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun EmptyStateWithoutActionPreview() {
     ComponentPreview {

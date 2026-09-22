@@ -41,8 +41,8 @@ import com.homelab.household.app.resources.leave_title
 import com.homelab.household.app.resources.leave_unreachable
 import com.homelab.household.app.resources.leave_wrong_pin
 import com.homelab.household.app.resources.members_failed
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
@@ -148,7 +148,7 @@ private fun refusal(status: LeaveHouseholdStatus): String? =
         else -> null
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun LeaveHouseholdContentPreview(
     @PreviewParameter(LeaveHouseholdUiStateProvider::class) state: LeaveHouseholdUiState,

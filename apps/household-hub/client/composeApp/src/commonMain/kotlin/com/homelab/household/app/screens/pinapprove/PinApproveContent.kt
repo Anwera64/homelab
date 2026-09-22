@@ -44,8 +44,8 @@ import com.homelab.household.app.resources.approve_unreachable
 import com.homelab.household.app.resources.approve_wrong_pin
 import com.homelab.household.app.resources.invite_create_expires
 import com.homelab.household.app.resources.members_failed
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.asCountdown
 import com.homelab.household.app.util.rememberWaitPhase
@@ -193,7 +193,7 @@ private fun refusal(status: PinApproveStatus): String? =
         else -> null
     }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PinApproveContentPreview(
     @PreviewParameter(PinApproveUiStateProvider::class) state: PinApproveUiState,

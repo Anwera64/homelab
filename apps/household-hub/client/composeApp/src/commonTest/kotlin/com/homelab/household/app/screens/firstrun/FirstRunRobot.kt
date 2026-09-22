@@ -122,12 +122,12 @@ suspend fun ComposeUiTest.onFirstRun(block: suspend FirstRunRobot.() -> Unit) {
 @OptIn(ExperimentalTestApi::class)
 fun ComposeUiTest.firstRunScreen(
     hub: FakeFirstRunHub,
-    onCreated: () -> Unit = {},
+    onCreate: () -> Unit = {},
     onSignIn: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
-            FirstRunScreen(onCreated = onCreated, onSignIn = onSignIn)
+            FirstRunScreen(onCreate = onCreate, onSignIn = onSignIn)
         }
     }
 }

@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.forgot_alone_title
 import com.homelab.household.app.resources.forgot_ask
@@ -81,7 +81,7 @@ class PinForgotScreenTest {
                 }
             }
 
-            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
             // The hub's own reset is the backstop, and it does not depend on the hub answering.
             onNodeWithText(getString(Res.string.forgot_alone_title)).assertIsDisplayed()
         }

@@ -49,7 +49,7 @@ class BearerAuthPropagationTest {
 
                         "/api/v1/agents" -> {
                             respond(
-                                content = """[{"id": "a-1", "slug": "llama", "name": "Llama", "system_prompt": "You are helpful."}]""",
+                                content = ONE_AGENT_JSON,
                                 status = HttpStatusCode.OK,
                                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
                             )
@@ -87,3 +87,7 @@ class BearerAuthPropagationTest {
             assertEquals("Bearer bearer-secret-token-abc", capturedHeaders[1])
         }
 }
+
+/** The agent list the fixture hub answers with; its shape is irrelevant here, only that it parses. */
+private const val ONE_AGENT_JSON =
+    """[{"id": "a-1", "slug": "llama", "name": "Llama", "system_prompt": "You are helpful."}]"""

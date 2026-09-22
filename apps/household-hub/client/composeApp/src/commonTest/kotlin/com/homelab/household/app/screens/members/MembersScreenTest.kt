@@ -8,8 +8,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_invite
 import com.homelab.household.app.resources.members_remove
@@ -120,7 +120,7 @@ class MembersScreenTest {
 
             // The title and the lead need no hub, so they are there from the first frame.
             onNodeWithText(getString(Res.string.members_title)).assertIsDisplayed()
-            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
             // Whether this phone may invite anyone is one of the things the hub has not said yet.
             onNodeWithText(getString(Res.string.members_invite)).assertDoesNotExist()
         }
@@ -149,8 +149,8 @@ class MembersScreenTest {
 
             // Pattern 3: what is already on screen is never replaced by blocks.
             onNodeWithText("Emma Larsson").assertIsDisplayed()
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-            onNodeWithTag(SkeletonGroupTag).assertDoesNotExist()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertDoesNotExist()
         }
     }
 

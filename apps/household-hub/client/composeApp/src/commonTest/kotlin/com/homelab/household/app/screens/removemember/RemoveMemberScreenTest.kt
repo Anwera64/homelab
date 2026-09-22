@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_remove_removing
 import com.homelab.household.app.resources.remove_confirm_label
@@ -51,7 +51,7 @@ class RemoveMemberScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    RemoveMemberScreen(member = liam, onBack = {}, onRemoved = { removed++ })
+                    RemoveMemberScreen(member = liam, onBack = {}, onRemove = { removed++ })
                 }
             }
 
@@ -71,7 +71,7 @@ class RemoveMemberScreenTest {
                 TestApp(
                     hub.engine,
                     sessionStorage = signedIn(),
-                ) { RemoveMemberScreen(member = liam, onBack = {}, onRemoved = {}) }
+                ) { RemoveMemberScreen(member = liam, onBack = {}, onRemove = {}) }
             }
 
             onNodeWithContentDescription(getString(Res.string.remove_confirm_label, "Liam")).performTextInput("Li")
@@ -113,7 +113,7 @@ class RemoveMemberScreenTest {
                         getString(Res.string.a11y_remove_removing, "Liam"),
                     ),
                 )
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
             onNodeWithText(getString(Res.string.remove_submit, "Liam")).assertDoesNotExist()
         }
 

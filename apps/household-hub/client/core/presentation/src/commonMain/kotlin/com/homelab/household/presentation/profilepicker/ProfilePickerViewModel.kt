@@ -45,7 +45,7 @@ class ProfilePickerViewModel(
         }
     }
 
-    fun onMemberSelected(member: Member) {
+    fun onSelectMember(member: Member) {
         viewModelScope.launch { _events.send(ProfilePickerEvent.GoToPin(member)) }
     }
 }

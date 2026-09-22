@@ -20,10 +20,10 @@ import org.koin.compose.koinInject
  */
 @Composable
 fun AppNavHost(
+    modifier: Modifier = Modifier,
     screens: AppScreens = RealAppScreens,
     backStack: SnapshotStateList<NavKey> = rememberAppBackStack(),
     session: AppSession = rememberAppSession(),
-    modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(session) {
         // Listening before renewing, so a token the hub refuses on the way sends the phone back too.
@@ -51,7 +51,7 @@ fun AppNavHost(
                     WithEntryViewModels {
                         // The picker stays under the PIN pad, so back from a PIN returns to it.
                         screens.SignIn(
-                            onMemberSelected = { member -> backStack.add(Destination.Pin(member)) },
+                            onSelectMember = { member -> backStack.add(Destination.Pin(member)) },
                             onInviteCode = { backStack.add(Destination.InviteCode) },
                         )
                     }
@@ -62,14 +62,14 @@ fun AppNavHost(
                             member = destination.member,
                             onSignedIn = { backStack.startOver(Destination.Home) },
                             onBack = { backStack.removeLastOrNull() },
-                            onForgotten = { backStack.add(Destination.PinForgot(destination.member)) },
+                            onForget = { backStack.add(Destination.PinForgot(destination.member)) },
                         )
                     }
                 }
                 entry<Destination.FirstRun> {
                     WithEntryViewModels {
                         screens.FirstRun(
-                            onCreated = { backStack.startOver(Destination.Home) },
+                            onCreate = { backStack.startOver(Destination.Home) },
                             onSignIn = { backStack.startOver(Destination.SignIn) },
                         )
                     }
@@ -87,9 +87,9 @@ fun AppNavHost(
                         screens.Join(
                             preview = destination.preview,
                             code = destination.code,
-                            onJoined = { backStack.startOver(Destination.Home) },
+                            onJoin = { backStack.startOver(Destination.Home) },
                             // The code is spent or gone: back to typing one, not to the form.
-                            onExpired = { backStack.startOver(Destination.InviteCode) },
+                            onExpire = { backStack.startOver(Destination.InviteCode) },
                         )
                     }
                 }
@@ -160,7 +160,7 @@ fun AppNavHost(
                             member = destination.member,
                             onBack = { backStack.removeLastOrNull() },
                             // They are gone: the list behind this screen would still show them.
-                            onRemoved = { backStack.startOver(Destination.Members) },
+                            onRemove = { backStack.startOver(Destination.Members) },
                         )
                     }
                 }
@@ -176,7 +176,7 @@ fun AppNavHost(
                     WithEntryViewModels {
                         screens.ChangePin(
                             onBack = { backStack.removeLastOrNull() },
-                            onChanged = { backStack.removeLastOrNull() },
+                            onChange = { backStack.removeLastOrNull() },
                         )
                     }
                 }

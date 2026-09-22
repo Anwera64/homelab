@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
@@ -49,7 +49,7 @@ class ProfileScreenTest {
                 }
             }
 
-            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
             // The settings rows and Sign out are static copy: they need no hub, so they are there.
             onNodeWithText(getString(Res.string.profile_members)).assertIsDisplayed()
             onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
