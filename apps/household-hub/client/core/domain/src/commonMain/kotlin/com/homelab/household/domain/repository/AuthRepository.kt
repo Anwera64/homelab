@@ -25,7 +25,6 @@ interface AuthRepository {
     /** A token is kept on this phone. Doesn't ask the hub whether it still accepts it. */
     fun hasStoredSession(): Boolean
     suspend fun logout()
-    fun observeCurrentUser(): Flow<User?>
 
     /** Emits when the hub stopped accepting this phone's token; the token is already forgotten. */
     fun observeSignedOut(): Flow<Unit>

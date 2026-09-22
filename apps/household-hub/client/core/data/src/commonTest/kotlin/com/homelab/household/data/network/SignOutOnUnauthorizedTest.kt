@@ -1,6 +1,7 @@
 package com.homelab.household.data.network
 
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.dto.UserReadDto
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -23,15 +24,15 @@ class SignOutOnUnauthorizedTest {
 
     private val hub = "https://hub.test.local"
 
-    private fun client(status: HttpStatusCode, tokenStorage: InMemoryTokenStorage, onSignedOut: () -> Unit) =
+    private fun client(status: HttpStatusCode, storage: InMemorySessionStorage, onSignedOut: () -> Unit) =
         HttpClient(MockEngine { respond("""{"detail":"no"}""", status, headersOf(HttpHeaders.ContentType, "application/json")) }) {
-            signOutOnUnauthorized(tokenStorage, onSignedOut)
+            signOutOnUnauthorized(storage, onSignedOut)
         }
 
     @Test
     fun `GIVEN a token kept on this phone WHEN a signed-in call comes back 401 THEN the token is forgotten and the sign-out is announced once`() = runTest {
         // GIVEN
-        val tokens = InMemoryTokenStorage().apply { saveTokens("revoked-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
         var signedOut = 0
 
         // WHEN
@@ -42,10 +43,29 @@ class SignOutOnUnauthorizedTest {
         assertEquals(1, signedOut)
     }
 
+    /**
+     * The stored member is forgotten with the token, and by the same call. Nothing keeps a copy in
+     * memory any more, so this is the only place a 401 can forget who was signed in.
+     */
+    @Test
+    fun `GIVEN a stored member WHEN a signed-in call comes back 401 THEN they are forgotten with the token`() = runTest {
+        // GIVEN
+        val tokens = InMemorySessionStorage().apply {
+            saveTokens("revoked-token")
+            saveUser(UserReadDto(id = "emma", full_name = "Emma", is_admin = true, is_active = true))
+        }
+
+        // WHEN
+        client(HttpStatusCode.Unauthorized, tokens) {}.get("$hub/api/v1/spaces/shared")
+
+        // THEN
+        assertNull(tokens.getUser())
+    }
+
     @Test
     fun `GIVEN someone else is signed in on this phone WHEN sign-in refuses a PIN with 401 THEN their token is left alone`() = runTest {
         // GIVEN
-        val tokens = InMemoryTokenStorage().apply { saveTokens("someone-elses-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("someone-elses-token") }
         var signedOut = 0
 
         // WHEN
@@ -59,7 +79,7 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN a member changing their PIN WHEN the hub refuses the current one with 403 THEN they stay signed in`() = runTest {
         // GIVEN
-        val tokens = InMemoryTokenStorage().apply { saveTokens("good-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("good-token") }
         var signedOut = 0
 
         // WHEN
@@ -76,7 +96,7 @@ class SignOutOnUnauthorizedTest {
         var signedOut = 0
 
         // WHEN
-        client(HttpStatusCode.Unauthorized, InMemoryTokenStorage()) { signedOut++ }.get("$hub/api/v1/spaces/shared")
+        client(HttpStatusCode.Unauthorized, InMemorySessionStorage()) { signedOut++ }.get("$hub/api/v1/spaces/shared")
 
         // THEN
         assertEquals(0, signedOut)

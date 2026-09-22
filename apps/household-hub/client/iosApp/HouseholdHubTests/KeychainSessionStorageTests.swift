@@ -1,7 +1,7 @@
 import XCTest
 import HouseholdHubKit
 
-/// The real-Keychain proof for `KeychainTokenStorage`.
+/// The real-Keychain proof for `KeychainSessionStorage`.
 ///
 /// This is a **unit-test bundle hosted by the app** (`TEST_HOST` is `HouseholdHub.app`), not a UI
 /// test. That is the whole point: the code runs inside the app's process, so `SecItemAdd` and
@@ -11,23 +11,23 @@ import HouseholdHubKit
 /// access group. Nothing is faked here: every assertion below is a round trip through the
 /// simulator's real Keychain.
 ///
-/// `KeychainTokenProbe` is a few lines of Kotlin in `:iosApp` that hold one `KeychainTokenStorage`
-/// each and forward the four `TokenStorage` methods, so that the Objective-C header of
+/// `KeychainSessionProbe` is a few lines of Kotlin in `:iosApp` that hold one `KeychainSessionStorage`
+/// each and forward the `StoredSessionLocalDataSource` methods, so that the Objective-C header of
 /// `HouseholdHubKit` does not have to export the whole of `:core:data`.
-final class KeychainTokenStorageTests: XCTestCase {
+final class KeychainSessionStorageTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        KeychainTokenProbe().clear()
+        KeychainSessionProbe().clear()
     }
 
     override func tearDown() {
-        KeychainTokenProbe().clear()
+        KeychainSessionProbe().clear()
         super.tearDown()
     }
 
     func testSavedTokensReadBack() {
-        let storage = KeychainTokenProbe()
+        let storage = KeychainSessionProbe()
 
         storage.save(accessToken: "access-1", refreshToken: "refresh-1")
 
@@ -38,9 +38,9 @@ final class KeychainTokenStorageTests: XCTestCase {
     /// The Keychain, not an in-memory field, is the source of truth: a fresh instance — which is
     /// what the app gets after a relaunch — sees what an earlier one wrote.
     func testSecondInstanceReadsWhatTheFirstWrote() {
-        KeychainTokenProbe().save(accessToken: "access-2", refreshToken: "refresh-2")
+        KeychainSessionProbe().save(accessToken: "access-2", refreshToken: "refresh-2")
 
-        let reader = KeychainTokenProbe()
+        let reader = KeychainSessionProbe()
 
         XCTAssertEqual(reader.accessToken(), "access-2")
         XCTAssertEqual(reader.refreshToken(), "refresh-2")
@@ -48,7 +48,7 @@ final class KeychainTokenStorageTests: XCTestCase {
 
     /// A refresh happens with no new refresh token, and must not wipe the stored one.
     func testNullRefreshTokenKeepsTheStoredOne() {
-        let storage = KeychainTokenProbe()
+        let storage = KeychainSessionProbe()
         storage.save(accessToken: "access-3", refreshToken: "refresh-3")
 
         storage.save(accessToken: "access-3-rotated", refreshToken: nil)
@@ -56,40 +56,76 @@ final class KeychainTokenStorageTests: XCTestCase {
         XCTAssertEqual(storage.accessToken(), "access-3-rotated")
         XCTAssertEqual(storage.refreshToken(), "refresh-3")
         // And the merge is in the Keychain item, not in this instance.
-        XCTAssertEqual(KeychainTokenProbe().refreshToken(), "refresh-3")
+        XCTAssertEqual(KeychainSessionProbe().refreshToken(), "refresh-3")
     }
 
     /// A write replaces the item rather than adding a second one, so there is nothing stale left
     /// behind for a later read to find.
     func testSavingTwiceReplacesTheItem() {
-        let storage = KeychainTokenProbe()
+        let storage = KeychainSessionProbe()
         storage.save(accessToken: "access-old", refreshToken: "refresh-old")
 
         storage.save(accessToken: "access-new", refreshToken: "refresh-new")
 
-        XCTAssertEqual(KeychainTokenProbe().accessToken(), "access-new")
-        XCTAssertEqual(KeychainTokenProbe().refreshToken(), "refresh-new")
+        XCTAssertEqual(KeychainSessionProbe().accessToken(), "access-new")
+        XCTAssertEqual(KeychainSessionProbe().refreshToken(), "refresh-new")
     }
 
     func testClearEmptiesTheKeychain() {
-        let storage = KeychainTokenProbe()
+        let storage = KeychainSessionProbe()
         storage.save(accessToken: "access-4", refreshToken: "refresh-4")
 
         storage.clear()
 
         XCTAssertNil(storage.accessToken())
         XCTAssertNil(storage.refreshToken())
-        XCTAssertNil(KeychainTokenProbe().accessToken())
+        XCTAssertNil(KeychainSessionProbe().accessToken())
     }
 
     /// Signed out is the resting state, and reads there are `nil`, not a thrown error.
     func testReadsWithNothingStoredAreNil() {
-        let storage = KeychainTokenProbe()
+        let storage = KeychainSessionProbe()
 
         XCTAssertNil(storage.accessToken())
         XCTAssertNil(storage.refreshToken())
         // Clearing an already-empty item is a no-op, not a failure.
         storage.clear()
         XCTAssertNil(storage.accessToken())
+    }
+
+    /// The member the hub last named is kept beside the token, in the same item, and a relaunch
+    /// reads them back — which is what keeps the profile from drawing an empty circle offline.
+    func testSecondInstanceReadsTheStoredMember() {
+        let storage = KeychainSessionProbe()
+        storage.save(accessToken: "access-5", refreshToken: nil)
+
+        storage.saveMember(id: "emma", name: "Emma Larsson")
+
+        let reader = KeychainSessionProbe()
+        XCTAssertEqual(reader.memberId(), "emma")
+        XCTAssertEqual(reader.memberName(), "Emma Larsson")
+    }
+
+    /// A PIN change saves a fresh token and nothing else; the stored member must survive it.
+    func testSavingOnlyATokenKeepsTheStoredMember() {
+        let storage = KeychainSessionProbe()
+        storage.save(accessToken: "access-6", refreshToken: nil)
+        storage.saveMember(id: "emma", name: "Emma Larsson")
+
+        storage.save(accessToken: "access-6-rotated", refreshToken: nil)
+
+        XCTAssertEqual(KeychainSessionProbe().accessToken(), "access-6-rotated")
+        XCTAssertEqual(KeychainSessionProbe().memberName(), "Emma Larsson")
+    }
+
+    func testClearRemovesTheStoredMember() {
+        let storage = KeychainSessionProbe()
+        storage.save(accessToken: "access-7", refreshToken: nil)
+        storage.saveMember(id: "emma", name: "Emma Larsson")
+
+        storage.clear()
+
+        XCTAssertNil(storage.memberId())
+        XCTAssertNil(KeychainSessionProbe().memberName())
     }
 }

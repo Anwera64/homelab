@@ -1,6 +1,6 @@
 package com.homelab.household.data.repository
 
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.dto.InviteReadDto
 import com.homelab.household.data.dto.PinResetReadDto
@@ -42,8 +42,8 @@ class MembersRepositoryTest {
 
     private fun repository(
         remote: MembersRemoteDataSource,
-        tokens: InMemoryTokenStorage = InMemoryTokenStorage(),
-    ) = MembersRepositoryImpl(remote = remote, tokenStorage = tokens)
+        tokens: InMemorySessionStorage = InMemorySessionStorage(),
+    ) = MembersRepositoryImpl(remote = remote, storage = tokens)
 
     // ---- listing -----------------------------------------------------------
 
@@ -150,7 +150,7 @@ class MembersRepositoryTest {
         val remote = mock<MembersRemoteDataSource>()
         everySuspend { remote.changePin("111111", "222222") } returns
             TokenResponseDto(access_token = "new-token", token_type = "bearer", user = emmaDto)
-        val tokens = InMemoryTokenStorage().apply { saveTokens("old-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("old-token") }
 
         // WHEN
         repository(remote, tokens).changePin("111111", "222222")
@@ -164,7 +164,7 @@ class MembersRepositoryTest {
         // GIVEN
         val remote = mock<MembersRemoteDataSource>()
         everySuspend { remote.changePin("000000", "222222") } throws WrongPinException(attemptsLeft = 1)
-        val tokens = InMemoryTokenStorage().apply { saveTokens("old-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("old-token") }
 
         // WHEN
         val thrown = assertFailsWith<WrongPinException> { repository(remote, tokens).changePin("000000", "222222") }

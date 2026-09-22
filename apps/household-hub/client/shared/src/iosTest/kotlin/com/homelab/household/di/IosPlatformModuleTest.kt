@@ -1,7 +1,7 @@
 package com.homelab.household.di
 
-import com.homelab.household.data.datasource.local.KeychainTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.KeychainSessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.GossipRepository
@@ -44,7 +44,7 @@ class IosPlatformModuleTest : KoinTest {
             engine.config is DarwinClientEngineConfig,
             "Expected a Darwin engine on iOS, got ${engine::class.simpleName}"
         )
-        assertTrue(get<TokenLocalDataSource>() is KeychainTokenStorage)
+        assertTrue(get<StoredSessionLocalDataSource>() is KeychainSessionStorage)
     }
 
     @Test
@@ -55,7 +55,7 @@ class IosPlatformModuleTest : KoinTest {
 
         // Platform
         assertNotNull(get<HttpClientEngine>())
-        assertNotNull(get<TokenLocalDataSource>())
+        assertNotNull(get<StoredSessionLocalDataSource>())
 
         // Repositories
         assertNotNull(get<AuthRepository>())

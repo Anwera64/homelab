@@ -4,7 +4,7 @@ import XCTest
 /// app bundle through XcodeGen.
 ///
 /// `HouseholdHubTests` is a **unit-test bundle hosted by the app** (see
-/// `KeychainTokenStorageTests` for the long version of why that matters here): `TEST_HOST` points
+/// `KeychainSessionStorageTests` for the long version of why that matters here): `TEST_HOST` points
 /// at `HouseholdHub.app`, so inside this process `Bundle.main` — and therefore
 /// `UIColor(named:)`, which always looks in the main bundle — resolves against the *shipping app's*
 /// asset catalog, not the test bundle's own. A colour set that only exists in some other target, or

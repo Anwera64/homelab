@@ -1,8 +1,8 @@
 package com.homelab.household.data.repository
 
 import app.cash.turbine.test
-import com.homelab.household.data.datasource.local.AuthSessionLocalDataSource
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.AuthEventsLocalDataSource
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.dto.AuthStatusDto
 import com.homelab.household.data.dto.InvitePreviewReadDto
@@ -59,12 +59,12 @@ class AuthRepositoryTest {
 
     private fun repository(
         remote: AuthRemoteDataSource,
-        tokens: InMemoryTokenStorage = InMemoryTokenStorage(),
-        session: AuthSessionLocalDataSource = AuthSessionLocalDataSource(),
+        tokens: InMemorySessionStorage = InMemorySessionStorage(),
+        events: AuthEventsLocalDataSource = AuthEventsLocalDataSource(),
     ) = AuthRepositoryImpl(
         remote = remote,
-        tokenStorage = tokens,
-        session = session,
+        storage = tokens,
+        events = events,
         hubConfig = HubConfig(baseUrl = "https://hub.test.local:8443"),
     )
 
@@ -75,7 +75,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.login("emma", "482913") } returns signedIn()
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
 
         // WHEN
         val user = repository(remote, tokens).login("emma", "482913")
@@ -91,7 +91,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.login("emma", "000000") } throws WrongPinException(attemptsLeft = 3)
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
 
         // WHEN
         val thrown = assertFailsWith<WrongPinException> { repository(remote, tokens).login("emma", "000000") }
@@ -112,17 +112,17 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `GIVEN a member who has just signed in WHEN the current member is observed THEN it is them`() = runTest {
+    fun `GIVEN a member signing in WHEN the hub says who they are THEN they are kept on this phone`() = runTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.login("emma", "482913") } returns signedIn()
-        val repository = repository(remote)
+        val tokens = InMemorySessionStorage()
 
         // WHEN
-        repository.login("emma", "482913")
+        repository(remote, tokens).login("emma", "482913")
 
         // THEN
-        assertEquals("emma", repository.observeCurrentUser().first()?.id)
+        assertEquals(emmaDto, tokens.getUser())
     }
 
     // ---- first run ---------------------------------------------------------
@@ -132,7 +132,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.onboard("Emma", "482913", "#C05638") } returns signedIn(token = "first-token")
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
 
         // WHEN
         val user = repository(remote, tokens).onboard("Emma", "482913", "#C05638")
@@ -149,7 +149,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.joinHousehold("482913", "Liam", "112233", "#C05638") } returns signedIn(token = "joined")
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
 
         // WHEN
         val user = repository(remote, tokens).joinHousehold("482913", "Liam", "112233", "#C05638")
@@ -164,7 +164,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.redeemPinReset("K7M2QP", "998877") } returns signedIn(token = "reset")
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
 
         // WHEN
         val user = repository(remote, tokens).redeemPinReset("K7M2QP", "998877")
@@ -243,6 +243,28 @@ class AuthRepositoryTest {
         verifySuspend(VerifyMode.exactly(0)) { remote.fetchCurrentUser() }
     }
 
+    /**
+     * The empty circle this whole change is about: the phone has been signed in since last time and
+     * the hub is not answering, and the profile still has a name and a colour to draw.
+     */
+    @Test
+    fun `GIVEN a member stored from last time WHEN the signed-in member is asked for THEN it is them and the hub is not asked`() = runTest {
+        // GIVEN
+        val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
+        val tokens = InMemorySessionStorage().apply {
+            saveTokens("token-from-last-time")
+            saveUser(emmaDto)
+        }
+
+        // WHEN
+        val user = repository(remote, tokens).getCurrentUser()
+
+        // THEN
+        assertEquals("emma", user?.id)
+        assertEquals("Emma", user?.fullName)
+        verifySuspend(VerifyMode.exactly(0)) { remote.fetchCurrentUser() }
+    }
+
     @Test
     fun `GIVEN no token kept on this phone WHEN the signed-in member is asked for THEN nobody is signed in and the hub is not asked`() = runTest {
         // GIVEN
@@ -257,11 +279,12 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `GIVEN a token kept from last time WHEN the signed-in member is asked for THEN the hub is asked once and the answer is kept`() = runTest {
-        // GIVEN
+    fun `GIVEN a token kept from last time but no member beside it WHEN the signed-in member is asked for THEN the hub is asked once and the answer is kept`() = runTest {
+        // GIVEN — an app updated from a version that kept only the token.
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.fetchCurrentUser() } returns emmaDto
-        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("token-from-last-time") })
+        val tokens = InMemorySessionStorage().apply { saveTokens("token-from-last-time") }
+        val repository = repository(remote, tokens)
 
         // WHEN
         val first = repository.getCurrentUser()
@@ -270,6 +293,7 @@ class AuthRepositoryTest {
         // THEN
         assertEquals("emma", first?.id)
         assertEquals("emma", second?.id)
+        assertEquals(emmaDto, tokens.getUser())
         verifySuspend(VerifyMode.exactly(1)) { remote.fetchCurrentUser() }
     }
 
@@ -278,7 +302,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.fetchCurrentUser() } throws ServerOfflineException()
-        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("token-from-last-time") })
+        val repository = repository(remote, InMemorySessionStorage().apply { saveTokens("token-from-last-time") })
 
         // WHEN
         val user = repository.getCurrentUser()
@@ -291,7 +315,7 @@ class AuthRepositoryTest {
     fun `GIVEN a token kept on this phone WHEN a stored session is asked about THEN it says yes without asking the hub`() = runTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>(MockMode.autofill)
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
         val repository = repository(remote, tokens)
 
         // WHEN
@@ -310,7 +334,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.login("emma", "482913") } returns signedIn()
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
         val repository = repository(remote, tokens)
         repository.login("emma", "482913")
 
@@ -319,25 +343,24 @@ class AuthRepositoryTest {
 
         // THEN
         assertNull(tokens.getAccessToken())
-        assertNull(repository.observeCurrentUser().first())
+        assertNull(tokens.getUser())
     }
 
     @Test
-    fun `GIVEN the hub has stopped accepting this phone WHEN the sign-out is raised THEN it is announced and who was signed in is forgotten`() = runTest {
+    fun `GIVEN the hub has stopped accepting this phone WHEN the sign-out is raised THEN it is announced`() = runTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.login("emma", "482913") } returns signedIn()
-        val session = AuthSessionLocalDataSource()
-        val repository = repository(remote, session = session)
+        val events = AuthEventsLocalDataSource()
+        val repository = repository(remote, events = events)
         repository.login("emma", "482913")
 
         // WHEN
         repository.observeSignedOut().test {
-            session.raiseSignedOut()
+            events.raiseSignedOut()
 
             // THEN
             awaitItem()
-            assertNull(repository.observeCurrentUser().first())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -349,7 +372,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.renew("kept-token") } returns signedIn(token = "fresh-token")
-        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
         val repository = repository(remote, tokens)
 
         // WHEN
@@ -358,7 +381,7 @@ class AuthRepositoryTest {
         // THEN
         assertEquals("fresh-token", fresh)
         assertEquals("fresh-token", tokens.getAccessToken())
-        assertEquals("emma", repository.observeCurrentUser().first()?.id)
+        assertEquals(emmaDto, tokens.getUser())
     }
 
     /**
@@ -377,7 +400,7 @@ class AuthRepositoryTest {
             hubIsAnswering.await()
             signedIn(token = "fresh-token")
         }
-        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
         val repository = repository(remote, tokens)
 
         // WHEN
@@ -401,7 +424,7 @@ class AuthRepositoryTest {
             hubIsAnswering.await()
             throw UnauthorizedException("no longer accepted")
         }
-        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("revoked-token") })
+        val repository = repository(remote, InMemorySessionStorage().apply { saveTokens("revoked-token") })
 
         // WHEN
         val callers = (1..5).map { async { runCatchingSafe { repository.refreshToken() } } }
@@ -419,7 +442,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.renew(any()) } returns signedIn(token = "fresh-token")
-        val repository = repository(remote, InMemoryTokenStorage().apply { saveTokens("kept-token") })
+        val repository = repository(remote, InMemorySessionStorage().apply { saveTokens("kept-token") })
 
         // WHEN
         repository.refreshToken()
@@ -434,7 +457,7 @@ class AuthRepositoryTest {
         // GIVEN
         val remote = mock<AuthRemoteDataSource>()
         everySuspend { remote.renew("kept-token") } throws ServerOfflineException()
-        val tokens = InMemoryTokenStorage().apply { saveTokens("kept-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
 
         // WHEN
         assertFailsWith<ServerOfflineException> { repository(remote, tokens).refreshToken() }

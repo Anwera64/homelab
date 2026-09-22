@@ -31,7 +31,7 @@ import com.homelab.household.app.testing.FakeJoinHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.resetpin.NewPinStatus
 import com.homelab.household.presentation.resetpin.NewPinUiState
 import kotlin.test.Test
@@ -65,12 +65,12 @@ class ResetPinScreenTest {
     fun the_new_pin_signs_the_member_in() {
         val hub = FakeJoinHub()
         hub.letsThemJoinAs(memberId = "emma", fullName = "Emma")
-        val tokens = InMemoryTokenStorage()
+        val tokens = InMemorySessionStorage()
         var signedIn = 0
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = tokens) {
+                TestApp(hub.engine, sessionStorage = tokens) {
                     NewPinScreen(code = "P4XN7T", onSignedIn = { signedIn++ })
                 }
             }

@@ -1,10 +1,11 @@
 package com.homelab.household
 
-import com.homelab.household.data.datasource.local.KeychainTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.KeychainSessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
+import com.homelab.household.data.dto.UserReadDto
 
 /**
- * Test support: the narrowest possible Swift-visible window onto [KeychainTokenStorage].
+ * Test support: the narrowest possible Swift-visible window onto [KeychainSessionStorage].
  *
  * Why it exists at all: the Keychain cannot be proved from a bare Kotlin/Native test binary — one
  * gets `errSecNotAvailable (-25291)`, because Gradle runs it as a plain Mach-O process with no app
@@ -20,14 +21,14 @@ import com.homelab.household.data.datasource.local.TokenLocalDataSource
  * references it) and obvious. Every member below takes and returns only `String`/`Unit`, so no
  * `:core:data` type appears in the exported header either.
  *
- * Each instance wraps its own [KeychainTokenStorage], which is what makes "a second instance reads
+ * Each instance wraps its own [KeychainSessionStorage], which is what makes "a second instance reads
  * what the first wrote" a real assertion about the Keychain rather than about a shared field.
  */
-class KeychainTokenProbe {
+class KeychainSessionProbe {
 
-    private val storage: TokenLocalDataSource = KeychainTokenStorage()
+    private val storage: StoredSessionLocalDataSource = KeychainSessionStorage()
 
-    /** [TokenLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
+    /** [StoredSessionLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
     fun save(accessToken: String, refreshToken: String?) {
         storage.saveTokens(accessToken, refreshToken)
     }
@@ -35,6 +36,22 @@ class KeychainTokenProbe {
     fun accessToken(): String? = storage.getAccessToken()
 
     fun refreshToken(): String? = storage.getRefreshToken()
+
+    /**
+     * [StoredSessionLocalDataSource.saveUser]. The member is built here rather than in Swift so
+     * that `UserReadDto` stays out of the exported header, which is the whole point of this class.
+     */
+    fun saveMember(id: String, name: String) {
+        storage.saveUser(UserReadDto(id = id, full_name = name, is_admin = true, is_active = true))
+    }
+
+    fun forgetMember() {
+        storage.saveUser(null)
+    }
+
+    fun memberId(): String? = storage.getUser()?.id
+
+    fun memberName(): String? = storage.getUser()?.full_name
 
     fun clear() {
         storage.clear()

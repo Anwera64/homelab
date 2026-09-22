@@ -12,6 +12,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.set
 import kotlinx.cinterop.value
+import com.homelab.household.data.dto.UserReadDto
 import kotlinx.serialization.json.Json
 import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
@@ -46,7 +47,8 @@ import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 
 /**
- * Keeps auth tokens in the iOS Keychain as a single generic-password item.
+ * Keeps the session — auth tokens and the signed-in member — in the iOS Keychain as a single
+ * generic-password item.
  *
  * The item is stored `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: it is never synced to
  * iCloud and never restored onto a new device. That is the Apple equivalent of the Android sibling
@@ -57,38 +59,54 @@ import platform.Security.kSecValueData
  * which is itself thread-safe and is the single source of truth. A cache would have to be
  * invalidated by writes from other instances of this class (the Android sibling gets away with it
  * only because the app builds one instance), and nothing here is hot enough to need one.
- * The one operation that is not a single Keychain call is [saveTokens], which must read the stored
- * refresh token before writing it back when the caller passes `null`; that read-modify-write is
- * held under an [NSLock] so two concurrent saves cannot interleave and lose a refresh token.
+ * Neither [saveTokens] nor [saveUser] is a single Keychain call: each has to read the rest of the
+ * stored payload before writing its own part back, so that saving a token cannot drop the member
+ * (or a `null` refresh token the stored one). Both read-modify-writes are held under an [NSLock],
+ * so two concurrent saves cannot interleave and lose what the other kept.
  * The lock is per-instance, so it makes concurrent *callers* safe, not concurrent processes — an
  * iOS app has exactly one process, so that is the whole of the problem.
  *
  * Nothing thrown by the Keychain or by JSON parsing escapes these four methods; anything
  * unreadable is deleted and reads as signed out.
  */
-class KeychainTokenStorage : TokenLocalDataSource {
+class KeychainSessionStorage : StoredSessionLocalDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val lock = NSLock()
 
     override fun saveTokens(accessToken: String, refreshToken: String?) {
         locked {
-            // A null refresh token means "leave the stored one alone", so merge before writing.
+            // A null refresh token means "leave the stored one alone", and the member is never
+            // this call's business, so merge both before writing.
             val stored = readPayload()
-            val payload = TokenDiskPayload(
-                accessToken = accessToken,
-                refreshToken = refreshToken ?: stored?.refreshToken
+            write(
+                SessionDiskPayload(
+                    accessToken = accessToken,
+                    refreshToken = refreshToken ?: stored?.refreshToken,
+                    user = stored?.user
+                )
             )
-            try {
-                Keychain.write(json.encodeToString(payload).encodeToByteArray())
-            } catch (_: Throwable) {
-            }
         }
     }
 
     override fun getAccessToken(): String? = locked { readPayload()?.accessToken }
 
     override fun getRefreshToken(): String? = locked { readPayload()?.refreshToken }
+
+    override fun saveUser(user: UserReadDto?) {
+        locked {
+            val stored = readPayload()
+            write(
+                SessionDiskPayload(
+                    accessToken = stored?.accessToken,
+                    refreshToken = stored?.refreshToken,
+                    user = user
+                )
+            )
+        }
+    }
+
+    override fun getUser(): UserReadDto? = locked { readPayload()?.user }
 
     override fun clear() {
         locked {
@@ -99,8 +117,16 @@ class KeychainTokenStorage : TokenLocalDataSource {
         }
     }
 
+    /** The one place anything is written; a Keychain that refuses leaves the item as it was. */
+    private fun write(payload: SessionDiskPayload) {
+        try {
+            Keychain.write(json.encodeToString(payload).encodeToByteArray())
+        } catch (_: Throwable) {
+        }
+    }
+
     /** Reads the stored payload, deleting (and reporting signed out) anything unreadable. */
-    private fun readPayload(): TokenDiskPayload? {
+    private fun readPayload(): SessionDiskPayload? {
         val bytes = try {
             Keychain.read()
         } catch (_: Throwable) {
@@ -108,7 +134,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
         } ?: return null
 
         return try {
-            json.decodeFromString<TokenDiskPayload>(bytes.decodeToString())
+            json.decodeFromString<SessionDiskPayload>(bytes.decodeToString())
         } catch (_: Throwable) {
             try {
                 Keychain.delete()
@@ -129,7 +155,7 @@ class KeychainTokenStorage : TokenLocalDataSource {
 }
 
 /**
- * The raw generic-password item behind [KeychainTokenStorage].
+ * The raw generic-password item behind [KeychainSessionStorage].
  *
  * Memory management: every CoreFoundation object created here is created with a `Create` function
  * (so we own a +1 reference) and handed to `defer`, which releases it when the enclosing

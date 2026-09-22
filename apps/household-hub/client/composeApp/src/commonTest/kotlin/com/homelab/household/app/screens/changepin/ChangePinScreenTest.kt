@@ -29,7 +29,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.changepin.ChangePinStatus
 import com.homelab.household.presentation.changepin.ChangePinUiState
 import kotlin.test.Test
@@ -43,18 +43,18 @@ class ChangePinScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun the_new_pin_is_taken_and_this_phone_keeps_its_place() {
         val hub = FakeMembersHub()
         hub.takesTheChange()
-        val tokens = InMemoryTokenStorage().apply { saveTokens("old-token") }
+        val tokens = InMemorySessionStorage().apply { saveTokens("old-token") }
         var changed = 0
 
         runScreenTest {
             setContent {
-                TestApp(hub.engine, tokenStorage = tokens) {
+                TestApp(hub.engine, sessionStorage = tokens) {
                     ChangePinScreen(onBack = {}, onChanged = { changed++ })
                 }
             }
@@ -76,7 +76,7 @@ class ChangePinScreenTest {
         hub.refusesThePin(attemptsLeft = 4)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("000000")
             onNodeWithContentDescription(getString(Res.string.change_pin_new)).performTextInput("864209")
@@ -92,7 +92,7 @@ class ChangePinScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("135790")
             onNodeWithContentDescription(getString(Res.string.change_pin_new)).performTextInput("864209")

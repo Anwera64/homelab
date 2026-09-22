@@ -34,8 +34,8 @@ import com.homelab.household.app.resources.launch_web_page_detail
 import com.homelab.household.app.resources.launch_web_page_title
 import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.TestApp
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
-import com.homelab.household.data.datasource.local.TokenLocalDataSource
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
+import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.presentation.launch.HubFailure
 import org.jetbrains.compose.resources.getString
 
@@ -144,11 +144,11 @@ fun ComposeUiTest.launchScreen(
     hub: FakeLaunchHub,
     onSignIn: () -> Unit = {},
     onFirstRun: () -> Unit = {},
-    tokenStorage: TokenLocalDataSource = InMemoryTokenStorage(),
+    sessionStorage: StoredSessionLocalDataSource = InMemorySessionStorage(),
     externalApps: ExternalApps = FakeExternalApps()
 ) {
     setContent {
-        TestApp(hub.engine, tokenStorage = tokenStorage, externalApps = externalApps) {
+        TestApp(hub.engine, sessionStorage = sessionStorage, externalApps = externalApps) {
             LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun)
         }
     }

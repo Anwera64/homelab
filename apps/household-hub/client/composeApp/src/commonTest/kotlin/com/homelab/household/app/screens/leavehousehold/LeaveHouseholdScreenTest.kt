@@ -27,7 +27,7 @@ import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemoryTokenStorage
+import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdUiState
 import kotlin.test.Test
@@ -40,7 +40,7 @@ class LeaveHouseholdScreenTest {
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemoryTokenStorage().apply { saveTokens("signed-in-token") }
+    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
 
     @Test
     fun your_pin_leaves_the_household() {
@@ -49,7 +49,7 @@ class LeaveHouseholdScreenTest {
         var left = 0
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = { left++ }) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = { left++ }) } }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("135790")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
@@ -64,7 +64,7 @@ class LeaveHouseholdScreenTest {
         hub.refusesThePin(attemptsLeft = 4)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("000000")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
@@ -79,7 +79,7 @@ class LeaveHouseholdScreenTest {
         hub.refusesTheOnlyAdmin()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, tokenStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
+            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { LeaveHouseholdScreen(onBack = {}, onLeft = {}) } }
 
             onNodeWithContentDescription(getString(Res.string.leave_pin_label)).performTextInput("135790")
             onNodeWithText(getString(Res.string.leave_submit)).performClick()
