@@ -112,3 +112,26 @@ async def test_a_database_from_before_alembic_is_adopted_not_wiped():
                 assert applied.scalar() == "ix_chat_messages_session_created"
         finally:
             await migrated.dispose()
+
+
+def test_migrating_does_not_silence_the_application_log():
+    """
+    GIVEN loggers the app has already set up WHEN it migrates THEN they still work.
+
+    `fileConfig` disables every existing logger by default, and the hub migrates inside its own
+    startup — so running it took uvicorn's loggers down with it, `uvicorn.access` included. The hub
+    went on serving perfectly and said nothing about it, which is the worst of both.
+    """
+    import logging
+
+    already_running = logging.getLogger("uvicorn.access")
+    already_running.disabled = False
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "logging-check.db"
+        command.upgrade(_alembic_config(f"sqlite:///{db_path}"), "head")
+
+    assert not already_running.disabled, (
+        "Migrating disabled a logger the application had already configured; env.py must not take "
+        "the running process's logging with it."
+    )
