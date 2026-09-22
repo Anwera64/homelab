@@ -3,9 +3,11 @@ package com.homelab.household.app.screens.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
@@ -149,6 +151,31 @@ class ConversationScreenTest {
 
             onNodeWithText("Message the Home Coordinator…").performTextInput("And Saturday?")
             onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
+
+            assertEquals(listOf("And Saturday?"), sent)
+        }
+
+    @Test
+    fun the_keyboard_send_key_goes_through_the_same_guard_as_the_button() =
+        runComposeUiTest {
+            val sent = mutableListOf<String>()
+            setContent(conversation(stateNamed("Stream dropped, reconnecting"), onSend = { sent += it }))
+
+            onNodeWithText(getString(Res.string.conversation_composer_waiting)).performTextInput("and another thing")
+            onNode(hasSetTextAction()).performImeAction()
+
+            // Otherwise Enter would be a way round the rule the send button obeys.
+            assertEquals(emptyList(), sent)
+        }
+
+    @Test
+    fun the_keyboard_send_key_sends_when_nothing_is_in_flight() =
+        runComposeUiTest {
+            val sent = mutableListOf<String>()
+            setContent(conversation(stateNamed("A finished exchange"), onSend = { sent += it }))
+
+            onNodeWithText("Message the Home Coordinator…").performTextInput("And Saturday?")
+            onNode(hasSetTextAction()).performImeAction()
 
             assertEquals(listOf("And Saturday?"), sent)
         }

@@ -4,17 +4,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.hasImeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.text.input.ImeAction
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.testing.StillTheme
@@ -92,6 +96,44 @@ class MessageComposerTest {
             onNodeWithContentDescription(getString(Res.string.send_message))
                 .assertHeightIsAtLeast(DefaultSizes.touchTarget)
                 .assertWidthIsAtLeast(DefaultSizes.touchTarget)
+        }
+
+    /**
+     * The keyboard's own key sends, because typing a message and reaching for a button is one
+     * motion too many — and the key says "Send" rather than offering a newline, so it has to.
+     */
+    @Test
+    fun the_keyboard_send_key_sends_the_message() =
+        runComposeUiTest {
+            var text by mutableStateOf("")
+            var sent: String? = null
+            setContent {
+                StillTheme {
+                    MessageComposer(
+                        value = text,
+                        onValueChange = { text = it },
+                        onSend = { sent = it },
+                        placeholder = "Message the Coordinator…",
+                    )
+                }
+            }
+
+            onNode(hasSetTextAction()).performTextInput("Move dinner to 20:00")
+            onNode(hasSetTextAction()).performImeAction()
+
+            assertEquals("Move dinner to 20:00", sent)
+        }
+
+    @Test
+    fun the_keyboard_offers_send_rather_than_a_newline() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message…")
+                }
+            }
+
+            onNode(hasSetTextAction()).assert(hasImeAction(ImeAction.Send))
         }
 
     @Test

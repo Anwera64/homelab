@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
@@ -80,6 +83,11 @@ fun MessageComposer(
                 modifier = Modifier.weight(1f),
                 textStyle = textStyle.copy(color = colors.textPrimary),
                 maxLines = 5,
+                // The keyboard's own key sends. It says "Send" rather than offering a newline,
+                // which is the whole point: a message is a message, and reaching for the button
+                // after typing one is a motion too many. Long messages still wrap to five lines.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { onSend(value) }),
                 cursorBrush = SolidColor(colors.primary),
                 decorationBox = { innerField ->
                     Box(
