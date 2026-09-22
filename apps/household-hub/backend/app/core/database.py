@@ -1,4 +1,6 @@
-from sqlalchemy import event
+from pathlib import Path
+
+from sqlalchemy import event, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
@@ -49,7 +51,46 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
+def _alembic_config() -> "Config":
+    from alembic.config import Config
+
+    backend_root = Path(__file__).resolve().parent.parent.parent
+    config = Config(str(backend_root / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_root / "alembic"))
+    return config
+
+
+def _migrate(connection) -> None:
+    """
+    Bring the schema to head, adopting a database that predates Alembic without touching its data.
+
+    A hub that has been running since before this existed already has every table, so `upgrade
+    head` would try to create them a second time and fail. It has no `alembic_version` table
+    either, which is exactly how that case is recognised: stamp it with the baseline revision —
+    the revision that describes the schema it already has — and let the upgrade carry it forward
+    from there. A genuinely empty database has no tables to find and is simply migrated.
+
+    Doing this here rather than in a hand-run command is the point: nobody should have to wipe the
+    database to pick up an index.
+    """
+    from alembic import command
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    config = _alembic_config()
+    config.attributes["connection"] = connection
+
+    already_stamped = MigrationContext.configure(connection).get_current_revision() is not None
+    predates_alembic = not already_stamped and inspect(connection).has_table("users")
+
+    if predates_alembic:
+        baseline = ScriptDirectory.from_config(config).get_base()
+        command.stamp(config, baseline)
+
+    command.upgrade(config, "head")
+
+
 async def init_db() -> None:
     """Initialize database tables."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate)
