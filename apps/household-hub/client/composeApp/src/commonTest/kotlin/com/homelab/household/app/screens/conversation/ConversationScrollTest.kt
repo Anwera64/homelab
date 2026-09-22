@@ -65,6 +65,15 @@ class ConversationScrollTest {
         }
 
     @Test
+    fun opening_a_long_conversation_starts_at_the_newest_message() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A conversation opened again")))
+
+            onNodeWithText("Answer 20,", substring = true).assertIsDisplayed()
+            onNodeWithText("Question 1 of a long-running conversation").assertDoesNotExist()
+        }
+
+    @Test
     fun a_conversation_that_fits_does_not_scroll_anything_away() =
         runComposeUiTest {
             setContent(conversation(stateNamed("A finished exchange")))
