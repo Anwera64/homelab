@@ -233,4 +233,21 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       'Homepage services.yaml Jellyfin widget must specify version: 2 to prevent legacy /emby/ calls'
     );
   });
+
+  await t.test('Ollama models live in a named volume, not on the Windows share', () => {
+    const ollamaMatch = dockerComposeContent.match(/container_name:\s*ollama[\s\S]*?volumes:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:\s*\n)/);
+    assert.ok(ollamaMatch, 'docker-compose.yml must declare volumes for the ollama service');
+    assert.ok(
+      ollamaMatch[1].includes('- ollama_models:/root/.ollama/models'),
+      'ollama must mount the ollama_models volume at /root/.ollama/models'
+    );
+    assert.ok(
+      ollamaMatch[1].includes('- ${CONFIG_PATH}/ollama:/root/.ollama'),
+      'ollama must keep the config bind mount for keys and Modelfiles'
+    );
+    assert.ok(
+      /^volumes:\s*\n[\s\S]*?^  ollama_models:\s*\n\s+name:\s*ollama_models\s*$/m.test(dockerComposeContent),
+      'docker-compose.yml must declare the ollama_models volume with a fixed name'
+    );
+  });
 });

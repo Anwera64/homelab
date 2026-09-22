@@ -246,7 +246,7 @@ if ($failedContainers.Count -gt 0) {
             $installedModelsRaw = (docker exec ollama ollama list 2>$null) -join "`n"
             foreach ($model in $requiredModels) {
                 if ($installedModelsRaw -notmatch [regex]::Escape($model)) {
-                    Write-Host "  [+] Pulling missing starter model '$model' into config/ollama..." -ForegroundColor Yellow
+                    Write-Host "  [+] Pulling missing starter model '$model' into the ollama_models volume..." -ForegroundColor Yellow
                     docker exec ollama ollama pull $model
                     if ($LASTEXITCODE -eq 0) {
                         Write-Host "  [SUCCESS] Model '$model' is ready!" -ForegroundColor Green
