@@ -36,6 +36,10 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         "Three things, in order of how much they'll bite. The panel review is tomorrow at 14:30 — " +
             "that's the one to protect. The print shop closes at 18:00 the same day, so if the boards aren't"
 
+    /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
+    private val longAnswer =
+        (1..40).joinToString(" ") { "Sentence $it of an answer that keeps going well past the fold." }
+
     private val named =
         listOf(
             // New Chat: the same screen with the greeting where the transcript will be.
@@ -65,6 +69,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     messages = listOf(question),
                     streamingMessage = partialAnswer,
                     turnState = TurnState.StillWorking,
+                ),
+            "A long answer arriving" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = longAnswer,
+                    turnState = TurnState.Streaming,
                 ),
             "The answer failed" to
                 agent.copy(

@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +78,28 @@ fun ConversationContent(
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
+    val transcript = rememberLazyListState()
+
+    // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this
+    // the words land below the fold and the screen sits still while the agent talks.
+    //
+    // It follows only while you are already at the bottom. Scroll up to re-read something and the
+    // answer keeps arriving without dragging you back down; return to the bottom and it picks the
+    // thread up again. Forcing it unconditionally would make a long answer impossible to read back
+    // while it is still being written.
+    val following by remember { derivedStateOf { !transcript.canScrollForward } }
+
+    // Counted from the state rather than read off the layout, because the first pass runs before
+    // there is any layout to read and the answer is already on screen by then.
+    val turnIsDrawn = state.streamingMessage != null || state.turnState == TurnState.Failed
+    val itemCount = state.messages.size + if (turnIsDrawn) 1 else 0
+
+    LaunchedEffect(itemCount, state.streamingMessage, state.turnState) {
+        if (!following || itemCount == 0) return@LaunchedEffect
+        // The last item is the answer itself and grows as it arrives, so this asks for its end
+        // rather than its start; the offset is clamped to however tall it has become.
+        transcript.scrollToItem(itemCount - 1, Int.MAX_VALUE)
+    }
 
     HearthScaffold(
         modifier = modifier,
@@ -158,6 +183,7 @@ fun ConversationContent(
         }
 
         LazyColumn(
+            state = transcript,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
@@ -216,6 +242,28 @@ private fun TurnStatus(
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
+    val transcript = rememberLazyListState()
+
+    // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this
+    // the words land below the fold and the screen sits still while the agent talks.
+    //
+    // It follows only while you are already at the bottom. Scroll up to re-read something and the
+    // answer keeps arriving without dragging you back down; return to the bottom and it picks the
+    // thread up again. Forcing it unconditionally would make a long answer impossible to read back
+    // while it is still being written.
+    val following by remember { derivedStateOf { !transcript.canScrollForward } }
+
+    // Counted from the state rather than read off the layout, because the first pass runs before
+    // there is any layout to read and the answer is already on screen by then.
+    val turnIsDrawn = state.streamingMessage != null || state.turnState == TurnState.Failed
+    val itemCount = state.messages.size + if (turnIsDrawn) 1 else 0
+
+    LaunchedEffect(itemCount, state.streamingMessage, state.turnState) {
+        if (!following || itemCount == 0) return@LaunchedEffect
+        // The last item is the answer itself and grows as it arrives, so this asks for its end
+        // rather than its start; the offset is clamped to however tall it has become.
+        transcript.scrollToItem(itemCount - 1, Int.MAX_VALUE)
+    }
 
     when (state.turnState) {
         TurnState.Reconnecting -> {
