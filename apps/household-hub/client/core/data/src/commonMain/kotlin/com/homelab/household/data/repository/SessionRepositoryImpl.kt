@@ -136,7 +136,9 @@ class SessionRepositoryImpl(
                     ended = true
                 }.collect { event ->
                     when (event) {
-                        is ChatStreamEvent.Delta -> delivered = true
+                        // The hub saying it has the question is what decides this, not the first
+                        // word: a model loading and then thinking can go a minute without one.
+                        is ChatStreamEvent.Accepted, is ChatStreamEvent.Delta -> delivered = true
 
                         // The hub refused the turn before the question was written down, and
                         // said why. Thrown from the collector, which — as above — goes straight

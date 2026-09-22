@@ -21,9 +21,14 @@ import com.homelab.household.app.resources.conversation_failed_title
 import com.homelab.household.app.resources.conversation_not_sent
 import com.homelab.household.app.resources.conversation_reconnecting
 import com.homelab.household.app.resources.conversation_retry
+import com.homelab.household.app.resources.conversation_sent
 import com.homelab.household.app.resources.conversation_still_working
+import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.resources.tool_calendar_read_done
+import com.homelab.household.app.resources.tool_calendar_read_failed
+import com.homelab.household.app.resources.tool_calendar_read_running
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getString
@@ -239,6 +244,79 @@ class ConversationScreenTest {
             // Words are their own sign that something is happening; two at once is noise.
             onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
             onNodeWithText("Three things, in order of how much ", substring = true).assertIsDisplayed()
+        }
+
+    // ---- a turn you can watch ----------------------------------------------
+
+    @Test
+    fun the_newest_question_says_it_was_sent() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished exchange")))
+
+            onNodeWithText(getString(Res.string.conversation_sent)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_question_that_never_landed_does_not_claim_to_have_been_sent() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            onNodeWithText(getString(Res.string.conversation_sent)).assertDoesNotExist()
+        }
+
+    @Test
+    fun while_an_answer_is_being_written_the_composer_says_it_is_waiting() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            // It used to keep its idle words while refusing every send, which read as broken.
+            onNodeWithText(getString(Res.string.conversation_composer_waiting)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_model_thinking_out_loud_is_shown_under_the_dots() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking out loud")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+            // Only its newest words — the start has scrolled away.
+            onNodeWithText("then list the events in order.", substring = true).assertIsDisplayed()
+            onNodeWithText("Okay, the user is asking", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun a_tool_is_named_in_words_while_it_runs() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Using a tool")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_running)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thought, 3)).assertIsDisplayed()
+            onNodeWithText("calendar_read", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun the_trail_sits_above_an_answer_as_it_arrives() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("The answer arrives, with its trail")))
+
+            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_finished_answer_keeps_its_trail() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished answer and its trail")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_tool_that_could_not_run_says_so_in_the_trail() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A tool that couldn't run")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_failed)).assertIsDisplayed()
         }
 
     /** A failed turn has a card of its own to show; the dots would say it was still coming. */

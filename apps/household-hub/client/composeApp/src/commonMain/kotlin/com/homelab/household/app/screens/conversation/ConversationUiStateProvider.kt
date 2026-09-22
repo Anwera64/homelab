@@ -6,6 +6,7 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
 
 /**
@@ -36,6 +37,11 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         "Three things, in order of how much they'll bite. The panel review is tomorrow at 14:30 — " +
             "that's the one to protect. The print shop closes at 18:00 the same day, so if the boards aren't"
 
+    /** A model thinking, as qwen3 really does: first person, and naming the tool it means to use. */
+    private val thought =
+        "Okay, the user is asking what's on their calendar tomorrow. So tomorrow is Wednesday the 23rd. " +
+            "I should use calendar_read with that date in ISO format, then list the events in order."
+
     /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
     private val longAnswer =
         (1..40).joinToString(" ") { "Sentence $it of an answer that keeps going well past the fold." }
@@ -59,6 +65,45 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     messages = listOf(question),
                     streamingMessage = "",
                     turnState = TurnState.Streaming,
+                ),
+            // The rest of a turn you can watch, frame by frame as the Chat Turn States canvas draws it.
+            "Thinking out loud" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                    reasoning = thought,
+                ),
+            "Using a tool" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                    activeTool = "calendar_read",
+                    trail = listOf(TurnRecord.Thought(3)),
+                ),
+            "The answer arrives, with its trail" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "Tomorrow's fairly light. The panel review at 14:30 is the only fixed",
+                    turnState = TurnState.Streaming,
+                    trail = listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")),
+                ),
+            "A finished answer and its trail" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            question,
+                            said("m-2", "Tomorrow's fairly light. Nothing in the evening.", MessageRole.ASSISTANT),
+                        ),
+                    trails = mapOf("m-2" to listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read"))),
+                ),
+            "A tool that couldn't run" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "I couldn't reach your calendar just now, so I can't say for certain.",
+                    turnState = TurnState.Streaming,
+                    trail = listOf(TurnRecord.Thought(2), TurnRecord.ToolFailed("calendar_read")),
                 ),
             "Answering" to
                 agent.copy(

@@ -22,6 +22,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.HearthScaffold
@@ -31,8 +33,11 @@ import com.homelab.household.app.components.MessageComposer
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.SlowLine
 import com.homelab.household.app.components.ThinkingDots
+import com.homelab.household.app.components.ToolRecordLine
+import com.homelab.household.app.components.ToolRunningChip
 import com.homelab.household.app.components.TurnStatusLine
 import com.homelab.household.app.components.TurnStatusTone
+import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.conversation_back
 import com.homelab.household.app.resources.conversation_composer_idle
@@ -45,8 +50,10 @@ import com.homelab.household.app.resources.conversation_not_sent
 import com.homelab.household.app.resources.conversation_reconnecting
 import com.homelab.household.app.resources.conversation_reconnecting_detail
 import com.homelab.household.app.resources.conversation_retry
+import com.homelab.household.app.resources.conversation_sent
 import com.homelab.household.app.resources.conversation_still_working
 import com.homelab.household.app.resources.conversation_still_working_detail
+import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
@@ -55,6 +62,7 @@ import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
@@ -94,6 +102,12 @@ fun ConversationContent(
     val thinking = state.turnState == TurnState.Streaming && state.streamingMessage.isNullOrEmpty()
     val thinkingPhase = rememberWaitPhase(thinking)
 
+    // "Slow" is timed on silence alone. A model visibly thinking or using a tool is busy, not
+    // slow, and a cold load is the one wait where nothing at all comes back.
+    val slowPhase = rememberWaitPhase(state.isSilent)
+
+    val latestQuestionId = state.messages.lastOrNull { it.role == MessageRole.USER }?.id
+
     // How many messages the list was last laid out around, so that "were you at the bottom?" can
     // be asked about what was there before this change.
     var seenCount by remember { mutableIntStateOf(0) }
@@ -105,7 +119,8 @@ fun ConversationContent(
 
     // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this the
     // words land below the fold and the screen sits still while the agent talks.
-    LaunchedEffect(itemCount, state.streamingMessage, state.turnState) {
+    // Thinking, a tool and the trail grow the answer too, before a single word of it arrives.
+    LaunchedEffect(itemCount, state.streamingMessage, state.turnState, state.reasoning, state.activeTool, state.trail) {
         if (itemCount == 0) return@LaunchedEffect
 
         // Were you at the end of what was already there? Asked against the count from before this
@@ -188,9 +203,19 @@ fun ConversationContent(
                     },
                     placeholder =
                         when (state.turnState) {
-                            TurnState.Reconnecting -> stringResource(Res.string.conversation_composer_waiting)
-                            TurnState.StillWorking -> stringResource(Res.string.conversation_composer_leave)
-                            else -> stringResource(Res.string.conversation_composer_idle, state.agentName)
+                            // It refuses a send while an answer is written, so it says so: keeping
+                            // its idle words while refusing read as a composer that was broken.
+                            TurnState.Streaming, TurnState.Reconnecting -> {
+                                stringResource(Res.string.conversation_composer_waiting)
+                            }
+
+                            TurnState.StillWorking -> {
+                                stringResource(Res.string.conversation_composer_leave)
+                            }
+
+                            else -> {
+                                stringResource(Res.string.conversation_composer_idle, state.agentName)
+                            }
                         },
                 )
             }
@@ -230,51 +255,131 @@ fun ConversationContent(
                 val undelivered =
                     message.role == MessageRole.USER &&
                         (message.status == MessageStatus.FAILED_OFFLINE || message.status == MessageStatus.FAILED_ERROR)
+                // The receipt belongs to the newest question only: under every one it is noise.
+                val receipted = message.id == latestQuestionId && message.status == MessageStatus.SENT
 
-                MessageBubble(
-                    content = message.content,
-                    fromMe = message.role == MessageRole.USER,
-                    status =
-                        if (undelivered) {
-                            {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    TurnStatusLine(
-                                        label = stringResource(Res.string.conversation_not_sent),
-                                        detail = null,
-                                        tone = TurnStatusTone.Wrong,
-                                    )
-                                    // Only this case re-sends: the question itself never landed.
-                                    SecondaryButton(
-                                        text = stringResource(Res.string.conversation_retry),
-                                        onClick = { onRetry(message.content) },
+                Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                    TurnTrail(state.trails[message.id].orEmpty())
+                    MessageBubble(
+                        content = message.content,
+                        fromMe = message.role == MessageRole.USER,
+                        status =
+                            if (receipted) {
+                                {
+                                    Text(
+                                        stringResource(Res.string.conversation_sent),
+                                        style = type.monoSm,
+                                        color = colors.textMuted,
                                     )
                                 }
-                            }
-                        } else {
-                            null
-                        },
-                )
+                            } else if (undelivered) {
+                                {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        TurnStatusLine(
+                                            label = stringResource(Res.string.conversation_not_sent),
+                                            detail = null,
+                                            tone = TurnStatusTone.Wrong,
+                                        )
+                                        // Only this case re-sends: the question itself never landed.
+                                        SecondaryButton(
+                                            text = stringResource(Res.string.conversation_retry),
+                                            onClick = { onRetry(message.content) },
+                                        )
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                    )
+                }
             }
 
             // The answer being written, with whatever has become of it sitting where it stopped.
             if (state.streamingMessage != null || state.turnState == TurnState.Failed) {
                 item {
-                    MessageBubble(
-                        content = state.streamingMessage.orEmpty(),
-                        fromMe = false,
-                        status = {
-                            if (thinking) {
-                                Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                                    if (thinkingPhase != WaitPhase.Hidden) ThinkingDots()
-                                    SlowLine(thinkingPhase)
+                    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                        TurnTrail(state.trail)
+                        MessageBubble(
+                            content = state.streamingMessage.orEmpty(),
+                            fromMe = false,
+                            status = {
+                                val tool = state.activeTool
+                                when {
+                                    // In the answer's place, because that is where the eye is waiting.
+                                    tool != null -> ToolRunningChip(stringResource(toolLabel(tool).running))
+
+                                    thinking -> Thinking(state.reasoning, thinkingPhase, slowPhase)
+
+                                    else -> TurnStatus(state, onTryAgain)
                                 }
-                            } else {
-                                TurnStatus(state, onTryAgain)
-                            }
-                        },
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A model working before its first word: the dots, its newest thoughts beneath them, and the slow
+ * line only if it has said nothing at all for eight seconds.
+ */
+@Composable
+private fun Thinking(
+    reasoning: String,
+    phase: WaitPhase,
+    slowPhase: WaitPhase,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+        if (phase != WaitPhase.Hidden) ThinkingDots()
+        if (reasoning.isNotEmpty()) {
+            Text(
+                text = reasoningTail(reasoning),
+                style = HearthTheme.typography.caption,
+                color = HearthTheme.colors.textMuted,
+                // Kept out of what a screen reader hears. It changes many times a second, and the
+                // dots already say "Thinking…" once, politely.
+                modifier =
+                    Modifier
+                        .widthIn(max = HearthTheme.size.readingWidth)
+                        .semantics { hideFromAccessibility() },
+            )
+        }
+        SlowLine(slowPhase)
+    }
+}
+
+/**
+ * What an answer did on the way to it, above the answer: one quiet line each (design notes §6.5).
+ * Thinking comes first, summed; then each tool, in the order it ran.
+ */
+@Composable
+private fun TurnTrail(records: List<TurnRecord>) {
+    if (records.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
+        records.forEach { record ->
+            when (record) {
+                is TurnRecord.Thought -> {
+                    ToolRecordLine(
+                        icon = HearthIcon.Streaming,
+                        text = stringResource(Res.string.conversation_thought, record.seconds),
+                    )
+                }
+
+                is TurnRecord.ToolDone -> {
+                    val label = toolLabel(record.tool)
+                    ToolRecordLine(icon = label.icon, text = stringResource(label.done))
+                }
+
+                is TurnRecord.ToolFailed -> {
+                    ToolRecordLine(
+                        icon = HearthIcon.Error,
+                        text = stringResource(toolLabel(record.tool).failed),
+                        tint = HearthTheme.colors.error,
                     )
                 }
             }

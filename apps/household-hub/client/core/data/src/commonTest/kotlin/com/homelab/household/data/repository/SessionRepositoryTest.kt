@@ -392,6 +392,39 @@ class SessionRepositoryTest {
             verifySuspend(VerifyMode.exactly(0)) { remote.fetchSession(any()) }
         }
 
+    /**
+     * The hub said it had the question, then the stream died before a word of the answer.
+     *
+     * Deciding by the first word used to call this "never arrived" and offer to send it again,
+     * when the question was sitting on the hub the whole time — a model that loads for fifty
+     * seconds and then thinks makes that window long. The hub saying so is the line that counts.
+     */
+    @Test
+    fun `GIVEN the hub has the question WHEN the stream dies before a word THEN the answer is fetched rather than the question blamed`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    throw ServerOfflineException("Stream dropped")
+                }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(
+                        messageDto("m1", "s-1", "user", "Hello"),
+                        messageDto("m2", "s-1", "assistant", "Hi there."),
+                    ),
+                )
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Hello").toList()
+
+            // THEN
+            assertEquals("Hi there.", (events.last() as ChatStreamEvent.Done).assistantContent)
+        }
+
     @Test
     fun `GIVEN the hub no longer working on the turn and no answer WHEN it is polled THEN the turn is reported failed`() =
         runTest {

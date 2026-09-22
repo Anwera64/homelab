@@ -1,6 +1,25 @@
 package com.homelab.household.domain.model
 
 sealed interface ChatStreamEvent {
+    /**
+     * The hub has written the question down.
+     *
+     * The earliest honest thing it can say, and the line between the two kinds of failure: before
+     * it, a broken turn means the question never arrived; after it, the question is safe and only
+     * the answer is in trouble — so nothing after this should ever offer to send it again.
+     */
+    data object Accepted : ChatStreamEvent
+
+    /**
+     * What a thinking model is saying to itself before it answers.
+     *
+     * Worth watching while it happens and worth nothing afterwards: it is never part of the answer
+     * and the hub does not keep it.
+     */
+    data class Reasoning(
+        val content: String,
+    ) : ChatStreamEvent
+
     data class Delta(
         val content: String,
     ) : ChatStreamEvent

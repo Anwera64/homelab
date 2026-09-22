@@ -29,5 +29,7 @@ class LLMResponse:
 @dataclass
 class LLMResponseChunk:
     delta_content: str = ""
+    # What a thinking model says to itself before it answers. Never part of the answer.
+    delta_reasoning: str = ""
     tool_calls: List[LLMToolCall] = field(default_factory=list)
     finish_reason: Optional[str] = None

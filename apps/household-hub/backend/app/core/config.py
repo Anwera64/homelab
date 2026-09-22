@@ -32,7 +32,8 @@ class Settings(BaseSettings):
 
     # AI & LLM Inference Settings
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
-    OLLAMA_TIMEOUT_SECONDS: float = 60.0
+    # Long enough to cover a cold load of the model into memory: 52.6 s for qwen3:14b, measured.
+    OLLAMA_TIMEOUT_SECONDS: float = 120.0
     DEFAULT_LLM_MODEL: str = "qwen3:14b"
     MAX_TOOL_CALL_ITERATIONS: int = 5
     MAX_CONTEXT_TOKENS: int = 8192

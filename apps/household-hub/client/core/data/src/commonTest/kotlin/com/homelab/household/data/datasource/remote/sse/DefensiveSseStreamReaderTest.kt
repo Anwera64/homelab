@@ -129,4 +129,65 @@ class DefensiveSseStreamReaderTest {
             assertEquals(1, events.size)
             assertEquals("Agent personality not found", (events[0] as ChatStreamEvent.StreamError).message)
         }
+
+    /** The hub has saved the question. The earliest thing it can honestly say. */
+    @Test
+    fun the_hub_saying_it_has_the_question_is_read() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "accepted"}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(listOf(ChatStreamEvent.Accepted), events)
+        }
+
+    @Test
+    fun reasoning_is_read_as_it_arrives() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "reasoning", "content": "Okay, the user wants"}
+
+                data: {"type": "reasoning", "content": " tomorrow."}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(
+                listOf(ChatStreamEvent.Reasoning("Okay, the user wants"), ChatStreamEvent.Reasoning(" tomorrow.")),
+                events,
+            )
+        }
+
+    /**
+     * The hub has always sent a tool's outcome inside `data`, and the reader looked for it at the
+     * top level — so every tool arrived nameless and every failure arrived as a success.
+     */
+    @Test
+    fun a_tool_s_outcome_is_read_from_where_the_hub_puts_it() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_result", "data": {"tool": "calendar_read", "success": false, "error": "Unauthorized"}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            val result = events.single() as ChatStreamEvent.ToolResult
+            assertEquals("calendar_read", result.tool)
+            assertEquals(false, result.success)
+            assertEquals("Unauthorized", result.error)
+        }
 }

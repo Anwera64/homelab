@@ -41,6 +41,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
+import kotlin.time.TimeSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSessionViewModelTest {
@@ -70,6 +73,19 @@ class ChatSessionViewModelTest {
                 toggleSecretModeUseCase = toggleSecretModeUseCase,
             )
     }
+
+    /** The same wiring, with a clock the test moves by hand. */
+    private fun viewModelWith(timeSource: TimeSource) =
+        ChatSessionViewModel(
+            streamChatTurnUseCase = streamChatTurnUseCase,
+            getSessionUseCase = getSessionUseCase,
+            listAgentsUseCase = listAgentsUseCase,
+            createSessionUseCase = createSessionUseCase,
+            regenerateAnswerUseCase = regenerateAnswerUseCase,
+            approveToolProposalUseCase = approveToolProposalUseCase,
+            toggleSecretModeUseCase = toggleSecretModeUseCase,
+            timeSource = timeSource,
+        )
 
     @AfterTest
     fun tearDown() {
@@ -396,6 +412,151 @@ class ChatSessionViewModelTest {
             val state = viewModel.uiState.value
             assertEquals(TurnState.Failed, state.turnState)
             assertTrue(state.canSend, "the turn is over, so the composer is free again")
+        }
+
+    // ---- what the agent says that is not the answer ------------------------
+
+    @Test
+    fun the_question_is_marked_sent_the_moment_the_hub_has_it() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.Accepted)
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            // Not at the end of the answer, which may be a minute away: the receipt says so now.
+            assertEquals(
+                MessageStatus.SENT,
+                viewModel.uiState.value.messages
+                    .single()
+                    .status,
+            )
+        }
+
+    @Test
+    fun reasoning_gathers_while_the_model_thinks() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(ChatStreamEvent.Reasoning("Okay, the user "), ChatStreamEvent.Reasoning("wants tomorrow."))
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("Okay, the user wants tomorrow.", state.reasoning)
+            assertFalse(state.isSilent, "a model visibly thinking is not a silent hub")
+        }
+
+    @Test
+    fun a_tool_is_shown_while_it_runs() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(ChatStreamEvent.ToolExecuting("calendar_read"))
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            assertEquals("calendar_read", viewModel.uiState.value.activeTool)
+        }
+
+    @Test
+    fun a_tool_that_finishes_leaves_a_record_and_one_that_fails_says_so() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.ToolExecuting("calendar_read"),
+                    ChatStreamEvent.ToolResult("calendar_read", success = true),
+                    ChatStreamEvent.ToolExecuting("searxng_search"),
+                    ChatStreamEvent.ToolResult("searxng_search", success = false, error = "offline"),
+                )
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertNull(state.activeTool)
+            assertEquals(
+                listOf(TurnRecord.ToolDone("calendar_read"), TurnRecord.ToolFailed("searxng_search")),
+                state.trail,
+            )
+        }
+
+    /**
+     * How long it thought, measured from the first thought to the first word and summed across a
+     * tool — one record, at the top of the trail, however many times it stopped to think.
+     */
+    @Test
+    fun thinking_folds_into_one_timed_record_at_the_top_of_the_trail() =
+        runTest(testDispatcher) {
+            val clock = TestTimeSource()
+            viewModel = viewModelWith(clock)
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Reasoning("I need the calendar."))
+                    clock += 3.seconds
+                    emit(ChatStreamEvent.ToolExecuting("calendar_read"))
+                    emit(ChatStreamEvent.ToolResult("calendar_read", success = true))
+                    emit(ChatStreamEvent.Reasoning("Two events."))
+                    clock += 1.seconds
+                    emit(ChatStreamEvent.Delta("Two things."))
+                }
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")), state.trail)
+            assertEquals("", state.reasoning, "once the answer begins, the thinking steps aside")
+        }
+
+    @Test
+    fun the_trail_stays_with_its_answer_once_the_turn_is_done() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.ToolExecuting("calendar_read"),
+                    ChatStreamEvent.ToolResult("calendar_read", success = true),
+                    ChatStreamEvent.Delta("A light day."),
+                    ChatStreamEvent.Done(messageId = "m-2", assistantContent = "A light day."),
+                )
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf(TurnRecord.ToolDone("calendar_read")), state.trails["m-2"])
+            assertTrue(state.trail.isEmpty())
+            assertNull(state.activeTool)
+        }
+
+    @Test
+    fun a_new_turn_starts_with_nothing_left_over_from_the_last() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", "First", false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Reasoning("Hmm."),
+                    ChatStreamEvent.ToolExecuting("calendar_read"),
+                    ChatStreamEvent.ToolResult("calendar_read", success = false),
+                    ChatStreamEvent.TurnFailed,
+                )
+            every { streamChatTurnUseCase("s-1", "Second", false, any()) } returns flowOf(ChatStreamEvent.Accepted)
+            viewModel.sendMessage("First")
+            advanceUntilIdle()
+
+            viewModel.sendMessage("Second")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("", state.reasoning)
+            assertTrue(state.trail.isEmpty())
+            assertTrue(state.isSilent, "a turn that has heard nothing yet is silent")
         }
 
     /**

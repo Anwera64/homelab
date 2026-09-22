@@ -300,9 +300,9 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
     session_repo = FakeSessionRepository(sessions=[session])
     agent_repo = FakeAgentRepository(agents=[agent])
 
-    # Turn 1: chat_completion triggers tool call
+    # The decision streams too now: Ollama sends the tool call whole, in one chunk.
     tc = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "today"})
-    resp1 = LLMResponse(content="", tool_calls=[tc])
+    decision_chunks = [LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls")]
 
     # Synthesis: streamed chunks after tool result
     stream_chunks = [
@@ -310,7 +310,7 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
         LLMResponseChunk(delta_content="have "),
         LLMResponseChunk(delta_content="2 meetings."),
     ]
-    llm_client = FakeLLMClient(responses=[resp1], stream_chunks_list=[stream_chunks])
+    llm_client = FakeLLMClient(stream_chunks_list=[decision_chunks, stream_chunks])
     tool_executor = FakeToolExecutor()
 
     use_case = ProcessChatTurnUseCase(
@@ -330,11 +330,13 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
         )
     ]
 
-    # Tool call detection used chat_completion
-    assert len(llm_client.chat_calls) == 1
+    # Nothing blocks any more: a blocking call has to finish the whole response before a single
+    # byte comes back, which is what ran into the timeout while a thinking model decided.
+    assert len(llm_client.chat_calls) == 0
+    assert len(llm_client.stream_calls) == 2
+    assert llm_client.stream_calls[0]["tools"] is not None
     # Synthesis used stream_chat_completion with tools=None
-    assert len(llm_client.stream_calls) == 1
-    assert llm_client.stream_calls[0]["tools"] is None
+    assert llm_client.stream_calls[1]["tools"] is None
 
     # Events sequence: tool_executing, tool_result, deltas, done
     types = [ev["type"] for ev in events]
@@ -554,3 +556,175 @@ async def test_a_turn_that_never_opens_is_not_reported_as_a_failed_answer():
                 session_id="nowhere", current_user=user, content="Hello"
             )
         ]
+
+
+def _use_case(session_repo, agent, llm_client, tool_executor=None):
+    return ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=llm_client,
+        context_assembler=FakeContextAssembler(),
+        tool_executor=tool_executor or FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        uow=FakeUnitOfWork(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_tool_decision_shows_its_words_as_they_come():
+    """
+    The decision used to be one blocking call, so an agent with tools answered in a single lump at
+    the end - or not at all, when a thinking model took longer than the timeout to finish it.
+
+    Streamed, anything the model writes before calling a tool reaches you as it is written, and it
+    stays in the answer: that is a change from the blocking call, which kept it out.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "2026-09-23"})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [
+                LLMResponseChunk(delta_content="Let me "),
+                LLMResponseChunk(delta_content="check. "),
+                LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls"),
+            ],
+            [LLMResponseChunk(delta_content="Tomorrow is light.")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    types = [ev["type"] for ev in events]
+    first_tool = types.index("tool_executing")
+    assert [ev["content"] for ev in events[:first_tool] if ev["type"] == "delta"] == ["Let me ", "check. "]
+    assert events[-1]["assistant_content"] == "Let me check. Tomorrow is light."
+
+
+@pytest.mark.asyncio
+async def test_a_write_the_decision_asks_for_still_waits_for_approval():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_write"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_write", arguments={"title": "Dinner"})
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls")],
+            [LLMResponseChunk(delta_content="Shall I add it?")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client, tool_executor).execute_stream(
+            session_id="s1", current_user=user, content="Put dinner in the calendar"
+        )
+    ]
+
+    proposals = [ev for ev in events if ev["type"] == "tool_call"]
+    assert proposals and proposals[0]["data"]["status"] == "proposal_pending"
+    assert tool_executor.executed_calls == []
+
+
+@pytest.mark.asyncio
+async def test_reasoning_is_shown_while_it_happens_and_never_kept():
+    """
+    What the model says to itself is worth watching and worth nothing afterwards. It goes to the
+    phone as it arrives and never into the answer that is saved.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [
+                LLMResponseChunk(delta_reasoning="Okay, the user wants "),
+                LLMResponseChunk(delta_reasoning="tomorrow."),
+                LLMResponseChunk(delta_content="A light day."),
+            ]
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    assert [ev["content"] for ev in events if ev["type"] == "reasoning"] == ["Okay, the user wants ", "tomorrow."]
+    assert events[-1]["assistant_content"] == "A light day."
+    assert session_repo.messages[-1].content == "A light day."
+
+
+@pytest.mark.asyncio
+async def test_reasoning_around_a_tool_is_shown_too():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "2026-09-23"})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(delta_reasoning="I need the calendar."), LLMResponseChunk(tool_calls=[tc])],
+            [LLMResponseChunk(delta_reasoning="Two events."), LLMResponseChunk(delta_content="Two things.")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    assert [ev["content"] for ev in events if ev["type"] == "reasoning"] == ["I need the calendar.", "Two events."]
+    assert events[-1]["assistant_content"] == "Two things."
+
+
+@pytest.mark.asyncio
+async def test_the_question_is_accepted_the_moment_it_is_saved():
+    """
+    The earliest honest thing the hub can say. After it, whatever breaks is the answer's problem,
+    never the question's - which is what keeps the phone from offering to send it twice.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Hi.")]])
+
+    turn = _use_case(session_repo, agent, llm_client).execute_stream(
+        session_id="s1", current_user=user, content="Hello"
+    )
+    first = await turn.__anext__()
+
+    assert first == {"type": "accepted"}
+    assert session_repo.messages[-1].content == "Hello"
+    await turn.aclose()
+
+
+@pytest.mark.asyncio
+async def test_regenerating_is_accepted_straight_away():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(
+        sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")],
+        messages=[ChatMessage(id="m1", session_id="s1", role="user", content="Plan meals")],
+    )
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Monday: soup.")]])
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client).regenerate_stream(
+            session_id="s1", current_user=user
+        )
+    ]
+
+    assert events[0] == {"type": "accepted"}
+
