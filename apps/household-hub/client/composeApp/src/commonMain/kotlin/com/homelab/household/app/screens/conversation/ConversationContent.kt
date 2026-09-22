@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -54,7 +55,9 @@ import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.LocalHearthMotion
 import com.homelab.household.app.theme.PreviewDayNight
+import com.homelab.household.app.theme.StillMotion
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.MessageRole
@@ -420,20 +423,26 @@ private fun TurnStatus(
     }
 }
 
+/**
+ * Motion off, because a preview draws one frame: with it on, every wait is still inside its hold
+ * and the thinking states draw an empty bubble. `ThinkingDotsPreview` shows the dots moving.
+ */
 @PreviewDayNight
 @Composable
 private fun ConversationContentPreview(
     @PreviewParameter(ConversationUiStateProvider::class) state: ChatSessionUiState,
 ) {
     HearthTheme {
-        ConversationContent(
-            state = state,
-            onComposerTextChange = {},
-            onSend = {},
-            onRetry = {},
-            onTryAgain = {},
-            onBack = {},
-            memberName = "Emma",
-        )
+        CompositionLocalProvider(LocalHearthMotion provides StillMotion) {
+            ConversationContent(
+                state = state,
+                onComposerTextChange = {},
+                onSend = {},
+                onRetry = {},
+                onTryAgain = {},
+                onBack = {},
+                memberName = "Emma",
+            )
+        }
     }
 }
