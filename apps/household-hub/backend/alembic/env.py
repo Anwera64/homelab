@@ -23,8 +23,12 @@ from app.core.database import Base
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Only when Alembic is the program being run. The hub migrates inside its own startup, and
+# `fileConfig` disables every logger that already exists unless told otherwise — which took
+# uvicorn's loggers down with it, `uvicorn.access` included, for the life of the process. The hub
+# went on serving perfectly and said nothing about it, which is a bad way to find out.
+if config.config_file_name is not None and config.attributes.get("connection") is None:
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
