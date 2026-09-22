@@ -265,13 +265,13 @@ class ProcessChatTurnUseCase:
             is_turn_secret=is_turn_secret,
         )
 
-    async def execute_stream(
-        self,
-        session_id: str,
-        current_user: User,
-        content: str,
-        auto_approve_writes: bool = False,
-    ):
+    async def _open_turn(self, session_id: str, current_user: User):
+        """
+        The checks both streamed turns share, and the pair they need afterwards.
+
+        Everything here is about whether this person may speak to this agent at all; nothing in it
+        depends on there being a new question, which is why regenerating can run it unchanged.
+        """
         session = await self.session_repo.get_by_id(session_id)
         if not session:
             raise EntityNotFoundException("Session not found")
@@ -298,9 +298,54 @@ class ProcessChatTurnUseCase:
                 f"Agent '{agent.name}' is deactivated and cannot accept new messages."
             )
 
+        return session, agent
+
+    async def regenerate_stream(self, session_id: str, current_user: User):
+        """
+        Answer the last question again, without asking it again.
+
+        A turn can arrive, run, and fail to produce an answer — the model times out, the upstream
+        gateway gives up. The question is stored and perfectly good; only the answer is missing.
+        Re-sending the question would store it twice and make the transcript stutter, so this
+        picks up from the messages already there.
+
+        The privacy decision is read back from the question rather than recomputed. It was made
+        when the question was asked, and a turn that answered it differently the second time would
+        be a turn that leaked.
+        """
+        session, agent = await self._open_turn(session_id, current_user)
+
+        recent_messages = await self.session_repo.get_messages(session.id, limit=30)
+        last_message = recent_messages[-1] if recent_messages else None
+        if last_message is None or last_message.role != "user":
+            raise InvalidOperationException(
+                "There is no unanswered question in this conversation to answer again."
+            )
+
+        privacy_trigger_detected = bool(
+            (last_message.metadata_json or {}).get("privacy_trigger_detected", False)
+        )
+
+        async for event in self._stream_answer(
+            session=session,
+            agent=agent,
+            current_user=current_user,
+            recent_messages=recent_messages,
+            privacy_trigger_detected=privacy_trigger_detected,
+            auto_approve_writes=False,
+        ):
+            yield event
+
+    async def execute_stream(
+        self,
+        session_id: str,
+        current_user: User,
+        content: str,
+        auto_approve_writes: bool = False,
+    ):
+        session, agent = await self._open_turn(session_id, current_user)
+
         privacy_trigger_detected = self._check_privacy_triggers(content)
-        is_turn_secret = privacy_trigger_detected or session.is_secret
-        suggest_secret_mode = privacy_trigger_detected and not session.is_secret
 
         async with self.uow:
             user_msg = ChatMessage(
@@ -315,6 +360,30 @@ class ProcessChatTurnUseCase:
             await self.uow.commit()
 
         recent_messages = await self.session_repo.get_messages(session.id, limit=30)
+
+        async for event in self._stream_answer(
+            session=session,
+            agent=agent,
+            current_user=current_user,
+            recent_messages=recent_messages,
+            privacy_trigger_detected=privacy_trigger_detected,
+            auto_approve_writes=auto_approve_writes,
+        ):
+            yield event
+
+    async def _stream_answer(
+        self,
+        session,
+        agent,
+        current_user: User,
+        recent_messages,
+        privacy_trigger_detected: bool,
+        auto_approve_writes: bool,
+    ):
+        """Generate and persist the answer. Everything a turn does once the question is settled."""
+        is_turn_secret = privacy_trigger_detected or session.is_secret
+        suggest_secret_mode = privacy_trigger_detected and not session.is_secret
+
         llm_messages = await self.context_assembler.execute(
             user=current_user,
             agent=agent,

@@ -58,7 +58,11 @@ def test_migrations_match_the_models():
 
 @pytest.mark.asyncio
 async def test_a_database_from_before_alembic_is_adopted_not_wiped():
-    """GIVEN a schema built by create_all WHEN the hub starts THEN it migrates with its rows intact."""
+    """GIVEN a pre-Alembic schema WHEN the hub starts THEN it migrates with its rows intact.
+
+    This also proves the upgrade *runs* rather than being stamped over: the index added after the
+    baseline has to exist afterwards, on a database that never had it.
+    """
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -66,11 +70,17 @@ async def test_a_database_from_before_alembic_is_adopted_not_wiped():
 
     with tempfile.TemporaryDirectory() as workspace:
         db_path = Path(workspace) / "legacy.db"
+        database_url = f"sqlite:///{db_path}"
 
-        # A hub that predates Alembic: every table, no alembic_version, and a row worth keeping.
+        # A hub that predates Alembic has the schema as it stood when Alembic arrived — which is
+        # what the baseline revision describes — and no alembic_version table. Building it from
+        # today's metadata instead would give it revisions it never ran, and the test would be
+        # asserting against a database that cannot exist.
+        command.upgrade(_alembic_config(database_url), "efd5e0befdb0")
+
         legacy = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
         async with legacy.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(text("DROP TABLE alembic_version"))
             await conn.execute(
                 text(
                     "INSERT INTO system_settings (key, value, created_at, updated_at) "
@@ -92,5 +102,13 @@ async def test_a_database_from_before_alembic_is_adopted_not_wiped():
                     text("SELECT value FROM system_settings WHERE key = 'household_name'")
                 )
                 assert survived.scalar() == "HyggeHub"
+
+                applied = await conn.execute(
+                    text(
+                        "SELECT name FROM sqlite_master WHERE type = 'index' "
+                        "AND name = 'ix_chat_messages_session_created'"
+                    )
+                )
+                assert applied.scalar() == "ix_chat_messages_session_created"
         finally:
             await migrated.dispose()

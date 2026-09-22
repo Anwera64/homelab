@@ -82,12 +82,16 @@ async def get_session(
     limit: int = Query(50, ge=1, le=100),
     before_id: Optional[str] = Query(None),
     use_case: GetSessionUseCase = Depends(get_session_use_case),
+    lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get session details and message history.
     Strict Zero-Leak Privacy: Only the session owner can view this session.
     Supports cursor pagination via 'limit' (1-100) and 'before_id'.
+
+    Also reports whether a turn is being generated right now, so a client whose stream dropped can
+    tell "still writing" from "the turn died" without waiting for a timeout to decide for it.
     """
     session, messages = await use_case.execute(
         session_id=session_id,
@@ -95,7 +99,9 @@ async def get_session(
         limit=limit,
         before_id=before_id,
     )
-    return SessionPresentationMapper.to_detail_response(session, messages)
+    detail = SessionPresentationMapper.to_detail_response(session, messages)
+    detail.turn_running = lock_registry.is_locked(session_id)
+    return detail
 
 
 @router.patch("/{session_id}/secret", response_model=SessionRead)
@@ -224,6 +230,80 @@ async def chat_turn(
             suggest_secret_mode=result.suggest_secret_mode,
             session_title=session_entity.title,
         )
+
+
+@router.post("/{session_id}/chat/regenerate")
+async def regenerate_answer(
+    session_id: str,
+    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
+    lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
+    stream_runner = Depends(get_background_chat_stream_runner),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Answer the last question again, streamed like any other turn, without asking it again.
+
+    A turn whose model timed out leaves the question stored and no answer. Re-sending the question
+    would store it twice; the screen promises only a fresh answer, so that is what this is.
+    """
+    if not await lock_registry.try_acquire(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session {session_id} is currently processing another message.",
+        )
+
+    try:
+        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+
+        last_message = messages[-1] if messages else None
+        if last_message is None or last_message.role != "user":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="There is no unanswered question in this conversation to answer again.",
+            )
+
+        agent_id = session_entity.agent_id or ""
+        agent = await agent_uc.execute(agent_id) if agent_id else None
+        agent_name = agent.name if agent else ""
+        question = last_message.content
+        is_first_turn = len(messages) == 1
+    except Exception:
+        await lock_registry.release(session_id)
+        raise
+
+    queue = asyncio.Queue()
+
+    async def worker():
+        try:
+            await stream_runner(
+                session_id=session_id,
+                current_user=current_user,
+                content=question,
+                auto_approve_writes=False,
+                queue=queue,
+                agent_id=agent_id,
+                agent_name=agent_name,
+                is_first_turn=is_first_turn,
+                regenerate=True,
+            )
+        finally:
+            await lock_registry.release(session_id)
+
+    asyncio.create_task(worker())
+
+    async def sse_generator():
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+            yield "data: [DONE]\n\n"
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
 
 @router.post("/{session_id}/chat/stream")

@@ -310,18 +310,30 @@ def get_container(session: AsyncSession):
         agent_id: str = "",
         agent_name: str = "",
         is_first_turn: bool = False,
+        regenerate: bool = False,
     ):
         try:
             async with AsyncSessionLocal() as bg_sess:
                 bg_container = get_container(bg_sess)
                 bg_stream_uc = bg_container[pres_deps.get_process_chat_turn_use_case]
                 final_event = None
-                async for event in bg_stream_uc.execute_stream(
-                    session_id=session_id,
-                    current_user=current_user,
-                    content=content,
-                    auto_approve_writes=auto_approve_writes,
-                ):
+                # Regenerating answers the question already in the transcript, so `content` is
+                # only what reflection is told about afterwards — the turn itself reads it back
+                # from the conversation rather than being handed it again.
+                turn = (
+                    bg_stream_uc.regenerate_stream(
+                        session_id=session_id,
+                        current_user=current_user,
+                    )
+                    if regenerate
+                    else bg_stream_uc.execute_stream(
+                        session_id=session_id,
+                        current_user=current_user,
+                        content=content,
+                        auto_approve_writes=auto_approve_writes,
+                    )
+                )
+                async for event in turn:
                     if event.get("type") == "done":
                         final_event = event
                     await queue.put(event)

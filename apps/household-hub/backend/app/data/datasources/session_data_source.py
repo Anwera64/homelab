@@ -1,12 +1,29 @@
+from dataclasses import dataclass
 from typing import Protocol, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
+from sqlalchemy.orm import joinedload
 
 from app.data.models.session_model import SessionModel, MessageModel
 
 
+@dataclass(frozen=True)
+class SessionListRow:
+    """
+    A session as the Chats list needs it: the row itself, plus the newest thing said in it.
+
+    The preview is not a column and never will be — it belongs to whichever message is latest, so
+    it is read alongside the session rather than stored on it. The agent travels on
+    `session.agent`, eagerly loaded, so the mapper can reach its name and avatar without a second
+    query per row.
+    """
+
+    session: SessionModel
+    last_message_preview: Optional[str]
+
+
 class ISessionDataSource(Protocol):
-    async def list_by_user_id(self, user_id: str) -> List[SessionModel]:
+    async def list_by_user_id(self, user_id: str) -> List[SessionListRow]:
         ...
 
     async def get_by_id(self, session_id: str) -> Optional[SessionModel]:
@@ -35,14 +52,30 @@ class SqliteSessionDataSource(ISessionDataSource):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def list_by_user_id(self, user_id: str) -> List[SessionModel]:
+    async def list_by_user_id(self, user_id: str) -> List[SessionListRow]:
+        # One correlated sub-select per row for the newest message. It is a seek rather than a
+        # scan because of ix_chat_messages_session_created; without that index this is the most
+        # expensive query in the hub.
+        newest_message = (
+            select(MessageModel.content)
+            .where(MessageModel.session_id == SessionModel.id)
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+            .correlate(SessionModel)
+            .scalar_subquery()
+        )
+
         stmt = (
-            select(SessionModel)
+            select(SessionModel, newest_message.label("last_message_preview"))
+            .options(joinedload(SessionModel.agent))
             .where(SessionModel.user_id == user_id)
             .order_by(SessionModel.updated_at.desc())
         )
         res = await self.session.execute(stmt)
-        return list(res.scalars().all())
+        return [
+            SessionListRow(session=session, last_message_preview=preview)
+            for session, preview in res.all()
+        ]
 
     async def get_by_id(self, session_id: str) -> Optional[SessionModel]:
         res = await self.session.execute(select(SessionModel).where(SessionModel.id == session_id))

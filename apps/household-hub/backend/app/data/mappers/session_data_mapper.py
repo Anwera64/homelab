@@ -1,8 +1,32 @@
 from app.domain.entities.session import ConversationSession, ChatMessage
+from app.data.datasources.session_data_source import SessionListRow
 from app.data.models.session_model import SessionModel, MessageModel
+
+# Long enough to recognise a conversation by, short enough that a list of forty rows is not a
+# transcript. The phone never truncates: a row shows what it is given.
+PREVIEW_LENGTH = 120
 
 
 class SessionDataMapper:
+    @staticmethod
+    def to_domain_session_row(row: SessionListRow) -> ConversationSession:
+        """A session with everything its Chats row draws — agent, and the last thing said."""
+        session = SessionDataMapper.to_domain_session(row.session)
+        agent = row.session.agent
+        session.last_message_preview = SessionDataMapper._preview(row.last_message_preview)
+        session.agent_name = agent.name if agent else None
+        session.agent_avatar = agent.avatar if agent else None
+        return session
+
+    @staticmethod
+    def _preview(content: str | None) -> str | None:
+        if content is None:
+            return None
+        collapsed = " ".join(content.split())
+        if len(collapsed) <= PREVIEW_LENGTH:
+            return collapsed
+        return collapsed[: PREVIEW_LENGTH - 1].rstrip() + "…"
+
     @staticmethod
     def to_domain_session(model: SessionModel) -> ConversationSession:
         return ConversationSession(
