@@ -32,7 +32,7 @@ ktlint_standard_package-name = disabled
 # dependency this rule exists to catch. See DesignSystemTokenTest.
 compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps
 
+[**/androidDeviceTest/**/*.kt]
 # Android instrumented tests write `GIVEN_..._WHEN_..._THEN_...` because dex below API 30
 # rejects a space in a method name and this client is minSdk 26. Again: TestNameCompatibilityTest.
-[**/androidDeviceTest/**/*.kt]
 ktlint_standard_function-naming = disabled

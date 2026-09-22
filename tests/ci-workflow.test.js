@@ -9,6 +9,7 @@ const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/household-hub-clien
 const SETUP_ACTION_PATH = path.join(ROOT_DIR, '.github/actions/setup-client/action.yml');
 const GRADLEW_PATH = 'apps/household-hub/client/gradlew';
 const GRADLE_PROPERTIES_PATH = path.join(ROOT_DIR, 'apps/household-hub/client/gradle.properties');
+const PRE_COMMIT_HOOK_PATH = path.join(ROOT_DIR, '.githooks/pre-commit');
 
 // Missing files read as empty so each check fails with its own message instead of aborting the suite.
 // Line endings are normalised: a Windows checkout with core.autocrlf hands the YAML over as CRLF, and
@@ -92,6 +93,35 @@ test('Household Hub client CI workflow', async (t) => {
     assert.ok(
       /uses:\s*actions\/cache\/restore@[\s\S]*?key:[^\n]*github\.sha/.test(uiTestsJob),
       'android-ui-tests must restore the build cache compile saved'
+    );
+  });
+
+  // The linter is only worth having if it cannot be quietly dropped. Two places enforce it: the
+  // hook, so a violation never reaches a commit, and CI, so it never reaches master from a machine
+  // whose hooks were skipped.
+  await t.test('A lint job runs ktlintCheck, beside the compile chain rather than behind it', () => {
+    const jobsBlock = topLevelBlock(workflowContent, 'jobs');
+    const lintJob = nestedBlock(jobsBlock, 'lint', 2);
+    assert.ok(lintJob, 'Workflow must define a lint job');
+    assert.ok(/\.\/gradlew\b[^\n]*\sktlintCheck(\s|$)/m.test(lintJob), 'lint must run ./gradlew ktlintCheck');
+    // Nothing to wait for: no Android SDK, no emulator, so it answers in about a minute.
+    assert.ok(!/^\s+needs:/m.test(lintJob), 'lint must not depend on another job');
+    assert.ok(
+      /uses:\s*["']?\.\/\.github\/actions\/setup-client\b/.test(lintJob),
+      'lint must use the shared ./.github/actions/setup-client'
+    );
+  });
+
+  await t.test('The pre-commit hook runs ktlintCheck on client commits', () => {
+    const hook = readIfExists(PRE_COMMIT_HOOK_PATH);
+    assert.ok(hook, '.githooks/pre-commit must exist');
+    assert.ok(/\bktlintCheck\b/.test(hook), 'The pre-commit hook must run ktlintCheck');
+    // Formatting is a command, not a puzzle; the hook has to name it.
+    assert.ok(/\bktlintFormat\b/.test(hook), 'A failing lint must tell the committer to run ktlintFormat');
+    // Only client commits pay for it.
+    assert.ok(
+      hook.includes('^apps/household-hub/client/'),
+      'The ktlint step must stay behind the staged-client-files guard'
     );
   });
 
