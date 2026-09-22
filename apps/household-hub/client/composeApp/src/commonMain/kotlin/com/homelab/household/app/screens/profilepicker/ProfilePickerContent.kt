@@ -32,9 +32,9 @@ import com.homelab.household.app.resources.picker_member_description
 import com.homelab.household.app.resources.picker_retry
 import com.homelab.household.app.resources.picker_title
 import com.homelab.household.app.resources.picker_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.profilepicker.PickerStatus
 import com.homelab.household.presentation.profilepicker.ProfilePickerUiState
@@ -50,10 +50,10 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ProfilePickerContent(
     state: ProfilePickerUiState,
-    onMemberSelected: (Member) -> Unit,
+    onSelectMember: (Member) -> Unit,
     onRetry: () -> Unit,
     onInviteCode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -66,117 +66,143 @@ fun ProfilePickerContent(
             // A new member opening the app is not on the picker: this is their door.
             Box(
                 modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 SecondaryButton(text = stringResource(Res.string.picker_invite_code), onClick = onInviteCode)
             }
-        }
+        },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(vertical = HearthTheme.spacing.huge),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically),
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             ) {
                 Text(
                     text = stringResource(Res.string.picker_title),
                     style = type.hero,
                     color = colors.textPrimary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 if (status is PickerStatus.Loaded) {
                     Text(
-                        text = pluralStringResource(Res.plurals.picker_member_count, status.members.size, status.members.size),
+                        text =
+                            pluralStringResource(
+                                Res.plurals.picker_member_count,
+                                status.members.size,
+                                status.members.size,
+                            ),
                         style = type.body,
-                        color = colors.textMuted
+                        color = colors.textMuted,
                     )
                 }
             }
 
             when (status) {
-                PickerStatus.Loading -> HearthProgressBar()
+                PickerStatus.Loading -> {
+                    HearthProgressBar()
+                }
 
                 is PickerStatus.Loaded -> {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterHorizontally),
-                        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                HearthTheme.spacing.xxl,
+                                Alignment.CenterHorizontally,
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
                     ) {
                         status.members.forEach { member ->
-                            Face(member = member, onClick = { onMemberSelected(member) })
+                            Face(member = member, onClick = { onSelectMember(member) })
                         }
                     }
                     Text(
                         text = stringResource(Res.string.picker_hint),
                         style = type.label,
                         color = colors.textMuted,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
 
-                PickerStatus.Unreachable -> Problem(stringResource(Res.string.picker_unreachable), onRetry)
-                PickerStatus.Failed -> Problem(stringResource(Res.string.picker_failed), onRetry)
+                PickerStatus.Unreachable -> {
+                    Problem(stringResource(Res.string.picker_unreachable), onRetry)
+                }
+
+                PickerStatus.Failed -> {
+                    Problem(stringResource(Res.string.picker_failed), onRetry)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun Face(member: Member, onClick: () -> Unit) {
+private fun Face(
+    member: Member,
+    onClick: () -> Unit,
+) {
     val colors = HearthTheme.colors
     Column(
-        modifier = Modifier
-            .clip(HearthShapes.item)
-            .clickable(onClickLabel = stringResource(Res.string.picker_member_description, member.name), onClick = onClick)
-            .padding(HearthTheme.spacing.sm),
+        modifier =
+            Modifier
+                .clip(HearthShapes.item)
+                .clickable(
+                    onClickLabel = stringResource(Res.string.picker_member_description, member.name),
+                    onClick = onClick,
+                ).padding(HearthTheme.spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         MemberAvatar(
             name = member.name,
             colour = member.avatarColor,
             size = HearthTheme.size.avatarHero,
-            glyph = HearthTheme.typography.glyphHero
+            glyph = HearthTheme.typography.glyphHero,
         )
         Text(text = member.name, style = HearthTheme.typography.bodyLarge, color = colors.textMuted)
     }
 }
 
 @Composable
-private fun Problem(message: String, onRetry: () -> Unit) {
+private fun Problem(
+    message: String,
+    onRetry: () -> Unit,
+) {
     val colors = HearthTheme.colors
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
     ) {
         Text(
             text = message,
             style = HearthTheme.typography.body,
             color = colors.textMuted,
             textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth)
+            modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
         )
         PrimaryButton(
             text = stringResource(Res.string.picker_retry),
             onClick = onRetry,
             icon = HearthIcon.Retry,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun ProfilePickerContentPreview(
-    @PreviewParameter(ProfilePickerUiStateProvider::class) state: ProfilePickerUiState
+    @PreviewParameter(ProfilePickerUiStateProvider::class) state: ProfilePickerUiState,
 ) {
     HearthTheme {
-        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
+        ProfilePickerContent(state = state, onSelectMember = {}, onRetry = {}, onInviteCode = {})
     }
 }

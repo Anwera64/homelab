@@ -17,9 +17,8 @@ import kotlinx.coroutines.launch
 
 class RemoveMemberViewModel(
     member: Member,
-    private val removeMember: RemoveMemberUseCase
+    private val removeMember: RemoveMemberUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(RemoveMemberUiState(member = member))
     val uiState: StateFlow<RemoveMemberUiState> = _uiState.asStateFlow()
 
@@ -48,13 +47,14 @@ class RemoveMemberViewModel(
                     _events.send(RemoveMemberEvent.Removed)
                 },
                 onFailure = { error ->
-                    val status = if (error is ServerOfflineException) {
-                        RemoveMemberStatus.Unreachable
-                    } else {
-                        RemoveMemberStatus.Failed
-                    }
+                    val status =
+                        if (error is ServerOfflineException) {
+                            RemoveMemberStatus.Unreachable
+                        } else {
+                            RemoveMemberStatus.Failed
+                        }
                     _uiState.update { it.copy(status = status) }
-                }
+                },
             )
         }
     }

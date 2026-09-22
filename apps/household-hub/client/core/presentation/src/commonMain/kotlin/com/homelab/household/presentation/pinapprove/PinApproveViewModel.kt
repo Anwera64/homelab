@@ -19,9 +19,8 @@ import kotlinx.coroutines.launch
 
 class PinApproveViewModel(
     member: Member,
-    private val approvePinReset: ApprovePinResetUseCase
+    private val approvePinReset: ApprovePinResetUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(PinApproveUiState(member = member))
     val uiState: StateFlow<PinApproveUiState> = _uiState.asStateFlow()
 
@@ -53,36 +52,53 @@ class PinApproveViewModel(
                 },
                 onFailure = { error ->
                     when (error) {
-                        is PinLockedException -> lockFor(error.retryAfterSeconds)
-                        is WrongPinException ->
-                            _uiState.update { it.copy(pin = "", status = PinApproveStatus.WrongPin(error.attemptsLeft)) }
-                        is ServerOfflineException -> _uiState.update { it.copy(status = PinApproveStatus.Unreachable) }
-                        else -> _uiState.update { it.copy(status = PinApproveStatus.Failed) }
+                        is PinLockedException -> {
+                            lockFor(error.retryAfterSeconds)
+                        }
+
+                        is WrongPinException -> {
+                            _uiState.update {
+                                it.copy(
+                                    pin = "",
+                                    status = PinApproveStatus.WrongPin(error.attemptsLeft),
+                                )
+                            }
+                        }
+
+                        is ServerOfflineException -> {
+                            _uiState.update { it.copy(status = PinApproveStatus.Unreachable) }
+                        }
+
+                        else -> {
+                            _uiState.update { it.copy(status = PinApproveStatus.Failed) }
+                        }
                     }
-                }
+                },
             )
         }
     }
 
     private fun lockFor(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(pin = "", status = PinApproveStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(pin = "", status = PinApproveStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = PinApproveStatus.Idle) }
             }
-            _uiState.update { it.copy(status = PinApproveStatus.Idle) }
-        }
     }
 
     /** How long they have to use the code, counted down from what the hub said. */
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 0) {
-                _uiState.update { it.copy(secondsLeft = left) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 0) {
+                    _uiState.update { it.copy(secondsLeft = left) }
+                    delay(1_000)
+                }
             }
-        }
     }
 }

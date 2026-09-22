@@ -6,5 +6,5 @@ import com.homelab.household.domain.model.User
 data class ProfileUiState(
     val member: User? = null,
     val isSoleAdmin: Boolean = false,
-    val status: ProfileStatus = ProfileStatus.Loading
+    val status: ProfileStatus = ProfileStatus.Loading,
 )

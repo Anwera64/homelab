@@ -56,9 +56,9 @@ import com.homelab.household.app.resources.pin_locked_countdown
 import com.homelab.household.app.resources.pin_title
 import com.homelab.household.app.resources.pin_unreachable
 import com.homelab.household.app.resources.pin_wrong
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.Pin
@@ -79,20 +79,20 @@ fun PinEntryContent(
     onDigit: (Char) -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
-    onForgotten: () -> Unit,
-    modifier: Modifier = Modifier
+    onForget: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     HearthScaffold(
         modifier = modifier,
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.pin_back)) },
-        gutter = HearthTheme.spacing.none
+        gutter = HearthTheme.spacing.none,
     ) { padding ->
         PinPad(
             state = state,
             onDigit = onDigit,
             onDelete = onDelete,
-            onForgotten = onForgotten,
-            modifier = Modifier.fillMaxSize().padding(padding)
+            onForget = onForget,
+            modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
 }
@@ -102,30 +102,31 @@ private fun PinPad(
     state: PinEntryUiState,
     onDigit: (Char) -> Unit,
     onDelete: () -> Unit,
-    onForgotten: () -> Unit,
-    modifier: Modifier
+    onForget: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val spacing = HearthTheme.spacing
 
     Column(modifier = modifier) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = spacing.xxl, end = spacing.xxl, top = spacing.sm),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = spacing.xxl, end = spacing.xxl, top = spacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(spacing.lg)
+            verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
             MemberAvatar(
                 name = state.member.name,
                 colour = state.member.avatarColor,
                 size = HearthTheme.size.tile,
-                glyph = HearthTheme.typography.glyphXxl
+                glyph = HearthTheme.typography.glyphXxl,
             )
             Text(
                 text = stringResource(Res.string.pin_title, state.member.name),
                 style = HearthTheme.typography.title,
-                color = colors.textPrimary
+                color = colors.textPrimary,
             )
         }
 
@@ -136,17 +137,19 @@ private fun PinPad(
         Dots(
             entered = state.entered,
             waving = wait != WaitPhase.Hidden,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = spacing.xxl, bottom = spacing.sm)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = spacing.xxl, bottom = spacing.sm),
         )
 
         StatusLine(
             status = state.status,
             wait = wait,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.xxl)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.xxl),
         )
 
         // Recovery is social, and it starts here: there is no email to send a reset to.
@@ -155,24 +158,26 @@ private fun PinPad(
             style = HearthTheme.typography.bodyStrong,
             color = colors.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .clickable(onClick = onForgotten)
-                .padding(horizontal = spacing.md, vertical = spacing.sm)
+            modifier =
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clickable(onClick = onForget)
+                    .padding(horizontal = spacing.md, vertical = spacing.sm),
         )
 
         Keypad(
             onDigit = onDigit,
             onDelete = onDelete,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(start = spacing.xxxl, end = spacing.xxxl, top = spacing.xl, bottom = spacing.xxxl)
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(start = spacing.xxxl, end = spacing.xxxl, top = spacing.xl, bottom = spacing.xxxl),
         )
     }
 }
 
-const val PinDotsTag = "PinDots"
+const val PIN_DOTS_TAG = "PinDots"
 
 /**
  * The six dots, and while the hub has the PIN, the wave (design notes §6.21, pattern 5).
@@ -187,34 +192,40 @@ const val PinDotsTag = "PinDots"
  * it rather than a seventh thing to read out.
  */
 @Composable
-private fun Dots(entered: Int, waving: Boolean, modifier: Modifier) {
+private fun Dots(
+    entered: Int,
+    waving: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     val description = pluralStringResource(Res.plurals.pin_entered, entered, entered)
     val checking = stringResource(Res.string.a11y_pin_checking)
 
     Row(
-        modifier = modifier
-            .testTag(PinDotsTag)
-            .clearAndSetSemantics {
-                contentDescription = description
-                if (waving) {
-                    stateDescription = checking
-                    liveRegion = LiveRegionMode.Polite
-                }
-            },
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterHorizontally)
+        modifier =
+            modifier
+                .testTag(PIN_DOTS_TAG)
+                .clearAndSetSemantics {
+                    contentDescription = description
+                    if (waving) {
+                        stateDescription = checking
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                },
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterHorizontally),
     ) {
         repeat(Pin.LENGTH) { index ->
             val filled = index < entered
-            val dot = Modifier
-                .size(HearthTheme.size.pinDot)
-                .offset(y = if (filled) waveLift(waving, index) else HearthTheme.spacing.none)
+            val dot =
+                Modifier
+                    .size(HearthTheme.size.pinDot)
+                    .offset(y = if (filled) waveLift(waving, index) else HearthTheme.spacing.none)
             Box(
                 if (filled) {
                     dot.background(colors.primary, CircleShape)
                 } else {
                     dot.border(HearthTheme.size.hairline, colors.outline, CircleShape)
-                }
+                },
             )
         }
     }
@@ -229,7 +240,10 @@ private fun Dots(entered: Int, waving: Boolean, modifier: Modifier) {
  * failing (see `HearthMotion`).
  */
 @Composable
-private fun waveLift(waving: Boolean, position: Int): Dp {
+private fun waveLift(
+    waving: Boolean,
+    position: Int,
+): Dp {
     val motion = HearthTheme.motion
     if (!waving || !motion.animate) return HearthTheme.spacing.none
 
@@ -237,12 +251,13 @@ private fun waveLift(waving: Boolean, position: Int): Dp {
     val lift by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = motion.wave.inWholeMilliseconds.toInt()),
-            repeatMode = RepeatMode.Reverse,
-            initialStartOffset = StartOffset((motion.waveStagger * position).inWholeMilliseconds.toInt())
-        ),
-        label = "pinWaveLift"
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = motion.wave.inWholeMilliseconds.toInt()),
+                repeatMode = RepeatMode.Reverse,
+                initialStartOffset = StartOffset((motion.waveStagger * position).inWholeMilliseconds.toInt()),
+            ),
+        label = "pinWaveLift",
     )
     return motion.waveLift * -lift
 }
@@ -253,49 +268,80 @@ private fun waveLift(waving: Boolean, position: Int): Dp {
  * would otherwise shove the whole keypad down under the reader's thumb.
  */
 @Composable
-private fun StatusLine(status: PinStatus, wait: WaitPhase, modifier: Modifier) {
+private fun StatusLine(
+    status: PinStatus,
+    wait: WaitPhase,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     val caption = HearthTheme.typography.caption
 
     @Composable
-    fun line(text: String, warning: Boolean) =
-        Text(text = text, style = caption, color = if (warning) colors.error else colors.textMuted, textAlign = TextAlign.Center)
+    fun line(
+        text: String,
+        warning: Boolean,
+    ) = Text(
+        text = text,
+        style = caption,
+        color = if (warning) colors.error else colors.textMuted,
+        textAlign = TextAlign.Center,
+    )
 
     Column(
         modifier = modifier.heightIn(min = HearthTheme.size.statusLine),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
     ) {
         when (status) {
             // Checking says nothing here: the dots are already saying it, and the slow line is
             // what turns up in this reserved space if the hub takes its time.
-            PinStatus.Idle, PinStatus.Checking -> SlowLine(wait)
+            PinStatus.Idle, PinStatus.Checking -> {
+                SlowLine(wait)
+            }
+
             // The canvas draws the warning from two tries out; before that a miss is just a miss.
-            is PinStatus.WrongPin -> if (status.attemptsLeft <= WARN_FROM_ATTEMPTS_LEFT) {
-                line(pluralStringResource(Res.plurals.pin_attempts_left, status.attemptsLeft, status.attemptsLeft), warning = false)
-            } else {
-                line(stringResource(Res.string.pin_wrong), warning = true)
+            is PinStatus.WrongPin -> {
+                if (status.attemptsLeft <= WARN_FROM_ATTEMPTS_LEFT) {
+                    line(
+                        pluralStringResource(Res.plurals.pin_attempts_left, status.attemptsLeft, status.attemptsLeft),
+                        warning = false,
+                    )
+                } else {
+                    line(stringResource(Res.string.pin_wrong), warning = true)
+                }
             }
 
             is PinStatus.Locked -> {
                 line(stringResource(Res.string.pin_locked), warning = true)
-                line(pluralStringResource(Res.plurals.pin_locked_countdown, status.secondsLeft, status.secondsLeft), warning = true)
+                line(
+                    pluralStringResource(Res.plurals.pin_locked_countdown, status.secondsLeft, status.secondsLeft),
+                    warning = true,
+                )
             }
 
-            PinStatus.Unreachable -> line(stringResource(Res.string.pin_unreachable), warning = true)
-            PinStatus.Failed -> line(stringResource(Res.string.pin_failed), warning = true)
+            PinStatus.Unreachable -> {
+                line(stringResource(Res.string.pin_unreachable), warning = true)
+            }
+
+            PinStatus.Failed -> {
+                line(stringResource(Res.string.pin_failed), warning = true)
+            }
         }
     }
 }
 
 @Composable
-private fun Keypad(onDigit: (Char) -> Unit, onDelete: () -> Unit, modifier: Modifier) {
+private fun Keypad(
+    onDigit: (Char) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val spacing = HearthTheme.spacing
     val deleteDescription = stringResource(Res.string.pin_delete)
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(spacing.lg, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(spacing.lg, Alignment.CenterVertically),
     ) {
         listOf("123", "456", "789").forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing.lg)) {
@@ -306,19 +352,20 @@ private fun Keypad(onDigit: (Char) -> Unit, onDelete: () -> Unit, modifier: Modi
             Spacer(Modifier.weight(1f))
             DigitKey(digit = '0', onDigit = onDigit, modifier = Modifier.weight(1f))
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = HearthTheme.size.tile)
-                    .clip(HearthShapes.key)
-                    .clickable(onClick = onDelete)
-                    .semantics { contentDescription = deleteDescription },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = HearthTheme.size.tile)
+                        .clip(HearthShapes.key)
+                        .clickable(onClick = onDelete)
+                        .semantics { contentDescription = deleteDescription },
+                contentAlignment = Alignment.Center,
             ) {
                 HearthIconImage(
                     icon = HearthIcon.Delete,
                     contentDescription = null,
                     size = HearthTheme.size.iconXl,
-                    tint = HearthTheme.colors.textMuted
+                    tint = HearthTheme.colors.textMuted,
                 )
             }
         }
@@ -326,15 +373,20 @@ private fun Keypad(onDigit: (Char) -> Unit, onDelete: () -> Unit, modifier: Modi
 }
 
 @Composable
-private fun DigitKey(digit: Char, onDigit: (Char) -> Unit, modifier: Modifier) {
+private fun DigitKey(
+    digit: Char,
+    onDigit: (Char) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     Box(
-        modifier = modifier
-            .heightIn(min = HearthTheme.size.tile)
-            .clip(HearthShapes.key)
-            .background(colors.surface)
-            .clickable { onDigit(digit) },
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .heightIn(min = HearthTheme.size.tile)
+                .clip(HearthShapes.key)
+                .background(colors.surface)
+                .clickable { onDigit(digit) },
+        contentAlignment = Alignment.Center,
     ) {
         Text(text = digit.toString(), style = HearthTheme.typography.glyphXxl, color = colors.textPrimary)
     }
@@ -342,12 +394,12 @@ private fun DigitKey(digit: Char, onDigit: (Char) -> Unit, modifier: Modifier) {
 
 private const val WARN_FROM_ATTEMPTS_LEFT = 2
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PinEntryContentPreview(
-    @PreviewParameter(PinEntryUiStateProvider::class) state: PinEntryUiState
+    @PreviewParameter(PinEntryUiStateProvider::class) state: PinEntryUiState,
 ) {
     HearthTheme {
-        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForgotten = {})
+        PinEntryContent(state = state, onDigit = {}, onDelete = {}, onBack = {}, onForget = {})
     }
 }

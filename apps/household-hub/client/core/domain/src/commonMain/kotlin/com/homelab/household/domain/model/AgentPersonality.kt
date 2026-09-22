@@ -16,5 +16,5 @@ data class AgentPersonality(
     val ownerId: String? = null,
     val deletedAt: String? = null,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
 )

@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.width
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_invite_code_checking
 import com.homelab.household.app.resources.invite_code_checking
@@ -24,15 +24,14 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.presentation.invitecode.InviteCodeStatus
 import com.homelab.household.presentation.invitecode.InviteCodeUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.jetbrains.compose.resources.getString
 
 /** Entering an invite code, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class InviteCodeScreenTest {
-
     @Test
     fun a_good_code_opens_the_join_screen() {
         val hub = FakeJoinHub()
@@ -137,30 +136,31 @@ class InviteCodeScreenTest {
      * Nothing is dimmed — the button stays enabled and at full colour (design notes §2).
      */
     @Test
-    fun checking_the_code_shows_on_the_button_that_asked() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                InviteCodeContent(
-                    state = InviteCodeUiState(code = "K7M2QP", status = InviteCodeStatus.Checking),
-                    onCodeChange = {},
-                    onContinue = {},
-                    onPaste = {},
-                    onBack = {}
-                )
+    fun checking_the_code_shows_on_the_button_that_asked() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    InviteCodeContent(
+                        state = InviteCodeUiState(code = "K7M2QP", status = InviteCodeStatus.Checking),
+                        onCodeChange = {},
+                        onContinue = {},
+                        onPaste = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.invite_code_checking))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_invite_code_checking)
+            onNodeWithText(getString(Res.string.invite_code_checking))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_invite_code_checking),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
+        }
 
     /**
      * The slow line sits under the button, so the button now has a `Column` between it and the
@@ -169,29 +169,31 @@ class InviteCodeScreenTest {
      * to tests that assert semantics, colour and height and never once a width.
      */
     @Test
-    fun the_continue_button_still_fills_the_screen_under_its_wrapper() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                InviteCodeContent(
-                    state = InviteCodeUiState(code = "K7M2QP"),
-                    onCodeChange = {},
-                    onContinue = {},
-                    onPaste = {},
-                    onBack = {}
-                )
+    fun the_continue_button_still_fills_the_screen_under_its_wrapper() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    InviteCodeContent(
+                        state = InviteCodeUiState(code = "K7M2QP"),
+                        onCodeChange = {},
+                        onContinue = {},
+                        onPaste = {},
+                        onBack = {},
+                    )
+                }
             }
+
+            val screen = onRoot().getUnclippedBoundsInRoot().width
+            val button =
+                onNodeWithText(getString(Res.string.invite_code_continue))
+                    .getUnclippedBoundsInRoot()
+                    .width
+
+            assertTrue(
+                button > screen / 2,
+                "the button was told to fill its width but measured $button inside a $screen screen",
+            )
         }
-
-        val screen = onRoot().getUnclippedBoundsInRoot().width
-        val button = onNodeWithText(getString(Res.string.invite_code_continue))
-            .getUnclippedBoundsInRoot()
-            .width
-
-        assertTrue(
-            button > screen / 2,
-            "the button was told to fill its width but measured $button inside a $screen screen"
-        )
-    }
 
     @Test
     fun every_previewed_state_draws() {
@@ -206,7 +208,7 @@ class InviteCodeScreenTest {
                             onCodeChange = {},
                             onContinue = {},
                             onPaste = {},
-                            onBack = {}
+                            onBack = {},
                         )
                     }
                 }

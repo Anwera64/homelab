@@ -21,9 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class LeaveHouseholdViewModel(
-    private val leaveHousehold: LeaveHouseholdUseCase
+    private val leaveHousehold: LeaveHouseholdUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(LeaveHouseholdUiState())
     val uiState: StateFlow<LeaveHouseholdUiState> = _uiState.asStateFlow()
 
@@ -58,28 +57,42 @@ class LeaveHouseholdViewModel(
                 },
                 onFailure = { error ->
                     when (error) {
-                        is PinLockedException -> countDown(error.retryAfterSeconds)
-                        is WrongPinException -> _uiState.update {
-                            it.copy(pin = "", status = LeaveHouseholdStatus.WrongPin(error.attemptsLeft))
+                        is PinLockedException -> {
+                            countDown(error.retryAfterSeconds)
                         }
-                        is SoleAdminException -> _uiState.update { it.copy(status = LeaveHouseholdStatus.SoleAdmin) }
-                        is ServerOfflineException ->
+
+                        is WrongPinException -> {
+                            _uiState.update {
+                                it.copy(pin = "", status = LeaveHouseholdStatus.WrongPin(error.attemptsLeft))
+                            }
+                        }
+
+                        is SoleAdminException -> {
+                            _uiState.update { it.copy(status = LeaveHouseholdStatus.SoleAdmin) }
+                        }
+
+                        is ServerOfflineException -> {
                             _uiState.update { it.copy(status = LeaveHouseholdStatus.Unreachable) }
-                        else -> _uiState.update { it.copy(status = LeaveHouseholdStatus.Failed) }
+                        }
+
+                        else -> {
+                            _uiState.update { it.copy(status = LeaveHouseholdStatus.Failed) }
+                        }
                     }
-                }
+                },
             )
         }
     }
 
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(pin = "", status = LeaveHouseholdStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(pin = "", status = LeaveHouseholdStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = LeaveHouseholdStatus.Idle) }
             }
-            _uiState.update { it.copy(status = LeaveHouseholdStatus.Idle) }
-        }
     }
 }

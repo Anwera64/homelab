@@ -23,7 +23,7 @@ fun PinField(
     contentDescription: String? = null,
     helper: String? = null,
     error: String? = null,
-    imeAction: ImeAction = ImeAction.Done
+    imeAction: ImeAction = ImeAction.Done,
 ) {
     HearthTextField(
         value = value,
@@ -36,6 +36,6 @@ fun PinField(
         error = error,
         textStyle = HearthTheme.typography.monoLg,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = imeAction),
-        visualTransformation = PasswordVisualTransformation()
+        visualTransformation = PasswordVisualTransformation(),
     )
 }

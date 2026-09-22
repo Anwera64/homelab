@@ -10,5 +10,5 @@ data class ChangePinUiState(
     val currentError: CurrentPinError? = null,
     val newError: PinError? = null,
     val againMismatch: Boolean = false,
-    val status: ChangePinStatus = ChangePinStatus.Idle
+    val status: ChangePinStatus = ChangePinStatus.Idle,
 )

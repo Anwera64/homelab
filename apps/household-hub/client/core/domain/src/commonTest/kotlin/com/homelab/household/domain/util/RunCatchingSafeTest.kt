@@ -1,14 +1,13 @@
 package com.homelab.household.domain.util
 
+import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlinx.coroutines.test.runTest
 
 class RunCatchingSafeTest {
-
     @Test
     fun wraps_a_returned_value_as_success() {
         val result = runCatchingSafe { 42 }
@@ -25,9 +24,10 @@ class RunCatchingSafeTest {
 
     /** Swallowing cancellation would let a cancelled coroutine carry on as if it had failed. */
     @Test
-    fun rethrows_cancellation_instead_of_wrapping_it() = runTest {
-        assertFailsWith<CancellationException> {
-            runCatchingSafe { throw CancellationException("cancelled") }
+    fun rethrows_cancellation_instead_of_wrapping_it() =
+        runTest {
+            assertFailsWith<CancellationException> {
+                runCatchingSafe { throw CancellationException("cancelled") }
+            }
         }
-    }
 }

@@ -26,22 +26,24 @@ fun ToolRecordLine(
     text: String,
     modifier: Modifier = Modifier,
     tint: Color = HearthTheme.colors.textMuted,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
-    val interaction = if (onClick != null) {
-        Modifier
-            .minimumInteractiveComponentSize()
-            .clip(HearthShapes.item)
-            .clickable(onClick = onClick)
-    } else {
-        Modifier
-    }
+    val interaction =
+        if (onClick != null) {
+            Modifier
+                .minimumInteractiveComponentSize()
+                .clip(HearthShapes.item)
+                .clickable(onClick = onClick)
+        } else {
+            Modifier
+        }
     Row(
-        modifier = modifier
-            .then(interaction)
-            .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
+        modifier =
+            modifier
+                .then(interaction)
+                .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconSm, tint = tint)
         Text(text = text, style = HearthTheme.typography.label, color = tint)

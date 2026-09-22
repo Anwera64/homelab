@@ -6,5 +6,5 @@ data class MemberRow(
     val name: String,
     val avatarColor: String,
     val isYou: Boolean,
-    val isAdmin: Boolean
+    val isAdmin: Boolean,
 )

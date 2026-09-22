@@ -41,8 +41,8 @@ import com.homelab.household.app.resources.remove_stays_title
 import com.homelab.household.app.resources.remove_submit
 import com.homelab.household.app.resources.remove_title
 import com.homelab.household.app.resources.remove_unreachable
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.removemember.RemoveMemberStatus
@@ -61,7 +61,7 @@ fun RemoveMemberContent(
     onNameChange: (String) -> Unit,
     onRemove: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val wait = rememberWaitPhase(state.status == RemoveMemberStatus.Removing)
     val waiting = wait != WaitPhase.Hidden
@@ -76,71 +76,74 @@ fun RemoveMemberContent(
         bottomBar = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
-                    text = if (waiting) {
-                        stringResource(Res.string.remove_removing)
-                    } else {
-                        stringResource(Res.string.remove_submit, name)
-                    },
+                    text =
+                        if (waiting) {
+                            stringResource(Res.string.remove_removing)
+                        } else {
+                            stringResource(Res.string.remove_submit, name)
+                        },
                     onClick = onRemove,
                     busy = waiting,
                     busyDescription = stringResource(Res.string.a11y_remove_removing, name),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SecondaryButton(
                     text = stringResource(Res.string.remove_keep),
                     onClick = onBack,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SlowLine(wait)
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
                 modifier = Modifier.padding(top = HearthTheme.spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             ) {
                 MemberAvatar(
                     name = name,
                     colour = state.member.avatarColor,
                     size = HearthTheme.size.tile,
-                    glyph = type.glyphXxl
+                    glyph = type.glyphXxl,
                 )
                 Text(
                     stringResource(Res.string.remove_title, name),
                     style = type.title,
                     color = colors.textPrimary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Text(
                     stringResource(Res.string.remove_detail),
                     style = type.body,
                     color = colors.textMuted,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
 
             ConsequenceCards(
                 erasedTitle = stringResource(Res.string.remove_erased_title),
-                erased = listOf(
-                    stringResource(Res.string.remove_erased_chats),
-                    stringResource(Res.string.remove_erased_space),
-                    stringResource(Res.string.remove_erased_calendar)
-                ),
+                erased =
+                    listOf(
+                        stringResource(Res.string.remove_erased_chats),
+                        stringResource(Res.string.remove_erased_space),
+                        stringResource(Res.string.remove_erased_calendar),
+                    ),
                 staysTitle = stringResource(Res.string.remove_stays_title),
-                stays = listOf(
-                    stringResource(Res.string.remove_stays_shared),
-                    stringResource(Res.string.remove_stays_agents)
-                ),
-                modifier = Modifier.fillMaxWidth()
+                stays =
+                    listOf(
+                        stringResource(Res.string.remove_stays_shared),
+                        stringResource(Res.string.remove_stays_agents),
+                    ),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Text(stringResource(Res.string.remove_agents_note), style = type.caption, color = colors.textMuted)
@@ -151,7 +154,7 @@ fun RemoveMemberContent(
                 label = stringResource(Res.string.remove_confirm_label, name),
                 contentDescription = stringResource(Res.string.remove_confirm_label, name),
                 error = if (state.nameMismatch) stringResource(Res.string.remove_confirm_mismatch) else null,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             failure(state.status)?.let { failure ->
@@ -162,16 +165,17 @@ fun RemoveMemberContent(
 }
 
 @Composable
-private fun failure(status: RemoveMemberStatus): String? = when (status) {
-    RemoveMemberStatus.Unreachable -> stringResource(Res.string.remove_unreachable)
-    RemoveMemberStatus.Failed -> stringResource(Res.string.members_failed)
-    else -> null
-}
+private fun failure(status: RemoveMemberStatus): String? =
+    when (status) {
+        RemoveMemberStatus.Unreachable -> stringResource(Res.string.remove_unreachable)
+        RemoveMemberStatus.Failed -> stringResource(Res.string.members_failed)
+        else -> null
+    }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun RemoveMemberContentPreview(
-    @PreviewParameter(RemoveMemberUiStateProvider::class) state: RemoveMemberUiState
+    @PreviewParameter(RemoveMemberUiStateProvider::class) state: RemoveMemberUiState,
 ) {
     HearthTheme {
         RemoveMemberContent(state = state, onNameChange = {}, onRemove = {}, onBack = {})

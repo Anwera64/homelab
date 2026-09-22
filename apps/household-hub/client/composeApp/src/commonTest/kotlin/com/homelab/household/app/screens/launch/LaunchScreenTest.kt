@@ -32,7 +32,6 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class LaunchScreenTest {
-
     /** No "your hub is ready" on the way: the splash is all there is until the user moves on. */
     @Test
     fun a_hub_with_members_sends_the_user_to_sign_in_from_the_splash() {
@@ -189,6 +188,7 @@ class LaunchScreenTest {
                 onLaunch {
                     when (val status = state.status) {
                         HubStatus.Checking -> seesItReachingTheHub()
+
                         // The previewed reason is one the hub can really produce.
                         is HubStatus.Unavailable -> seesTheHubIsUnavailable(status.reason)
                     }
@@ -200,18 +200,19 @@ class LaunchScreenTest {
 
     /** A short phone or a large font: the offline screen scrolls rather than clipping its buttons. */
     @Test
-    fun the_offline_screen_scrolls_when_it_does_not_fit() = runComposeUiTest {
-        val offline = LaunchUiStateProvider().values.first { it.status is HubStatus.Unavailable }
-        setContent {
-            StillTheme {
-                Box(Modifier.size(width = 360.dp, height = 320.dp)) {
-                    LaunchContent(state = offline, onRetry = {}, onOpenTailscale = {})
+    fun the_offline_screen_scrolls_when_it_does_not_fit() =
+        runComposeUiTest {
+            val offline = LaunchUiStateProvider().values.first { it.status is HubStatus.Unavailable }
+            setContent {
+                StillTheme {
+                    Box(Modifier.size(width = 360.dp, height = 320.dp)) {
+                        LaunchContent(state = offline, onRetry = {}, onOpenTailscale = {})
+                    }
                 }
             }
-        }
 
-        onNodeWithText(getString(Res.string.launch_offline_hint)).performScrollTo().assertIsDisplayed()
-    }
+            onNodeWithText(getString(Res.string.launch_offline_hint)).performScrollTo().assertIsDisplayed()
+        }
 
     private companion object {
         const val WAIT_MILLIS = 5_000L

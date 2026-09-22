@@ -22,9 +22,8 @@ import kotlinx.coroutines.launch
 
 class NewPinViewModel(
     private val code: String,
-    private val redeemPinReset: RedeemPinResetUseCase
+    private val redeemPinReset: RedeemPinResetUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(NewPinUiState())
     val uiState: StateFlow<NewPinUiState> = _uiState.asStateFlow()
 
@@ -70,7 +69,7 @@ class NewPinViewModel(
                         is ServerOfflineException -> _uiState.update { it.copy(status = NewPinStatus.Unreachable) }
                         else -> _uiState.update { it.copy(status = NewPinStatus.Failed) }
                     }
-                }
+                },
             )
         }
     }
@@ -79,12 +78,13 @@ class NewPinViewModel(
 
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(status = NewPinStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(status = NewPinStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = NewPinStatus.Idle) }
             }
-            _uiState.update { it.copy(status = NewPinStatus.Idle) }
-        }
     }
 }

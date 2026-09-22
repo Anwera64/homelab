@@ -4,5 +4,5 @@ package com.homelab.household.presentation.members
 data class MembersUiState(
     val rows: List<MemberRow> = emptyList(),
     val youAreAdmin: Boolean = false,
-    val status: MembersStatus = MembersStatus.Loading
+    val status: MembersStatus = MembersStatus.Loading,
 )

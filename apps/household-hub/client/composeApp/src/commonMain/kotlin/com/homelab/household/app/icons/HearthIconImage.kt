@@ -17,12 +17,12 @@ fun HearthIconImage(
     modifier: Modifier = Modifier,
     active: Boolean = false,
     size: Dp = HearthTheme.size.iconLg,
-    tint: Color = LocalContentColor.current
+    tint: Color = LocalContentColor.current,
 ) {
     Icon(
         imageVector = icon.vector(active),
         contentDescription = contentDescription,
         modifier = modifier.size(size),
-        tint = tint
+        tint = tint,
     )
 }

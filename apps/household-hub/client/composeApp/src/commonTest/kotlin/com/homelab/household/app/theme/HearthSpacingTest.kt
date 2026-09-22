@@ -12,19 +12,19 @@ import kotlin.test.assertTrue
  * raw dp instead.
  */
 class HearthSpacingTest {
-
-    private val spacingSteps = listOf(
-        "none" to DefaultSpacing.none,
-        "xxs" to DefaultSpacing.xxs,
-        "xs" to DefaultSpacing.xs,
-        "sm" to DefaultSpacing.sm,
-        "md" to DefaultSpacing.md,
-        "lg" to DefaultSpacing.lg,
-        "xl" to DefaultSpacing.xl,
-        "xxl" to DefaultSpacing.xxl,
-        "xxxl" to DefaultSpacing.xxxl,
-        "huge" to DefaultSpacing.huge
-    )
+    private val spacingSteps =
+        listOf(
+            "none" to DefaultSpacing.none,
+            "xxs" to DefaultSpacing.xxs,
+            "xs" to DefaultSpacing.xs,
+            "sm" to DefaultSpacing.sm,
+            "md" to DefaultSpacing.md,
+            "lg" to DefaultSpacing.lg,
+            "xl" to DefaultSpacing.xl,
+            "xxl" to DefaultSpacing.xxl,
+            "xxxl" to DefaultSpacing.xxxl,
+            "huge" to DefaultSpacing.huge,
+        )
 
     @Test
     fun spacing_steps_only_climb() {
@@ -45,14 +45,15 @@ class HearthSpacingTest {
 
     @Test
     fun icon_sizes_climb_in_four_dp_steps() {
-        val icons = listOf(
-            "iconSm" to DefaultSizes.iconSm,
-            "iconMd" to DefaultSizes.iconMd,
-            "iconLg" to DefaultSizes.iconLg,
-            "iconXl" to DefaultSizes.iconXl,
-            "iconXxl" to DefaultSizes.iconXxl,
-            "iconHero" to DefaultSizes.iconHero
-        )
+        val icons =
+            listOf(
+                "iconSm" to DefaultSizes.iconSm,
+                "iconMd" to DefaultSizes.iconMd,
+                "iconLg" to DefaultSizes.iconLg,
+                "iconXl" to DefaultSizes.iconXl,
+                "iconXxl" to DefaultSizes.iconXxl,
+                "iconHero" to DefaultSizes.iconHero,
+            )
         icons.forEach { (name, size) -> assertOnGrid(size, 4, "size $name") }
         icons.zipWithNext { (smallerName, smaller), (largerName, larger) ->
             assertTrue(larger > smaller, "$largerName ($larger) must be a bigger icon than $smallerName ($smaller)")
@@ -69,7 +70,7 @@ class HearthSpacingTest {
             "swatch" to DefaultSizes.swatch,
             "avatarHero" to DefaultSizes.avatarHero,
             "readingWidth" to DefaultSizes.readingWidth,
-            "progressTrack" to DefaultSizes.progressTrack
+            "progressTrack" to DefaultSizes.progressTrack,
         ).forEach { (name, size) -> assertOnGrid(size, 8, "size $name") }
     }
 
@@ -80,10 +81,13 @@ class HearthSpacingTest {
 
     @Test
     fun a_tappable_thing_is_never_smaller_than_the_accessibility_floor() {
-        assertTrue(DefaultSizes.touchTarget >= 48.dp, "touchTarget is ${DefaultSizes.touchTarget}, under the 48dp floor")
+        assertTrue(
+            DefaultSizes.touchTarget >= 48.dp,
+            "touchTarget is ${DefaultSizes.touchTarget}, under the 48dp floor",
+        )
         assertTrue(
             DefaultSizes.control >= DefaultSizes.touchTarget,
-            "control (${DefaultSizes.control}) must clear touchTarget (${DefaultSizes.touchTarget})"
+            "control (${DefaultSizes.control}) must clear touchTarget (${DefaultSizes.touchTarget})",
         )
     }
 
@@ -99,7 +103,11 @@ class HearthSpacingTest {
         assertEquals(HearthShapes.bento, HearthShapes.tile)
     }
 
-    private fun assertOnGrid(value: Dp, grid: Int, what: String) {
+    private fun assertOnGrid(
+        value: Dp,
+        grid: Int,
+        what: String,
+    ) {
         assertTrue(value.value % grid == 0f, "$what is $value, off the ${grid}dp grid")
     }
 }

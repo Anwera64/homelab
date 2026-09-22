@@ -27,12 +27,12 @@ class JoinViewModel(
     preview: InvitePreview,
     private val code: String,
     private val joinHousehold: JoinHouseholdUseCase,
-    private val listMembers: ListMembersUseCase
+    private val listMembers: ListMembersUseCase,
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(
-        JoinUiState(preview = preview, colour = AvatarPalette.swatches.first())
-    )
+    private val _uiState =
+        MutableStateFlow(
+            JoinUiState(preview = preview, colour = AvatarPalette.swatches.first()),
+        )
     val uiState: StateFlow<JoinUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<JoinEvent>(Channel.BUFFERED)
@@ -60,11 +60,12 @@ class JoinViewModel(
         val state = _uiState.value
         if (state.status is JoinStatus.Joining) return
 
-        val nameError = when {
-            state.name.isBlank() -> NameError.Missing
-            !MemberName.isValid(state.name) -> NameError.TooLong
-            else -> null
-        }
+        val nameError =
+            when {
+                state.name.isBlank() -> NameError.Missing
+                !MemberName.isValid(state.name) -> NameError.TooLong
+                else -> null
+            }
         val pinError = if (Pin.isValid(state.pin)) null else PinError.NotSixDigits
         if (nameError != null || pinError != null) {
             _uiState.update { it.copy(nameError = nameError, pinError = pinError) }
@@ -81,13 +82,23 @@ class JoinViewModel(
                 },
                 onFailure = { error ->
                     when (error) {
-                        is NameTakenException ->
+                        is NameTakenException -> {
                             _uiState.update { it.copy(status = JoinStatus.Idle, nameError = NameError.Taken) }
-                        is InviteInvalidException -> _uiState.update { it.copy(status = JoinStatus.Expired) }
-                        is ServerOfflineException -> _uiState.update { it.copy(status = JoinStatus.Unreachable) }
-                        else -> _uiState.update { it.copy(status = JoinStatus.Failed) }
+                        }
+
+                        is InviteInvalidException -> {
+                            _uiState.update { it.copy(status = JoinStatus.Expired) }
+                        }
+
+                        is ServerOfflineException -> {
+                            _uiState.update { it.copy(status = JoinStatus.Unreachable) }
+                        }
+
+                        else -> {
+                            _uiState.update { it.copy(status = JoinStatus.Failed) }
+                        }
                     }
-                }
+                },
             )
         }
     }

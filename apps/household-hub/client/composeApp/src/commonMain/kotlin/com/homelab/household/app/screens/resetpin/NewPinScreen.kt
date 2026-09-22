@@ -15,7 +15,7 @@ import org.koin.core.parameter.parametersOf
 fun NewPinScreen(
     code: String,
     onSignedIn: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: NewPinViewModel = koinViewModel(parameters = { parametersOf(code) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -31,6 +31,6 @@ fun NewPinScreen(
         onPinChange = viewModel::onPinChange,
         onAgainChange = viewModel::onAgainChange,
         onSetPin = viewModel::setPin,
-        modifier = modifier
+        modifier = modifier,
     )
 }

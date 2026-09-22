@@ -39,20 +39,25 @@ class KtorServerStatusRemoteDataSource(
         }
     }
 
-    override fun observeStatus(intervalSeconds: Long): Flow<ServerStatus> = flow {
-        var currentDelay = intervalSeconds.seconds
-        while (currentCoroutineContext().isActive) {
-            val status = checkHealth()
-            emit(status)
-            when (status) {
-                is ServerStatus.Online -> currentDelay = intervalSeconds.seconds
-                is ServerStatus.Offline -> {
-                    // Exponential backoff up to 60s
-                    currentDelay = (currentDelay * 1.5).coerceAtMost(60.seconds)
+    override fun observeStatus(intervalSeconds: Long): Flow<ServerStatus> =
+        flow {
+            var currentDelay = intervalSeconds.seconds
+            while (currentCoroutineContext().isActive) {
+                val status = checkHealth()
+                emit(status)
+                when (status) {
+                    is ServerStatus.Online -> {
+                        currentDelay = intervalSeconds.seconds
+                    }
+
+                    is ServerStatus.Offline -> {
+                        // Exponential backoff up to 60s
+                        currentDelay = (currentDelay * 1.5).coerceAtMost(60.seconds)
+                    }
+
+                    else -> {}
                 }
-                else -> {}
+                delay(currentDelay)
             }
-            delay(currentDelay)
         }
-    }
 }

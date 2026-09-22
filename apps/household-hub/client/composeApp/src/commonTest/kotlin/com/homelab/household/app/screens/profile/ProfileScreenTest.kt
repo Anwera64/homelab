@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
@@ -20,15 +20,14 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.jetbrains.compose.resources.getString
 
 /** Your own account, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ProfileScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -45,12 +44,12 @@ class ProfileScreenTest {
                         onMembers = {},
                         onChangePin = {},
                         onLeave = {},
-                        onSignOut = {}
+                        onSignOut = {},
                     )
                 }
             }
 
-            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
             // The settings rows and Sign out are static copy: they need no hub, so they are there.
             onNodeWithText(getString(Res.string.profile_members)).assertIsDisplayed()
             onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
@@ -83,7 +82,13 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(onBack = {}, onMembers = { members++ }, onChangePin = {}, onLeave = {}, onSignedOut = {})
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = { members++ },
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                    )
                 }
             }
 
@@ -102,7 +107,13 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = tokens) {
-                    ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = { signedOut++ })
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = { signedOut++ },
+                    )
                 }
             }
 
@@ -129,7 +140,7 @@ class ProfileScreenTest {
                             onMembers = {},
                             onChangePin = {},
                             onLeave = {},
-                            onSignOut = {}
+                            onSignOut = {},
                         )
                     }
                 }

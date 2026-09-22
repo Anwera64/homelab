@@ -12,5 +12,5 @@ data class SessionReadDto(
     @SerialName("is_secret") val is_secret: Boolean = false,
     @SerialName("is_archived") val is_archived: Boolean = false,
     @SerialName("created_at") val created_at: String? = null,
-    @SerialName("updated_at") val updated_at: String? = null
+    @SerialName("updated_at") val updated_at: String? = null,
 )

@@ -18,27 +18,28 @@ import kotlin.test.Test
  */
 @OptIn(ExperimentalTestApi::class)
 class SlowLineTest {
-
     @Test
-    fun a_hub_taking_longer_than_usual_says_so_quietly() = runComposeUiTest {
-        setContent { StillTheme { SlowLine(WaitPhase.Slow) } }
+    fun a_hub_taking_longer_than_usual_says_so_quietly() =
+        runComposeUiTest {
+            setContent { StillTheme { SlowLine(WaitPhase.Slow) } }
 
-        onNodeWithText(getString(Res.string.wait_slow_hub)).assertIsDisplayed()
-    }
+            onNodeWithText(getString(Res.string.wait_slow_hub)).assertIsDisplayed()
+        }
 
     /**
      * And says nothing at all before then. A wait that is going normally has no news, and a caption
      * that appeared at 250ms would make every call look like a problem.
      */
     @Test
-    fun a_wait_going_normally_has_nothing_to_say() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                SlowLine(WaitPhase.Hidden)
-                SlowLine(WaitPhase.Showing)
+    fun a_wait_going_normally_has_nothing_to_say() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    SlowLine(WaitPhase.Hidden)
+                    SlowLine(WaitPhase.Showing)
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.wait_slow_hub)).assertDoesNotExist()
-    }
+            onNodeWithText(getString(Res.string.wait_slow_hub)).assertDoesNotExist()
+        }
 }

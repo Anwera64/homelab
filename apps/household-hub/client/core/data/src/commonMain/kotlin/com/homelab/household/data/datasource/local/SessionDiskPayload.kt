@@ -13,5 +13,5 @@ import kotlinx.serialization.Serializable
 internal data class SessionDiskPayload(
     val accessToken: String? = null,
     val refreshToken: String? = null,
-    val user: UserReadDto? = null
+    val user: UserReadDto? = null,
 )

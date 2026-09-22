@@ -16,11 +16,10 @@ import kotlin.test.assertTrue
 
 /**
  * First run with the real stack under it, down to the Ktor client; only the hub is faked.
- * Where `onCreated` and `onSignIn` take the user is `AppNavHostTest`.
+ * Where `onCreate` and `onSignIn` take the user is `AppNavHostTest`.
  */
 @OptIn(ExperimentalTestApi::class)
 class FirstRunScreenTest {
-
     @Test
     fun creating_with_nothing_filled_in_says_what_is_missing_under_each_field() {
         val hub = FakeFirstRunHub()
@@ -47,7 +46,7 @@ class FirstRunScreenTest {
         var created = 0
 
         runScreenTest {
-            firstRunScreen(hub, onCreated = { created++ })
+            firstRunScreen(hub, onCreate = { created++ })
 
             onFirstRun {
                 typesName("Emma")
@@ -71,7 +70,7 @@ class FirstRunScreenTest {
         var created = 0
 
         runScreenTest {
-            firstRunScreen(hub, onCreated = { created++ })
+            firstRunScreen(hub, onCreate = { created++ })
 
             onFirstRun {
                 typesName("Emma")
@@ -145,7 +144,7 @@ class FirstRunScreenTest {
                             onPinChange = {},
                             onColourSelect = {},
                             onCreate = {},
-                            onSignIn = {}
+                            onSignIn = {},
                         )
                     }
                 }

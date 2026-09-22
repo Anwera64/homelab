@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.Flow
  * name, mapped one-to-one, for no reader's benefit.
  */
 interface ServerStatusRemoteDataSource {
-
     suspend fun checkHealth(): ServerStatus
 
     /**

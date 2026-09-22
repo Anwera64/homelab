@@ -14,9 +14,8 @@ import kotlinx.coroutines.launch
 
 class PinForgotViewModel(
     member: Member,
-    private val listMembers: ListMembersUseCase
+    private val listMembers: ListMembersUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(PinForgotUiState(member = member))
     val uiState: StateFlow<PinForgotUiState> = _uiState.asStateFlow()
 
@@ -34,13 +33,14 @@ class PinForgotViewModel(
                     _uiState.update { it.copy(others = others, status = PinForgotStatus.Ready) }
                 },
                 onFailure = { error ->
-                    val status = if (error is ServerOfflineException) {
-                        PinForgotStatus.Unreachable
-                    } else {
-                        PinForgotStatus.Failed
-                    }
+                    val status =
+                        if (error is ServerOfflineException) {
+                            PinForgotStatus.Unreachable
+                        } else {
+                            PinForgotStatus.Failed
+                        }
                     _uiState.update { it.copy(status = status) }
-                }
+                },
             )
         }
     }

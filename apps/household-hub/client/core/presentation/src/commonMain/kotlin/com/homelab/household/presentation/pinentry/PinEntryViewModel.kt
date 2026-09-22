@@ -22,9 +22,8 @@ import kotlinx.coroutines.launch
 
 class PinEntryViewModel(
     member: Member,
-    private val loginUseCase: LoginUseCase
+    private val loginUseCase: LoginUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(PinEntryUiState(member = member))
     val uiState: StateFlow<PinEntryUiState> = _uiState.asStateFlow()
 
@@ -48,10 +47,11 @@ class PinEntryViewModel(
         _uiState.update { it.copy(entered = pin.length) }
     }
 
-    private fun acceptsInput(): Boolean = when (_uiState.value.status) {
-        PinStatus.Checking, is PinStatus.Locked -> false
-        else -> true
-    }
+    private fun acceptsInput(): Boolean =
+        when (_uiState.value.status) {
+            PinStatus.Checking, is PinStatus.Locked -> false
+            else -> true
+        }
 
     private fun signIn() {
         val attempt = pin
@@ -66,22 +66,39 @@ class PinEntryViewModel(
 
             pin = ""
             when (val error = result.exceptionOrNull()) {
-                is PinLockedException -> countDown(error.retryAfterSeconds)
-                is WrongPinException -> _uiState.update { it.copy(entered = 0, status = PinStatus.WrongPin(error.attemptsLeft)) }
-                is ServerOfflineException -> _uiState.update { it.copy(entered = 0, status = PinStatus.Unreachable) }
-                else -> _uiState.update { it.copy(entered = 0, status = PinStatus.Failed) }
+                is PinLockedException -> {
+                    countDown(error.retryAfterSeconds)
+                }
+
+                is WrongPinException -> {
+                    _uiState.update {
+                        it.copy(
+                            entered = 0,
+                            status = PinStatus.WrongPin(error.attemptsLeft),
+                        )
+                    }
+                }
+
+                is ServerOfflineException -> {
+                    _uiState.update { it.copy(entered = 0, status = PinStatus.Unreachable) }
+                }
+
+                else -> {
+                    _uiState.update { it.copy(entered = 0, status = PinStatus.Failed) }
+                }
             }
         }
     }
 
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(entered = 0, status = PinStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(entered = 0, status = PinStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = PinStatus.Idle) }
             }
-            _uiState.update { it.copy(status = PinStatus.Idle) }
-        }
     }
 }

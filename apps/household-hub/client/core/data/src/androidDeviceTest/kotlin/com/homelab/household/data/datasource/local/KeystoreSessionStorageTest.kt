@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.homelab.household.data.dto.UserReadDto
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,27 +11,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /**
  * The Android [StoredSessionLocalDataSource], on a real device: the Keystore only exists there.
  *
- * Names here use underscores rather than the backticked `GIVEN … WHEN … THEN …` the rest of
+ * Names here use underscores rather than the backticked `GIVEN ï¿½ WHEN ï¿½ THEN ï¿½` the rest of
  * `:core:data` uses. A method name containing a space is not legal dex below minSdkVersion 30,
  * and this module is minSdk 26, so D8 would refuse to build this file at all.
  */
 @RunWith(AndroidJUnit4::class)
 class KeystoreSessionStorageTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val tokenFile get() = File(context.noBackupFilesDir, "auth_tokens.bin")
 
-    private val emma = UserReadDto(
-        id = "emma",
-        full_name = "Emma Larsson",
-        is_admin = true,
-        is_active = true,
-        avatar_color = "#3C6E4E",
-    )
+    private val emma =
+        UserReadDto(
+            id = "emma",
+            full_name = "Emma Larsson",
+            is_admin = true,
+            is_active = true,
+            avatar_color = "#3C6E4E",
+        )
 
     @Before
     fun signedOutToStart() {

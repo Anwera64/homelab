@@ -27,8 +27,9 @@ import org.jetbrains.compose.resources.getString
 
 /** Everything the invite-code screen says and does, named as the resources it reads. */
 @OptIn(ExperimentalTestApi::class)
-class InviteCodeRobot(private val test: ComposeUiTest) {
-
+class InviteCodeRobot(
+    private val test: ComposeUiTest,
+) {
     suspend fun seesTheCodeScreen() {
         seesText(getString(Res.string.invite_code_title))
         seesText(getString(Res.string.invite_code_detail))
@@ -75,7 +76,7 @@ suspend fun ComposeUiTest.onInviteCode(block: suspend InviteCodeRobot.() -> Unit
 fun ComposeUiTest.inviteCodeScreen(
     hub: FakeJoinHub,
     onBack: () -> Unit = {},
-    onInvite: (InvitePreview, String) -> Unit = { _, _ -> }
+    onInvite: (InvitePreview, String) -> Unit = { _, _ -> },
 ) {
     setContent {
         TestApp(hub.engine) {

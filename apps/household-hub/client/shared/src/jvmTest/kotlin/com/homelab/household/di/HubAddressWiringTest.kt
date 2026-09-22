@@ -30,17 +30,17 @@ import org.koin.test.KoinTest
 import org.koin.test.get
 
 class HubAddressWiringTest : KoinTest {
-
     private val requestedHosts = mutableListOf<String>()
 
-    private val recordingEngine = MockEngine { request ->
-        requestedHosts += request.url.host
-        respond(
-            content = "{}",
-            status = HttpStatusCode.InternalServerError,
-            headers = headersOf(HttpHeaders.ContentType, "application/json")
-        )
-    }
+    private val recordingEngine =
+        MockEngine { request ->
+            requestedHosts += request.url.host
+            respond(
+                content = "{}",
+                status = HttpStatusCode.InternalServerError,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
 
     @AfterEach
     fun tearDown() {
@@ -48,32 +48,35 @@ class HubAddressWiringTest : KoinTest {
     }
 
     @Test
-    fun every_repository_talks_to_the_configured_hub() = runTest {
-        startKoin {
-            modules(
-                sdkModules(HubConfig(baseUrl = "https://hub.test")) + module {
-                    single<HttpClientEngine> { recordingEngine }
-                    single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
-                }
-            )
+    fun every_repository_talks_to_the_configured_hub() =
+        runTest {
+            startKoin {
+                modules(
+                    sdkModules(HubConfig(baseUrl = "https://hub.test")) +
+                        module {
+                            single<HttpClientEngine> { recordingEngine }
+                            single<StoredSessionLocalDataSource> { InMemorySessionStorage() }
+                        },
+                )
+            }
+
+            val calls: Map<String, suspend () -> Unit> =
+                mapOf(
+                    "AuthRepository" to { get<AuthRepository>().checkStatus() },
+                    "SessionRepository" to { get<SessionRepository>().listSessions() },
+                    "AgentRepository" to { get<AgentRepository>().listAgents() },
+                    "SpaceRepository" to { get<SpaceRepository>().getHouseholdSpace() },
+                    "MemoryRepository" to { get<MemoryRepository>().auditMemories() },
+                    "GossipRepository" to { get<GossipRepository>().listHouseholdMilestones() },
+                    "ServerStatusRemoteDataSource" to { get<ServerStatusRemoteDataSource>().checkHealth() },
+                )
+
+            calls.forEach { (name, call) ->
+                val before = requestedHosts.size
+                runCatchingSafe { call() }
+                assertTrue(requestedHosts.size > before, "$name made no request")
+            }
+
+            requestedHosts.forEach { host -> assertEquals("hub.test", host) }
         }
-
-        val calls: Map<String, suspend () -> Unit> = mapOf(
-            "AuthRepository" to { get<AuthRepository>().checkStatus() },
-            "SessionRepository" to { get<SessionRepository>().listSessions() },
-            "AgentRepository" to { get<AgentRepository>().listAgents() },
-            "SpaceRepository" to { get<SpaceRepository>().getHouseholdSpace() },
-            "MemoryRepository" to { get<MemoryRepository>().auditMemories() },
-            "GossipRepository" to { get<GossipRepository>().listHouseholdMilestones() },
-            "ServerStatusRemoteDataSource" to { get<ServerStatusRemoteDataSource>().checkHealth() }
-        )
-
-        calls.forEach { (name, call) ->
-            val before = requestedHosts.size
-            runCatchingSafe { call() }
-            assertTrue(requestedHosts.size > before, "$name made no request")
-        }
-
-        requestedHosts.forEach { host -> assertEquals("hub.test", host) }
-    }
 }

@@ -23,7 +23,6 @@ import kotlin.test.assertFailsWith
 
 /** The wire for the household's two spaces — the personal one and the shared one. */
 class KtorSpaceRemoteDataSourceTest {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     private val personalSpaceJson = """{
@@ -48,96 +47,107 @@ class KtorSpaceRemoteDataSourceTest {
         status: HttpStatusCode = HttpStatusCode.OK,
     ): HttpResponseData = respond(content, status, headersOf(HttpHeaders.ContentType, "application/json"))
 
-    private fun dataSource(engine: MockEngine) = KtorSpaceRemoteDataSource(
-        client = HttpClient(engine) { install(ContentNegotiation) { json(json) } },
-        baseUrl = DEFAULT_BASE_URL,
-    )
+    private fun dataSource(engine: MockEngine) =
+        KtorSpaceRemoteDataSource(
+            client = HttpClient(engine) { install(ContentNegotiation) { json(json) } },
+            baseUrl = DEFAULT_BASE_URL,
+        )
 
-    private fun assertSameJson(expected: String, actual: String?) =
-        assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
+    private fun assertSameJson(
+        expected: String,
+        actual: String?,
+    ) = assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
 
     private fun unreachableHub() = MockEngine { throw IOException("Connection refused") }
 
     // ---- getPersonalSpace -----------------------------------------------------
 
     @Test
-    fun `GIVEN a member's own space WHEN it is asked for THEN it comes back from the personal address`() = runTest {
-        // GIVEN
-        var path: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            respondJson(personalSpaceJson)
+    fun `GIVEN a member's own space WHEN it is asked for THEN it comes back from the personal address`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    respondJson(personalSpaceJson)
+                }
+
+            // WHEN
+            val space = dataSource(engine).getPersonalSpace()
+
+            // THEN
+            assertEquals("/api/v1/spaces/personal", path)
+            assertEquals("sp-personal-emma", space.id)
         }
 
-        // WHEN
-        val space = dataSource(engine).getPersonalSpace()
-
-        // THEN
-        assertEquals("/api/v1/spaces/personal", path)
-        assertEquals("sp-personal-emma", space.id)
-    }
-
     @Test
-    fun `GIVEN the hub cannot be reached WHEN a member's own space is asked for THEN it is reported as offline`() = runTest {
-        // GIVEN
-        val engine = unreachableHub()
+    fun `GIVEN the hub cannot be reached WHEN a member's own space is asked for THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
 
-        // WHEN / THEN
-        assertFailsWith<ServerOfflineException> { dataSource(engine).getPersonalSpace() }
-    }
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> { dataSource(engine).getPersonalSpace() }
+        }
 
     // ---- getHouseholdSpace ------------------------------------------------
 
     @Test
-    fun `GIVEN the space everybody shares WHEN it is asked for THEN it comes back from the shared address`() = runTest {
-        // GIVEN
-        var path: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            respondJson(householdSpaceJson)
+    fun `GIVEN the space everybody shares WHEN it is asked for THEN it comes back from the shared address`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    respondJson(householdSpaceJson)
+                }
+
+            // WHEN
+            val space = dataSource(engine).getHouseholdSpace()
+
+            // THEN
+            assertEquals("/api/v1/spaces/shared", path)
+            assertEquals("sp-household", space.id)
         }
-
-        // WHEN
-        val space = dataSource(engine).getHouseholdSpace()
-
-        // THEN
-        assertEquals("/api/v1/spaces/shared", path)
-        assertEquals("sp-household", space.id)
-    }
 
     // ---- updateSpaceSettings -----------------------------------------------
 
     @Test
-    fun `GIVEN new settings for a space WHEN they are saved THEN they are put to that space's own address`() = runTest {
-        // GIVEN
-        var path: String? = null
-        var method: HttpMethod? = null
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            method = request.method
-            sent = (request.body as TextContent).text
-            respondJson(householdSpaceJson)
+    fun `GIVEN new settings for a space WHEN they are saved THEN they are put to that space's own address`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            var method: HttpMethod? = null
+            var sent: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    method = request.method
+                    sent = (request.body as TextContent).text
+                    respondJson(householdSpaceJson)
+                }
+
+            // WHEN
+            val space = dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
+
+            // THEN
+            assertEquals("/api/v1/spaces/sp-household/settings", path)
+            assertEquals(HttpMethod.Put, method)
+            assertSameJson("""{"settings": {"theme": "dark"}}""", sent)
+            assertEquals("sp-household", space.id)
         }
-
-        // WHEN
-        val space = dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
-
-        // THEN
-        assertEquals("/api/v1/spaces/sp-household/settings", path)
-        assertEquals(HttpMethod.Put, method)
-        assertSameJson("""{"settings": {"theme": "dark"}}""", sent)
-        assertEquals("sp-household", space.id)
-    }
 
     @Test
-    fun `GIVEN the hub cannot be reached WHEN a space's settings are saved THEN it is reported as offline`() = runTest {
-        // GIVEN
-        val engine = unreachableHub()
+    fun `GIVEN the hub cannot be reached WHEN a space's settings are saved THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
 
-        // WHEN / THEN
-        assertFailsWith<ServerOfflineException> {
-            dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> {
+                dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
+            }
         }
-    }
 }

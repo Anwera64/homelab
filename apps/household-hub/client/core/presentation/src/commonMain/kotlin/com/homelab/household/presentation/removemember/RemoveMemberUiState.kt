@@ -7,5 +7,5 @@ data class RemoveMemberUiState(
     val member: Member,
     val typedName: String = "",
     val nameMismatch: Boolean = false,
-    val status: RemoveMemberStatus = RemoveMemberStatus.Idle
+    val status: RemoveMemberStatus = RemoveMemberStatus.Idle,
 )

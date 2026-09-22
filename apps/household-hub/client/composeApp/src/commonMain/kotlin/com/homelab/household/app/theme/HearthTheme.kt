@@ -32,7 +32,7 @@ internal val LocalHearthMotion = staticCompositionLocalOf { DefaultMotion }
 @Composable
 fun HearthTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) NightColors else DayColors
     val fonts = rememberHearthFonts()
@@ -44,13 +44,13 @@ fun HearthTheme(
         LocalHearthTypography provides typography,
         LocalHearthSpacing provides DefaultSpacing,
         LocalHearthSizes provides DefaultSizes,
-        LocalHearthMotion provides DefaultMotion
+        LocalHearthMotion provides DefaultMotion,
     ) {
         MaterialTheme(
             colorScheme = colors.toColorScheme(darkTheme),
             typography = typography.material,
             shapes = HearthShapes.material,
-            content = content
+            content = content,
         )
     }
 }
@@ -114,6 +114,6 @@ private fun HearthColors.toColorScheme(darkTheme: Boolean): ColorScheme {
         surfaceContainerHigh = surfaceAlt,
         surfaceContainerHighest = surface3,
         outline = outline,
-        outlineVariant = outlineSoft
+        outlineVariant = outlineSoft,
     )
 }

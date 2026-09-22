@@ -19,9 +19,12 @@ import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 
-const val EmptyStateIconTag = "EmptyStateIcon"
+const val EMPTY_STATE_ICON_TAG = "EmptyStateIcon"
 
-class EmptyStateAction(val label: String, val onClick: () -> Unit)
+class EmptyStateAction(
+    val label: String,
+    val onClick: () -> Unit,
+)
 
 /**
  * The one empty-state pattern: the screen's own icon on a soft tile, a plain title and one line
@@ -33,51 +36,53 @@ fun EmptyState(
     title: String,
     line: String,
     modifier: Modifier = Modifier,
-    action: EmptyStateAction? = null
+    action: EmptyStateAction? = null,
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier = modifier.fillMaxWidth().padding(
-            start = HearthTheme.spacing.lg,
-            top = HearthTheme.spacing.xxl,
-            end = HearthTheme.spacing.lg,
-            bottom = HearthTheme.spacing.huge
-        ),
+        modifier =
+            modifier.fillMaxWidth().padding(
+                start = HearthTheme.spacing.lg,
+                top = HearthTheme.spacing.xxl,
+                end = HearthTheme.spacing.lg,
+                bottom = HearthTheme.spacing.huge,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterVertically),
     ) {
         Box(
-            modifier = Modifier
-                .size(HearthTheme.size.tile)
-                .background(colors.outlineSoft, HearthShapes.tile)
-                .testTag(EmptyStateIconTag),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .size(HearthTheme.size.tile)
+                    .background(colors.outlineSoft, HearthShapes.tile)
+                    .testTag(EMPTY_STATE_ICON_TAG),
+            contentAlignment = Alignment.Center,
         ) {
             HearthIconImage(
                 icon = icon,
                 contentDescription = null,
                 size = HearthTheme.size.iconXl,
-                tint = colors.textMuted
+                tint = colors.textMuted,
             )
         }
         Text(
             text = title,
             style = HearthTheme.typography.heading,
             color = colors.textPrimary,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
         Text(
             text = line,
             modifier = Modifier.widthIn(max = HearthTheme.size.readingWidth),
             style = HearthTheme.typography.label,
             color = colors.textMuted,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
         if (action != null) {
             PrimaryButton(
                 text = action.label,
                 onClick = action.onClick,
-                modifier = Modifier.padding(top = HearthTheme.spacing.sm)
+                modifier = Modifier.padding(top = HearthTheme.spacing.sm),
             )
         }
     }

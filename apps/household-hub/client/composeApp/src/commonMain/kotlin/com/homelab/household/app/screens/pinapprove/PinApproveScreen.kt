@@ -14,7 +14,7 @@ import org.koin.core.parameter.parametersOf
 fun PinApproveScreen(
     member: Member,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: PinApproveViewModel = koinViewModel(parameters = { parametersOf(member) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -24,6 +24,6 @@ fun PinApproveScreen(
         onPinChange = viewModel::onPinChange,
         onApprove = viewModel::approve,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

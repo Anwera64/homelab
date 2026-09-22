@@ -25,7 +25,6 @@ import kotlin.test.assertFailsWith
 
 /** The wire for everything an admin does to the household's agents. */
 class KtorAgentRemoteDataSourceTest {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     private val llamaJson = """{
@@ -50,185 +49,204 @@ class KtorAgentRemoteDataSourceTest {
         status: HttpStatusCode = HttpStatusCode.OK,
     ): HttpResponseData = respond(content, status, headersOf(HttpHeaders.ContentType, "application/json"))
 
-    private fun dataSource(engine: MockEngine) = KtorAgentRemoteDataSource(
-        client = HttpClient(engine) { install(ContentNegotiation) { json(json) } },
-        baseUrl = DEFAULT_BASE_URL,
-    )
+    private fun dataSource(engine: MockEngine) =
+        KtorAgentRemoteDataSource(
+            client = HttpClient(engine) { install(ContentNegotiation) { json(json) } },
+            baseUrl = DEFAULT_BASE_URL,
+        )
 
-    private fun assertSameJson(expected: String, actual: String?) =
-        assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
+    private fun assertSameJson(
+        expected: String,
+        actual: String?,
+    ) = assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
 
     private fun unreachableHub() = MockEngine { throw IOException("Connection refused") }
 
     // ---- listAgents ---------------------------------------------------------
 
     @Test
-    fun `GIVEN a household with one agent WHEN its agents are asked for THEN their full personality comes back`() = runTest {
-        // GIVEN
-        var path: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            respondJson("[$llamaJson]")
+    fun `GIVEN a household with one agent WHEN its agents are asked for THEN their full personality comes back`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    respondJson("[$llamaJson]")
+                }
+
+            // WHEN
+            val agents = dataSource(engine).listAgents()
+
+            // THEN
+            assertEquals("/api/v1/agents", path)
+            assertEquals(1, agents.size)
+            assertEquals("a-1", agents.first().id)
+            assertEquals("llama", agents.first().slug)
         }
 
-        // WHEN
-        val agents = dataSource(engine).listAgents()
-
-        // THEN
-        assertEquals("/api/v1/agents", path)
-        assertEquals(1, agents.size)
-        assertEquals("a-1", agents.first().id)
-        assertEquals("llama", agents.first().slug)
-    }
-
     @Test
-    fun `GIVEN the hub cannot be reached WHEN the household's agents are asked for THEN it is reported as offline`() = runTest {
-        // GIVEN
-        val engine = unreachableHub()
+    fun `GIVEN the hub cannot be reached WHEN the household's agents are asked for THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
 
-        // WHEN / THEN
-        assertFailsWith<ServerOfflineException> { dataSource(engine).listAgents() }
-    }
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> { dataSource(engine).listAgents() }
+        }
 
     // ---- getAgent -------------------------------------------------------------
 
     @Test
-    fun `GIVEN one agent's id WHEN it is asked for by itself THEN its personality comes back`() = runTest {
-        // GIVEN
-        var path: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            respondJson(llamaJson)
+    fun `GIVEN one agent's id WHEN it is asked for by itself THEN its personality comes back`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    respondJson(llamaJson)
+                }
+
+            // WHEN
+            val agent = dataSource(engine).getAgent("a-1")
+
+            // THEN
+            assertEquals("/api/v1/agents/a-1", path)
+            assertEquals("Llama", agent.name)
         }
-
-        // WHEN
-        val agent = dataSource(engine).getAgent("a-1")
-
-        // THEN
-        assertEquals("/api/v1/agents/a-1", path)
-        assertEquals("Llama", agent.name)
-    }
 
     // ---- createAgent ------------------------------------------------------
 
     @Test
-    fun `GIVEN a new agent's personality WHEN it is created THEN it is posted and the stored agent comes back`() = runTest {
-        // GIVEN
-        var path: String? = null
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            sent = (request.body as TextContent).text
-            respondJson(llamaJson, HttpStatusCode.Created)
-        }
-        val create = AgentCreateDto(
-            slug = "llama",
-            name = "Llama",
-            description = "General helper",
-            avatar = "🦙",
-            system_prompt = "You are helpful.",
-            model_alias = "llama3:8b",
-            temperature = 0.5f,
-            top_p = 0.95f,
-            tool_permissions = listOf("search"),
-        )
+    fun `GIVEN a new agent's personality WHEN it is created THEN it is posted and the stored agent comes back`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            var sent: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    sent = (request.body as TextContent).text
+                    respondJson(llamaJson, HttpStatusCode.Created)
+                }
+            val create =
+                AgentCreateDto(
+                    slug = "llama",
+                    name = "Llama",
+                    description = "General helper",
+                    avatar = "🦙",
+                    system_prompt = "You are helpful.",
+                    model_alias = "llama3:8b",
+                    temperature = 0.5f,
+                    top_p = 0.95f,
+                    tool_permissions = listOf("search"),
+                )
 
-        // WHEN
-        val agent = dataSource(engine).createAgent(create)
+            // WHEN
+            val agent = dataSource(engine).createAgent(create)
 
-        // THEN
-        assertEquals("/api/v1/agents", path)
-        assertSameJson(
-            """{"slug": "llama", "name": "Llama", "description": "General helper", "avatar": "🦙",
+            // THEN
+            assertEquals("/api/v1/agents", path)
+            assertSameJson(
+                """{"slug": "llama", "name": "Llama", "description": "General helper", "avatar": "🦙",
                 "system_prompt": "You are helpful.", "model_alias": "llama3:8b", "temperature": 0.5,
                 "top_p": 0.95, "tool_permissions": ["search"]}""",
-            sent,
-        )
-        assertEquals("a-1", agent.id)
-    }
+                sent,
+            )
+            assertEquals("a-1", agent.id)
+        }
 
     @Test
-    fun `GIVEN the hub cannot be reached WHEN an agent is created THEN it is reported as offline`() = runTest {
-        // GIVEN
-        val engine = unreachableHub()
-        val create = AgentCreateDto(slug = "llama", name = "Llama", system_prompt = "You are helpful.")
+    fun `GIVEN the hub cannot be reached WHEN an agent is created THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
+            val create = AgentCreateDto(slug = "llama", name = "Llama", system_prompt = "You are helpful.")
 
-        // WHEN / THEN
-        assertFailsWith<ServerOfflineException> { dataSource(engine).createAgent(create) }
-    }
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> { dataSource(engine).createAgent(create) }
+        }
 
     // ---- updateAgent --------------------------------------------------------
 
     @Test
-    fun `GIVEN changes to an agent's personality WHEN it is updated THEN they are sent to that agent's own address`() = runTest {
-        // GIVEN
-        var path: String? = null
-        var method: HttpMethod? = null
-        var sent: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            method = request.method
-            sent = (request.body as TextContent).text
-            respondJson(llamaJson)
+    fun `GIVEN changes to an agent's personality WHEN it is updated THEN they are sent to that agent's own address`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            var method: HttpMethod? = null
+            var sent: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    method = request.method
+                    sent = (request.body as TextContent).text
+                    respondJson(llamaJson)
+                }
+            val update = AgentUpdateDto(name = "Llama", temperature = 0.5f, is_active = true)
+
+            // WHEN
+            val agent = dataSource(engine).updateAgent("a-1", update)
+
+            // THEN
+            assertEquals("/api/v1/agents/a-1", path)
+            assertEquals(HttpMethod.Put, method)
+            assertSameJson("""{"name": "Llama", "temperature": 0.5, "is_active": true}""", sent)
+            assertEquals("a-1", agent.id)
         }
-        val update = AgentUpdateDto(name = "Llama", temperature = 0.5f, is_active = true)
-
-        // WHEN
-        val agent = dataSource(engine).updateAgent("a-1", update)
-
-        // THEN
-        assertEquals("/api/v1/agents/a-1", path)
-        assertEquals(HttpMethod.Put, method)
-        assertSameJson("""{"name": "Llama", "temperature": 0.5, "is_active": true}""", sent)
-        assertEquals("a-1", agent.id)
-    }
 
     // ---- deleteAgent --------------------------------------------------------
 
     @Test
-    fun `GIVEN an agent an admin no longer wants WHEN it is deleted THEN its own address is asked to remove it`() = runTest {
-        // GIVEN
-        var path: String? = null
-        var method: HttpMethod? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            method = request.method
-            respondJson("""{"message": "Agent deleted"}""")
+    fun `GIVEN an agent an admin no longer wants WHEN it is deleted THEN its own address is asked to remove it`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            var method: HttpMethod? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    method = request.method
+                    respondJson("""{"message": "Agent deleted"}""")
+                }
+
+            // WHEN
+            dataSource(engine).deleteAgent("a-1")
+
+            // THEN
+            assertEquals("/api/v1/agents/a-1", path)
+            assertEquals(HttpMethod.Delete, method)
         }
-
-        // WHEN
-        dataSource(engine).deleteAgent("a-1")
-
-        // THEN
-        assertEquals("/api/v1/agents/a-1", path)
-        assertEquals(HttpMethod.Delete, method)
-    }
 
     // ---- restoreAgent -------------------------------------------------------
 
     @Test
-    fun `GIVEN a deleted agent WHEN it is restored THEN its own restore address is posted to and it comes back`() = runTest {
-        // GIVEN
-        var path: String? = null
-        val engine = MockEngine { request ->
-            path = request.url.encodedPath
-            respondJson(llamaJson)
+    fun `GIVEN a deleted agent WHEN it is restored THEN its own restore address is posted to and it comes back`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    respondJson(llamaJson)
+                }
+
+            // WHEN
+            val agent = dataSource(engine).restoreAgent("a-1")
+
+            // THEN
+            assertEquals("/api/v1/agents/a-1/restore", path)
+            assertEquals("a-1", agent.id)
         }
 
-        // WHEN
-        val agent = dataSource(engine).restoreAgent("a-1")
-
-        // THEN
-        assertEquals("/api/v1/agents/a-1/restore", path)
-        assertEquals("a-1", agent.id)
-    }
-
     @Test
-    fun `GIVEN the hub cannot be reached WHEN a deleted agent is restored THEN it is reported as offline`() = runTest {
-        // GIVEN
-        val engine = unreachableHub()
+    fun `GIVEN the hub cannot be reached WHEN a deleted agent is restored THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
 
-        // WHEN / THEN
-        assertFailsWith<ServerOfflineException> { dataSource(engine).restoreAgent("a-1") }
-    }
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> { dataSource(engine).restoreAgent("a-1") }
+        }
 }

@@ -13,7 +13,6 @@ import kotlin.test.assertEquals
  * (see `startSseFixture` / `stopSseFixture` in `shared/build.gradle.kts`).
  */
 object SseFixture {
-
     /**
      * Fixed, so a leaked server is noticed loudly instead of silently moving out of the way.
      * Must match the `sseFixturePort` in `shared/build.gradle.kts`.
@@ -47,12 +46,15 @@ object SseFixture {
     fun ackClient(): HttpClient = HttpClient(Darwin.create())
 
     /** Confirms to the fixture that delta [index] of [scenario] reached the collector. */
-    suspend fun HttpClient.ack(scenario: String, index: Int) {
+    suspend fun HttpClient.ack(
+        scenario: String,
+        index: Int,
+    ) {
         val response: HttpResponse = get("$BASE_URL/fixture/ack/$scenario/$index")
         assertEquals(
             HttpStatusCode.OK,
             response.status,
-            "Could not ack $scenario delta $index; is the fixture on port $PORT running?"
+            "Could not ack $scenario delta $index; is the fixture on port $PORT running?",
         )
     }
 }

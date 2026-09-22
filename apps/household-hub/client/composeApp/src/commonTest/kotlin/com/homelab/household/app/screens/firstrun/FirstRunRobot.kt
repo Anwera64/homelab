@@ -35,8 +35,9 @@ import org.jetbrains.compose.resources.getString
  * The form has two text fields, name then PIN, and is found by that order.
  */
 @OptIn(ExperimentalTestApi::class)
-class FirstRunRobot(private val test: ComposeUiTest) {
-
+class FirstRunRobot(
+    private val test: ComposeUiTest,
+) {
     suspend fun seesTheForm() {
         seesText(getString(Res.string.first_run_title))
         seesText(getString(Res.string.first_run_create))
@@ -121,12 +122,12 @@ suspend fun ComposeUiTest.onFirstRun(block: suspend FirstRunRobot.() -> Unit) {
 @OptIn(ExperimentalTestApi::class)
 fun ComposeUiTest.firstRunScreen(
     hub: FakeFirstRunHub,
-    onCreated: () -> Unit = {},
-    onSignIn: () -> Unit = {}
+    onCreate: () -> Unit = {},
+    onSignIn: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
-            FirstRunScreen(onCreated = onCreated, onSignIn = onSignIn)
+            FirstRunScreen(onCreate = onCreate, onSignIn = onSignIn)
         }
     }
 }

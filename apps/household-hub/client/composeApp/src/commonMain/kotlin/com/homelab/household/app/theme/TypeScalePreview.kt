@@ -19,18 +19,19 @@ import androidx.compose.ui.text.TextStyle
  * next to the tokens: a role that looks wrong next to its neighbours is easier to see than to
  * argue about.
  */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun TypeScalePreview() {
     HearthTheme {
         val type = HearthTheme.typography
         val colors = HearthTheme.colors
         Column(
-            modifier = Modifier
-                .background(colors.canvas)
-                .verticalScroll(rememberScrollState())
-                .padding(HearthTheme.spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            modifier =
+                Modifier
+                    .background(colors.canvas)
+                    .verticalScroll(rememberScrollState())
+                    .padding(HearthTheme.spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         ) {
             Specimen("hero", "Evening, Emma", type.hero)
             Specimen("title", "Unlock secret chats", type.title)
@@ -54,17 +55,21 @@ private fun TypeScalePreview() {
 }
 
 @Composable
-private fun Specimen(name: String, sample: String, style: TextStyle) {
+private fun Specimen(
+    name: String,
+    sample: String,
+    style: TextStyle,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-        verticalAlignment = Alignment.Bottom
+        verticalAlignment = Alignment.Bottom,
     ) {
         Text(
             text = name,
             style = HearthTheme.typography.monoSm,
             color = HearthTheme.colors.textMuted,
-            modifier = Modifier.padding(bottom = HearthTheme.spacing.xxs)
+            modifier = Modifier.padding(bottom = HearthTheme.spacing.xxs),
         )
         Text(text = sample, style = style, color = HearthTheme.colors.textPrimary)
     }

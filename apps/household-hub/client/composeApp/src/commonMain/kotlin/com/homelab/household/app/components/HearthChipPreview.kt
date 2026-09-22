@@ -2,10 +2,10 @@ package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.icons.HearthIcon
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** Every chip variant side by side, so a colour that drifts from its neighbours is easy to spot. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthChipVariantsPreview() {
     ComponentPreview {
@@ -15,7 +15,7 @@ private fun HearthChipVariantsPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthChipWithIconPreview() {
     ComponentPreview {

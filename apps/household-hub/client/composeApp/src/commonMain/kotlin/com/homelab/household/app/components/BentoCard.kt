@@ -16,24 +16,24 @@ import com.homelab.household.app.theme.HearthTheme
 fun BentoCard(
     modifier: Modifier = Modifier,
     label: String? = null,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = HearthTheme.colors
     Surface(
         modifier = modifier,
         shape = HearthShapes.bento,
         color = colors.surface,
-        contentColor = colors.textPrimary
+        contentColor = colors.textPrimary,
     ) {
         Column(
             modifier = Modifier.padding(HearthTheme.spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         ) {
             if (label != null) {
                 Text(
                     text = label.uppercase(),
                     style = HearthTheme.typography.overline,
-                    color = colors.textMuted
+                    color = colors.textMuted,
                 )
             }
             content()

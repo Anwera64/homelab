@@ -9,7 +9,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_join_joining
 import com.homelab.household.app.resources.join_joining
@@ -22,15 +22,14 @@ import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.presentation.firstrun.AvatarPalette
 import com.homelab.household.presentation.join.JoinStatus
 import com.homelab.household.presentation.join.JoinUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.jetbrains.compose.resources.getString
 
 /** Joining the household, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class JoinScreenTest {
-
     private val invite = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E")
 
     @Test
@@ -40,7 +39,7 @@ class JoinScreenTest {
         var joined = 0
 
         runScreenTest {
-            joinScreen(hub, invite, onJoined = { joined++ })
+            joinScreen(hub, invite, onJoin = { joined++ })
 
             onJoin {
                 seesTheInvitationFrom("Emma")
@@ -111,35 +110,42 @@ class JoinScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun joining_the_household_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                JoinContent(
-                    state = JoinUiState(
-                        preview = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E"),
-                        colour = AvatarPalette.swatches.first(),
-                        pin = "975310",
-                        status = JoinStatus.Joining
-                    ),
-                    onNameChange = {},
-                    onPinChange = {},
-                    onColourSelect = {},
-                    onJoin = {}
-                )
+    fun joining_the_household_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    JoinContent(
+                        state =
+                            JoinUiState(
+                                preview =
+                                    InvitePreview(
+                                        invitedName = "Liam",
+                                        inviterName = "Emma",
+                                        inviterAvatarColor = "#3C6E4E",
+                                    ),
+                                colour = AvatarPalette.swatches.first(),
+                                pin = "975310",
+                                status = JoinStatus.Joining,
+                            ),
+                        onNameChange = {},
+                        onPinChange = {},
+                        onColourSelect = {},
+                        onJoin = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.join_joining))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_join_joining)
+            onNodeWithText(getString(Res.string.join_joining))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_join_joining),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.join_submit)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.join_submit)).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {
@@ -154,7 +160,7 @@ class JoinScreenTest {
                             onNameChange = {},
                             onPinChange = {},
                             onColourSelect = {},
-                            onJoin = {}
+                            onJoin = {},
                         )
                     }
                 }

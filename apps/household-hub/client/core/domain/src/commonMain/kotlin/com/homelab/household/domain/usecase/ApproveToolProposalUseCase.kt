@@ -5,6 +5,6 @@ interface ApproveToolProposalUseCase {
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>? = null
+        modifiedArguments: Map<String, Any?>? = null,
     ): Boolean
 }

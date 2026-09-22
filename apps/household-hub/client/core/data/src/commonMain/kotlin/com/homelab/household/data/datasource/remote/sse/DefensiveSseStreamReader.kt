@@ -11,51 +11,54 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class DefensiveSseStreamReader(
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    private val controlTokens = listOf(
-        "<|im_start|>",
-        "<|im_end|>",
-        "<|endoftext|>",
-        "<|startoftext|>",
-        "###",
-        "---"
-    )
+    private val controlTokens =
+        listOf(
+            "<|im_start|>",
+            "<|im_end|>",
+            "<|endoftext|>",
+            "<|startoftext|>",
+            "###",
+            "---",
+        )
 
-    fun readEvents(channel: ByteReadChannel): Flow<ChatStreamEvent> = flow {
-        while (!channel.isClosedForRead) {
-            val line = channel.readUTF8Line() ?: break
-            val trimmed = line.trim()
-            if (trimmed.isEmpty()) continue
-            if (trimmed == "data: [DONE]" || trimmed == "[DONE]") {
-                break
-            }
-            if (trimmed.startsWith("data:")) {
-                val dataContent = trimmed.substringAfter("data:").trim()
-                if (dataContent == "[DONE]") {
+    fun readEvents(channel: ByteReadChannel): Flow<ChatStreamEvent> =
+        flow {
+            while (!channel.isClosedForRead) {
+                val line = channel.readUTF8Line() ?: break
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) continue
+                if (trimmed == "data: [DONE]" || trimmed == "[DONE]") {
                     break
                 }
-                if (dataContent.startsWith("{")) {
-                    // Only the parse is defensive. Emission is deliberately kept outside the catch
-                    // so a downstream collector failure can never be mistaken for a malformed line.
-                    val event = try {
-                        parseEvent(dataContent)
-                    } catch (_: IllegalArgumentException) {
-                        // Malformed or unexpectedly shaped JSON: skip the line, keep streaming.
-                        // SerializationException is an IllegalArgumentException, and so is a shape
-                        // mismatch from jsonObject/jsonPrimitive: those call kotlinx's own private
-                        // error(JsonElement, String) helper, which throws IllegalArgumentException —
-                        // not kotlin.error(), which would be an IllegalStateException. A reviewer
-                        // read it the other way once; the shape test below pins which it is.
-                        null
+                if (trimmed.startsWith("data:")) {
+                    val dataContent = trimmed.substringAfter("data:").trim()
+                    if (dataContent == "[DONE]") {
+                        break
                     }
-                    if (event != null) {
-                        emit(event)
+                    if (dataContent.startsWith("{")) {
+                        // Only the parse is defensive. Emission is deliberately kept outside the catch
+                        // so a downstream collector failure can never be mistaken for a malformed line.
+                        val event =
+                            try {
+                                parseEvent(dataContent)
+                            } catch (_: IllegalArgumentException) {
+                                // Malformed or unexpectedly shaped JSON: skip the line, keep streaming.
+                                // SerializationException is an IllegalArgumentException, and so is a shape
+                                // mismatch from jsonObject/jsonPrimitive: those call kotlinx's own private
+                                // error(JsonElement, String) helper, which throws IllegalArgumentException —
+                                // not kotlin.error(), which would be an IllegalStateException. A reviewer
+                                // read it the other way once; the shape test below pins which it is.
+                                null
+                            }
+                        if (event != null) {
+                            emit(event)
+                        }
                     }
                 }
             }
         }
-    }
 
     /** Pure parse step: returns `null` for event types this client does not model. */
     private fun parseEvent(dataContent: String): ChatStreamEvent? {
@@ -65,21 +68,25 @@ class DefensiveSseStreamReader(
                 val rawContent = element["content"]?.jsonPrimitive?.content ?: ""
                 ChatStreamEvent.Delta(sanitizeContent(rawContent))
             }
+
             "tool_executing" -> {
                 val tool = element["tool"]?.jsonPrimitive?.content ?: ""
                 ChatStreamEvent.ToolExecuting(tool = tool)
             }
+
             "tool_result" -> {
                 val tool = element["tool"]?.jsonPrimitive?.content ?: ""
                 val success = element["success"]?.jsonPrimitive?.booleanOrNull ?: true
                 val error = element["error"]?.jsonPrimitive?.content
                 ChatStreamEvent.ToolResult(tool = tool, success = success, error = error)
             }
+
             "tool_approval_proposal", "tool_proposal" -> {
                 val tool = element["tool"]?.jsonPrimitive?.content ?: ""
                 val message = element["message"]?.jsonPrimitive?.content ?: ""
                 ChatStreamEvent.ToolApprovalProposal(tool = tool, message = message)
             }
+
             "done" -> {
                 val messageId = element["message_id"]?.jsonPrimitive?.content ?: ""
                 val assistantContent = sanitizeContent(element["assistant_content"]?.jsonPrimitive?.content ?: "")
@@ -91,10 +98,13 @@ class DefensiveSseStreamReader(
                     assistantContent = assistantContent,
                     suggestSecretMode = suggestSecret,
                     isTurnSecret = isTurnSecret,
-                    agentName = agentName
+                    agentName = agentName,
                 )
             }
-            else -> null
+
+            else -> {
+                null
+            }
         }
     }
 

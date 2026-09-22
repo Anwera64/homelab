@@ -8,5 +8,5 @@ import kotlinx.serialization.Serializable
 data class MemberProfileDto(
     val id: String,
     @SerialName("full_name") val full_name: String,
-    @SerialName("avatar_color") val avatar_color: String
+    @SerialName("avatar_color") val avatar_color: String,
 )

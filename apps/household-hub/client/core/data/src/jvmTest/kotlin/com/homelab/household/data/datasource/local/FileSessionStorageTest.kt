@@ -11,18 +11,18 @@ import org.junit.jupiter.api.Test
  * next one must read, because that is the whole job.
  */
 class FileSessionStorageTest {
-
     private val testDir = "build/test-token-storage"
 
     private fun storage() = FileSessionStorage(storageDir = testDir)
 
-    private val emma = UserReadDto(
-        id = "emma",
-        full_name = "Emma",
-        is_admin = true,
-        is_active = true,
-        avatar_color = "#3C6E4E",
-    )
+    private val emma =
+        UserReadDto(
+            id = "emma",
+            full_name = "Emma",
+            is_admin = true,
+            is_active = true,
+            avatar_color = "#3C6E4E",
+        )
 
     @BeforeEach
     fun signedOutToStart() {

@@ -29,23 +29,55 @@ import com.homelab.household.domain.model.Member
  * the navigation tests stub the screens out and test the back stack alone.
  */
 interface AppScreens {
-    @Composable fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit)
+    @Composable fun Launch(
+        onSignIn: () -> Unit,
+        onFirstRun: () -> Unit,
+    )
 
-    @Composable fun SignIn(onMemberSelected: (Member) -> Unit, onInviteCode: () -> Unit)
+    @Composable fun SignIn(
+        onSelectMember: (Member) -> Unit,
+        onInviteCode: () -> Unit,
+    )
 
-    @Composable fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit, onForgotten: () -> Unit)
+    @Composable fun Pin(
+        member: Member,
+        onSignedIn: () -> Unit,
+        onBack: () -> Unit,
+        onForget: () -> Unit,
+    )
 
-    @Composable fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit)
+    @Composable fun FirstRun(
+        onCreate: () -> Unit,
+        onSignIn: () -> Unit,
+    )
 
-    @Composable fun InviteCode(onBack: () -> Unit, onInvite: (InvitePreview, String) -> Unit)
+    @Composable fun InviteCode(
+        onBack: () -> Unit,
+        onInvite: (InvitePreview, String) -> Unit,
+    )
 
-    @Composable fun Join(preview: InvitePreview, code: String, onJoined: () -> Unit, onExpired: () -> Unit)
+    @Composable fun Join(
+        preview: InvitePreview,
+        code: String,
+        onJoin: () -> Unit,
+        onExpire: () -> Unit,
+    )
 
-    @Composable fun PinForgot(member: Member, onBack: () -> Unit, onHaveCode: () -> Unit)
+    @Composable fun PinForgot(
+        member: Member,
+        onBack: () -> Unit,
+        onHaveCode: () -> Unit,
+    )
 
-    @Composable fun ResetCode(onBack: () -> Unit, onCode: (String) -> Unit)
+    @Composable fun ResetCode(
+        onBack: () -> Unit,
+        onCode: (String) -> Unit,
+    )
 
-    @Composable fun NewPin(code: String, onSignedIn: () -> Unit)
+    @Composable fun NewPin(
+        code: String,
+        onSignedIn: () -> Unit,
+    )
 
     @Composable fun Home(onProfile: () -> Unit)
 
@@ -54,72 +86,116 @@ interface AppScreens {
         onMembers: () -> Unit,
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
-        onSignedOut: () -> Unit
+        onSignedOut: () -> Unit,
     )
 
     @Composable fun Members(
         onBack: () -> Unit,
         onInvite: () -> Unit,
         onResetPin: (Member) -> Unit,
-        onRemove: (Member) -> Unit
+        onRemove: (Member) -> Unit,
     )
 
     @Composable fun InviteCreate(onBack: () -> Unit)
 
-    @Composable fun PinApprove(member: Member, onBack: () -> Unit)
+    @Composable fun PinApprove(
+        member: Member,
+        onBack: () -> Unit,
+    )
 
-    @Composable fun RemoveMember(member: Member, onBack: () -> Unit, onRemoved: () -> Unit)
+    @Composable fun RemoveMember(
+        member: Member,
+        onBack: () -> Unit,
+        onRemove: () -> Unit,
+    )
 
-    @Composable fun LeaveHousehold(onBack: () -> Unit, onLeft: () -> Unit)
+    @Composable fun LeaveHousehold(
+        onBack: () -> Unit,
+        onLeft: () -> Unit,
+    )
 
-    @Composable fun ChangePin(onBack: () -> Unit, onChanged: () -> Unit)
+    @Composable fun ChangePin(
+        onBack: () -> Unit,
+        onChange: () -> Unit,
+    )
 }
 
 /** The screens the app actually runs. */
 object RealAppScreens : AppScreens {
-
     @Composable
-    override fun Launch(onSignIn: () -> Unit, onFirstRun: () -> Unit) {
+    override fun Launch(
+        onSignIn: () -> Unit,
+        onFirstRun: () -> Unit,
+    ) {
         LaunchScreen(onSignIn = onSignIn, onFirstRun = onFirstRun)
     }
 
     @Composable
-    override fun SignIn(onMemberSelected: (Member) -> Unit, onInviteCode: () -> Unit) {
-        ProfilePickerScreen(onMemberSelected = onMemberSelected, onInviteCode = onInviteCode)
+    override fun SignIn(
+        onSelectMember: (Member) -> Unit,
+        onInviteCode: () -> Unit,
+    ) {
+        ProfilePickerScreen(onSelectMember = onSelectMember, onInviteCode = onInviteCode)
     }
 
     @Composable
-    override fun Pin(member: Member, onSignedIn: () -> Unit, onBack: () -> Unit, onForgotten: () -> Unit) {
-        PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack, onForgotten = onForgotten)
+    override fun Pin(
+        member: Member,
+        onSignedIn: () -> Unit,
+        onBack: () -> Unit,
+        onForget: () -> Unit,
+    ) {
+        PinEntryScreen(member = member, onSignedIn = onSignedIn, onBack = onBack, onForget = onForget)
     }
 
     @Composable
-    override fun FirstRun(onCreated: () -> Unit, onSignIn: () -> Unit) {
-        FirstRunScreen(onCreated = onCreated, onSignIn = onSignIn)
+    override fun FirstRun(
+        onCreate: () -> Unit,
+        onSignIn: () -> Unit,
+    ) {
+        FirstRunScreen(onCreate = onCreate, onSignIn = onSignIn)
     }
 
     @Composable
-    override fun InviteCode(onBack: () -> Unit, onInvite: (InvitePreview, String) -> Unit) {
+    override fun InviteCode(
+        onBack: () -> Unit,
+        onInvite: (InvitePreview, String) -> Unit,
+    ) {
         InviteCodeScreen(onBack = onBack, onInvite = onInvite)
     }
 
     @Composable
-    override fun Join(preview: InvitePreview, code: String, onJoined: () -> Unit, onExpired: () -> Unit) {
-        JoinScreen(preview = preview, code = code, onJoined = onJoined, onExpired = onExpired)
+    override fun Join(
+        preview: InvitePreview,
+        code: String,
+        onJoin: () -> Unit,
+        onExpire: () -> Unit,
+    ) {
+        JoinScreen(preview = preview, code = code, onJoin = onJoin, onExpire = onExpire)
     }
 
     @Composable
-    override fun PinForgot(member: Member, onBack: () -> Unit, onHaveCode: () -> Unit) {
+    override fun PinForgot(
+        member: Member,
+        onBack: () -> Unit,
+        onHaveCode: () -> Unit,
+    ) {
         PinForgotScreen(member = member, onBack = onBack, onHaveCode = onHaveCode)
     }
 
     @Composable
-    override fun ResetCode(onBack: () -> Unit, onCode: (String) -> Unit) {
+    override fun ResetCode(
+        onBack: () -> Unit,
+        onCode: (String) -> Unit,
+    ) {
         ResetCodeScreen(onBack = onBack, onCode = onCode)
     }
 
     @Composable
-    override fun NewPin(code: String, onSignedIn: () -> Unit) {
+    override fun NewPin(
+        code: String,
+        onSignedIn: () -> Unit,
+    ) {
         NewPinScreen(code = code, onSignedIn = onSignedIn)
     }
 
@@ -134,14 +210,14 @@ object RealAppScreens : AppScreens {
         onMembers: () -> Unit,
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
-        onSignedOut: () -> Unit
+        onSignedOut: () -> Unit,
     ) {
         ProfileScreen(
             onBack = onBack,
             onMembers = onMembers,
             onChangePin = onChangePin,
             onLeave = onLeave,
-            onSignedOut = onSignedOut
+            onSignedOut = onSignedOut,
         )
     }
 
@@ -150,7 +226,7 @@ object RealAppScreens : AppScreens {
         onBack: () -> Unit,
         onInvite: () -> Unit,
         onResetPin: (Member) -> Unit,
-        onRemove: (Member) -> Unit
+        onRemove: (Member) -> Unit,
     ) {
         MembersScreen(onBack = onBack, onInvite = onInvite, onResetPin = onResetPin, onRemove = onRemove)
     }
@@ -161,22 +237,35 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun PinApprove(member: Member, onBack: () -> Unit) {
+    override fun PinApprove(
+        member: Member,
+        onBack: () -> Unit,
+    ) {
         PinApproveScreen(member = member, onBack = onBack)
     }
 
     @Composable
-    override fun RemoveMember(member: Member, onBack: () -> Unit, onRemoved: () -> Unit) {
-        RemoveMemberScreen(member = member, onBack = onBack, onRemoved = onRemoved)
+    override fun RemoveMember(
+        member: Member,
+        onBack: () -> Unit,
+        onRemove: () -> Unit,
+    ) {
+        RemoveMemberScreen(member = member, onBack = onBack, onRemove = onRemove)
     }
 
     @Composable
-    override fun LeaveHousehold(onBack: () -> Unit, onLeft: () -> Unit) {
+    override fun LeaveHousehold(
+        onBack: () -> Unit,
+        onLeft: () -> Unit,
+    ) {
         LeaveHouseholdScreen(onBack = onBack, onLeft = onLeft)
     }
 
     @Composable
-    override fun ChangePin(onBack: () -> Unit, onChanged: () -> Unit) {
-        ChangePinScreen(onBack = onBack, onChanged = onChanged)
+    override fun ChangePin(
+        onBack: () -> Unit,
+        onChange: () -> Unit,
+    ) {
+        ChangePinScreen(onBack = onBack, onChange = onChange)
     }
 }

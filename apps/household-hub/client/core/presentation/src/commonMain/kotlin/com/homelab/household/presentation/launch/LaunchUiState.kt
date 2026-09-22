@@ -7,5 +7,5 @@ package com.homelab.household.presentation.launch
 data class LaunchUiState(
     val hubAddress: String = "",
     val status: HubStatus = HubStatus.Checking,
-    val retryInSeconds: Int? = null
+    val retryInSeconds: Int? = null,
 )

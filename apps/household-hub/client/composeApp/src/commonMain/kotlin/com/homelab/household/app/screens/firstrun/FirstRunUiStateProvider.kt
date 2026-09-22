@@ -9,14 +9,16 @@ import com.homelab.household.presentation.firstrun.PinError
 
 /** The first-run form in each state worth drawing. `FirstRunScreenTest` renders them all. */
 class FirstRunUiStateProvider : PreviewParameterProvider<FirstRunUiState> {
-
-    private val named = listOf(
-        "Empty" to FirstRunUiState(),
-        "Filled in" to FirstRunUiState(name = "Emma Larsson", pin = "482913", colour = AvatarPalette.swatches[1]),
-        "Missing fields" to FirstRunUiState(nameError = NameError.Missing, pinError = PinError.NotSixDigits),
-        "Hub unreachable" to FirstRunUiState(name = "Emma Larsson", pin = "482913", failure = FirstRunFailure.Unreachable),
-        "Already set up" to FirstRunUiState(name = "Emma Larsson", pin = "482913", failure = FirstRunFailure.AlreadySetUp)
-    )
+    private val named =
+        listOf(
+            "Empty" to FirstRunUiState(),
+            "Filled in" to FirstRunUiState(name = "Emma Larsson", pin = "482913", colour = AvatarPalette.swatches[1]),
+            "Missing fields" to FirstRunUiState(nameError = NameError.Missing, pinError = PinError.NotSixDigits),
+            "Hub unreachable" to
+                FirstRunUiState(name = "Emma Larsson", pin = "482913", failure = FirstRunFailure.Unreachable),
+            "Already set up" to
+                FirstRunUiState(name = "Emma Larsson", pin = "482913", failure = FirstRunFailure.AlreadySetUp),
+        )
 
     override val values: Sequence<FirstRunUiState> = named.map { it.second }.asSequence()
 

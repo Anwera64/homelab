@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_approve_checking
 import com.homelab.household.app.resources.approve_checking
@@ -30,13 +30,12 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.pinapprove.PinApproveStatus
 import com.homelab.household.presentation.pinapprove.PinApproveUiState
-import kotlin.test.Test
 import org.jetbrains.compose.resources.getString
+import kotlin.test.Test
 
 /** Vouching for a housemate, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class PinApproveScreenTest {
-
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
     private val wait = 5_000L
 
@@ -49,7 +48,12 @@ class PinApproveScreenTest {
         hub.approvesResets(code = "P4XN7T")
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { PinApproveScreen(member = emma, onBack = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.approve_pin_label)).performTextInput("246801")
             onNodeWithText(getString(Res.string.approve_generate)).performClick()
@@ -64,7 +68,12 @@ class PinApproveScreenTest {
         hub.refusesThePin(attemptsLeft = 3)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { PinApproveScreen(member = emma, onBack = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { PinApproveScreen(member = emma, onBack = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.approve_pin_label)).performTextInput("000000")
             onNodeWithText(getString(Res.string.approve_generate)).performClick()
@@ -79,33 +88,35 @@ class PinApproveScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun checking_your_pin_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                PinApproveContent(
-                    state = PinApproveUiState(
-                        member = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E"),
-                        pin = "246801",
-                        status = PinApproveStatus.Checking
-                    ),
-                    onPinChange = {},
-                    onApprove = {},
-                    onBack = {}
-                )
+    fun checking_your_pin_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    PinApproveContent(
+                        state =
+                            PinApproveUiState(
+                                member = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E"),
+                                pin = "246801",
+                                status = PinApproveStatus.Checking,
+                            ),
+                        onPinChange = {},
+                        onApprove = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.approve_checking))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_approve_checking)
+            onNodeWithText(getString(Res.string.approve_checking))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_approve_checking),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.approve_generate)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.approve_generate)).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {

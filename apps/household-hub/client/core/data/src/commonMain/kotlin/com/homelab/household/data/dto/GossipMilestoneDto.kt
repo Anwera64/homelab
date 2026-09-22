@@ -18,5 +18,5 @@ data class GossipMilestoneDto(
     @SerialName("source_session_id") val source_session_id: String? = null,
     @SerialName("is_active") val is_active: Boolean = true,
     @SerialName("created_at") val created_at: String? = null,
-    @SerialName("updated_at") val updated_at: String? = null
+    @SerialName("updated_at") val updated_at: String? = null,
 )

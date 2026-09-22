@@ -8,8 +8,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_invite
 import com.homelab.household.app.resources.members_remove
@@ -24,14 +24,13 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.members.MembersStatus
 import com.homelab.household.presentation.members.MembersUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.jetbrains.compose.resources.getString
 
 /** The members list, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class MembersScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -46,7 +45,12 @@ class MembersScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    MembersScreen(onBack = {}, onInvite = {}, onResetPin = { reset += it }, onRemove = { removed += it })
+                    MembersScreen(
+                        onBack = {},
+                        onInvite = {},
+                        onResetPin = { reset += it },
+                        onRemove = { removed += it },
+                    )
                 }
             }
 
@@ -109,14 +113,14 @@ class MembersScreenTest {
                         onResetPin = {},
                         onRemove = {},
                         onRetry = {},
-                        onBack = {}
+                        onBack = {},
                     )
                 }
             }
 
             // The title and the lead need no hub, so they are there from the first frame.
             onNodeWithText(getString(Res.string.members_title)).assertIsDisplayed()
-            onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
             // Whether this phone may invite anyone is one of the things the hub has not said yet.
             onNodeWithText(getString(Res.string.members_invite)).assertDoesNotExist()
         }
@@ -128,24 +132,25 @@ class MembersScreenTest {
             setContent {
                 StillTheme {
                     MembersContent(
-                        state = MembersUiState(
-                            rows = MembersUiStateProvider().values.first().rows,
-                            youAreAdmin = true,
-                            status = MembersStatus.Loading
-                        ),
+                        state =
+                            MembersUiState(
+                                rows = MembersUiStateProvider().values.first().rows,
+                                youAreAdmin = true,
+                                status = MembersStatus.Loading,
+                            ),
                         onInvite = {},
                         onResetPin = {},
                         onRemove = {},
                         onRetry = {},
-                        onBack = {}
+                        onBack = {},
                     )
                 }
             }
 
             // Pattern 3: what is already on screen is never replaced by blocks.
             onNodeWithText("Emma Larsson").assertIsDisplayed()
-            onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-            onNodeWithTag(SkeletonGroupTag).assertDoesNotExist()
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertDoesNotExist()
         }
     }
 
@@ -163,7 +168,7 @@ class MembersScreenTest {
                             onResetPin = {},
                             onRemove = {},
                             onRetry = {},
-                            onBack = {}
+                            onBack = {},
                         )
                     }
                 }

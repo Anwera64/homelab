@@ -32,7 +32,6 @@ import org.koin.test.KoinTest
 import org.koin.test.get
 
 class KoinDependencyGraphTest : KoinTest {
-
     @AfterEach
     fun tearDown() {
         stopKoin()
@@ -71,6 +70,8 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<MemoryAuditViewModel>())
         assertNotNull(get<FirstRunViewModel>())
         assertNotNull(get<ProfilePickerViewModel>())
-        assertNotNull(get<PinEntryViewModel> { parametersOf(Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")) })
+        assertNotNull(
+            get<PinEntryViewModel> { parametersOf(Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")) },
+        )
     }
 }

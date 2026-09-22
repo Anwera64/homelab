@@ -11,5 +11,6 @@ sealed interface JoinStatus {
     data object Expired : JoinStatus
 
     data object Unreachable : JoinStatus
+
     data object Failed : JoinStatus
 }

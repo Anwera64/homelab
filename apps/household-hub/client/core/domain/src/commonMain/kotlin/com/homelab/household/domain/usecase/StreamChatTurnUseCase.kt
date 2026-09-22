@@ -7,6 +7,6 @@ interface StreamChatTurnUseCase {
     operator fun invoke(
         sessionId: String,
         content: String,
-        autoApproveWrites: Boolean = false
+        autoApproveWrites: Boolean = false,
     ): Flow<ChatStreamEvent>
 }

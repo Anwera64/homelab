@@ -55,14 +55,16 @@ import org.jetbrains.compose.resources.stringResource
  * at a fraction of its own bar is relative to whatever that bar already is, so it doesn't drift.
  */
 @Immutable
-internal data class BusyBar(val bar: Color, val track: Color) {
+internal data class BusyBar(
+    val bar: Color,
+    val track: Color,
+) {
     companion object {
-        fun filled(colors: HearthColors) =
-            BusyBar(colors.onPrimary, colors.onPrimary.copy(alpha = FILLED_TRACK))
+        fun filled(colors: HearthColors) = BusyBar(colors.onPrimary, colors.onPrimary.copy(alpha = FILLED_TRACK))
 
         fun outlined(colors: HearthColors) = BusyBar(colors.primary, colors.outlineSoft)
-        fun destructive(colors: HearthColors) =
-            BusyBar(colors.error, colors.error.copy(alpha = DESTRUCTIVE_TRACK))
+
+        fun destructive(colors: HearthColors) = BusyBar(colors.error, colors.error.copy(alpha = DESTRUCTIVE_TRACK))
 
         private const val FILLED_TRACK = 0.24f
         private const val DESTRUCTIVE_TRACK = 0.18f
@@ -87,27 +89,28 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     icon: HearthIcon? = null,
     busy: Boolean = false,
-    busyDescription: String? = null
+    busyDescription: String? = null,
 ) {
     val colors = HearthTheme.colors
     WithBusyBar(modifier = modifier, busy = busy, busyBar = BusyBar.filled(colors)) {
         Button(
             onClick = { if (!busy) onClick() },
-            modifier = Modifier
-                .heightIn(min = buttonMinHeight)
-                .shadow(
-                    elevation = HearthTheme.size.raised,
-                    shape = HearthShapes.button,
-                    ambientColor = colors.primary.copy(alpha = 0.30f),
-                    spotColor = colors.primary.copy(alpha = 0.30f)
-                )
-                .busySemantics(busy, busyDescription),
+            modifier =
+                Modifier
+                    .heightIn(min = buttonMinHeight)
+                    .shadow(
+                        elevation = HearthTheme.size.raised,
+                        shape = HearthShapes.button,
+                        ambientColor = colors.primary.copy(alpha = 0.30f),
+                        spotColor = colors.primary.copy(alpha = 0.30f),
+                    ).busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.primary,
-                contentColor = colors.onPrimary
-            ),
-            contentPadding = buttonPadding
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = colors.primary,
+                    contentColor = colors.onPrimary,
+                ),
+            contentPadding = buttonPadding,
         ) {
             ButtonContent(text, icon)
         }
@@ -121,12 +124,19 @@ fun SecondaryButton(
     modifier: Modifier = Modifier,
     icon: HearthIcon? = null,
     busy: Boolean = false,
-    busyDescription: String? = null
+    busyDescription: String? = null,
 ) {
     val colors = HearthTheme.colors
     OutlinedActionButton(
-        text, onClick, modifier, icon, busy, busyDescription,
-        colors.outline, colors.textMuted, BusyBar.outlined(colors)
+        text = text,
+        onClick = onClick,
+        icon = icon,
+        busy = busy,
+        busyDescription = busyDescription,
+        borderColor = colors.outline,
+        contentColor = colors.textMuted,
+        busyBar = BusyBar.outlined(colors),
+        modifier = modifier,
     )
 }
 
@@ -138,7 +148,7 @@ fun DestructiveButton(
     modifier: Modifier = Modifier,
     icon: HearthIcon? = null,
     busy: Boolean = false,
-    busyDescription: String? = null
+    busyDescription: String? = null,
 ) {
     val colors = HearthTheme.colors
     OutlinedActionButton(
@@ -150,7 +160,7 @@ fun DestructiveButton(
         busyDescription = busyDescription,
         borderColor = colors.error,
         contentColor = colors.error,
-        busyBar = BusyBar.destructive(colors)
+        busyBar = BusyBar.destructive(colors),
     )
 }
 
@@ -158,24 +168,25 @@ fun DestructiveButton(
 private fun OutlinedActionButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier,
     icon: HearthIcon?,
     busy: Boolean,
     busyDescription: String?,
     borderColor: Color,
     contentColor: Color,
-    busyBar: BusyBar
+    busyBar: BusyBar,
+    modifier: Modifier = Modifier,
 ) {
     WithBusyBar(modifier = modifier, busy = busy, busyBar = busyBar) {
         OutlinedButton(
             onClick = { if (!busy) onClick() },
-            modifier = Modifier
-                .heightIn(min = buttonMinHeight)
-                .busySemantics(busy, busyDescription),
+            modifier =
+                Modifier
+                    .heightIn(min = buttonMinHeight)
+                    .busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
             border = BorderStroke(HearthTheme.size.hairline, borderColor),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-            contentPadding = buttonPadding
+            contentPadding = buttonPadding,
         ) {
             ButtonContent(text, icon)
         }
@@ -201,10 +212,10 @@ private fun OutlinedActionButton(
  */
 @Composable
 private fun WithBusyBar(
-    modifier: Modifier,
     busy: Boolean,
     busyBar: BusyBar,
-    button: @Composable () -> Unit
+    modifier: Modifier = Modifier,
+    button: @Composable () -> Unit,
 ) {
     Box(modifier = modifier, propagateMinConstraints = true) {
         button()
@@ -216,12 +227,12 @@ private fun WithBusyBar(
 private fun BoxScope.BusyBarOverlay(busyBar: BusyBar) {
     Box(
         modifier = Modifier.matchParentSize().clip(HearthShapes.button),
-        contentAlignment = Alignment.BottomCenter
+        contentAlignment = Alignment.BottomCenter,
     ) {
         HearthProgressBar(
             width = HearthProgressBarWidth.Inset,
             color = busyBar.bar,
-            trackColor = busyBar.track
+            trackColor = busyBar.track,
         )
     }
 }
@@ -232,20 +243,26 @@ private fun BoxScope.BusyBarOverlay(busyBar: BusyBar) {
  * worse than one that says what it is doing.
  */
 @Composable
-private fun Modifier.busySemantics(busy: Boolean, description: String?): Modifier {
+private fun Modifier.busySemantics(
+    busy: Boolean,
+    description: String?,
+): Modifier {
     if (!busy) return this
     val announcement = description ?: stringResource(Res.string.a11y_working)
     return semantics { stateDescription = announcement }
 }
 
 @Composable
-private fun RowScope.ButtonContent(text: String, icon: HearthIcon?) {
+private fun RowScope.ButtonContent(
+    text: String,
+    icon: HearthIcon?,
+) {
     if (icon != null) {
         HearthIconImage(
             icon = icon,
             contentDescription = null,
             active = true,
-            size = HearthTheme.size.iconMd
+            size = HearthTheme.size.iconMd,
         )
         Spacer(Modifier.width(HearthTheme.spacing.sm))
     }

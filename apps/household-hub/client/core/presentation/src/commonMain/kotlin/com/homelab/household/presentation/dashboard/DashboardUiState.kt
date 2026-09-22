@@ -11,5 +11,5 @@ data class DashboardUiState(
     val recentSessions: List<ConversationSession> = emptyList(),
     val householdMilestones: List<HouseholdMilestone> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )

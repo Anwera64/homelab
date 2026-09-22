@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.update
  * sessions gives that, where a map of per-session flows needed a lock to create an entry safely.
  */
 class SessionCacheLocalDataSource {
-
     private val messagesBySession = MutableStateFlow<Map<String, List<ChatMessageReadDto>>>(emptyMap())
     private val lockedSecretSessions = MutableStateFlow<Set<String>>(emptySet())
 
@@ -27,7 +26,10 @@ class SessionCacheLocalDataSource {
     fun observeMessages(sessionId: String): Flow<List<ChatMessageReadDto>> =
         messagesBySession.map { it[sessionId].orEmpty() }.distinctUntilChanged()
 
-    fun cacheMessages(sessionId: String, messages: List<ChatMessageReadDto>) {
+    fun cacheMessages(
+        sessionId: String,
+        messages: List<ChatMessageReadDto>,
+    ) {
         messagesBySession.update { it + (sessionId to messages) }
     }
 

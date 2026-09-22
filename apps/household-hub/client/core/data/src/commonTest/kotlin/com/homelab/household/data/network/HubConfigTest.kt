@@ -6,7 +6,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class HubConfigTest {
-
     @Test
     fun `GIVEN a hub address and nothing else WHEN the config is built THEN it is not a debug build`() {
         // GIVEN

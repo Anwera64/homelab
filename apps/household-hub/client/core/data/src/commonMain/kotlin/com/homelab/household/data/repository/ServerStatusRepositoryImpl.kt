@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.Flow
 class ServerStatusRepositoryImpl(
     private val remote: ServerStatusRemoteDataSource,
 ) : ServerStatusRepository {
-
     override fun observeServerStatus(): Flow<ServerStatus> = remote.observeStatus()
 
     override suspend fun checkHealth(): ServerStatus = remote.checkHealth()

@@ -19,17 +19,23 @@ class MembersRepositoryImpl(
     private val remote: MembersRemoteDataSource,
     private val storage: StoredSessionLocalDataSource,
 ) : MembersRepository {
-
     override suspend fun listHouseholdMembers(): List<User> =
         remote.listHouseholdMembers().map(UserDataMapper::toDomain)
 
-    override suspend fun createInvite(invitedName: String, isAdmin: Boolean): Invite =
-        InviteDataMapper.toDomain(remote.createInvite(invitedName, isAdmin))
+    override suspend fun createInvite(
+        invitedName: String,
+        isAdmin: Boolean,
+    ): Invite = InviteDataMapper.toDomain(remote.createInvite(invitedName, isAdmin))
 
-    override suspend fun approvePinReset(memberId: String, ownPin: String): ResetCode =
-        PinResetDataMapper.toDomain(remote.approvePinReset(memberId, ownPin))
+    override suspend fun approvePinReset(
+        memberId: String,
+        ownPin: String,
+    ): ResetCode = PinResetDataMapper.toDomain(remote.approvePinReset(memberId, ownPin))
 
-    override suspend fun changePin(currentPin: String, newPin: String) {
+    override suspend fun changePin(
+        currentPin: String,
+        newPin: String,
+    ) {
         storage.saveTokens(remote.changePin(currentPin, newPin).access_token)
     }
 

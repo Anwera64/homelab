@@ -1,3 +1,9 @@
+/*
+ * Where the hub's HTTP answers become domain exceptions, named once for every remote data source.
+ *
+ * Nothing above the data sources sees an [HttpStatusCode]: a data source reaches the hub inside
+ * [reachingHub], checks the refusals its endpoint can return, and then calls [ensureJsonSuccess].
+ */
 package com.homelab.household.data.network
 
 import com.homelab.household.data.dto.PinRefusalDto
@@ -18,13 +24,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-
-/**
- * Where the hub's HTTP answers become domain exceptions, named once for every remote data source.
- *
- * Nothing above the data sources sees an [HttpStatusCode]: a data source reaches the hub inside
- * [reachingHub], checks the refusals its endpoint can return, and then calls [ensureJsonSuccess].
- */
 
 /** Network failures become [ServerOfflineException]; everything else passes through as thrown. */
 suspend fun <T> reachingHub(block: suspend () -> T): T =
@@ -57,8 +56,7 @@ fun HttpResponse.ensureJsonSuccess(): HttpResponse {
 }
 
 /** Why the hub refused, when it said. A body that isn't a refusal reads as none rather than throwing. */
-suspend fun HttpResponse.pinRefusal(): PinRefusalDto? =
-    runCatchingSafe { body<PinRefusalDto>() }.getOrNull()
+suspend fun HttpResponse.pinRefusal(): PinRefusalDto? = runCatchingSafe { body<PinRefusalDto>() }.getOrNull()
 
 /**
  * How **sign-in** refuses a PIN: 401 with `attempts_left`, and 429 with `retry_after_seconds` once
@@ -70,8 +68,14 @@ suspend fun HttpResponse.throwIfSignInRefused() {
             val attemptsLeft = pinRefusal()?.attempts_left
             throw if (attemptsLeft != null) WrongPinException(attemptsLeft) else UnauthorizedException("Wrong PIN")
         }
-        HttpStatusCode.TooManyRequests -> throw pinLockout()
-        else -> Unit
+
+        HttpStatusCode.TooManyRequests -> {
+            throw pinLockout()
+        }
+
+        else -> {
+            Unit
+        }
     }
 }
 
@@ -86,8 +90,14 @@ suspend fun HttpResponse.throwIfPinRefused() {
             val attemptsLeft = pinRefusal()?.attempts_left
             throw if (attemptsLeft != null) WrongPinException(attemptsLeft) else ForbiddenException("Wrong PIN")
         }
-        HttpStatusCode.TooManyRequests -> throw pinLockout()
-        else -> Unit
+
+        HttpStatusCode.TooManyRequests -> {
+            throw pinLockout()
+        }
+
+        else -> {
+            Unit
+        }
     }
 }
 
@@ -98,8 +108,7 @@ suspend fun HttpResponse.throwIfPinRefused() {
 suspend fun HttpResponse.codeGuessesLocked(): CodeGuessesLockedException =
     CodeGuessesLockedException(retryAfterSeconds())
 
-private suspend fun HttpResponse.pinLockout(): PinLockedException =
-    PinLockedException(retryAfterSeconds())
+private suspend fun HttpResponse.pinLockout(): PinLockedException = PinLockedException(retryAfterSeconds())
 
 /**
  * How long the hub says to wait, from the refusal body or the `Retry-After` header. A 429 that says

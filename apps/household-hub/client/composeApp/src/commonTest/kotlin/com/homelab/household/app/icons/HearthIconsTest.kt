@@ -14,31 +14,56 @@ import kotlin.test.assertTrue
 
 /** Names, grid and stroke rules come from the Hearth icon sheet (design notes §3). */
 class HearthIconsTest {
+    private val sheetTokens =
+        setOf(
+            // Navigation
+            "household",
+            "schedule",
+            "chats",
+            "mySpace",
+            "newChat",
+            // Conversation
+            "send",
+            "attach",
+            "back",
+            "agentSwitch",
+            "retry",
+            "streaming",
+            // Privacy
+            "secretLocked",
+            "secretOpen",
+            "memory",
+            "revoke",
+            "shared",
+            "biometricUnlock",
+            // Tools
+            "calendarAdd",
+            "search",
+            "document",
+            "toolGeneric",
+            // Hub status and feedback
+            "hubOnline",
+            "hubOffline",
+            "synced",
+            "warning",
+            "error",
+            // Profile and settings
+            "profile",
+            "settings",
+            "signOut",
+            "chevronRight",
+            // Sign in: the PIN pad's delete key, drawn on the PIN artboard rather than the sheet
+            "delete",
+        )
 
-    private val sheetTokens = setOf(
-        // Navigation
-        "household", "schedule", "chats", "mySpace", "newChat",
-        // Conversation
-        "send", "attach", "back", "agentSwitch", "retry", "streaming",
-        // Privacy
-        "secretLocked", "secretOpen", "memory", "revoke", "shared", "biometricUnlock",
-        // Tools
-        "calendarAdd", "search", "document", "toolGeneric",
-        // Hub status and feedback
-        "hubOnline", "hubOffline", "synced", "warning", "error",
-        // Profile and settings
-        "profile", "settings", "signOut", "chevronRight",
-        // Sign in: the PIN pad's delete key, drawn on the PIN artboard rather than the sheet
-        "delete"
-    )
-
-    private val solidShapeCounts = mapOf(
-        "streaming" to 3,
-        "hubOnline" to 1,
-        "hubOffline" to 1,
-        "warning" to 1,
-        "error" to 1
-    )
+    private val solidShapeCounts =
+        mapOf(
+            "streaming" to 3,
+            "hubOnline" to 1,
+            "hubOffline" to 1,
+            "warning" to 1,
+            "error" to 1,
+        )
 
     @Test
     fun the_set_is_exactly_the_icon_sheet() {
@@ -100,10 +125,11 @@ class HearthIconsTest {
 
     private fun ImageVector.paths(): List<VectorPath> = root.paths()
 
-    private fun VectorGroup.paths(): List<VectorPath> = flatMap { node ->
-        when (node) {
-            is VectorPath -> listOf(node)
-            is VectorGroup -> node.paths()
+    private fun VectorGroup.paths(): List<VectorPath> =
+        flatMap { node ->
+            when (node) {
+                is VectorPath -> listOf(node)
+                is VectorGroup -> node.paths()
+            }
         }
-    }
 }

@@ -25,78 +25,89 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class MessageComposerTest {
-
     @Test
-    fun send_passes_the_current_text() = runComposeUiTest {
-        var text by mutableStateOf("")
-        var sent: String? = null
-        setContent {
-            StillTheme {
-                MessageComposer(
-                    value = text,
-                    onValueChange = { text = it },
-                    onSend = { sent = it },
-                    placeholder = "Message the Coordinator…"
-                )
+    fun send_passes_the_current_text() =
+        runComposeUiTest {
+            var text by mutableStateOf("")
+            var sent: String? = null
+            setContent {
+                StillTheme {
+                    MessageComposer(
+                        value = text,
+                        onValueChange = { text = it },
+                        onSend = { sent = it },
+                        placeholder = "Message the Coordinator…",
+                    )
+                }
             }
+
+            onNode(hasSetTextAction()).performTextInput("What's left this week?")
+            onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
+
+            assertEquals("What's left this week?", sent)
         }
 
-        onNode(hasSetTextAction()).performTextInput("What's left this week?")
-        onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
-
-        assertEquals("What's left this week?", sent)
-    }
-
     @Test
-    fun send_is_always_clickable_even_when_empty() = runComposeUiTest {
-        var sends = 0
-        setContent {
-            StillTheme {
-                MessageComposer(value = "", onValueChange = {}, onSend = { sends++ }, placeholder = "Message…")
+    fun send_is_always_clickable_even_when_empty() =
+        runComposeUiTest {
+            var sends = 0
+            setContent {
+                StillTheme {
+                    MessageComposer(value = "", onValueChange = {}, onSend = { sends++ }, placeholder = "Message…")
+                }
             }
+
+            onNodeWithContentDescription(
+                getString(Res.string.send_message),
+            ).assertIsEnabled().assertHasClickAction().performClick()
+
+            assertEquals(1, sends)
         }
 
-        onNodeWithContentDescription(getString(Res.string.send_message)).assertIsEnabled().assertHasClickAction().performClick()
-
-        assertEquals(1, sends)
-    }
-
     @Test
-    fun the_composer_never_clears_the_text_itself() = runComposeUiTest {
-        var text by mutableStateOf("Move dinner to 20:00")
-        setContent {
-            StillTheme {
-                MessageComposer(value = text, onValueChange = { text = it }, onSend = {}, placeholder = "Message…")
+    fun the_composer_never_clears_the_text_itself() =
+        runComposeUiTest {
+            var text by mutableStateOf("Move dinner to 20:00")
+            setContent {
+                StillTheme {
+                    MessageComposer(value = text, onValueChange = { text = it }, onSend = {}, placeholder = "Message…")
+                }
             }
+
+            onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
+
+            onNode(hasSetTextAction()).assertTextContains("Move dinner to 20:00")
         }
-
-        onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
-
-        onNode(hasSetTextAction()).assertTextContains("Move dinner to 20:00")
-    }
 
     /** Send used to be 44dp square, under the floor — the one thing the scale actually grew. */
     @Test
-    fun send_is_big_enough_to_hit() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message…")
+    fun send_is_big_enough_to_hit() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message…")
+                }
             }
-        }
 
-        onNodeWithContentDescription(getString(Res.string.send_message))
-            .assertHeightIsAtLeast(DefaultSizes.touchTarget)
-            .assertWidthIsAtLeast(DefaultSizes.touchTarget)
-    }
+            onNodeWithContentDescription(getString(Res.string.send_message))
+                .assertHeightIsAtLeast(DefaultSizes.touchTarget)
+                .assertWidthIsAtLeast(DefaultSizes.touchTarget)
+        }
 
     @Test
-    fun shows_the_placeholder_when_empty() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                MessageComposer(value = "", onValueChange = {}, onSend = {}, placeholder = "Message the Coordinator…")
+    fun shows_the_placeholder_when_empty() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    MessageComposer(
+                        value = "",
+                        onValueChange = {},
+                        onSend = {},
+                        placeholder = "Message the Coordinator…",
+                    )
+                }
             }
-        }
 
-        onNodeWithText("Message the Coordinator…").assertExists()
-    }
+            onNodeWithText("Message the Coordinator…").assertExists()
+        }
 }

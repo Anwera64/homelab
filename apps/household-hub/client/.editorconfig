@@ -1,0 +1,38 @@
+# The single source of formatting truth for the client: IntelliJ, the ktlint CLI and the
+# `ktlintCheck` Gradle task all read this file, so the IDE formats the way the build checks.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+max_line_length = 120
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Composables are PascalCase, which is the whole convention Compose is read by.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# `GIVEN ... WHEN ... THEN ...` test names are backticked on purpose; TestNameCompatibilityTest
+# is what guards them, and it knows things about dex and Kotlin/Native that ktlint does not.
+ktlint_ignore_back_ticked_identifier = true
+
+# `data/datasource/remote/interface/` uses a Kotlin keyword as a path segment. Renaming the
+# package is a real change with real churn, and not one a lint commit should smuggle in.
+ktlint_standard_package-name = disabled
+
+# The design system's locals are the scale itself, reaching a screen through `HearthTheme`
+# precisely so a later size class can provide a different one — the opposite of the implicit
+# dependency this rule exists to catch. See DesignSystemTokenTest.
+compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps
+
+[**/androidDeviceTest/**/*.kt]
+# Android instrumented tests write `GIVEN_..._WHEN_..._THEN_...` because dex below API 30
+# rejects a space in a method name and this client is minSdk 26. Again: TestNameCompatibilityTest.
+ktlint_standard_function-naming = disabled

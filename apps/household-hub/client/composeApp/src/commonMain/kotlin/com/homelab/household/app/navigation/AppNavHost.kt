@@ -20,10 +20,10 @@ import org.koin.compose.koinInject
  */
 @Composable
 fun AppNavHost(
+    modifier: Modifier = Modifier,
     screens: AppScreens = RealAppScreens,
     backStack: SnapshotStateList<NavKey> = rememberAppBackStack(),
     session: AppSession = rememberAppSession(),
-    modifier: Modifier = Modifier
 ) {
     LaunchedEffect(session) {
         // Listening before renewing, so a token the hub refuses on the way sends the phone back too.
@@ -37,149 +37,150 @@ fun AppNavHost(
         backStack = backStack,
         modifier = modifier,
         onBack = { backStack.removeLastOrNull() },
-        entryProvider = entryProvider {
-            entry<Destination.Launch> {
-                WithEntryViewModels {
-                    screens.Launch(
-                        onSignIn = { backStack.startOver(Destination.SignIn) },
-                        onFirstRun = { backStack.startOver(Destination.FirstRun) }
-                    )
+        entryProvider =
+            entryProvider {
+                entry<Destination.Launch> {
+                    WithEntryViewModels {
+                        screens.Launch(
+                            onSignIn = { backStack.startOver(Destination.SignIn) },
+                            onFirstRun = { backStack.startOver(Destination.FirstRun) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.SignIn> {
-                WithEntryViewModels {
-                    // The picker stays under the PIN pad, so back from a PIN returns to it.
-                    screens.SignIn(
-                        onMemberSelected = { member -> backStack.add(Destination.Pin(member)) },
-                        onInviteCode = { backStack.add(Destination.InviteCode) }
-                    )
+                entry<Destination.SignIn> {
+                    WithEntryViewModels {
+                        // The picker stays under the PIN pad, so back from a PIN returns to it.
+                        screens.SignIn(
+                            onSelectMember = { member -> backStack.add(Destination.Pin(member)) },
+                            onInviteCode = { backStack.add(Destination.InviteCode) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.Pin> { destination ->
-                WithEntryViewModels {
-                    screens.Pin(
-                        member = destination.member,
-                        onSignedIn = { backStack.startOver(Destination.Home) },
-                        onBack = { backStack.removeLastOrNull() },
-                        onForgotten = { backStack.add(Destination.PinForgot(destination.member)) }
-                    )
+                entry<Destination.Pin> { destination ->
+                    WithEntryViewModels {
+                        screens.Pin(
+                            member = destination.member,
+                            onSignedIn = { backStack.startOver(Destination.Home) },
+                            onBack = { backStack.removeLastOrNull() },
+                            onForget = { backStack.add(Destination.PinForgot(destination.member)) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.FirstRun> {
-                WithEntryViewModels {
-                    screens.FirstRun(
-                        onCreated = { backStack.startOver(Destination.Home) },
-                        onSignIn = { backStack.startOver(Destination.SignIn) }
-                    )
+                entry<Destination.FirstRun> {
+                    WithEntryViewModels {
+                        screens.FirstRun(
+                            onCreate = { backStack.startOver(Destination.Home) },
+                            onSignIn = { backStack.startOver(Destination.SignIn) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.InviteCode> {
-                WithEntryViewModels {
-                    screens.InviteCode(
-                        onBack = { backStack.removeLastOrNull() },
-                        onInvite = { preview, code -> backStack.add(Destination.Join(preview, code)) }
-                    )
+                entry<Destination.InviteCode> {
+                    WithEntryViewModels {
+                        screens.InviteCode(
+                            onBack = { backStack.removeLastOrNull() },
+                            onInvite = { preview, code -> backStack.add(Destination.Join(preview, code)) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.Join> { destination ->
-                WithEntryViewModels {
-                    screens.Join(
-                        preview = destination.preview,
-                        code = destination.code,
-                        onJoined = { backStack.startOver(Destination.Home) },
-                        // The code is spent or gone: back to typing one, not to the form.
-                        onExpired = { backStack.startOver(Destination.InviteCode) }
-                    )
+                entry<Destination.Join> { destination ->
+                    WithEntryViewModels {
+                        screens.Join(
+                            preview = destination.preview,
+                            code = destination.code,
+                            onJoin = { backStack.startOver(Destination.Home) },
+                            // The code is spent or gone: back to typing one, not to the form.
+                            onExpire = { backStack.startOver(Destination.InviteCode) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.PinForgot> { destination ->
-                WithEntryViewModels {
-                    screens.PinForgot(
-                        member = destination.member,
-                        onBack = { backStack.removeLastOrNull() },
-                        onHaveCode = { backStack.add(Destination.ResetCode) }
-                    )
+                entry<Destination.PinForgot> { destination ->
+                    WithEntryViewModels {
+                        screens.PinForgot(
+                            member = destination.member,
+                            onBack = { backStack.removeLastOrNull() },
+                            onHaveCode = { backStack.add(Destination.ResetCode) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.ResetCode> {
-                WithEntryViewModels {
-                    screens.ResetCode(
-                        onBack = { backStack.removeLastOrNull() },
-                        onCode = { code -> backStack.add(Destination.NewPin(code)) }
-                    )
+                entry<Destination.ResetCode> {
+                    WithEntryViewModels {
+                        screens.ResetCode(
+                            onBack = { backStack.removeLastOrNull() },
+                            onCode = { code -> backStack.add(Destination.NewPin(code)) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.NewPin> { destination ->
-                WithEntryViewModels {
-                    screens.NewPin(
-                        code = destination.code,
-                        onSignedIn = { backStack.startOver(Destination.Home) }
-                    )
+                entry<Destination.NewPin> { destination ->
+                    WithEntryViewModels {
+                        screens.NewPin(
+                            code = destination.code,
+                            onSignedIn = { backStack.startOver(Destination.Home) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.Home> {
-                WithEntryViewModels {
-                    screens.Home(onProfile = { backStack.add(Destination.Profile) })
+                entry<Destination.Home> {
+                    WithEntryViewModels {
+                        screens.Home(onProfile = { backStack.add(Destination.Profile) })
+                    }
                 }
-            }
-            entry<Destination.Profile> {
-                WithEntryViewModels {
-                    screens.Profile(
-                        onBack = { backStack.removeLastOrNull() },
-                        onMembers = { backStack.add(Destination.Members) },
-                        onChangePin = { backStack.add(Destination.ChangePin) },
-                        onLeave = { backStack.add(Destination.LeaveHousehold) },
-                        onSignedOut = { backStack.startOver(Destination.SignIn) }
-                    )
+                entry<Destination.Profile> {
+                    WithEntryViewModels {
+                        screens.Profile(
+                            onBack = { backStack.removeLastOrNull() },
+                            onMembers = { backStack.add(Destination.Members) },
+                            onChangePin = { backStack.add(Destination.ChangePin) },
+                            onLeave = { backStack.add(Destination.LeaveHousehold) },
+                            onSignedOut = { backStack.startOver(Destination.SignIn) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.Members> {
-                WithEntryViewModels {
-                    screens.Members(
-                        onBack = { backStack.removeLastOrNull() },
-                        onInvite = { backStack.add(Destination.InviteCreate) },
-                        onResetPin = { member -> backStack.add(Destination.PinApprove(member)) },
-                        onRemove = { member -> backStack.add(Destination.RemoveMember(member)) }
-                    )
+                entry<Destination.Members> {
+                    WithEntryViewModels {
+                        screens.Members(
+                            onBack = { backStack.removeLastOrNull() },
+                            onInvite = { backStack.add(Destination.InviteCreate) },
+                            onResetPin = { member -> backStack.add(Destination.PinApprove(member)) },
+                            onRemove = { member -> backStack.add(Destination.RemoveMember(member)) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.InviteCreate> {
-                WithEntryViewModels {
-                    screens.InviteCreate(onBack = { backStack.removeLastOrNull() })
+                entry<Destination.InviteCreate> {
+                    WithEntryViewModels {
+                        screens.InviteCreate(onBack = { backStack.removeLastOrNull() })
+                    }
                 }
-            }
-            entry<Destination.PinApprove> { destination ->
-                WithEntryViewModels {
-                    screens.PinApprove(member = destination.member, onBack = { backStack.removeLastOrNull() })
+                entry<Destination.PinApprove> { destination ->
+                    WithEntryViewModels {
+                        screens.PinApprove(member = destination.member, onBack = { backStack.removeLastOrNull() })
+                    }
                 }
-            }
-            entry<Destination.RemoveMember> { destination ->
-                WithEntryViewModels {
-                    screens.RemoveMember(
-                        member = destination.member,
-                        onBack = { backStack.removeLastOrNull() },
-                        // They are gone: the list behind this screen would still show them.
-                        onRemoved = { backStack.startOver(Destination.Members) }
-                    )
+                entry<Destination.RemoveMember> { destination ->
+                    WithEntryViewModels {
+                        screens.RemoveMember(
+                            member = destination.member,
+                            onBack = { backStack.removeLastOrNull() },
+                            // They are gone: the list behind this screen would still show them.
+                            onRemove = { backStack.startOver(Destination.Members) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.LeaveHousehold> {
-                WithEntryViewModels {
-                    screens.LeaveHousehold(
-                        onBack = { backStack.removeLastOrNull() },
-                        onLeft = { backStack.startOver(Destination.SignIn) }
-                    )
+                entry<Destination.LeaveHousehold> {
+                    WithEntryViewModels {
+                        screens.LeaveHousehold(
+                            onBack = { backStack.removeLastOrNull() },
+                            onLeft = { backStack.startOver(Destination.SignIn) },
+                        )
+                    }
                 }
-            }
-            entry<Destination.ChangePin> {
-                WithEntryViewModels {
-                    screens.ChangePin(
-                        onBack = { backStack.removeLastOrNull() },
-                        onChanged = { backStack.removeLastOrNull() }
-                    )
+                entry<Destination.ChangePin> {
+                    WithEntryViewModels {
+                        screens.ChangePin(
+                            onBack = { backStack.removeLastOrNull() },
+                            onChange = { backStack.removeLastOrNull() },
+                        )
+                    }
                 }
-            }
-        }
+            },
     )
 }
 

@@ -1,10 +1,10 @@
 package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** The three widths, running. Previews keep `DefaultMotion`; only tests turn the motion off. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthProgressBarPreview() {
     ComponentPreview {

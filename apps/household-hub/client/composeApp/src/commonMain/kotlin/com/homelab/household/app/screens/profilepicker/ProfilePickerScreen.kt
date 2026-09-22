@@ -13,24 +13,24 @@ import org.koin.compose.viewmodel.koinViewModel
 /** "Who's here?": tap a face, then enter that member's PIN. Nothing to type an identifier for. */
 @Composable
 fun ProfilePickerScreen(
-    onMemberSelected: (Member) -> Unit,
+    onSelectMember: (Member) -> Unit,
     onInviteCode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfilePickerViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            is ProfilePickerEvent.GoToPin -> onMemberSelected(event.member)
+            is ProfilePickerEvent.GoToPin -> onSelectMember(event.member)
         }
     }
 
     ProfilePickerContent(
         state = state,
-        onMemberSelected = viewModel::onMemberSelected,
+        onSelectMember = viewModel::onSelectMember,
         onRetry = viewModel::load,
         onInviteCode = onInviteCode,
-        modifier = modifier
+        modifier = modifier,
     )
 }

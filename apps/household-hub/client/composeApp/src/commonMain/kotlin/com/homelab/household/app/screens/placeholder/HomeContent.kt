@@ -19,48 +19,51 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.home_detail
 import com.homelab.household.app.resources.home_title
 import com.homelab.household.app.resources.profile_open
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.User
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun HomePlaceholderContent(
-    modifier: Modifier,
     member: User?,
     onProfile: () -> Unit,
-    description: String
+    description: String,
+    modifier: Modifier = Modifier,
 ) {
     HearthScaffold(
         modifier = modifier,
         header = {
             Box(
-                modifier = Modifier
-                    .safeContentPadding()
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.CenterEnd
+                modifier =
+                    Modifier
+                        .safeContentPadding()
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.CenterEnd,
             ) {
                 MemberAvatar(
                     name = member?.fullName.orEmpty(),
                     colour = member?.avatarColor ?: DEFAULT_COLOUR,
                     size = HearthTheme.size.touchTarget,
                     glyph = HearthTheme.typography.glyphMd,
-                    modifier = Modifier
-                        .clickable(onClick = onProfile)
-                        .semantics { contentDescription = description }
+                    modifier =
+                        Modifier
+                            .clickable(onClick = onProfile)
+                            .semantics { contentDescription = description },
                 )
             }
-        }
+        },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-            verticalArrangement = Arrangement.Center
+            modifier =
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
         ) {
             PlaceholderContent(
                 title = stringResource(Res.string.home_title),
-                detail = stringResource(Res.string.home_detail)
+                detail = stringResource(Res.string.home_detail),
             )
         }
     }
@@ -69,19 +72,21 @@ internal fun HomePlaceholderContent(
 /** The default colour a member wears when the hub hasn't said. */
 private const val DEFAULT_COLOUR = "#3C6E4E"
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
-private fun HomePlaceHolderPreview() = HearthTheme {
-    HomePlaceholderContent(
-        modifier = Modifier,
-        member = User(
-            id = "",
-            fullName = "Full name",
-            avatarColor = DEFAULT_COLOUR,
-            isAdmin = false,
-            isActive = true
-        ),
-        onProfile = {},
-        description = stringResource(Res.string.profile_open)
-    )
-}
+private fun HomePlaceHolderPreview() =
+    HearthTheme {
+        HomePlaceholderContent(
+            modifier = Modifier,
+            member =
+                User(
+                    id = "",
+                    fullName = "Full name",
+                    avatarColor = DEFAULT_COLOUR,
+                    isAdmin = false,
+                    isActive = true,
+                ),
+            onProfile = {},
+            description = stringResource(Res.string.profile_open),
+        )
+    }

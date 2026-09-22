@@ -14,10 +14,14 @@ sealed interface HubFailure {
     data object AddressNotFound : HubFailure
 
     /** The hub answered, with a status that isn't a success. */
-    data class Upstream(val statusCode: Int) : HubFailure
+    data class Upstream(
+        val statusCode: Int,
+    ) : HubFailure
 
     /** Something answered, but not with JSON — a captive portal or the wrong server, most likely. */
-    data class NotJson(val contentType: String) : HubFailure
+    data class NotJson(
+        val contentType: String,
+    ) : HubFailure
 
     data object Unknown : HubFailure
 }

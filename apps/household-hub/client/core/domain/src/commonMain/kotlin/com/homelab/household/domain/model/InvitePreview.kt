@@ -4,5 +4,5 @@ package com.homelab.household.domain.model
 data class InvitePreview(
     val invitedName: String,
     val inviterName: String,
-    val inviterAvatarColor: String
+    val inviterAvatarColor: String,
 )

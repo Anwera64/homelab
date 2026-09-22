@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_change_pin_saving
 import com.homelab.household.app.resources.change_pin_again
@@ -32,14 +32,13 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.changepin.ChangePinStatus
 import com.homelab.household.presentation.changepin.ChangePinUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.jetbrains.compose.resources.getString
 
 /** Changing a PIN, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ChangePinScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -55,7 +54,7 @@ class ChangePinScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = tokens) {
-                    ChangePinScreen(onBack = {}, onChanged = { changed++ })
+                    ChangePinScreen(onBack = {}, onChange = { changed++ })
                 }
             }
 
@@ -76,7 +75,12 @@ class ChangePinScreenTest {
         hub.refusesThePin(attemptsLeft = 4)
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { ChangePinScreen(onBack = {}, onChange = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("000000")
             onNodeWithContentDescription(getString(Res.string.change_pin_new)).performTextInput("864209")
@@ -92,7 +96,12 @@ class ChangePinScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { ChangePinScreen(onBack = {}, onChanged = {}) } }
+            setContent {
+                TestApp(
+                    hub.engine,
+                    sessionStorage = signedIn(),
+                ) { ChangePinScreen(onBack = {}, onChange = {}) }
+            }
 
             onNodeWithContentDescription(getString(Res.string.change_pin_current)).performTextInput("135790")
             onNodeWithContentDescription(getString(Res.string.change_pin_new)).performTextInput("864209")
@@ -109,36 +118,38 @@ class ChangePinScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun saving_the_new_pin_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                ChangePinContent(
-                    state = ChangePinUiState(
-                        current = "135790",
-                        new = "864209",
-                        again = "864209",
-                        status = ChangePinStatus.Saving
-                    ),
-                    onCurrentChange = {},
-                    onNewChange = {},
-                    onAgainChange = {},
-                    onChange = {},
-                    onBack = {}
-                )
+    fun saving_the_new_pin_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    ChangePinContent(
+                        state =
+                            ChangePinUiState(
+                                current = "135790",
+                                new = "864209",
+                                again = "864209",
+                                status = ChangePinStatus.Saving,
+                            ),
+                        onCurrentChange = {},
+                        onNewChange = {},
+                        onAgainChange = {},
+                        onChange = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.change_pin_saving))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_change_pin_saving)
+            onNodeWithText(getString(Res.string.change_pin_saving))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_change_pin_saving),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.change_pin_submit)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.change_pin_submit)).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {
@@ -154,7 +165,7 @@ class ChangePinScreenTest {
                             onNewChange = {},
                             onAgainChange = {},
                             onChange = {},
-                            onBack = {}
+                            onBack = {},
                         )
                     }
                 }

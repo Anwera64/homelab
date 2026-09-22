@@ -16,7 +16,6 @@ import io.ktor.http.headersOf
  * sent so a test can read what the form posted.
  */
 class FakeFirstRunHub {
-
     private val sent = mutableListOf<String>()
     val registrations: List<String> get() = sent.toList()
 
@@ -24,14 +23,15 @@ class FakeFirstRunHub {
         respond("The test did not say what the hub should answer", HttpStatusCode.NotImplemented)
     }
 
-    val engine: HttpClientEngine = MockEngine { request ->
-        if (request.url.encodedPath == "/api/v1/auth/register-initial") {
-            sent += (request.body as TextContent).text
-            answer()
-        } else {
-            respond("", HttpStatusCode.NotFound)
+    val engine: HttpClientEngine =
+        MockEngine { request ->
+            if (request.url.encodedPath == "/api/v1/auth/register-initial") {
+                sent += (request.body as TextContent).text
+                answer()
+            } else {
+                respond("", HttpStatusCode.NotFound)
+            }
         }
-    }
 
     fun createsTheHousehold() {
         answer = {
@@ -40,7 +40,7 @@ class FakeFirstRunHub {
                     "full_name":"Emma","avatar_color":"#C05638","is_admin":true,"is_active":true,
                     "personal_space_id":"space-1","created_at":"2026-09-13T00:00:00Z"}}""",
                 status = HttpStatusCode.Created,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
     }
@@ -56,7 +56,7 @@ class FakeFirstRunHub {
             respond(
                 content = """{"detail":"System is already initialized."}""",
                 status = HttpStatusCode.BadRequest,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
     }

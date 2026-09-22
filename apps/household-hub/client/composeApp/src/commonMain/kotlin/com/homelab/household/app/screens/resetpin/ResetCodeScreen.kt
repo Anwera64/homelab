@@ -14,7 +14,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ResetCodeScreen(
     onBack: () -> Unit,
     onCode: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ResetCodeViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -30,6 +30,6 @@ fun ResetCodeScreen(
         onCodeChange = viewModel::onCodeChange,
         onContinue = viewModel::onContinue,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -32,6 +32,28 @@ defaults:
 # ios-simulator-tests and ios-app-tests wait for nothing and start alongside compile, so a commit
 # gets its Android and its iOS answer in the same wall clock instead of one after the other.
 jobs:
+  # Needs nothing and blocks nothing: no Android SDK, no emulator, so it starts with compile and
+  # answers in about a minute. A formatting complaint should not arrive after the emulator has run.
+  lint:
+    name: Formatting and Compose rules (ktlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-client
+
+      # Rules come from apps/household-hub/client/.editorconfig, the same file the IDE reads.
+      - name: Run ktlint
+        run: ./gradlew ktlintCheck --continue
+
+      - name: Upload ktlint reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ktlint-reports
+          path: apps/household-hub/client/**/build/reports/ktlint/
+
   compile:
     name: Compile Android app and test APKs
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 
 class ListHouseholdMilestonesUseCaseImpl(
-    private val gossipRepository: GossipRepository
+    private val gossipRepository: GossipRepository,
 ) : ListHouseholdMilestonesUseCase {
     override suspend operator fun invoke(limit: Int): List<HouseholdMilestone> =
         gossipRepository.listHouseholdMilestones(limit)

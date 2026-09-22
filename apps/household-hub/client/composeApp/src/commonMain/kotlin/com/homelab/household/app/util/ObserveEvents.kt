@@ -17,7 +17,10 @@ import kotlinx.coroutines.flow.Flow
  * back — it picks the events up when it comes back.
  */
 @Composable
-fun <T> ObserveEvents(events: Flow<T>, onEvent: (T) -> Unit) {
+fun <T> ObserveEvents(
+    events: Flow<T>,
+    onEvent: (T) -> Unit,
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnEvent by rememberUpdatedState(onEvent)
 

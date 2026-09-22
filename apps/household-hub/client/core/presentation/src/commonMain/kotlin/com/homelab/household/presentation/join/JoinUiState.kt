@@ -16,5 +16,5 @@ data class JoinUiState(
     val takenColours: Set<String> = emptySet(),
     val nameError: NameError? = null,
     val pinError: PinError? = null,
-    val status: JoinStatus = JoinStatus.Idle
+    val status: JoinStatus = JoinStatus.Idle,
 )

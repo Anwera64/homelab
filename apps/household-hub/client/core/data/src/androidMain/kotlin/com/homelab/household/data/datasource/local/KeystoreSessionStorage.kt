@@ -4,13 +4,13 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import com.homelab.household.data.dto.UserReadDto
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import kotlinx.serialization.json.Json
 
 /**
  * Keeps the session — tokens and the signed-in member — encrypted with an AES-256-GCM key held in
@@ -19,8 +19,9 @@ import kotlinx.serialization.json.Json
  * The file lives in `noBackupFilesDir`: Keystore keys never leave the device, so a restored
  * backup could not be decrypted anyway. Anything unreadable is deleted and reads as signed out.
  */
-class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
-
+class KeystoreSessionStorage(
+    context: Context,
+) : StoredSessionLocalDataSource {
     private val tokenFile = File(context.noBackupFilesDir, FILE_NAME)
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -30,7 +31,10 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
     private var user: UserReadDto? = null
 
     @Synchronized
-    override fun saveTokens(accessToken: String, refreshToken: String?) {
+    override fun saveTokens(
+        accessToken: String,
+        refreshToken: String?,
+    ) {
         ensureLoaded()
         this.accessToken = accessToken
         if (refreshToken != null) {
@@ -111,15 +115,17 @@ class KeystoreSessionStorage(context: Context) : StoredSessionLocalDataSource {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
 
-        val spec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        )
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setKeySize(256)
-            .build()
-        return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        val spec =
+            KeyGenParameterSpec
+                .Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build()
+        return KeyGenerator
+            .getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
             .apply { init(spec) }
             .generateKey()
     }

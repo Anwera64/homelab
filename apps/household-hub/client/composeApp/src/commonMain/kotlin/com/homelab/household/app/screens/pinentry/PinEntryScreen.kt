@@ -17,8 +17,8 @@ fun PinEntryScreen(
     member: Member,
     onSignedIn: () -> Unit,
     onBack: () -> Unit,
-    onForgotten: () -> Unit,
-    modifier: Modifier = Modifier
+    onForget: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: PinEntryViewModel = koinViewModel(parameters = { parametersOf(member) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -34,7 +34,7 @@ fun PinEntryScreen(
         onDigit = viewModel::onDigit,
         onDelete = viewModel::onDelete,
         onBack = onBack,
-        onForgotten = onForgotten,
-        modifier = modifier
+        onForget = onForget,
+        modifier = modifier,
     )
 }

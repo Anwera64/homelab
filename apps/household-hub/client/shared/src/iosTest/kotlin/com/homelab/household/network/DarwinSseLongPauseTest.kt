@@ -48,59 +48,60 @@ import kotlin.time.TimeSource
  * configuration removed entirely.
  */
 class DarwinSseLongPauseTest : KoinTest {
-
     @AfterTest
     fun tearDown() {
         stopKoin()
     }
 
     @Test
-    fun darwin_stream_survives_a_pause_longer_than_nsurlsessions_default_request_timeout() = runBlocking {
-        HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
-        val repository = get<SessionRepository>()
-        val acks = SseFixture.ackClient()
+    fun darwin_stream_survives_a_pause_longer_than_nsurlsessions_default_request_timeout() =
+        runBlocking {
+            HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
+            val repository = get<SessionRepository>()
+            val acks = SseFixture.ackClient()
 
-        val events = mutableListOf<ChatStreamEvent>()
-        val deltaArrivals = mutableListOf<Duration>()
-        val clock = TimeSource.Monotonic.markNow()
+            val events = mutableListOf<ChatStreamEvent>()
+            val deltaArrivals = mutableListOf<Duration>()
+            val clock = TimeSource.Monotonic.markNow()
 
-        try {
-            withTimeout(5.minutes) {
-                withContext(Dispatchers.Default) {
-                    repository.streamChatTurn(
-                        sessionId = SseFixture.SCENARIO_LONG_PAUSE,
-                        content = "prove the stream survives a long silence"
-                    ).collect { event ->
-                        events += event
-                        if (event is ChatStreamEvent.Delta) {
-                            deltaArrivals += clock.elapsedNow()
-                            acks.ack(SseFixture.SCENARIO_LONG_PAUSE, deltaArrivals.size)
-                        }
+            try {
+                withTimeout(5.minutes) {
+                    withContext(Dispatchers.Default) {
+                        repository
+                            .streamChatTurn(
+                                sessionId = SseFixture.SCENARIO_LONG_PAUSE,
+                                content = "prove the stream survives a long silence",
+                            ).collect { event ->
+                                events += event
+                                if (event is ChatStreamEvent.Delta) {
+                                    deltaArrivals += clock.elapsedNow()
+                                    acks.ack(SseFixture.SCENARIO_LONG_PAUSE, deltaArrivals.size)
+                                }
+                            }
                     }
                 }
+            } finally {
+                acks.close()
             }
-        } finally {
-            acks.close()
+
+            assertEquals(
+                listOf("before-pause ", "after-pause"),
+                events.filterIsInstance<ChatStreamEvent.Delta>().map { it.content },
+                "The stream did not survive the pause; got $events",
+            )
+
+            val done = events.last()
+            assertTrue(done is ChatStreamEvent.Done, "Stream did not end with a Done event: $done")
+            assertEquals("before-pause after-pause", done.assistantContent)
+
+            // Guards the test against its own fixture: if the pause were ever shortened below
+            // NSURLSession's 60s default, this test would silently stop proving anything.
+            val gap = deltaArrivals[1] - deltaArrivals[0]
+            assertTrue(
+                gap > 60.seconds,
+                "The silence between deltas was only $gap. NSURLSession's default " +
+                    "timeoutIntervalForRequest is 60s, so a shorter gap proves nothing about the " +
+                    "3600s setting in PlatformModule.ios.kt.",
+            )
         }
-
-        assertEquals(
-            listOf("before-pause ", "after-pause"),
-            events.filterIsInstance<ChatStreamEvent.Delta>().map { it.content },
-            "The stream did not survive the pause; got $events"
-        )
-
-        val done = events.last()
-        assertTrue(done is ChatStreamEvent.Done, "Stream did not end with a Done event: $done")
-        assertEquals("before-pause after-pause", done.assistantContent)
-
-        // Guards the test against its own fixture: if the pause were ever shortened below
-        // NSURLSession's 60s default, this test would silently stop proving anything.
-        val gap = deltaArrivals[1] - deltaArrivals[0]
-        assertTrue(
-            gap > 60.seconds,
-            "The silence between deltas was only $gap. NSURLSession's default " +
-                "timeoutIntervalForRequest is 60s, so a shorter gap proves nothing about the " +
-                "3600s setting in PlatformModule.ios.kt."
-        )
-    }
 }

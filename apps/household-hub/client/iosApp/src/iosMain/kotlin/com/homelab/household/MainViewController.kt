@@ -25,10 +25,11 @@ import kotlin.experimental.ExperimentalNativeApi
 @OptIn(ExperimentalNativeApi::class)
 private val koin by lazy {
     HouseholdHubSdk.init(
-        hubConfig = HubConfig(
-            baseUrl = DEFAULT_BASE_URL,
-            isDebug = Platform.isDebugBinary
-        )
+        hubConfig =
+            HubConfig(
+                baseUrl = DEFAULT_BASE_URL,
+                isDebug = Platform.isDebugBinary,
+            ),
     )
 }
 
@@ -43,7 +44,13 @@ fun startHouseholdHub() {
     koin
 }
 
-/** The Compose UI, wrapped in the `UIViewController` that SwiftUI hosts. */
+/**
+ * The Compose UI, wrapped in the `UIViewController` that SwiftUI hosts.
+ *
+ * PascalCase because `ContentView.swift` calls this symbol by name, as
+ * `MainViewControllerKt.MainViewController()`. It is an ObjC entry point, not a Kotlin function.
+ */
+@Suppress("ktlint:standard:function-naming")
 fun MainViewController(): UIViewController {
     startHouseholdHub()
     return ComposeUIViewController {

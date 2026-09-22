@@ -19,23 +19,32 @@ class KtorMemoryRemoteDataSource(
     private val client: HttpClient,
     private val baseUrl: String,
 ) : MemoryRemoteDataSource {
+    override suspend fun auditMemories(scope: String?): List<MemoryReadDto> =
+        reachingHub {
+            client
+                .get("$baseUrl/api/v1/memories") {
+                    if (scope != null) {
+                        parameter("scope", scope)
+                    }
+                }.ensureJsonSuccess()
+                .body()
+        }
 
-    override suspend fun auditMemories(scope: String?): List<MemoryReadDto> = reachingHub {
-        client.get("$baseUrl/api/v1/memories") {
-            if (scope != null) {
-                parameter("scope", scope)
-            }
-        }.ensureJsonSuccess().body()
-    }
+    override suspend fun deleteMemory(memoryId: String): Unit =
+        reachingHub {
+            client.delete("$baseUrl/api/v1/memories/$memoryId").ensureJsonSuccess()
+        }
 
-    override suspend fun deleteMemory(memoryId: String): Unit = reachingHub {
-        client.delete("$baseUrl/api/v1/memories/$memoryId").ensureJsonSuccess()
-    }
-
-    override suspend fun updateMemory(memoryId: String, memory: MemoryUpdateDto): MemoryReadDto = reachingHub {
-        client.patch("$baseUrl/api/v1/memories/$memoryId") {
-            contentType(ContentType.Application.Json)
-            setBody(memory)
-        }.ensureJsonSuccess().body()
-    }
+    override suspend fun updateMemory(
+        memoryId: String,
+        memory: MemoryUpdateDto,
+    ): MemoryReadDto =
+        reachingHub {
+            client
+                .patch("$baseUrl/api/v1/memories/$memoryId") {
+                    contentType(ContentType.Application.Json)
+                    setBody(memory)
+                }.ensureJsonSuccess()
+                .body()
+        }
 }

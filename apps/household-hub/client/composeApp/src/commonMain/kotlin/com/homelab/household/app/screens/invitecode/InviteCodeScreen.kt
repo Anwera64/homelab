@@ -16,7 +16,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun InviteCodeScreen(
     onBack: () -> Unit,
     onInvite: (InvitePreview, String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: InviteCodeViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -35,6 +35,6 @@ fun InviteCodeScreen(
         onPaste = { viewModel.onCodeChange(clipboard.getText()?.text.orEmpty()) },
         onContinue = viewModel::onContinue,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -9,11 +9,13 @@ import com.homelab.household.data.dto.MemoryUpdateDto
  * wire's lowercase name.
  */
 interface MemoryRemoteDataSource {
-
     /** [scope] is already the wire value ("personal" or "household"), or null to audit every scope. */
     suspend fun auditMemories(scope: String?): List<MemoryReadDto>
 
     suspend fun deleteMemory(memoryId: String)
 
-    suspend fun updateMemory(memoryId: String, memory: MemoryUpdateDto): MemoryReadDto
+    suspend fun updateMemory(
+        memoryId: String,
+        memory: MemoryUpdateDto,
+    ): MemoryReadDto
 }

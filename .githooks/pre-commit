@@ -51,16 +51,19 @@ if [ -d "apps/household-hub/backend" ]; then
   fi
 fi
 
-# 4. Validate Household Hub client (KMP) boundaries, DI graph, design tokens and coroutine safety
+# 4. Validate Household Hub client (KMP) formatting, boundaries, DI graph, design tokens and
+#    coroutine safety. One gradlew invocation, so the daemon starts once rather than twice.
 if git diff --cached --name-only | grep -q '^apps/household-hub/client/'; then
-  echo "  [+] Validating client Clean Architecture boundaries, Koin graph, design tokens and coroutine safety..."
-  (cd apps/household-hub/client && ./gradlew :shared:jvmTest \
+  echo "  [+] Validating client formatting (ktlint), Clean Architecture boundaries, Koin graph, design tokens and coroutine safety..."
+  (cd apps/household-hub/client && ./gradlew ktlintCheck :shared:jvmTest \
     --tests "*CleanArchitectureBoundaryTest*" --tests "*KoinDependencyGraphTest*" \
-    --tests "*DesignSystemTokenTest*" --tests "*CoroutineSafetyTest*" -q --console=plain)
+    --tests "*DesignSystemTokenTest*" --tests "*CoroutineSafetyTest*" \
+    --tests "*LintSetupTest*" -q --console=plain)
   CLIENT_EXIT_CODE=$?
   if [ $CLIENT_EXIT_CODE -ne 0 ]; then
     echo ""
-    echo "❌ [Pre-Commit FAILED] Client boundary, DI graph, design-token or coroutine-safety checks failed! Commit aborted."
+    echo "❌ [Pre-Commit FAILED] Client formatting, boundary, DI graph, design-token or coroutine-safety checks failed! Commit aborted."
+    echo "   If it was the formatting: cd apps/household-hub/client && ./gradlew ktlintFormat"
     exit 1
   fi
 fi

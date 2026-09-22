@@ -1,14 +1,13 @@
 package com.homelab.household.data.datasource.local
 
 import com.homelab.household.data.dto.UserReadDto
-import java.io.File
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 
 class FileSessionStorage(
-    storageDir: String? = null
+    storageDir: String? = null,
 ) : StoredSessionLocalDataSource {
-
     private val json = Json { ignoreUnknownKeys = true }
     private val tokenFile: File
     private var inMemoryAccessToken: String? = null
@@ -16,12 +15,13 @@ class FileSessionStorage(
     private var inMemoryUser: UserReadDto? = null
 
     init {
-        val baseDir = if (!storageDir.isNullOrBlank()) {
-            File(storageDir)
-        } else {
-            val userHome = System.getProperty("user.home") ?: "."
-            File(userHome, ".household_hub")
-        }
+        val baseDir =
+            if (!storageDir.isNullOrBlank()) {
+                File(storageDir)
+            } else {
+                val userHome = System.getProperty("user.home") ?: "."
+                File(userHome, ".household_hub")
+            }
         if (!baseDir.exists()) {
             baseDir.mkdirs()
         }
@@ -44,7 +44,10 @@ class FileSessionStorage(
         }
     }
 
-    override fun saveTokens(accessToken: String, refreshToken: String?) {
+    override fun saveTokens(
+        accessToken: String,
+        refreshToken: String?,
+    ) {
         inMemoryAccessToken = accessToken
         if (refreshToken != null) {
             inMemoryRefreshToken = refreshToken
@@ -78,11 +81,12 @@ class FileSessionStorage(
     /** Writes everything this machine currently knows, so no field can be dropped by a partial save. */
     private fun write() {
         try {
-            val payload = SessionDiskPayload(
-                accessToken = inMemoryAccessToken,
-                refreshToken = inMemoryRefreshToken,
-                user = inMemoryUser
-            )
+            val payload =
+                SessionDiskPayload(
+                    accessToken = inMemoryAccessToken,
+                    refreshToken = inMemoryRefreshToken,
+                    user = inMemoryUser,
+                )
             tokenFile.writeText(json.encodeToString(payload))
         } catch (_: Exception) {
         }

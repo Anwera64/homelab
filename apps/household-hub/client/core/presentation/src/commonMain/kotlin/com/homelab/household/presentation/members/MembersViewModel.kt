@@ -18,9 +18,8 @@ private const val DEFAULT_COLOUR = "#3C6E4E"
 
 class MembersViewModel(
     private val listHouseholdMembers: ListHouseholdMembersUseCase,
-    private val getCurrentUser: GetCurrentUserUseCase
+    private val getCurrentUser: GetCurrentUserUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(MembersUiState())
     val uiState: StateFlow<MembersUiState> = _uiState.asStateFlow()
 
@@ -37,24 +36,37 @@ class MembersViewModel(
                 val household = listHouseholdMembers()
                 you to household
             }.fold(
-                onSuccess = { (you, household) -> _uiState.update { it.copy(rows = rows(you, household), youAreAdmin = you?.isAdmin == true, status = MembersStatus.Ready) } },
+                onSuccess = { (you, household) ->
+                    _uiState.update {
+                        it.copy(
+                            rows = rows(you, household),
+                            youAreAdmin =
+                                you?.isAdmin == true,
+                            status = MembersStatus.Ready,
+                        )
+                    }
+                },
                 onFailure = { error ->
-                    val status = if (error is ServerOfflineException) MembersStatus.Unreachable else MembersStatus.Failed
+                    val status =
+                        if (error is ServerOfflineException) MembersStatus.Unreachable else MembersStatus.Failed
                     _uiState.update { it.copy(status = status) }
-                }
+                },
             )
         }
     }
 
     /** You first: it is your household seen from your side. */
-    private fun rows(you: User?, household: List<User>): List<MemberRow> =
+    private fun rows(
+        you: User?,
+        household: List<User>,
+    ): List<MemberRow> =
         household.sortedByDescending { it.id == you?.id }.map { member ->
             MemberRow(
                 id = member.id,
                 name = member.fullName,
                 avatarColor = member.avatarColor ?: DEFAULT_COLOUR,
                 isYou = member.id == you?.id,
-                isAdmin = member.isAdmin
+                isAdmin = member.isAdmin,
             )
         }
 }

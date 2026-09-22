@@ -3,10 +3,10 @@ package com.homelab.household.app.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** The field's states. With an error the helper is left out, as callers hide it then. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthTextFieldEmptyPreview() {
     ComponentPreview {
@@ -15,12 +15,12 @@ private fun HearthTextFieldEmptyPreview() {
             onValueChange = {},
             label = "Household name",
             placeholder = "The Soares home",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthTextFieldHelperPreview() {
     ComponentPreview {
@@ -30,12 +30,12 @@ private fun HearthTextFieldHelperPreview() {
             label = "Your name",
             placeholder = "Emma",
             helper = "This is how the household sees you",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthTextFieldErrorPreview() {
     ComponentPreview {
@@ -45,12 +45,12 @@ private fun HearthTextFieldErrorPreview() {
             label = "Invite code",
             placeholder = "K7M2QP",
             error = "Invite codes are 6 characters",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun HearthTextFieldFilledPreview() {
     ComponentPreview {
@@ -60,7 +60,7 @@ private fun HearthTextFieldFilledPreview() {
             label = "Your name",
             placeholder = "Emma",
             helper = "This is how the household sees you",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

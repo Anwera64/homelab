@@ -12,12 +12,6 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,6 +19,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 /**
  * First run takes a name, a PIN and a colour. The button is never disabled: tapping it with
@@ -32,7 +32,6 @@ import kotlinx.coroutines.test.setMain
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirstRunViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private val onboard = mock<FirstRunOnboardUseCase>()
 
@@ -48,10 +47,11 @@ class FirstRunViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun filledIn() = FirstRunViewModel(onboard).apply {
-        onNameChange("Emma")
-        onPinChange("482913")
-    }
+    private fun filledIn() =
+        FirstRunViewModel(onboard).apply {
+            onNameChange("Emma")
+            onPinChange("482913")
+        }
 
     @Test
     fun it_starts_with_the_first_swatch_chosen() {
@@ -72,25 +72,27 @@ class FirstRunViewModelTest {
     }
 
     @Test
-    fun creating_with_nothing_filled_in_says_so_under_each_field_and_sends_nothing() = runTest(testDispatcher) {
-        val viewModel = FirstRunViewModel(onboard)
+    fun creating_with_nothing_filled_in_says_so_under_each_field_and_sends_nothing() =
+        runTest(testDispatcher) {
+            val viewModel = FirstRunViewModel(onboard)
 
-        viewModel.create()
-        advanceUntilIdle()
+            viewModel.create()
+            advanceUntilIdle()
 
-        assertEquals(NameError.Missing, viewModel.uiState.value.nameError)
-        assertEquals(PinError.NotSixDigits, viewModel.uiState.value.pinError)
-        verifySuspend(VerifyMode.exactly(0)) { onboard(any(), any(), any()) }
-    }
+            assertEquals(NameError.Missing, viewModel.uiState.value.nameError)
+            assertEquals(PinError.NotSixDigits, viewModel.uiState.value.pinError)
+            verifySuspend(VerifyMode.exactly(0)) { onboard(any(), any(), any()) }
+        }
 
     @Test
-    fun a_name_over_128_characters_is_too_long() = runTest(testDispatcher) {
-        val viewModel = filledIn().apply { onNameChange("x".repeat(129)) }
+    fun a_name_over_128_characters_is_too_long() =
+        runTest(testDispatcher) {
+            val viewModel = filledIn().apply { onNameChange("x".repeat(129)) }
 
-        viewModel.create()
+            viewModel.create()
 
-        assertEquals(NameError.TooLong, viewModel.uiState.value.nameError)
-    }
+            assertEquals(NameError.TooLong, viewModel.uiState.value.nameError)
+        }
 
     @Test
     fun typing_in_a_field_clears_its_error() {
@@ -105,53 +107,57 @@ class FirstRunViewModelTest {
     }
 
     @Test
-    fun creating_sends_the_name_pin_and_colour_and_goes_home() = runTest(testDispatcher) {
-        everySuspend { onboard("Emma", "482913", "#C05638") } returns emma
-        val viewModel = filledIn().apply { onColourSelect("#C05638") }
+    fun creating_sends_the_name_pin_and_colour_and_goes_home() =
+        runTest(testDispatcher) {
+            everySuspend { onboard("Emma", "482913", "#C05638") } returns emma
+            val viewModel = filledIn().apply { onColourSelect("#C05638") }
 
-        viewModel.events.test {
+            viewModel.events.test {
+                viewModel.create()
+                advanceUntilIdle()
+
+                assertEquals(FirstRunEvent.GoToHome, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun an_unreachable_hub_is_reported_and_nothing_typed_is_cleared() =
+        runTest(testDispatcher) {
+            everySuspend { onboard(any(), any(), any()) } throws ServerOfflineException()
+            val viewModel = filledIn()
+
             viewModel.create()
             advanceUntilIdle()
 
-            assertEquals(FirstRunEvent.GoToHome, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            val state = viewModel.uiState.value
+            assertEquals(FirstRunFailure.Unreachable, state.failure)
+            assertEquals("Emma", state.name)
+            assertEquals("482913", state.pin)
+            assertFalse(state.isCreating)
         }
-    }
 
     @Test
-    fun an_unreachable_hub_is_reported_and_nothing_typed_is_cleared() = runTest(testDispatcher) {
-        everySuspend { onboard(any(), any(), any()) } throws ServerOfflineException()
-        val viewModel = filledIn()
+    fun a_hub_someone_else_already_set_up_says_so() =
+        runTest(testDispatcher) {
+            everySuspend { onboard(any(), any(), any()) } throws HubAlreadySetUpException()
+            val viewModel = filledIn()
 
-        viewModel.create()
-        advanceUntilIdle()
+            viewModel.create()
+            advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertEquals(FirstRunFailure.Unreachable, state.failure)
-        assertEquals("Emma", state.name)
-        assertEquals("482913", state.pin)
-        assertFalse(state.isCreating)
-    }
+            assertEquals(FirstRunFailure.AlreadySetUp, viewModel.uiState.value.failure)
+        }
 
     @Test
-    fun a_hub_someone_else_already_set_up_says_so() = runTest(testDispatcher) {
-        everySuspend { onboard(any(), any(), any()) } throws HubAlreadySetUpException()
-        val viewModel = filledIn()
+    fun anything_else_is_an_unknown_failure() =
+        runTest(testDispatcher) {
+            everySuspend { onboard(any(), any(), any()) } throws IllegalStateException("odd")
+            val viewModel = filledIn()
 
-        viewModel.create()
-        advanceUntilIdle()
+            viewModel.create()
+            advanceUntilIdle()
 
-        assertEquals(FirstRunFailure.AlreadySetUp, viewModel.uiState.value.failure)
-    }
-
-    @Test
-    fun anything_else_is_an_unknown_failure() = runTest(testDispatcher) {
-        everySuspend { onboard(any(), any(), any()) } throws IllegalStateException("odd")
-        val viewModel = filledIn()
-
-        viewModel.create()
-        advanceUntilIdle()
-
-        assertEquals(FirstRunFailure.Unknown, viewModel.uiState.value.failure)
-    }
+            assertEquals(FirstRunFailure.Unknown, viewModel.uiState.value.failure)
+        }
 }

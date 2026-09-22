@@ -20,7 +20,7 @@ fun HearthChip(
     label: String,
     modifier: Modifier = Modifier,
     variant: ChipVariant = ChipVariant.Neutral,
-    icon: HearthIcon? = null
+    icon: HearthIcon? = null,
 ) {
     val colors = chipColors(variant, HearthTheme.colors)
     Surface(
@@ -28,12 +28,12 @@ fun HearthChip(
         shape = HearthShapes.pill,
         color = colors.container,
         contentColor = colors.content,
-        border = colors.border?.let { BorderStroke(HearthTheme.size.hairline, it) }
+        border = colors.border?.let { BorderStroke(HearthTheme.size.hairline, it) },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = HearthTheme.spacing.md, vertical = HearthTheme.spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
                 HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconSm)

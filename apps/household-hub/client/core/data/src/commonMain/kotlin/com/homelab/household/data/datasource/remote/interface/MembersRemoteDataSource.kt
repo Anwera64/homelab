@@ -11,16 +11,24 @@ import com.homelab.household.data.dto.UserReadDto
  * means. `MembersRepositoryImpl` maps those DTOs and decides what this phone keeps.
  */
 interface MembersRemoteDataSource {
-
     suspend fun listHouseholdMembers(): List<UserReadDto>
 
-    suspend fun createInvite(invitedName: String, isAdmin: Boolean): InviteReadDto
+    suspend fun createInvite(
+        invitedName: String,
+        isAdmin: Boolean,
+    ): InviteReadDto
 
     /** [ownPin] is the approver's own PIN, not the PIN of whoever forgot theirs. */
-    suspend fun approvePinReset(memberId: String, ownPin: String): PinResetReadDto
+    suspend fun approvePinReset(
+        memberId: String,
+        ownPin: String,
+    ): PinResetReadDto
 
     /** A changed PIN invalidates the old token, so the hub hands back a fresh one. */
-    suspend fun changePin(currentPin: String, newPin: String): TokenResponseDto
+    suspend fun changePin(
+        currentPin: String,
+        newPin: String,
+    ): TokenResponseDto
 
     suspend fun removeMember(memberId: String)
 

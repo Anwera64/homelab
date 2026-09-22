@@ -14,8 +14,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
-import com.homelab.household.app.components.SkeletonGroupTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
+import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_invite_create_making
 import com.homelab.household.app.resources.a11y_invite_create_remaking
@@ -34,14 +34,13 @@ import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Invite
 import com.homelab.household.presentation.invitecreate.InviteCreateStatus
 import com.homelab.household.presentation.invitecreate.InviteCreateUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import org.jetbrains.compose.resources.getString
 
 /** Making an invite code, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class InviteCreateScreenTest {
-
     private val wait = 5_000L
 
     /** A phone with somebody signed in on it: these screens are all behind a token. */
@@ -98,73 +97,76 @@ class InviteCreateScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun making_the_first_code_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                InviteCreateContent(
-                    state = InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating),
-                    onNameChange = {},
-                    onAdminChange = {},
-                    onCreate = {},
-                    onNewCode = {},
-                    onCopy = {},
-                    onBack = {}
-                )
+    fun making_the_first_code_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    InviteCreateContent(
+                        state = InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating),
+                        onNameChange = {},
+                        onAdminChange = {},
+                        onCreate = {},
+                        onNewCode = {},
+                        onCopy = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.invite_create_making))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_invite_create_making)
+            onNodeWithText(getString(Res.string.invite_create_making))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_invite_create_making),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.invite_create_new_code)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.invite_create_new_code)).assertDoesNotExist()
+        }
 
     /**
      * Replacing a code already on screen. The button that asked carries the bar, and it announces
      * itself differently — this is a *new* code, and the one on screen is about to stop working.
      */
     @Test
-    fun making_a_second_code_announces_that_it_is_a_new_one() = runComposeUiTest {
-        val invite = Invite(code = "K7M2QP", invitedName = "Liam", isAdmin = false, expiresInSeconds = 892)
+    fun making_a_second_code_announces_that_it_is_a_new_one() =
+        runComposeUiTest {
+            val invite = Invite(code = "K7M2QP", invitedName = "Liam", isAdmin = false, expiresInSeconds = 892)
 
-        setContent {
-            StillTheme {
-                InviteCreateContent(
-                    state = InviteCreateUiState(
-                        name = "Liam",
-                        invite = invite,
-                        secondsLeft = 892,
-                        status = InviteCreateStatus.Creating
-                    ),
-                    onNameChange = {},
-                    onAdminChange = {},
-                    onCreate = {},
-                    onNewCode = {},
-                    onCopy = {},
-                    onBack = {}
-                )
+            setContent {
+                StillTheme {
+                    InviteCreateContent(
+                        state =
+                            InviteCreateUiState(
+                                name = "Liam",
+                                invite = invite,
+                                secondsLeft = 892,
+                                status = InviteCreateStatus.Creating,
+                            ),
+                        onNameChange = {},
+                        onAdminChange = {},
+                        onCreate = {},
+                        onNewCode = {},
+                        onCopy = {},
+                        onBack = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.invite_create_making)).assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.StateDescription,
-                getString(Res.string.a11y_invite_create_remaking)
+            onNodeWithText(getString(Res.string.invite_create_making)).assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_invite_create_remaking),
+                ),
             )
-        )
 
-        // The old code must go. Leaving it on screen invites the admin to read out six characters
-        // that are being replaced, which is worse than showing nothing (§6.21, pattern 4).
-        onNodeWithText("K7M2QP").assertDoesNotExist()
-        onNodeWithTag(SkeletonGroupTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.invite_create_making_new)).assertIsDisplayed()
-    }
+            // The old code must go. Leaving it on screen invites the admin to read out six characters
+            // that are being replaced, which is worse than showing nothing (§6.21, pattern 4).
+            onNodeWithText("K7M2QP").assertDoesNotExist()
+            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.invite_create_making_new)).assertIsDisplayed()
+        }
 
     @Test
     fun every_previewed_state_draws() {
@@ -181,7 +183,7 @@ class InviteCreateScreenTest {
                             onCreate = {},
                             onNewCode = {},
                             onCopy = {},
-                            onBack = {}
+                            onBack = {},
                         )
                     }
                 }

@@ -4,9 +4,6 @@ import com.homelab.household.data.BuildConfig
 import com.homelab.household.data.datasource.local.AuthEventsLocalDataSource
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
-import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
-import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
-import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorAuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorGossipRemoteDataSource
@@ -15,16 +12,19 @@ import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.GossipRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.MembersRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.PublicEndpoints
 import com.homelab.household.data.network.signOutOnUnauthorized
-import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.GossipRepositoryImpl
@@ -55,67 +55,69 @@ import org.koin.dsl.module
 
 const val DEFAULT_BASE_URL = BuildConfig.BASE_URL
 
-val dataModule = module {
-    single {
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = false
+val dataModule =
+    module {
+        single {
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                prettyPrint = false
+            }
         }
-    }
 
-    single {
-        val storage: StoredSessionLocalDataSource = get()
-        val jsonSerializer: Json = get()
-        val hubConfig: HubConfig = get()
-        HttpClient(get<HttpClientEngine>()) {
-            install(ContentNegotiation) {
-                json(jsonSerializer)
-            }
-            install(Logging) {
-                logger = KermitKtorLogger()
-                level = if (hubConfig.isDebug) {
-                    LogLevel.ALL
-                } else {
-                    LogLevel.INFO
+        single {
+            val storage: StoredSessionLocalDataSource = get()
+            val jsonSerializer: Json = get()
+            val hubConfig: HubConfig = get()
+            HttpClient(get<HttpClientEngine>()) {
+                install(ContentNegotiation) {
+                    json(jsonSerializer)
                 }
-            }
-            install(Auth) {
-                bearer {
-                    loadTokens {
-                        val access = storage.getAccessToken()
-                        val refresh = storage.getRefreshToken()
-                        if (access != null) {
-                            BearerTokens(accessToken = access, refreshToken = refresh ?: "")
+                install(Logging) {
+                    logger = KermitKtorLogger()
+                    level =
+                        if (hubConfig.isDebug) {
+                            LogLevel.ALL
                         } else {
-                            null
+                            LogLevel.INFO
                         }
-                    }
-                    sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
                 }
+                install(Auth) {
+                    bearer {
+                        loadTokens {
+                            val access = storage.getAccessToken()
+                            val refresh = storage.getRefreshToken()
+                            if (access != null) {
+                                BearerTokens(accessToken = access, refreshToken = refresh ?: "")
+                            } else {
+                                null
+                            }
+                        }
+                        sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
+                    }
+                }
+                val events: AuthEventsLocalDataSource = get()
+                signOutOnUnauthorized(storage) { events.raiseSignedOut() }
             }
-            val events: AuthEventsLocalDataSource = get()
-            signOutOnUnauthorized(storage) { events.raiseSignedOut() }
         }
-    }
-    single { AuthEventsLocalDataSource() }
-    single { SessionCacheLocalDataSource() }
-    single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<AgentRemoteDataSource> { KtorAgentRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<SpaceRemoteDataSource> { KtorSpaceRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single { DefensiveSseStreamReader(get()) }
-    single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
-    single<SessionRemoteDataSource> { KtorSessionRemoteDataSource(get(), get<HubConfig>().baseUrl, get()) }
+        single { AuthEventsLocalDataSource() }
+        single { SessionCacheLocalDataSource() }
+        single<AuthRemoteDataSource> { KtorAuthRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<MembersRemoteDataSource> { KtorMembersRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<AgentRemoteDataSource> { KtorAgentRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<SpaceRemoteDataSource> { KtorSpaceRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single { DefensiveSseStreamReader(get()) }
+        single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<SessionRemoteDataSource> { KtorSessionRemoteDataSource(get(), get<HubConfig>().baseUrl, get()) }
 
-    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
-    single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
-    single<SessionRepository> { SessionRepositoryImpl(get(), get()) }
-    single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
-    single<AgentRepository> { AgentRepositoryImpl(get()) }
-    single<SpaceRepository> { SpaceRepositoryImpl(get()) }
-    single<MemoryRepository> { MemoryRepositoryImpl(get()) }
-    single<GossipRepository> { GossipRepositoryImpl(get()) }
-}
+        single<AuthRepository> { AuthRepositoryImpl(get(), get(), get(), get()) }
+        single<MembersRepository> { MembersRepositoryImpl(get(), get()) }
+        single<SessionRepository> { SessionRepositoryImpl(get(), get()) }
+        single<ServerStatusRepository> { ServerStatusRepositoryImpl(get()) }
+        single<AgentRepository> { AgentRepositoryImpl(get()) }
+        single<SpaceRepository> { SpaceRepositoryImpl(get()) }
+        single<MemoryRepository> { MemoryRepositoryImpl(get()) }
+        single<GossipRepository> { GossipRepositoryImpl(get()) }
+    }

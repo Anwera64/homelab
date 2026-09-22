@@ -4,5 +4,5 @@ package com.homelab.household.domain.model
 data class Member(
     val id: String,
     val name: String,
-    val avatarColor: String
+    val avatarColor: String,
 )

@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SessionSecretToggleDto(
-    @SerialName("is_secret") val is_secret: Boolean
+    @SerialName("is_secret") val is_secret: Boolean,
 )

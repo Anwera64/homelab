@@ -15,85 +15,90 @@ import dev.mokkery.everySuspend
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlinx.coroutines.test.runTest
 
 class SessionUseCasesTest {
-
     private val sessionRepo = mock<SessionRepository>()
     private val createSessionUseCase = CreateSessionUseCaseImpl(sessionRepo)
     private val getSessionUseCase = GetSessionUseCaseImpl(sessionRepo)
     private val archiveSessionUseCase = ArchiveSessionUseCaseImpl(sessionRepo)
     private val toggleSecretModeUseCase = ToggleSecretModeUseCaseImpl(sessionRepo)
 
-    private val dummySession = ConversationSession(
-        id = "session-1",
-        userId = "user-1",
-        agentId = "agent-1",
-        title = "Research Session",
-        isSecret = false,
-        isArchived = false,
-        createdAt = "2026-09-08T12:00:00Z",
-        updatedAt = "2026-09-08T12:00:00Z"
-    )
-
-    @Test
-    fun create_session_with_valid_agent_returns_session() = runTest {
-        everySuspend { sessionRepo.createSession("agent-1", "Research Session", false) } returns dummySession
-
-        val session = createSessionUseCase("agent-1", "Research Session", false)
-
-        assertEquals("session-1", session.id)
-        assertEquals("agent-1", session.agentId)
-        verifySuspend(VerifyMode.exactly(1)) { sessionRepo.createSession("agent-1", "Research Session", false) }
-    }
-
-    @Test
-    fun create_session_with_blank_agent_id_throws_validation_error() = runTest {
-        assertFailsWith<ValidationException> {
-            createSessionUseCase("", "Research Session", false)
-        }
-    }
-
-    @Test
-    fun get_session_returns_session_and_messages() = runTest {
-        val messages = listOf(
-            ChatMessage(
-                id = "msg-1",
-                sessionId = "session-1",
-                role = MessageRole.USER,
-                content = "Hello",
-                status = MessageStatus.SENT,
-                createdAt = "2026-09-08T12:01:00Z"
-            )
+    private val dummySession =
+        ConversationSession(
+            id = "session-1",
+            userId = "user-1",
+            agentId = "agent-1",
+            title = "Research Session",
+            isSecret = false,
+            isArchived = false,
+            createdAt = "2026-09-08T12:00:00Z",
+            updatedAt = "2026-09-08T12:00:00Z",
         )
-        everySuspend { sessionRepo.getSession("session-1") } returns Pair(dummySession, messages)
-
-        val (session, fetchedMessages) = getSessionUseCase("session-1")
-
-        assertEquals("session-1", session.id)
-        assertEquals(1, fetchedMessages.size)
-        assertEquals("Hello", fetchedMessages.first().content)
-    }
 
     @Test
-    fun archive_session_delegates_to_repo() = runTest {
-        everySuspend { sessionRepo.archiveSession("session-1") } returns Unit
+    fun create_session_with_valid_agent_returns_session() =
+        runTest {
+            everySuspend { sessionRepo.createSession("agent-1", "Research Session", false) } returns dummySession
 
-        archiveSessionUseCase("session-1")
+            val session = createSessionUseCase("agent-1", "Research Session", false)
 
-        verifySuspend(VerifyMode.exactly(1)) { sessionRepo.archiveSession("session-1") }
-    }
+            assertEquals("session-1", session.id)
+            assertEquals("agent-1", session.agentId)
+            verifySuspend(VerifyMode.exactly(1)) { sessionRepo.createSession("agent-1", "Research Session", false) }
+        }
 
     @Test
-    fun toggle_secret_mode_delegates_to_repo() = runTest {
-        everySuspend { sessionRepo.toggleSecretMode("session-1", true) } returns dummySession.copy(isSecret = true)
+    fun create_session_with_blank_agent_id_throws_validation_error() =
+        runTest {
+            assertFailsWith<ValidationException> {
+                createSessionUseCase("", "Research Session", false)
+            }
+        }
 
-        val result = toggleSecretModeUseCase("session-1", true)
+    @Test
+    fun get_session_returns_session_and_messages() =
+        runTest {
+            val messages =
+                listOf(
+                    ChatMessage(
+                        id = "msg-1",
+                        sessionId = "session-1",
+                        role = MessageRole.USER,
+                        content = "Hello",
+                        status = MessageStatus.SENT,
+                        createdAt = "2026-09-08T12:01:00Z",
+                    ),
+                )
+            everySuspend { sessionRepo.getSession("session-1") } returns Pair(dummySession, messages)
 
-        assertEquals(true, result.isSecret)
-    }
+            val (session, fetchedMessages) = getSessionUseCase("session-1")
+
+            assertEquals("session-1", session.id)
+            assertEquals(1, fetchedMessages.size)
+            assertEquals("Hello", fetchedMessages.first().content)
+        }
+
+    @Test
+    fun archive_session_delegates_to_repo() =
+        runTest {
+            everySuspend { sessionRepo.archiveSession("session-1") } returns Unit
+
+            archiveSessionUseCase("session-1")
+
+            verifySuspend(VerifyMode.exactly(1)) { sessionRepo.archiveSession("session-1") }
+        }
+
+    @Test
+    fun toggle_secret_mode_delegates_to_repo() =
+        runTest {
+            everySuspend { sessionRepo.toggleSecretMode("session-1", true) } returns dummySession.copy(isSecret = true)
+
+            val result = toggleSecretModeUseCase("session-1", true)
+
+            assertEquals(true, result.isSecret)
+        }
 }
-

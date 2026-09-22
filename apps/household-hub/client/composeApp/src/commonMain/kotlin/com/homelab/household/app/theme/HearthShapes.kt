@@ -30,11 +30,12 @@ object HearthShapes {
     /** A key on the PIN pad. */
     val key = RoundedCornerShape(20.dp)
 
-    internal val material = Shapes(
-        extraSmall = RoundedCornerShape(8.dp),
-        small = RoundedCornerShape(12.dp),
-        medium = item,
-        large = bento,
-        extraLarge = bento
-    )
+    internal val material =
+        Shapes(
+            extraSmall = RoundedCornerShape(8.dp),
+            small = RoundedCornerShape(12.dp),
+            medium = item,
+            large = bento,
+            extraLarge = bento,
+        )
 }

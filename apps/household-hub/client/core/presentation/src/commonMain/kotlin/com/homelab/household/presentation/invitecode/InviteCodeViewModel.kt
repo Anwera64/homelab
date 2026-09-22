@@ -25,9 +25,8 @@ private const val CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 const val CODE_LENGTH = 6
 
 class InviteCodeViewModel(
-    private val lookUpInvite: LookUpInviteUseCase
+    private val lookUpInvite: LookUpInviteUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(InviteCodeUiState())
     val uiState: StateFlow<InviteCodeUiState> = _uiState.asStateFlow()
 
@@ -47,7 +46,10 @@ class InviteCodeViewModel(
     fun onContinue() {
         val state = _uiState.value
         when {
-            state.status is InviteCodeStatus.Checking || state.status is InviteCodeStatus.Locked -> return
+            state.status is InviteCodeStatus.Checking || state.status is InviteCodeStatus.Locked -> {
+                return
+            }
+
             state.code.length < CODE_LENGTH -> {
                 _uiState.update { it.copy(status = InviteCodeStatus.Incomplete) }
                 return
@@ -69,19 +71,20 @@ class InviteCodeViewModel(
                         is ServerOfflineException -> _uiState.update { it.copy(status = InviteCodeStatus.Unreachable) }
                         else -> _uiState.update { it.copy(status = InviteCodeStatus.Failed) }
                     }
-                }
+                },
             )
         }
     }
 
     private fun countDown(seconds: Int) {
         countdown?.cancel()
-        countdown = viewModelScope.launch {
-            for (left in seconds downTo 1) {
-                _uiState.update { it.copy(status = InviteCodeStatus.Locked(secondsLeft = left)) }
-                delay(1_000)
+        countdown =
+            viewModelScope.launch {
+                for (left in seconds downTo 1) {
+                    _uiState.update { it.copy(status = InviteCodeStatus.Locked(secondsLeft = left)) }
+                    delay(1_000)
+                }
+                _uiState.update { it.copy(status = InviteCodeStatus.Idle) }
             }
-            _uiState.update { it.copy(status = InviteCodeStatus.Idle) }
-        }
     }
 }

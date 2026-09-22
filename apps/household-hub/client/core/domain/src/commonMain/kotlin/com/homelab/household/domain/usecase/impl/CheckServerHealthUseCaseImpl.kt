@@ -5,7 +5,7 @@ import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.usecase.CheckServerHealthUseCase
 
 class CheckServerHealthUseCaseImpl(
-    private val serverStatusRepository: ServerStatusRepository
+    private val serverStatusRepository: ServerStatusRepository,
 ) : CheckServerHealthUseCase {
     override suspend operator fun invoke(): ServerStatus = serverStatusRepository.checkHealth()
 }

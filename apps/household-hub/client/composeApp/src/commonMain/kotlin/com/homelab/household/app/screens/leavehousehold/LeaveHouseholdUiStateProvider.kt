@@ -6,16 +6,16 @@ import com.homelab.household.presentation.leavehousehold.LeaveHouseholdUiState
 
 /** Leaving, in each state worth drawing. `LeaveHouseholdScreenTest` renders them all. */
 class LeaveHouseholdUiStateProvider : PreviewParameterProvider<LeaveHouseholdUiState> {
-
-    private val named = listOf(
-        "Asking for your PIN" to LeaveHouseholdUiState(),
-        "PIN typed" to LeaveHouseholdUiState(pin = "135790"),
-        "Deleting your account" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
-        "Wrong PIN" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.WrongPin(attemptsLeft = 4)),
-        "The only admin" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.SoleAdmin),
-        "Locked" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.Locked(secondsLeft = 30)),
-        "Hub unreachable" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Unreachable)
-    )
+    private val named =
+        listOf(
+            "Asking for your PIN" to LeaveHouseholdUiState(),
+            "PIN typed" to LeaveHouseholdUiState(pin = "135790"),
+            "Deleting your account" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving),
+            "Wrong PIN" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.WrongPin(attemptsLeft = 4)),
+            "The only admin" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.SoleAdmin),
+            "Locked" to LeaveHouseholdUiState(status = LeaveHouseholdStatus.Locked(secondsLeft = 30)),
+            "Hub unreachable" to LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Unreachable),
+        )
 
     override val values: Sequence<LeaveHouseholdUiState> = named.map { it.second }.asSequence()
 

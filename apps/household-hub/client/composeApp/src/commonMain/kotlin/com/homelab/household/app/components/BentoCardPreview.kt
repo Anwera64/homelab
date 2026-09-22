@@ -4,10 +4,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun BentoCardLabelledPreview() {
     ComponentPreview {
@@ -18,7 +18,7 @@ private fun BentoCardLabelledPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun BentoCardUnlabelledPreview() {
     ComponentPreview {

@@ -15,7 +15,7 @@ fun MembersScreen(
     onInvite: () -> Unit,
     onResetPin: (Member) -> Unit,
     onRemove: (Member) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: MembersViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -27,6 +27,6 @@ fun MembersScreen(
         onRemove = { row -> onRemove(Member(id = row.id, name = row.name, avatarColor = row.avatarColor)) },
         onRetry = viewModel::load,
         onBack = onBack,
-        modifier = modifier
+        modifier = modifier,
     )
 }

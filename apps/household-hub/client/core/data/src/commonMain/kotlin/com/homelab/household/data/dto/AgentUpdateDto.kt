@@ -13,5 +13,5 @@ data class AgentUpdateDto(
     val temperature: Float? = null,
     @SerialName("top_p") val top_p: Float? = null,
     @SerialName("tool_permissions") val tool_permissions: List<String>? = null,
-    @SerialName("is_active") val is_active: Boolean? = null
+    @SerialName("is_active") val is_active: Boolean? = null,
 )

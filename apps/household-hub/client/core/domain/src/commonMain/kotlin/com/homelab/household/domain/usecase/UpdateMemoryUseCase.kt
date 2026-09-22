@@ -7,6 +7,6 @@ interface UpdateMemoryUseCase {
         memoryId: String,
         content: String? = null,
         confidence: Float? = null,
-        isActive: Boolean? = null
+        isActive: Boolean? = null,
     ): AgentMemory
 }

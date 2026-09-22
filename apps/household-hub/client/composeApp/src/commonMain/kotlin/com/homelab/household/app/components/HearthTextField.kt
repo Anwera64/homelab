@@ -44,7 +44,7 @@ fun HearthTextField(
     minLines: Int = 1,
     textStyle: TextStyle? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -56,12 +56,13 @@ fun HearthTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics {
-                    if (error != null) error(error)
-                    if (contentDescription != null) this.contentDescription = contentDescription
-                },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        if (error != null) error(error)
+                        if (contentDescription != null) this.contentDescription = contentDescription
+                    },
             textStyle = fieldStyle.copy(color = colors.textPrimary),
             singleLine = singleLine,
             minLines = minLines,
@@ -70,23 +71,23 @@ fun HearthTextField(
             cursorBrush = SolidColor(colors.primary),
             decorationBox = { innerField ->
                 Box(
-                    modifier = Modifier
-                        .heightIn(min = HearthTheme.size.touchTarget)
-                        .background(colors.surface, HearthShapes.item)
-                        .border(
-                            width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
-                            color = if (error != null) colors.error else colors.outline,
-                            shape = HearthShapes.item
-                        )
-                        .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
-                    contentAlignment = Alignment.CenterStart
+                    modifier =
+                        Modifier
+                            .heightIn(min = HearthTheme.size.touchTarget)
+                            .background(colors.surface, HearthShapes.item)
+                            .border(
+                                width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
+                                color = if (error != null) colors.error else colors.outline,
+                                shape = HearthShapes.item,
+                            ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+                    contentAlignment = Alignment.CenterStart,
                 ) {
                     if (value.isEmpty() && placeholder != null) {
                         Text(placeholder, style = fieldStyle, color = colors.textMuted)
                     }
                     innerField()
                 }
-            }
+            },
         )
 
         if (helper != null) {
@@ -95,14 +96,14 @@ fun HearthTextField(
         if (error != null) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.Top,
             ) {
                 HearthIconImage(
                     icon = HearthIcon.Error,
                     contentDescription = null,
                     size = HearthTheme.size.iconSm,
                     tint = colors.error,
-                    modifier = Modifier.padding(top = HearthTheme.spacing.xxs)
+                    modifier = Modifier.padding(top = HearthTheme.spacing.xxs),
                 )
                 Text(error, style = type.caption, color = colors.error)
             }

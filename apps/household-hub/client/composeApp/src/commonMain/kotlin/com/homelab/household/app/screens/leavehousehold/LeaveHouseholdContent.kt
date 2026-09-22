@@ -41,8 +41,8 @@ import com.homelab.household.app.resources.leave_title
 import com.homelab.household.app.resources.leave_unreachable
 import com.homelab.household.app.resources.leave_wrong_pin
 import com.homelab.household.app.resources.members_failed
-import com.homelab.household.app.theme.DayNightPreviews
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdStatus
@@ -61,7 +61,7 @@ fun LeaveHouseholdContent(
     onPinChange: (String) -> Unit,
     onLeave: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val wait = rememberWaitPhase(state.status == LeaveHouseholdStatus.Leaving)
     val waiting = wait != WaitPhase.Hidden
@@ -75,31 +75,31 @@ fun LeaveHouseholdContent(
         bottomBar = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 DestructiveButton(
                     text = stringResource(if (waiting) Res.string.leave_deleting else Res.string.leave_submit),
                     onClick = onLeave,
                     busy = waiting,
                     busyDescription = stringResource(Res.string.a11y_leave_deleting),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SecondaryButton(
                     text = stringResource(Res.string.leave_cancel),
                     onClick = onBack,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 SlowLine(wait)
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
                 modifier = Modifier.padding(top = HearthTheme.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 Text(stringResource(Res.string.leave_title), style = type.hero, color = colors.textPrimary)
                 Text(stringResource(Res.string.leave_detail), style = type.body, color = colors.textMuted)
@@ -107,17 +107,19 @@ fun LeaveHouseholdContent(
 
             ConsequenceCards(
                 erasedTitle = stringResource(Res.string.leave_erased_title),
-                erased = listOf(
-                    stringResource(Res.string.leave_erased_chats),
-                    stringResource(Res.string.leave_erased_space),
-                    stringResource(Res.string.leave_erased_calendar)
-                ),
+                erased =
+                    listOf(
+                        stringResource(Res.string.leave_erased_chats),
+                        stringResource(Res.string.leave_erased_space),
+                        stringResource(Res.string.leave_erased_calendar),
+                    ),
                 staysTitle = stringResource(Res.string.leave_stays_title),
-                stays = listOf(
-                    stringResource(Res.string.leave_stays_shared),
-                    stringResource(Res.string.leave_stays_agents)
-                ),
-                modifier = Modifier.fillMaxWidth()
+                stays =
+                    listOf(
+                        stringResource(Res.string.leave_stays_shared),
+                        stringResource(Res.string.leave_stays_agents),
+                    ),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Text(stringResource(Res.string.leave_shared_note), style = type.caption, color = colors.textMuted)
@@ -128,27 +130,28 @@ fun LeaveHouseholdContent(
                 label = stringResource(Res.string.leave_pin_label),
                 contentDescription = stringResource(Res.string.leave_pin_label),
                 error = refusal(state.status),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
 
 @Composable
-private fun refusal(status: LeaveHouseholdStatus): String? = when (status) {
-    LeaveHouseholdStatus.NotSixDigits -> stringResource(Res.string.change_pin_not_six_digits)
-    is LeaveHouseholdStatus.WrongPin -> stringResource(Res.string.leave_wrong_pin, status.attemptsLeft)
-    is LeaveHouseholdStatus.Locked -> stringResource(Res.string.leave_locked, status.secondsLeft)
-    LeaveHouseholdStatus.SoleAdmin -> stringResource(Res.string.leave_sole_admin)
-    LeaveHouseholdStatus.Unreachable -> stringResource(Res.string.leave_unreachable)
-    LeaveHouseholdStatus.Failed -> stringResource(Res.string.members_failed)
-    else -> null
-}
+private fun refusal(status: LeaveHouseholdStatus): String? =
+    when (status) {
+        LeaveHouseholdStatus.NotSixDigits -> stringResource(Res.string.change_pin_not_six_digits)
+        is LeaveHouseholdStatus.WrongPin -> stringResource(Res.string.leave_wrong_pin, status.attemptsLeft)
+        is LeaveHouseholdStatus.Locked -> stringResource(Res.string.leave_locked, status.secondsLeft)
+        LeaveHouseholdStatus.SoleAdmin -> stringResource(Res.string.leave_sole_admin)
+        LeaveHouseholdStatus.Unreachable -> stringResource(Res.string.leave_unreachable)
+        LeaveHouseholdStatus.Failed -> stringResource(Res.string.members_failed)
+        else -> null
+    }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun LeaveHouseholdContentPreview(
-    @PreviewParameter(LeaveHouseholdUiStateProvider::class) state: LeaveHouseholdUiState
+    @PreviewParameter(LeaveHouseholdUiStateProvider::class) state: LeaveHouseholdUiState,
 ) {
     HearthTheme {
         LeaveHouseholdContent(state = state, onPinChange = {}, onLeave = {}, onBack = {})

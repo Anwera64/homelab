@@ -17,12 +17,12 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HomePlaceholderScreen(
     onProfile: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val member = state.member
     val description = stringResource(Res.string.profile_open)
 
-    HomePlaceholderContent(modifier, member, onProfile, description)
+    HomePlaceholderContent(member, onProfile, description, modifier)
 }

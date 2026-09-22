@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class UserOnboardRequestDto(
     @SerialName("full_name") val fullName: String,
     val pin: String,
-    @SerialName("avatar_color") val avatarColor: String
+    @SerialName("avatar_color") val avatarColor: String,
 )

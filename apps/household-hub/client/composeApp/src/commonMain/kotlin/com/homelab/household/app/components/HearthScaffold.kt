@@ -27,14 +27,14 @@ fun HearthScaffold(
     bottomBar: @Composable () -> Unit = {},
     gutter: Dp = HearthTheme.spacing.xl,
     contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
-    content: @Composable (PaddingValues) -> Unit
+    content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         modifier = modifier,
         topBar = header,
         bottomBar = bottomBar,
         containerColor = HearthTheme.colors.canvas,
-        contentWindowInsets = contentWindowInsets
+        contentWindowInsets = contentWindowInsets,
     ) { bars ->
         val layoutDirection = LocalLayoutDirection.current
         content(
@@ -42,8 +42,8 @@ fun HearthScaffold(
                 start = bars.calculateStartPadding(layoutDirection) + gutter,
                 top = bars.calculateTopPadding(),
                 end = bars.calculateEndPadding(layoutDirection) + gutter,
-                bottom = bars.calculateBottomPadding()
-            )
+                bottom = bars.calculateBottomPadding(),
+            ),
         )
     }
 }

@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class InvitePreviewReadDto(
     val invited_name: String,
     val inviter_name: String,
-    val inviter_avatar_color: String
+    val inviter_avatar_color: String,
 )

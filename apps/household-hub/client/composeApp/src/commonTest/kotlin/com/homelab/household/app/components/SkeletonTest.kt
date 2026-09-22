@@ -35,27 +35,27 @@ import kotlin.time.Duration
  */
 @OptIn(ExperimentalTestApi::class)
 class SkeletonTest {
-
     @Test
-    fun the_group_announces_the_wait() = runComposeUiTest {
-        setContent {
-            Still {
-                SkeletonGroup {
-                    SkeletonBlock()
-                    SkeletonCircle()
+    fun the_group_announces_the_wait() =
+        runComposeUiTest {
+            setContent {
+                Still {
+                    SkeletonGroup {
+                        SkeletonBlock()
+                        SkeletonCircle()
+                    }
                 }
             }
-        }
 
-        onNodeWithTag(SkeletonGroupTag)
-            .assertIsDisplayed()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_loading)
+            onNodeWithTag(SKELETON_GROUP_TAG)
+                .assertIsDisplayed()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_loading),
+                    ),
                 )
-            )
-    }
+        }
 
     /**
      * And the blocks say nothing themselves. The failure this catches is a skeleton built out of a
@@ -63,35 +63,38 @@ class SkeletonTest {
      * instead of waiting for the answer, three times over.
      */
     @Test
-    fun the_blocks_inside_it_are_not_in_the_semantics_tree() = runComposeUiTest {
-        setContent {
-            Still {
-                SkeletonGroup {
-                    SkeletonBlock()
-                    SkeletonBlock()
-                    SkeletonCircle()
+    fun the_blocks_inside_it_are_not_in_the_semantics_tree() =
+        runComposeUiTest {
+            setContent {
+                Still {
+                    SkeletonGroup {
+                        SkeletonBlock()
+                        SkeletonBlock()
+                        SkeletonCircle()
+                    }
                 }
             }
+
+            // `clearAndSetSemantics` empties a node rather than removing it, so the blocks are still
+            // there to be counted, and still carry the layout's own `Shape`. What matters is that none
+            // of them carries anything a screen reader would say out loud.
+            val spoken =
+                setOf(
+                    SemanticsProperties.Text,
+                    SemanticsProperties.ContentDescription,
+                    SemanticsProperties.StateDescription,
+                    SemanticsProperties.Role,
+                ).map { it.name }
+
+            val exposed =
+                onNodeWithTag(SKELETON_GROUP_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .descendants()
+                    .flatMap { node -> node.config.map { it.key.name } }
+                    .filter { it in spoken }
+
+            assertEquals(emptyList(), exposed, "a skeleton block must say nothing of its own")
         }
-
-        // `clearAndSetSemantics` empties a node rather than removing it, so the blocks are still
-        // there to be counted, and still carry the layout's own `Shape`. What matters is that none
-        // of them carries anything a screen reader would say out loud.
-        val spoken = setOf(
-            SemanticsProperties.Text,
-            SemanticsProperties.ContentDescription,
-            SemanticsProperties.StateDescription,
-            SemanticsProperties.Role
-        ).map { it.name }
-
-        val exposed = onNodeWithTag(SkeletonGroupTag, useUnmergedTree = true)
-            .fetchSemanticsNode()
-            .descendants()
-            .flatMap { node -> node.config.map { it.key.name } }
-            .filter { it in spoken }
-
-        assertEquals(emptyList(), exposed, "a skeleton block must say nothing of its own")
-    }
 
     /**
      * A skeleton line is a stand-in for a line of text, and the canvas draws it with the same
@@ -113,7 +116,7 @@ class SkeletonTest {
         assertTrue(DefaultMotion.breatheStagger > Duration.ZERO, "a stagger of zero is no stagger")
         assertTrue(
             DefaultMotion.breatheStagger < DefaultMotion.breathe,
-            "a stagger longer than the breath itself would put the last block a whole cycle behind"
+            "a stagger longer than the breath itself would put the last block a whole cycle behind",
         )
         assertEquals(Duration.ZERO, StillMotion.breatheStagger, "nothing is time-gated with motion off")
     }
@@ -122,8 +125,7 @@ class SkeletonTest {
      * The whole subtree, not just the group's own children: a label smuggled into a skeleton would
      * sit a level further down, inside the block that drew it.
      */
-    private fun SemanticsNode.descendants(): List<SemanticsNode> =
-        children + children.flatMap { it.descendants() }
+    private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
 
     @Composable
     private fun Still(content: @Composable () -> Unit) {

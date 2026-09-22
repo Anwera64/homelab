@@ -13,5 +13,5 @@ data class SessionDetailReadDto(
     @SerialName("is_archived") val is_archived: Boolean = false,
     @SerialName("created_at") val created_at: String? = null,
     @SerialName("updated_at") val updated_at: String? = null,
-    val messages: List<ChatMessageReadDto> = emptyList()
+    val messages: List<ChatMessageReadDto> = emptyList(),
 )

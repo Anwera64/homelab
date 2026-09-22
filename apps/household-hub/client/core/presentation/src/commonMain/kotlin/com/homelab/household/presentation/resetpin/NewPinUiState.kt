@@ -8,5 +8,5 @@ data class NewPinUiState(
     val again: String = "",
     val pinError: PinError? = null,
     val againMismatch: Boolean = false,
-    val status: NewPinStatus = NewPinStatus.Idle
+    val status: NewPinStatus = NewPinStatus.Idle,
 )

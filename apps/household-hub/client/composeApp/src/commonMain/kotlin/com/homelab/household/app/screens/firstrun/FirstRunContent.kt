@@ -40,8 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.ColourSwatches
 import com.homelab.household.app.components.HearthScaffold
-import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.HearthTextField
+import com.homelab.household.app.components.PinField
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.icons.HearthIcon
@@ -61,14 +61,14 @@ import com.homelab.household.app.resources.first_run_name_label
 import com.homelab.household.app.resources.first_run_name_missing
 import com.homelab.household.app.resources.first_run_name_too_long
 import com.homelab.household.app.resources.first_run_overline
-import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.resources.first_run_pin_helper
 import com.homelab.household.app.resources.first_run_pin_label
 import com.homelab.household.app.resources.first_run_pin_not_six_digits
 import com.homelab.household.app.resources.first_run_sign_in_instead
 import com.homelab.household.app.resources.first_run_title
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.util.hexColor
 import com.homelab.household.domain.model.MemberName
 import com.homelab.household.presentation.firstrun.AvatarPalette
@@ -92,7 +92,7 @@ fun FirstRunContent(
     onColourSelect: (String) -> Unit,
     onCreate: () -> Unit,
     onSignIn: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -101,23 +101,24 @@ fun FirstRunContent(
     HearthScaffold(
         modifier = modifier,
         gutter = HearthTheme.spacing.xxl,
-        bottomBar = { CreateFooter(state = state, onCreate = onCreate, onSignIn = onSignIn) }
+        bottomBar = { CreateFooter(state = state, onCreate = onCreate, onSignIn = onSignIn) },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                // iOS's numeric keypad (the PIN field's NumberPassword type) has no return key,
-                // so tapping away from the fields is the only way to dismiss it there. A tap that
-                // lands on a real control (a field, a swatch, the footer button) is consumed by
-                // that control first and never reaches this gesture.
-                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
-                .verticalScroll(rememberScrollState())
-                .padding(padding),
-            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    // iOS's numeric keypad (the PIN field's NumberPassword type) has no return key,
+                    // so tapping away from the fields is the only way to dismiss it there. A tap that
+                    // lands on a real control (a field, a swatch, the footer button) is consumed by
+                    // that control first and never reaches this gesture.
+                    .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
                 modifier = Modifier.padding(top = HearthTheme.spacing.huge),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 Text(stringResource(Res.string.first_run_overline), style = type.overline, color = colors.textMuted)
                 Text(stringResource(Res.string.first_run_title), style = type.hero, color = colors.textPrimary)
@@ -130,10 +131,11 @@ fun FirstRunContent(
                 label = stringResource(Res.string.first_run_name_label),
                 helper = if (state.nameError == null) stringResource(Res.string.first_run_name_helper) else null,
                 error = state.nameError?.let { nameErrorText(it) },
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Next
-                )
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Next,
+                    ),
             )
 
             PinField(
@@ -141,7 +143,7 @@ fun FirstRunContent(
                 onValueChange = onPinChange,
                 label = stringResource(Res.string.first_run_pin_label),
                 helper = if (state.pinError == null) stringResource(Res.string.first_run_pin_helper) else null,
-                error = state.pinError?.let { pinErrorText(it) }
+                error = state.pinError?.let { pinErrorText(it) },
             )
 
             ColourPicker(selected = state.colour, onSelect = onColourSelect)
@@ -150,7 +152,10 @@ fun FirstRunContent(
 }
 
 @Composable
-private fun ColourPicker(selected: String, onSelect: (String) -> Unit) {
+private fun ColourPicker(
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val count = AvatarPalette.swatches.size
@@ -161,31 +166,36 @@ private fun ColourPicker(selected: String, onSelect: (String) -> Unit) {
             swatches = AvatarPalette.swatches,
             selected = selected,
             onSelect = onSelect,
-            swatchDescription = { index -> stringResource(Res.string.first_run_colour_swatch, index + 1, count) }
+            swatchDescription = { index -> stringResource(Res.string.first_run_colour_swatch, index + 1, count) },
         )
         Text(stringResource(Res.string.first_run_colour_helper), style = type.caption, color = colors.textMuted)
     }
 }
 
-
 @Composable
-private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn: () -> Unit) {
+private fun CreateFooter(
+    state: FirstRunUiState,
+    onCreate: () -> Unit,
+    onSignIn: () -> Unit,
+) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.canvas)
-            // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(colors.canvas)
+                // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                ).padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         PrimaryButton(
             text = stringResource(Res.string.first_run_create),
             onClick = onCreate,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
 
         val failure = state.failure
@@ -195,7 +205,7 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
                 style = type.caption,
                 color = colors.textMuted,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
@@ -204,7 +214,7 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
                     contentDescription = null,
                     size = HearthTheme.size.iconSm,
                     tint = colors.error,
-                    modifier = Modifier.padding(top = HearthTheme.spacing.xxs)
+                    modifier = Modifier.padding(top = HearthTheme.spacing.xxs),
                 )
                 Text(failureText(failure), style = type.caption, color = colors.error)
             }
@@ -212,7 +222,7 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
                 SecondaryButton(
                     text = stringResource(Res.string.first_run_sign_in_instead),
                     onClick = onSignIn,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -220,29 +230,34 @@ private fun CreateFooter(state: FirstRunUiState, onCreate: () -> Unit, onSignIn:
 }
 
 @Composable
-private fun nameErrorText(error: NameError): String = when (error) {
-    NameError.Missing -> stringResource(Res.string.first_run_name_missing)
-    NameError.TooLong -> stringResource(Res.string.first_run_name_too_long, MemberName.MAX_LENGTH)
-    // First run has nobody to clash with, so the hub never reports a taken name here.
-    NameError.Taken -> stringResource(Res.string.join_name_taken)
-}
+private fun nameErrorText(error: NameError): String =
+    when (error) {
+        NameError.Missing -> stringResource(Res.string.first_run_name_missing)
+
+        NameError.TooLong -> stringResource(Res.string.first_run_name_too_long, MemberName.MAX_LENGTH)
+
+        // First run has nobody to clash with, so the hub never reports a taken name here.
+        NameError.Taken -> stringResource(Res.string.join_name_taken)
+    }
 
 @Composable
-private fun pinErrorText(error: PinError): String = when (error) {
-    PinError.NotSixDigits -> stringResource(Res.string.first_run_pin_not_six_digits)
-}
+private fun pinErrorText(error: PinError): String =
+    when (error) {
+        PinError.NotSixDigits -> stringResource(Res.string.first_run_pin_not_six_digits)
+    }
 
 @Composable
-private fun failureText(failure: FirstRunFailure): String = when (failure) {
-    FirstRunFailure.Unreachable -> stringResource(Res.string.first_run_failed_unreachable)
-    FirstRunFailure.AlreadySetUp -> stringResource(Res.string.first_run_failed_already_set_up)
-    FirstRunFailure.Unknown -> stringResource(Res.string.first_run_failed_unknown)
-}
+private fun failureText(failure: FirstRunFailure): String =
+    when (failure) {
+        FirstRunFailure.Unreachable -> stringResource(Res.string.first_run_failed_unreachable)
+        FirstRunFailure.AlreadySetUp -> stringResource(Res.string.first_run_failed_already_set_up)
+        FirstRunFailure.Unknown -> stringResource(Res.string.first_run_failed_unknown)
+    }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun FirstRunContentPreview(
-    @PreviewParameter(FirstRunUiStateProvider::class) state: FirstRunUiState
+    @PreviewParameter(FirstRunUiStateProvider::class) state: FirstRunUiState,
 ) {
     HearthTheme {
         FirstRunContent(
@@ -251,7 +266,7 @@ private fun FirstRunContentPreview(
             onPinChange = {},
             onColourSelect = {},
             onCreate = {},
-            onSignIn = {}
+            onSignIn = {},
         )
     }
 }

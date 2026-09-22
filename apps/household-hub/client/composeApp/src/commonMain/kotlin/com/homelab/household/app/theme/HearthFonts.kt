@@ -20,21 +20,23 @@ import org.jetbrains.compose.resources.Font
 data class HearthFonts(
     val outfit: FontFamily,
     val inter: FontFamily,
-    val jetBrainsMono: FontFamily
+    val jetBrainsMono: FontFamily,
 )
 
 @Composable
 internal fun rememberHearthFonts(): HearthFonts {
-    val outfit = FontFamily(
-        Font(Res.font.outfit_500, FontWeight.Medium),
-        Font(Res.font.outfit_600, FontWeight.SemiBold),
-        Font(Res.font.outfit_700, FontWeight.Bold)
-    )
-    val inter = FontFamily(
-        Font(Res.font.inter_400, FontWeight.Normal),
-        Font(Res.font.inter_500, FontWeight.Medium),
-        Font(Res.font.inter_600, FontWeight.SemiBold)
-    )
+    val outfit =
+        FontFamily(
+            Font(Res.font.outfit_500, FontWeight.Medium),
+            Font(Res.font.outfit_600, FontWeight.SemiBold),
+            Font(Res.font.outfit_700, FontWeight.Bold),
+        )
+    val inter =
+        FontFamily(
+            Font(Res.font.inter_400, FontWeight.Normal),
+            Font(Res.font.inter_500, FontWeight.Medium),
+            Font(Res.font.inter_600, FontWeight.SemiBold),
+        )
     val jetBrainsMono = FontFamily(Font(Res.font.jetbrains_mono_500, FontWeight.Medium))
     return remember(outfit, inter, jetBrainsMono) { HearthFonts(outfit, inter, jetBrainsMono) }
 }

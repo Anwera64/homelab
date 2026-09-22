@@ -14,5 +14,5 @@ data class HouseholdMilestone(
     val sourceSessionId: String? = null,
     val isActive: Boolean = true,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
 )

@@ -18,9 +18,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class FirstRunViewModel(
-    private val onboardUseCase: FirstRunOnboardUseCase
+    private val onboardUseCase: FirstRunOnboardUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(FirstRunUiState())
     val uiState: StateFlow<FirstRunUiState> = _uiState.asStateFlow()
 
@@ -44,11 +43,12 @@ class FirstRunViewModel(
         val state = _uiState.value
         if (state.isCreating) return
 
-        val nameError = when {
-            state.name.isBlank() -> NameError.Missing
-            !MemberName.isValid(state.name) -> NameError.TooLong
-            else -> null
-        }
+        val nameError =
+            when {
+                state.name.isBlank() -> NameError.Missing
+                !MemberName.isValid(state.name) -> NameError.TooLong
+                else -> null
+            }
         val pinError = if (Pin.isValid(state.pin)) null else PinError.NotSixDigits
         if (nameError != null || pinError != null) {
             _uiState.update { it.copy(nameError = nameError, pinError = pinError) }
@@ -63,9 +63,10 @@ class FirstRunViewModel(
         }
     }
 
-    private fun failureFor(error: Throwable): FirstRunFailure = when (error) {
-        is ServerOfflineException -> FirstRunFailure.Unreachable
-        is HubAlreadySetUpException -> FirstRunFailure.AlreadySetUp
-        else -> FirstRunFailure.Unknown
-    }
+    private fun failureFor(error: Throwable): FirstRunFailure =
+        when (error) {
+            is ServerOfflineException -> FirstRunFailure.Unreachable
+            is HubAlreadySetUpException -> FirstRunFailure.AlreadySetUp
+            else -> FirstRunFailure.Unknown
+        }
 }

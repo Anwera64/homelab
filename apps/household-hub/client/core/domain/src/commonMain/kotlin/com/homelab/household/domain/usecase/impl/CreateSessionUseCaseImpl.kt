@@ -5,8 +5,14 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.usecase.CreateSessionUseCase
 
-class CreateSessionUseCaseImpl(private val sessionRepository: SessionRepository) : CreateSessionUseCase {
-    override suspend operator fun invoke(agentId: String, title: String, isSecret: Boolean): ConversationSession {
+class CreateSessionUseCaseImpl(
+    private val sessionRepository: SessionRepository,
+) : CreateSessionUseCase {
+    override suspend operator fun invoke(
+        agentId: String,
+        title: String,
+        isSecret: Boolean,
+    ): ConversationSession {
         if (agentId.isBlank()) {
             throw ValidationException("Agent ID cannot be blank")
         }

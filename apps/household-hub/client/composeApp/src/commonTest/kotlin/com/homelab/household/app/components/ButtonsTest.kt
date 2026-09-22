@@ -44,40 +44,45 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class)
 class ButtonsTest {
+    @Test
+    fun primary_button_always_reaches_on_click() =
+        assertAlwaysClickable { onClick ->
+            PrimaryButton(text = "Create", onClick = onClick)
+        }
 
     @Test
-    fun primary_button_always_reaches_on_click() = assertAlwaysClickable { onClick ->
-        PrimaryButton(text = "Create", onClick = onClick)
-    }
+    fun secondary_button_always_reaches_on_click() =
+        assertAlwaysClickable { onClick ->
+            SecondaryButton(text = "Create", onClick = onClick)
+        }
 
     @Test
-    fun secondary_button_always_reaches_on_click() = assertAlwaysClickable { onClick ->
-        SecondaryButton(text = "Create", onClick = onClick)
-    }
-
-    @Test
-    fun destructive_button_always_reaches_on_click() = assertAlwaysClickable { onClick ->
-        DestructiveButton(text = "Create", onClick = onClick)
-    }
+    fun destructive_button_always_reaches_on_click() =
+        assertAlwaysClickable { onClick ->
+            DestructiveButton(text = "Create", onClick = onClick)
+        }
 
     /**
      * A button that is already working swallows the tap rather than sending a second one. This is
      * the button's own guard; every ViewModel guards re-entry too, and both are cheap.
      */
     @Test
-    fun a_busy_primary_button_swallows_the_tap() = assertBusySwallowsTheTap { busy, onClick ->
-        PrimaryButton(text = "Creating…", onClick = onClick, busy = busy)
-    }
+    fun a_busy_primary_button_swallows_the_tap() =
+        assertBusySwallowsTheTap { busy, onClick ->
+            PrimaryButton(text = "Creating…", onClick = onClick, busy = busy)
+        }
 
     @Test
-    fun a_busy_secondary_button_swallows_the_tap() = assertBusySwallowsTheTap { busy, onClick ->
-        SecondaryButton(text = "Creating…", onClick = onClick, busy = busy)
-    }
+    fun a_busy_secondary_button_swallows_the_tap() =
+        assertBusySwallowsTheTap { busy, onClick ->
+            SecondaryButton(text = "Creating…", onClick = onClick, busy = busy)
+        }
 
     @Test
-    fun a_busy_destructive_button_swallows_the_tap() = assertBusySwallowsTheTap { busy, onClick ->
-        DestructiveButton(text = "Creating…", onClick = onClick, busy = busy)
-    }
+    fun a_busy_destructive_button_swallows_the_tap() =
+        assertBusySwallowsTheTap { busy, onClick ->
+            DestructiveButton(text = "Creating…", onClick = onClick, busy = busy)
+        }
 
     /**
      * Nothing is ever dimmed while it works (design notes §2): a working button keeps its colour,
@@ -85,23 +90,24 @@ class ButtonsTest {
      * bottom edge is the only thing that changes.
      */
     @Test
-    fun a_busy_button_is_not_dimmed_but_says_it_is_working() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                PrimaryButton(text = "Creating…", onClick = {}, busy = true)
+    fun a_busy_button_is_not_dimmed_but_says_it_is_working() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    PrimaryButton(text = "Creating…", onClick = {}, busy = true)
+                }
             }
-        }
 
-        onNodeWithText("Creating…")
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_working)
+            onNodeWithText("Creating…")
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_working),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+        }
 
     /**
      * "Working" is only what a button says when its caller has nothing better. Every action on the
@@ -109,34 +115,36 @@ class ButtonsTest {
      * reader hearing "Working" three screens running has learned nothing.
      */
     @Test
-    fun a_button_announces_the_wait_its_caller_names() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                PrimaryButton(
-                    text = "Joining…",
-                    onClick = {},
-                    busy = true,
-                    busyDescription = "Joining the household"
-                )
+    fun a_button_announces_the_wait_its_caller_names() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    PrimaryButton(
+                        text = "Joining…",
+                        onClick = {},
+                        busy = true,
+                        busyDescription = "Joining the household",
+                    )
+                }
             }
-        }
 
-        onNodeWithText("Joining…").assert(
-            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Joining the household")
-        )
-    }
+            onNodeWithText("Joining…").assert(
+                SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Joining the household"),
+            )
+        }
 
     /** And no bar when it isn't working — the affordance only exists during the wait. */
     @Test
-    fun a_button_at_rest_carries_no_bar() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                PrimaryButton(text = "Create", onClick = {})
+    fun a_button_at_rest_carries_no_bar() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    PrimaryButton(text = "Create", onClick = {})
+                }
             }
-        }
 
-        onNodeWithTag(HearthProgressBarTag).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertDoesNotExist()
+        }
 
     /**
      * The bar is drawn on the button's own surface, not on a gap: a filled button's track is its
@@ -175,25 +183,29 @@ class ButtonsTest {
      * *box* around a button still hugging its label — and the shadow hugged it too.
      */
     @Test
-    fun a_primary_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
-        PrimaryButton(text = "Create", onClick = {}, modifier = modifier)
-    }
+    fun a_primary_button_told_to_fill_its_width_does() =
+        assertFillsTheWidthItIsGiven { modifier ->
+            PrimaryButton(text = "Create", onClick = {}, modifier = modifier)
+        }
 
     @Test
-    fun a_secondary_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
-        SecondaryButton(text = "Create", onClick = {}, modifier = modifier)
-    }
+    fun a_secondary_button_told_to_fill_its_width_does() =
+        assertFillsTheWidthItIsGiven { modifier ->
+            SecondaryButton(text = "Create", onClick = {}, modifier = modifier)
+        }
 
     @Test
-    fun a_destructive_button_told_to_fill_its_width_does() = assertFillsTheWidthItIsGiven { modifier ->
-        DestructiveButton(text = "Create", onClick = {}, modifier = modifier)
-    }
+    fun a_destructive_button_told_to_fill_its_width_does() =
+        assertFillsTheWidthItIsGiven { modifier ->
+            DestructiveButton(text = "Create", onClick = {}, modifier = modifier)
+        }
 
     /** The bar is laid over the button, so it must not change what the button measures. */
     @Test
-    fun a_working_button_fills_its_width_the_same_way() = assertFillsTheWidthItIsGiven { modifier ->
-        PrimaryButton(text = "Create", onClick = {}, busy = true, modifier = modifier)
-    }
+    fun a_working_button_fills_its_width_the_same_way() =
+        assertFillsTheWidthItIsGiven { modifier ->
+            PrimaryButton(text = "Create", onClick = {}, busy = true, modifier = modifier)
+        }
 
     /**
      * And a button told nothing still wraps. "Paste" on the invite-code screen and "Try again" on
@@ -201,67 +213,72 @@ class ButtonsTest {
      * component would have stretched them across the screen.
      */
     @Test
-    fun a_primary_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
-        PrimaryButton(text = "Create", onClick = {})
-    }
+    fun a_primary_button_left_to_itself_wraps_its_label() =
+        assertWrapsItsLabel {
+            PrimaryButton(text = "Create", onClick = {})
+        }
 
     @Test
-    fun a_secondary_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
-        SecondaryButton(text = "Create", onClick = {})
-    }
+    fun a_secondary_button_left_to_itself_wraps_its_label() =
+        assertWrapsItsLabel {
+            SecondaryButton(text = "Create", onClick = {})
+        }
 
     @Test
-    fun a_destructive_button_left_to_itself_wraps_its_label() = assertWrapsItsLabel {
-        DestructiveButton(text = "Create", onClick = {})
-    }
-
-    private fun assertFillsTheWidthItIsGiven(button: @Composable (Modifier) -> Unit) = runComposeUiTest {
-        setContent {
-            StillTheme {
-                Box(Modifier.width(ROOMY)) { button(Modifier.fillMaxWidth()) }
-            }
+    fun a_destructive_button_left_to_itself_wraps_its_label() =
+        assertWrapsItsLabel {
+            DestructiveButton(text = "Create", onClick = {})
         }
 
-        onNodeWithText("Create").assertWidthIsEqualTo(ROOMY)
-    }
-
-    private fun assertWrapsItsLabel(button: @Composable () -> Unit) = runComposeUiTest {
-        setContent {
-            StillTheme {
-                Box(Modifier.width(ROOMY)) { button() }
+    private fun assertFillsTheWidthItIsGiven(button: @Composable (Modifier) -> Unit) =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    Box(Modifier.width(ROOMY)) { button(Modifier.fillMaxWidth()) }
+                }
             }
+
+            onNodeWithText("Create").assertWidthIsEqualTo(ROOMY)
         }
 
-        val width = onNodeWithText("Create").getUnclippedBoundsInRoot().width
-        assertTrue(width < ROOMY, "a button given no width should wrap its label, but measured $width")
-    }
-
-    private fun assertAlwaysClickable(button: @Composable (onClick: () -> Unit) -> Unit) = runComposeUiTest {
-        var clicks = 0
-        setContent { StillTheme { button { clicks++ } } }
-
-        onNodeWithText("Create")
-            .assertIsEnabled()
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assertHeightIsAtLeast(DefaultSizes.touchTarget)
-            .performClick()
-
-        assertEquals(1, clicks)
-    }
-
-    private fun assertBusySwallowsTheTap(
-        button: @Composable (busy: Boolean, onClick: () -> Unit) -> Unit
-    ) = runComposeUiTest {
-        var clicks = 0
-        setContent {
-            StillTheme {
-                button(true) { clicks++ }
+    private fun assertWrapsItsLabel(button: @Composable () -> Unit) =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    Box(Modifier.width(ROOMY)) { button() }
+                }
             }
+
+            val width = onNodeWithText("Create").getUnclippedBoundsInRoot().width
+            assertTrue(width < ROOMY, "a button given no width should wrap its label, but measured $width")
         }
 
-        onNodeWithText("Creating…").performClick()
-        assertEquals(0, clicks)
-    }
+    private fun assertAlwaysClickable(button: @Composable (onClick: () -> Unit) -> Unit) =
+        runComposeUiTest {
+            var clicks = 0
+            setContent { StillTheme { button { clicks++ } } }
+
+            onNodeWithText("Create")
+                .assertIsEnabled()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .assertHeightIsAtLeast(DefaultSizes.touchTarget)
+                .performClick()
+
+            assertEquals(1, clicks)
+        }
+
+    private fun assertBusySwallowsTheTap(button: @Composable (busy: Boolean, onClick: () -> Unit) -> Unit) =
+        runComposeUiTest {
+            var clicks = 0
+            setContent {
+                StillTheme {
+                    button(true) { clicks++ }
+                }
+            }
+
+            onNodeWithText("Creating…").performClick()
+            assertEquals(0, clicks)
+        }
 
     private companion object {
         /** Wider than any of these labels needs, so "it wrapped" and "it filled" cannot be confused. */

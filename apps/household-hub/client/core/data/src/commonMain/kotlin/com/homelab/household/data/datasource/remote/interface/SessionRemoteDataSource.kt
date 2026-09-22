@@ -16,20 +16,30 @@ import kotlinx.coroutines.flow.Flow
  * file and its implementation by name.
  */
 interface SessionRemoteDataSource {
-
     suspend fun listSessions(): List<SessionReadDto>
 
     suspend fun fetchSession(sessionId: String): SessionDetailReadDto
 
-    suspend fun createSession(agentId: String, title: String, isSecret: Boolean): SessionReadDto
+    suspend fun createSession(
+        agentId: String,
+        title: String,
+        isSecret: Boolean,
+    ): SessionReadDto
 
     suspend fun archiveSession(sessionId: String)
 
-    suspend fun toggleSecretMode(sessionId: String, isSecret: Boolean): SessionReadDto
+    suspend fun toggleSecretMode(
+        sessionId: String,
+        isSecret: Boolean,
+    ): SessionReadDto
 
     suspend fun deleteSession(sessionId: String)
 
-    suspend fun approveToolProposal(sessionId: String, toolCallId: String, approved: Boolean): Boolean
+    suspend fun approveToolProposal(
+        sessionId: String,
+        toolCallId: String,
+        approved: Boolean,
+    ): Boolean
 
     /**
      * The agent's reply, token by token, for as long as the collector keeps up.
@@ -39,5 +49,9 @@ interface SessionRemoteDataSource {
      * read the conversation back until the reply lands — is the repository's decision, not this
      * layer's.
      */
-    fun openChatStream(sessionId: String, content: String, autoApproveWrites: Boolean): Flow<ChatStreamEvent>
+    fun openChatStream(
+        sessionId: String,
+        content: String,
+        autoApproveWrites: Boolean,
+    ): Flow<ChatStreamEvent>
 }

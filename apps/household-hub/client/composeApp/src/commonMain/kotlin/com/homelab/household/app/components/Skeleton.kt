@@ -33,7 +33,7 @@ import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import org.jetbrains.compose.resources.stringResource
 
-const val SkeletonGroupTag = "SkeletonGroup"
+const val SKELETON_GROUP_TAG = "SkeletonGroup"
 
 /**
  * The blocks that stand where an answer will land while the hub is asked for it (design notes
@@ -47,18 +47,19 @@ const val SkeletonGroupTag = "SkeletonGroup"
 fun SkeletonGroup(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(HearthTheme.spacing.md),
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val loading = stringResource(Res.string.a11y_loading)
     Column(
-        modifier = modifier
-            .testTag(SkeletonGroupTag)
-            .semantics {
-                stateDescription = loading
-                liveRegion = LiveRegionMode.Polite
-            },
+        modifier =
+            modifier
+                .testTag(SKELETON_GROUP_TAG)
+                .semantics {
+                    stateDescription = loading
+                    liveRegion = LiveRegionMode.Polite
+                },
         verticalArrangement = verticalArrangement,
-        content = content
+        content = content,
     )
 }
 
@@ -72,24 +73,33 @@ fun SkeletonBlock(
     height: Dp = HearthTheme.spacing.lg,
     widthFraction: Float = 1f,
     shape: Shape = HearthShapes.skeleton,
-    position: Int = 0
+    position: Int = 0,
 ) {
-    Skeleton(modifier.fillMaxWidth(widthFraction).height(height), shape, position)
+    Skeleton(shape, position, modifier.fillMaxWidth(widthFraction).height(height))
 }
 
 /** An avatar that hasn't arrived. */
 @Composable
-fun SkeletonCircle(modifier: Modifier = Modifier, size: Dp = HearthTheme.size.touchTarget, position: Int = 0) {
-    Skeleton(modifier.size(size), CircleShape, position)
+fun SkeletonCircle(
+    modifier: Modifier = Modifier,
+    size: Dp = HearthTheme.size.touchTarget,
+    position: Int = 0,
+) {
+    Skeleton(CircleShape, position, modifier.size(size))
 }
 
 @Composable
-private fun Skeleton(modifier: Modifier, shape: Shape, position: Int) {
+private fun Skeleton(
+    shape: Shape,
+    position: Int,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = modifier
-            .alpha(breath(position))
-            .background(HearthTheme.colors.outlineSoft, shape)
-            .clearAndSetSemantics {}
+        modifier =
+            modifier
+                .alpha(breath(position))
+                .background(HearthTheme.colors.outlineSoft, shape)
+                .clearAndSetSemantics {},
     )
 }
 
@@ -111,12 +121,13 @@ private fun breath(position: Int): Float {
     val alpha by transition.animateFloat(
         initialValue = DIM,
         targetValue = FULL,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = motion.breathe.inWholeMilliseconds.toInt()),
-            repeatMode = RepeatMode.Reverse,
-            initialStartOffset = StartOffset((motion.breatheStagger * position).inWholeMilliseconds.toInt())
-        ),
-        label = "skeletonAlpha"
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = motion.breathe.inWholeMilliseconds.toInt()),
+                repeatMode = RepeatMode.Reverse,
+                initialStartOffset = StartOffset((motion.breatheStagger * position).inWholeMilliseconds.toInt()),
+            ),
+        label = "skeletonAlpha",
     )
     return alpha
 }

@@ -16,9 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ProfilePickerViewModel(
-    private val listMembersUseCase: ListMembersUseCase
+    private val listMembersUseCase: ListMembersUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProfilePickerUiState())
     val uiState: StateFlow<ProfilePickerUiState> = _uiState.asStateFlow()
 
@@ -34,18 +33,19 @@ class ProfilePickerViewModel(
         _uiState.update { it.copy(status = PickerStatus.Loading) }
 
         viewModelScope.launch {
-            val status = runCatchingSafe { listMembersUseCase() }
-                .fold(
-                    onSuccess = { members -> PickerStatus.Loaded(members) },
-                    onFailure = { error ->
-                        if (error is ServerOfflineException) PickerStatus.Unreachable else PickerStatus.Failed
-                    }
-                )
+            val status =
+                runCatchingSafe { listMembersUseCase() }
+                    .fold(
+                        onSuccess = { members -> PickerStatus.Loaded(members) },
+                        onFailure = { error ->
+                            if (error is ServerOfflineException) PickerStatus.Unreachable else PickerStatus.Failed
+                        },
+                    )
             _uiState.update { it.copy(status = status) }
         }
     }
 
-    fun onMemberSelected(member: Member) {
+    fun onSelectMember(member: Member) {
         viewModelScope.launch { _events.send(ProfilePickerEvent.GoToPin(member)) }
     }
 }

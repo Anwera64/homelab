@@ -25,11 +25,13 @@ import com.homelab.household.data.dto.UserReadDto
  * what the first wrote" a real assertion about the Keychain rather than about a shared field.
  */
 class KeychainSessionProbe {
-
     private val storage: StoredSessionLocalDataSource = KeychainSessionStorage()
 
     /** [StoredSessionLocalDataSource.saveTokens]; a null [refreshToken] means "keep the stored one". */
-    fun save(accessToken: String, refreshToken: String?) {
+    fun save(
+        accessToken: String,
+        refreshToken: String?,
+    ) {
         storage.saveTokens(accessToken, refreshToken)
     }
 
@@ -41,7 +43,10 @@ class KeychainSessionProbe {
      * [StoredSessionLocalDataSource.saveUser]. The member is built here rather than in Swift so
      * that `UserReadDto` stays out of the exported header, which is the whole point of this class.
      */
-    fun saveMember(id: String, name: String) {
+    fun saveMember(
+        id: String,
+        name: String,
+    ) {
         storage.saveUser(UserReadDto(id = id, full_name = name, is_admin = true, is_active = true))
     }
 

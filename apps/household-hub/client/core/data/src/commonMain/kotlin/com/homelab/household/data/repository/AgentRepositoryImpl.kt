@@ -12,9 +12,7 @@ import com.homelab.household.domain.repository.AgentRepository
 class AgentRepositoryImpl(
     private val remote: AgentRemoteDataSource,
 ) : AgentRepository {
-
-    override suspend fun listAgents(): List<AgentPersonality> =
-        remote.listAgents().map(AgentDataMapper::toDomain)
+    override suspend fun listAgents(): List<AgentPersonality> = remote.listAgents().map(AgentDataMapper::toDomain)
 
     override suspend fun getAgent(agentId: String): AgentPersonality =
         AgentDataMapper.toDomain(remote.getAgent(agentId))

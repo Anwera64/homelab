@@ -14,16 +14,30 @@ import com.homelab.household.data.dto.UserReadDto
  * This is the seam that makes the repository testable: its tests mock this and never touch Ktor.
  */
 interface AuthRemoteDataSource {
+    suspend fun login(
+        memberId: String,
+        pin: String,
+    ): TokenResponseDto
 
-    suspend fun login(memberId: String, pin: String): TokenResponseDto
-
-    suspend fun onboard(name: String, pin: String, avatarColor: String): TokenResponseDto
+    suspend fun onboard(
+        name: String,
+        pin: String,
+        avatarColor: String,
+    ): TokenResponseDto
 
     suspend fun lookUpInvite(code: String): InvitePreviewReadDto
 
-    suspend fun joinHousehold(code: String, fullName: String, pin: String, avatarColor: String): TokenResponseDto
+    suspend fun joinHousehold(
+        code: String,
+        fullName: String,
+        pin: String,
+        avatarColor: String,
+    ): TokenResponseDto
 
-    suspend fun redeemPinReset(code: String, pin: String): TokenResponseDto
+    suspend fun redeemPinReset(
+        code: String,
+        pin: String,
+    ): TokenResponseDto
 
     suspend fun listMembers(): List<MemberProfileDto>
 

@@ -6,19 +6,21 @@ import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 
 object ChatMessageDataMapper {
-    fun toDomain(dto: ChatMessageReadDto): ChatMessage = ChatMessage(
-        id = dto.id,
-        sessionId = dto.session_id,
-        role = parseRole(dto.role),
-        content = dto.content,
-        status = MessageStatus.SENT,
-        createdAt = dto.created_at
-    )
+    fun toDomain(dto: ChatMessageReadDto): ChatMessage =
+        ChatMessage(
+            id = dto.id,
+            sessionId = dto.session_id,
+            role = parseRole(dto.role),
+            content = dto.content,
+            status = MessageStatus.SENT,
+            createdAt = dto.created_at,
+        )
 
-    private fun parseRole(role: String): MessageRole = when (role.lowercase()) {
-        "assistant" -> MessageRole.ASSISTANT
-        "system" -> MessageRole.SYSTEM
-        "tool" -> MessageRole.TOOL
-        else -> MessageRole.USER
-    }
+    private fun parseRole(role: String): MessageRole =
+        when (role.lowercase()) {
+            "assistant" -> MessageRole.ASSISTANT
+            "system" -> MessageRole.SYSTEM
+            "tool" -> MessageRole.TOOL
+            else -> MessageRole.USER
+        }
 }

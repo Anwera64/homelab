@@ -1,6 +1,7 @@
 package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
@@ -8,7 +9,6 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.graphics.Color
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_working
 import com.homelab.household.app.testing.StillTheme
@@ -30,21 +30,23 @@ import kotlin.test.assertNotEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class HearthProgressBarTest {
+    @Test
+    fun the_track_bar_rests_where_a_test_can_see_it() =
+        restingBar {
+            HearthProgressBar()
+        }
 
     @Test
-    fun the_track_bar_rests_where_a_test_can_see_it() = restingBar {
-        HearthProgressBar()
-    }
+    fun the_full_bleed_bar_rests_where_a_test_can_see_it() =
+        restingBar {
+            HearthProgressBar(width = HearthProgressBarWidth.FullBleed)
+        }
 
     @Test
-    fun the_full_bleed_bar_rests_where_a_test_can_see_it() = restingBar {
-        HearthProgressBar(width = HearthProgressBarWidth.FullBleed)
-    }
-
-    @Test
-    fun the_inset_bar_rests_where_a_test_can_see_it() = restingBar {
-        HearthProgressBar(width = HearthProgressBarWidth.Inset)
-    }
+    fun the_inset_bar_rests_where_a_test_can_see_it() =
+        restingBar {
+            HearthProgressBar(width = HearthProgressBarWidth.Inset)
+        }
 
     /**
      * A transparent track makes the bar read as a fragment floating on the canvas rather than a
@@ -59,20 +61,21 @@ class HearthProgressBarTest {
         assertNotEquals(Color.Transparent, HearthProgressBarWidth.FullBleed.trackColor(NightColors))
     }
 
-    private fun restingBar(bar: @Composable () -> Unit) = runComposeUiTest {
-        setContent {
-            StillTheme {
-                bar()
+    private fun restingBar(bar: @Composable () -> Unit) =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    bar()
+                }
             }
-        }
 
-        onNodeWithTag(HearthProgressBarTag)
-            .assertIsDisplayed()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_working)
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG)
+                .assertIsDisplayed()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_working),
+                    ),
                 )
-            )
-    }
+        }
 }

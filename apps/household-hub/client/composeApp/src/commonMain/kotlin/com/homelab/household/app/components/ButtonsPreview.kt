@@ -2,10 +2,10 @@ package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.icons.HearthIcon
-import com.homelab.household.app.theme.DayNightPreviews
+import com.homelab.household.app.theme.PreviewDayNight
 
 /** Each button kind, without and then with its icon. */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun PrimaryButtonPreview() {
     ComponentPreview {
@@ -14,7 +14,7 @@ private fun PrimaryButtonPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun SecondaryButtonPreview() {
     ComponentPreview {
@@ -23,7 +23,7 @@ private fun SecondaryButtonPreview() {
     }
 }
 
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun DestructiveButtonPreview() {
     ComponentPreview {
@@ -36,7 +36,7 @@ private fun DestructiveButtonPreview() {
  * The working state of each kind, beside its resting one. Previews keep `DefaultMotion`, so the
  * bar along each bottom edge is running here — this is the one place the motion is looked at.
  */
-@DayNightPreviews
+@PreviewDayNight
 @Composable
 private fun BusyButtonPreview() {
     ComponentPreview {

@@ -11,10 +11,6 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,11 +18,14 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /** Removing someone means typing their name: friction proportional to the damage. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoveMemberViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private val removeMember = mock<RemoveMemberUseCase>()
     private val liam = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
@@ -40,40 +39,43 @@ class RemoveMemberViewModelTest {
     private fun viewModel() = RemoveMemberViewModel(liam, removeMember)
 
     @Test
-    fun their_name_typed_out_removes_them() = runTest(testDispatcher) {
-        everySuspend { removeMember(any()) } returns Unit
-        val viewModel = viewModel()
-        viewModel.onNameChange("  liam ")
+    fun their_name_typed_out_removes_them() =
+        runTest(testDispatcher) {
+            everySuspend { removeMember(any()) } returns Unit
+            val viewModel = viewModel()
+            viewModel.onNameChange("  liam ")
 
-        viewModel.events.test {
+            viewModel.events.test {
+                viewModel.remove()
+                advanceUntilIdle()
+
+                assertEquals(RemoveMemberEvent.Removed, awaitItem())
+            }
+            verifySuspend(VerifyMode.exactly(1)) { removeMember("liam") }
+        }
+
+    @Test
+    fun another_name_is_answered_with_words_rather_than_a_dead_button() =
+        runTest(testDispatcher) {
+            val viewModel = viewModel()
+            viewModel.onNameChange("Li")
+
             viewModel.remove()
             advanceUntilIdle()
 
-            assertEquals(RemoveMemberEvent.Removed, awaitItem())
+            assertEquals(true, viewModel.uiState.value.nameMismatch)
         }
-        verifySuspend(VerifyMode.exactly(1)) { removeMember("liam") }
-    }
 
     @Test
-    fun another_name_is_answered_with_words_rather_than_a_dead_button() = runTest(testDispatcher) {
-        val viewModel = viewModel()
-        viewModel.onNameChange("Li")
+    fun an_unreachable_hub_says_nobody_was_removed() =
+        runTest(testDispatcher) {
+            everySuspend { removeMember(any()) } throws ServerOfflineException()
+            val viewModel = viewModel()
+            viewModel.onNameChange("Liam")
 
-        viewModel.remove()
-        advanceUntilIdle()
+            viewModel.remove()
+            advanceUntilIdle()
 
-        assertEquals(true, viewModel.uiState.value.nameMismatch)
-    }
-
-    @Test
-    fun an_unreachable_hub_says_nobody_was_removed() = runTest(testDispatcher) {
-        everySuspend { removeMember(any()) } throws ServerOfflineException()
-        val viewModel = viewModel()
-        viewModel.onNameChange("Liam")
-
-        viewModel.remove()
-        advanceUntilIdle()
-
-        assertEquals(RemoveMemberStatus.Unreachable, viewModel.uiState.value.status)
-    }
+            assertEquals(RemoveMemberStatus.Unreachable, viewModel.uiState.value.status)
+        }
 }

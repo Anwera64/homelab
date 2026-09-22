@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 data class HealthCheckDto(
     val status: String,
     val version: String? = null,
-    val database: String? = null
+    val database: String? = null,
 )

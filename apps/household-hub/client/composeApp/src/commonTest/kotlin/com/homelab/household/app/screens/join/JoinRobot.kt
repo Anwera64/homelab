@@ -27,8 +27,9 @@ import org.jetbrains.compose.resources.getString
 
 /** Everything the join screen says and does, named as the resources it reads. */
 @OptIn(ExperimentalTestApi::class)
-class JoinRobot(private val test: ComposeUiTest) {
-
+class JoinRobot(
+    private val test: ComposeUiTest,
+) {
     suspend fun seesTheInvitationFrom(inviterName: String) {
         seesText(getString(Res.string.join_invited_by, inviterName))
         seesText(getString(Res.string.join_title))
@@ -46,7 +47,10 @@ class JoinRobot(private val test: ComposeUiTest) {
         test.onNodeWithContentDescription(getString(Res.string.join_pin_label)).performTextInput(pin)
     }
 
-    suspend fun picksColour(number: Int, of: Int) {
+    suspend fun picksColour(
+        number: Int,
+        of: Int,
+    ) {
         test.onNodeWithContentDescription(getString(Res.string.join_colour_swatch, number, of)).performClick()
     }
 
@@ -81,12 +85,12 @@ fun ComposeUiTest.joinScreen(
     hub: FakeJoinHub,
     preview: InvitePreview,
     code: String = "K7M2QP",
-    onJoined: () -> Unit = {},
-    onExpired: () -> Unit = {}
+    onJoin: () -> Unit = {},
+    onExpire: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
-            JoinScreen(preview = preview, code = code, onJoined = onJoined, onExpired = onExpired)
+            JoinScreen(preview = preview, code = code, onJoin = onJoin, onExpire = onExpire)
         }
     }
 }

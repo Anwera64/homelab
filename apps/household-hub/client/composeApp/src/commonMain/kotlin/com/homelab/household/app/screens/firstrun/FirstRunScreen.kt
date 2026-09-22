@@ -15,16 +15,16 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun FirstRunScreen(
-    onCreated: () -> Unit,
+    onCreate: () -> Unit,
     onSignIn: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: FirstRunViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            FirstRunEvent.GoToHome -> onCreated()
+            FirstRunEvent.GoToHome -> onCreate()
         }
     }
 
@@ -35,6 +35,6 @@ fun FirstRunScreen(
         onColourSelect = viewModel::onColourSelect,
         onCreate = viewModel::create,
         onSignIn = onSignIn,
-        modifier = modifier
+        modifier = modifier,
     )
 }

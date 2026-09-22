@@ -11,38 +11,39 @@ import kotlin.test.assertEquals
 /** One-shot events reach the screen once each, and never twice on recomposition. */
 @OptIn(ExperimentalTestApi::class)
 class ObserveEventsTest {
-
     @Test
-    fun an_event_reaches_the_collector() = runScreenTest {
-        val events = Channel<String>(Channel.BUFFERED)
-        val seen = mutableListOf<String>()
+    fun an_event_reaches_the_collector() =
+        runScreenTest {
+            val events = Channel<String>(Channel.BUFFERED)
+            val seen = mutableListOf<String>()
 
-        setContent {
-            ObserveEvents(events.receiveAsFlow()) { seen += it }
-            Text("screen")
+            setContent {
+                ObserveEvents(events.receiveAsFlow()) { seen += it }
+                Text("screen")
+            }
+
+            events.trySend("go")
+            waitForIdle()
+
+            assertEquals(listOf("go"), seen)
         }
 
-        events.trySend("go")
-        waitForIdle()
-
-        assertEquals(listOf("go"), seen)
-    }
-
     @Test
-    fun a_recomposition_does_not_replay_an_event() = runScreenTest {
-        val events = Channel<String>(Channel.BUFFERED)
-        val seen = mutableListOf<String>()
+    fun a_recomposition_does_not_replay_an_event() =
+        runScreenTest {
+            val events = Channel<String>(Channel.BUFFERED)
+            val seen = mutableListOf<String>()
 
-        setContent {
-            ObserveEvents(events.receiveAsFlow()) { seen += it }
-            Text("screen")
+            setContent {
+                ObserveEvents(events.receiveAsFlow()) { seen += it }
+                Text("screen")
+            }
+
+            events.trySend("go")
+            waitForIdle()
+            events.trySend("again")
+            waitForIdle()
+
+            assertEquals(listOf("go", "again"), seen)
         }
-
-        events.trySend("go")
-        waitForIdle()
-        events.trySend("again")
-        waitForIdle()
-
-        assertEquals(listOf("go", "again"), seen)
-    }
 }

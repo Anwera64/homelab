@@ -25,26 +25,27 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalTestApi::class, ExperimentalAtomicApi::class)
 class AppStartTest {
-
     private val hubCalls = AtomicInt(0)
-    private val hub = MockEngine {
-        hubCalls.incrementAndFetch()
-        respond("Nothing on the way to home should wait for the hub", HttpStatusCode.NotImplemented)
-    }
-
-    private fun hubThatRenews() = MockEngine { request ->
-        hubCalls.incrementAndFetch()
-        if (request.url.encodedPath == "/api/v1/auth/refresh") {
-            respond(
-                """{"access_token":"fresh-token","token_type":"bearer","user":{"id":"emma","full_name":"Emma",
-                    "avatar_color":"#3C6E4E","is_admin":true,"is_active":true,"created_at":"2026-09-15T00:00:00Z"}}""",
-                HttpStatusCode.OK,
-                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            )
-        } else {
-            respond("", HttpStatusCode.NotFound)
+    private val hub =
+        MockEngine {
+            hubCalls.incrementAndFetch()
+            respond("Nothing on the way to home should wait for the hub", HttpStatusCode.NotImplemented)
         }
-    }
+
+    private fun hubThatRenews() =
+        MockEngine { request ->
+            hubCalls.incrementAndFetch()
+            if (request.url.encodedPath == "/api/v1/auth/refresh") {
+                respond(
+                    """{"access_token":"fresh-token","token_type":"bearer","user":{"id":"emma","full_name":"Emma",
+                    "avatar_color":"#3C6E4E","is_admin":true,"is_active":true,"created_at":"2026-09-15T00:00:00Z"}}""",
+                    HttpStatusCode.OK,
+                    headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                )
+            } else {
+                respond("", HttpStatusCode.NotFound)
+            }
+        }
 
     @Test
     fun a_phone_still_signed_in_opens_on_home_without_waiting_for_the_hub() {
@@ -87,7 +88,12 @@ class AppStartTest {
     @Test
     fun a_phone_with_nobody_signed_in_opens_on_launch() {
         runScreenTest {
-            setContent { TestApp(hub, sessionStorage = InMemorySessionStorage()) { AppNavHost(screens = StubScreens()) } }
+            setContent {
+                TestApp(
+                    hub,
+                    sessionStorage = InMemorySessionStorage(),
+                ) { AppNavHost(screens = StubScreens()) }
+            }
 
             waitUntilExactlyOneExists(hasText(StubScreens.LAUNCH), timeoutMillis = WAIT_MILLIS)
         }

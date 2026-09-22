@@ -11,6 +11,7 @@ interface ExternalApps {
     fun openTailscale()
 }
 
-val LocalExternalApps = staticCompositionLocalOf<ExternalApps> {
-    error("No ExternalApps provided: App() and TestApp provide one")
-}
+val LocalExternalApps =
+    staticCompositionLocalOf<ExternalApps> {
+        error("No ExternalApps provided: App() and TestApp provide one")
+    }

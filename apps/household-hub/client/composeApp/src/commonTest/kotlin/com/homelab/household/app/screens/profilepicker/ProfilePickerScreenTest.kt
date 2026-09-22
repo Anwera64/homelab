@@ -17,7 +17,6 @@ import kotlin.test.assertEquals
 /** "Who's here?" with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ProfilePickerScreenTest {
-
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
     private val liam = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
 
@@ -40,7 +39,7 @@ class ProfilePickerScreenTest {
         val picked = mutableListOf<Member>()
 
         runScreenTest {
-            profilePickerScreen(hub, onMemberSelected = { picked += it })
+            profilePickerScreen(hub, onSelectMember = { picked += it })
 
             onProfilePicker {
                 seesTheHousehold("Emma", "Liam")
@@ -93,7 +92,7 @@ class ProfilePickerScreenTest {
             runComposeUiTest {
                 setContent {
                     StillTheme {
-                        ProfilePickerContent(state = state, onMemberSelected = {}, onRetry = {}, onInviteCode = {})
+                        ProfilePickerContent(state = state, onSelectMember = {}, onRetry = {}, onInviteCode = {})
                     }
                 }
 

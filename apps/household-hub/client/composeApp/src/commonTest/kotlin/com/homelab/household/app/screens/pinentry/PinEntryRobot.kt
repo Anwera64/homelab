@@ -11,9 +11,9 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.pin_attempts_left
 import com.homelab.household.app.resources.pin_back
-import com.homelab.household.app.resources.pin_forgotten
 import com.homelab.household.app.resources.pin_delete
 import com.homelab.household.app.resources.pin_entered
+import com.homelab.household.app.resources.pin_forgotten
 import com.homelab.household.app.resources.pin_locked
 import com.homelab.household.app.resources.pin_title
 import com.homelab.household.app.resources.pin_unreachable
@@ -25,8 +25,9 @@ import org.jetbrains.compose.resources.getString
 
 /** Everything the PIN pad says and does, named as the resources the screen reads. */
 @OptIn(ExperimentalTestApi::class)
-class PinEntryRobot(private val test: ComposeUiTest) {
-
+class PinEntryRobot(
+    private val test: ComposeUiTest,
+) {
     suspend fun seesThePinPadOf(name: String) = seesText(getString(Res.string.pin_title, name))
 
     /** Taps the keys one digit at a time, the way a person would. */
@@ -49,8 +50,9 @@ class PinEntryRobot(private val test: ComposeUiTest) {
     suspend fun seesDigitsEntered(count: Int) {
         val description = getPluralString(Res.plurals.pin_entered, count, count)
         test.waitUntilExactlyOneExists(
-            androidx.compose.ui.test.hasContentDescription(description),
-            timeoutMillis = WAIT_MILLIS
+            androidx.compose.ui.test
+                .hasContentDescription(description),
+            timeoutMillis = WAIT_MILLIS,
         )
     }
 
@@ -82,7 +84,7 @@ fun ComposeUiTest.pinEntryScreen(
     member: Member,
     onSignedIn: () -> Unit = {},
     onBack: () -> Unit = {},
-    onForgotten: () -> Unit = {}
+    onForget: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine) {
@@ -90,7 +92,7 @@ fun ComposeUiTest.pinEntryScreen(
                 member = member,
                 onSignedIn = onSignedIn,
                 onBack = onBack,
-                onForgotten = onForgotten
+                onForget = onForget,
             )
         }
     }

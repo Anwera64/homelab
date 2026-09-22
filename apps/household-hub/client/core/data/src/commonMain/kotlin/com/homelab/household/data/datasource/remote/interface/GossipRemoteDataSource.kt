@@ -8,7 +8,6 @@ import com.homelab.household.data.dto.GossipMilestoneDto
  * them to `HouseholdMilestone`.
  */
 interface GossipRemoteDataSource {
-
     suspend fun listHouseholdMilestones(limit: Int): List<GossipMilestoneDto>
 
     suspend fun listUserAuditMilestones(limit: Int): List<GossipMilestoneDto>

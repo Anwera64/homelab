@@ -16,16 +16,16 @@ import org.koin.core.parameter.parametersOf
 fun JoinScreen(
     preview: InvitePreview,
     code: String,
-    onJoined: () -> Unit,
-    onExpired: () -> Unit,
-    modifier: Modifier = Modifier
+    onJoin: () -> Unit,
+    onExpire: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: JoinViewModel = koinViewModel(parameters = { parametersOf(preview, code) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
-            JoinEvent.Joined -> onJoined()
+            JoinEvent.Joined -> onJoin()
         }
     }
 
@@ -35,6 +35,6 @@ fun JoinScreen(
         onPinChange = viewModel::onPinChange,
         onColourSelect = viewModel::onColourSelect,
         onJoin = viewModel::join,
-        modifier = modifier
+        modifier = modifier,
     )
 }

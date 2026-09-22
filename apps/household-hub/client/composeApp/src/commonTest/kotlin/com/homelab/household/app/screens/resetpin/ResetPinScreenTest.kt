@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HearthProgressBarTag
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.a11y_new_pin_setting
 import com.homelab.household.app.resources.change_pin_mismatch
@@ -34,14 +34,13 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.resetpin.NewPinStatus
 import com.homelab.household.presentation.resetpin.NewPinUiState
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.jetbrains.compose.resources.getString
 
 /** Redeeming a reset code, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class ResetPinScreenTest {
-
     private val wait = 5_000L
 
     @Test
@@ -121,29 +120,30 @@ class ResetPinScreenTest {
      * Nothing is dimmed, and the button says which PIN is being set.
      */
     @Test
-    fun setting_the_new_pin_shows_on_the_button() = runComposeUiTest {
-        setContent {
-            StillTheme {
-                NewPinContent(
-                    state = NewPinUiState(pin = "864209", again = "864209", status = NewPinStatus.Setting),
-                    onPinChange = {},
-                    onAgainChange = {},
-                    onSetPin = {}
-                )
+    fun setting_the_new_pin_shows_on_the_button() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    NewPinContent(
+                        state = NewPinUiState(pin = "864209", again = "864209", status = NewPinStatus.Setting),
+                        onPinChange = {},
+                        onAgainChange = {},
+                        onSetPin = {},
+                    )
+                }
             }
-        }
 
-        onNodeWithText(getString(Res.string.new_pin_setting))
-            .assertIsEnabled()
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_new_pin_setting)
+            onNodeWithText(getString(Res.string.new_pin_setting))
+                .assertIsEnabled()
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        getString(Res.string.a11y_new_pin_setting),
+                    ),
                 )
-            )
-        onNodeWithTag(HearthProgressBarTag).assertIsDisplayed()
-        onNodeWithText(getString(Res.string.new_pin_submit)).assertDoesNotExist()
-    }
+            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.new_pin_submit)).assertDoesNotExist()
+        }
 
     @Test
     fun every_previewed_state_draws() {
