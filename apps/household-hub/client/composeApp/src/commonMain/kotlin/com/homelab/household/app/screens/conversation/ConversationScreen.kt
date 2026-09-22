@@ -31,6 +31,7 @@ fun ConversationScreen(
 
     ConversationContent(
         state = state,
+        onComposerTextChange = viewModel::composerTextChanged,
         onSend = viewModel::sendMessage,
         onRetry = viewModel::sendMessage,
         onTryAgain = viewModel::regenerate,

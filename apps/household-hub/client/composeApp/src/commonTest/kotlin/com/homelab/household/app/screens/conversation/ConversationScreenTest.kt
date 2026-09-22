@@ -3,6 +3,7 @@ package com.homelab.household.app.screens.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -47,6 +48,7 @@ class ConversationScreenTest {
     private fun conversation(
         state: ChatSessionUiState,
         onSend: (String) -> Unit = {},
+        onComposerTextChange: (String) -> Unit = {},
         onRetry: (String) -> Unit = {},
         onTryAgain: () -> Unit = {},
     ): @Composable () -> Unit =
@@ -54,6 +56,7 @@ class ConversationScreenTest {
             StillTheme {
                 ConversationContent(
                     state = state,
+                    onComposerTextChange = onComposerTextChange,
                     onSend = onSend,
                     onRetry = onRetry,
                     onTryAgain = onTryAgain,
@@ -134,9 +137,13 @@ class ConversationScreenTest {
     fun the_composer_does_not_send_while_an_answer_is_being_written() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
-            setContent(conversation(stateNamed("Stream dropped, reconnecting"), onSend = { sent += it }))
+            setContent(
+                conversation(
+                    stateNamed("Stream dropped, reconnecting").copy(composerText = "and another thing"),
+                    onSend = { sent += it },
+                ),
+            )
 
-            onNodeWithText(getString(Res.string.conversation_composer_waiting)).performTextInput("and another thing")
             onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
 
             // A second send would answer 409; the placeholder says so instead of failing at it.
@@ -147,9 +154,13 @@ class ConversationScreenTest {
     fun the_composer_sends_when_nothing_is_in_flight() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
-            setContent(conversation(stateNamed("A finished exchange"), onSend = { sent += it }))
+            setContent(
+                conversation(
+                    stateNamed("A finished exchange").copy(composerText = "And Saturday?"),
+                    onSend = { sent += it },
+                ),
+            )
 
-            onNodeWithText("Message the Home Coordinator…").performTextInput("And Saturday?")
             onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
 
             assertEquals(listOf("And Saturday?"), sent)
@@ -159,9 +170,13 @@ class ConversationScreenTest {
     fun the_keyboard_send_key_goes_through_the_same_guard_as_the_button() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
-            setContent(conversation(stateNamed("Stream dropped, reconnecting"), onSend = { sent += it }))
+            setContent(
+                conversation(
+                    stateNamed("Stream dropped, reconnecting").copy(composerText = "and another thing"),
+                    onSend = { sent += it },
+                ),
+            )
 
-            onNodeWithText(getString(Res.string.conversation_composer_waiting)).performTextInput("and another thing")
             onNode(hasSetTextAction()).performImeAction()
 
             // Otherwise Enter would be a way round the rule the send button obeys.
@@ -172,12 +187,33 @@ class ConversationScreenTest {
     fun the_keyboard_send_key_sends_when_nothing_is_in_flight() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
-            setContent(conversation(stateNamed("A finished exchange"), onSend = { sent += it }))
+            setContent(
+                conversation(
+                    stateNamed("A finished exchange").copy(composerText = "And Saturday?"),
+                    onSend = { sent += it },
+                ),
+            )
 
-            onNodeWithText("Message the Home Coordinator…").performTextInput("And Saturday?")
             onNode(hasSetTextAction()).performImeAction()
 
             assertEquals(listOf("And Saturday?"), sent)
+        }
+
+    @Test
+    fun a_send_that_failed_says_so_and_keeps_what_you_typed() =
+        runComposeUiTest {
+            setContent(
+                conversation(
+                    stateNamed("A finished exchange").copy(
+                        composerText = "Hi",
+                        errorMessage = "Can't reach your hub",
+                    ),
+                ),
+            )
+
+            // Silence here is what made a failed send look like nothing happening at all.
+            onNodeWithText("Can't reach your hub").assertIsDisplayed()
+            onNode(hasSetTextAction()).assertTextContains("Hi")
         }
 
     @Test

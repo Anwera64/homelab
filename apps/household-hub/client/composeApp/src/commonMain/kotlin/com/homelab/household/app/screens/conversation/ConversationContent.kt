@@ -65,6 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ConversationContent(
     state: ChatSessionUiState,
+    onComposerTextChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onRetry: (String) -> Unit,
     onTryAgain: () -> Unit,
@@ -74,7 +75,6 @@ fun ConversationContent(
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
-    var draft by remember { mutableStateOf("") }
 
     HearthScaffold(
         modifier = modifier,
@@ -96,22 +96,41 @@ fun ConversationContent(
             }
         },
         bottomBar = {
-            MessageComposer(
-                value = draft,
-                onValueChange = { draft = it },
-                onSend = {
-                    if (state.canSend && draft.isNotBlank()) {
-                        onSend(draft)
-                        draft = ""
-                    }
-                },
-                placeholder =
-                    when (state.turnState) {
-                        TurnState.Reconnecting -> stringResource(Res.string.conversation_composer_waiting)
-                        TurnState.StillWorking -> stringResource(Res.string.conversation_composer_leave)
-                        else -> stringResource(Res.string.conversation_composer_idle, state.agentName)
+            Column {
+                // Under the composer, where the problem is — and the message it refused is still
+                // sitting in the field above, so it can simply be sent again.
+                val failure = state.errorMessage
+                if (failure != null) {
+                    Text(
+                        text = failure,
+                        style = type.caption,
+                        color = colors.error,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = HearthTheme.spacing.xl,
+                                    end = HearthTheme.spacing.xl,
+                                    bottom = HearthTheme.spacing.sm,
+                                ),
+                    )
+                }
+                MessageComposer(
+                    value = state.composerText,
+                    onValueChange = onComposerTextChange,
+                    onSend = {
+                        if (state.canSend && state.composerText.isNotBlank()) {
+                            onSend(state.composerText)
+                        }
                     },
-            )
+                    placeholder =
+                        when (state.turnState) {
+                            TurnState.Reconnecting -> stringResource(Res.string.conversation_composer_waiting)
+                            TurnState.StillWorking -> stringResource(Res.string.conversation_composer_leave)
+                            else -> stringResource(Res.string.conversation_composer_idle, state.agentName)
+                        },
+                )
+            }
         },
     ) { padding ->
         if (state.isNew) {
@@ -247,6 +266,7 @@ private fun ConversationContentPreview(
     HearthTheme {
         ConversationContent(
             state = state,
+            onComposerTextChange = {},
             onSend = {},
             onRetry = {},
             onTryAgain = {},
