@@ -23,12 +23,17 @@ fun HearthTopBar(
     backDescription: String,
     modifier: Modifier = Modifier,
     title: String? = null,
+    titleContent: (@Composable () -> Unit)? = null,
 ) {
     val colors = HearthTheme.colors
 
     TopAppBar(
         title = {
-            if (title != null) {
+            // A conversation names its agent with an emoji beside the name, which is more than a
+            // string; anything else still gets the plain heading.
+            if (titleContent != null) {
+                titleContent()
+            } else if (title != null) {
                 Text(text = title, style = HearthTheme.typography.heading, color = colors.textPrimary)
             }
         },

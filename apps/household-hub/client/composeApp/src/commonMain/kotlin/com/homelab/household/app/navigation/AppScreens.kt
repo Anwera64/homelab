@@ -3,6 +3,7 @@ package com.homelab.household.app.navigation
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.screens.changepin.ChangePinScreen
 import com.homelab.household.app.screens.chats.ChatsScreen
+import com.homelab.household.app.screens.conversation.ConversationScreen
 import com.homelab.household.app.screens.firstrun.FirstRunScreen
 import com.homelab.household.app.screens.invitecode.InviteCodeScreen
 import com.homelab.household.app.screens.invitecreate.InviteCreateScreen
@@ -14,7 +15,6 @@ import com.homelab.household.app.screens.pinapprove.PinApproveScreen
 import com.homelab.household.app.screens.pinentry.PinEntryScreen
 import com.homelab.household.app.screens.pinforgot.PinForgotScreen
 import com.homelab.household.app.screens.placeholder.HomePlaceholderScreen
-import com.homelab.household.app.screens.placeholder.PlaceholderContent
 import com.homelab.household.app.screens.profile.ProfileScreen
 import com.homelab.household.app.screens.profilepicker.ProfilePickerScreen
 import com.homelab.household.app.screens.removemember.RemoveMemberScreen
@@ -265,7 +265,7 @@ object RealAppScreens : AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
     ) {
-        PlaceholderContent(title = "Conversation", detail = sessionId ?: "New chat")
+        ConversationScreen(sessionId = sessionId, onBack = onBack)
     }
 
     @Composable

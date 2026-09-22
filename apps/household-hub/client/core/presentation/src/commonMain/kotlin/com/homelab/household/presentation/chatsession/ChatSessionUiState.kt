@@ -35,6 +35,14 @@ data class ChatSessionUiState(
     val messages: List<ChatMessage> = emptyList(),
     val streamingMessage: String? = null,
     val turnState: TurnState = TurnState.Idle,
+    /**
+     * Who is answering. Held on the state rather than read off the session, because a chat that
+     * has not been created yet still has an agent to name — the hero greeting is drawn before
+     * anything exists on the hub.
+     */
+    val agentName: String = "",
+    val agentAvatar: String = "",
+    val agentTagline: String = "",
     val pendingToolProposal: ChatStreamEvent.ToolApprovalProposal? = null,
     val errorMessage: String? = null,
     val isSecretLocked: Boolean = false,
@@ -52,6 +60,10 @@ data class ChatSessionUiState(
                 TurnState.Streaming, TurnState.Reconnecting, TurnState.StillWorking -> false
                 TurnState.Idle, TurnState.Failed -> true
             }
+
+    /** A conversation nobody has spoken in yet: the hero greeting rather than a transcript. */
+    val isNew: Boolean
+        get() = messages.isEmpty() && streamingMessage == null
 
     /** The newest answer already on screen, which a recovery must not mistake for a new one. */
     val lastAssistantMessageId: String?
