@@ -29,6 +29,7 @@ import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MessageBubble
 import com.homelab.household.app.components.MessageComposer
+import com.homelab.household.app.components.NotSentReceipt
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.SentReceipt
 import com.homelab.household.app.components.SlowLine
@@ -36,7 +37,6 @@ import com.homelab.household.app.components.ThinkingDots
 import com.homelab.household.app.components.ToolRecordLine
 import com.homelab.household.app.components.ToolRunningChip
 import com.homelab.household.app.components.TurnStatusLine
-import com.homelab.household.app.components.TurnStatusTone
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.conversation_back
@@ -46,10 +46,8 @@ import com.homelab.household.app.resources.conversation_composer_waiting
 import com.homelab.household.app.resources.conversation_failed_line
 import com.homelab.household.app.resources.conversation_failed_title
 import com.homelab.household.app.resources.conversation_greeting
-import com.homelab.household.app.resources.conversation_not_sent
 import com.homelab.household.app.resources.conversation_reconnecting
 import com.homelab.household.app.resources.conversation_reconnecting_detail
-import com.homelab.household.app.resources.conversation_retry
 import com.homelab.household.app.resources.conversation_still_working
 import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thought
@@ -275,23 +273,8 @@ fun ConversationContent(
                             if (receipted) {
                                 { SentReceipt() }
                             } else if (undelivered) {
-                                {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        TurnStatusLine(
-                                            label = stringResource(Res.string.conversation_not_sent),
-                                            detail = null,
-                                            tone = TurnStatusTone.Wrong,
-                                        )
-                                        // Only this case re-sends: the question itself never landed.
-                                        SecondaryButton(
-                                            text = stringResource(Res.string.conversation_retry),
-                                            onClick = { onRetry(message.content) },
-                                        )
-                                    }
-                                }
+                                // Only this case re-sends: the question itself never landed.
+                                { NotSentReceipt(onRetry = { onRetry(message.content) }) }
                             } else {
                                 null
                             },

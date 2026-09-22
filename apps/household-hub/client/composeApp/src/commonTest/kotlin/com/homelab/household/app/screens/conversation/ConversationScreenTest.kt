@@ -18,6 +18,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import com.homelab.household.app.components.NOT_SENT_GLYPH_TAG
+import com.homelab.household.app.components.RETRY_GLYPH_TAG
 import com.homelab.household.app.components.SENT_GLYPH_TAG
 import com.homelab.household.app.components.THINKING_DOTS_TAG
 import com.homelab.household.app.resources.Res
@@ -400,6 +403,42 @@ class ConversationScreenTest {
             }
         }
     }
+
+    // ---- a question that never landed ----------------------------------------
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN it carries the error glyph and a retry glyph`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            onNodeWithTag(NOT_SENT_GLYPH_TAG, useUnmergedTree = true).assertExists()
+            onNodeWithTag(RETRY_GLYPH_TAG, useUnmergedTree = true).assertExists()
+        }
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN Retry sits on the same line after Not sent`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            val status = onNodeWithText(getString(Res.string.conversation_not_sent)).getUnclippedBoundsInRoot()
+            val retry =
+                onNodeWithText(getString(Res.string.conversation_retry), useUnmergedTree = true)
+                    .getUnclippedBoundsInRoot()
+            val statusMiddle = (status.top + status.bottom) / 2
+            val retryMiddle = (retry.top + retry.bottom) / 2
+            assertTrue((statusMiddle - retryMiddle).value in -1f..1f, "one line, not stacked")
+            assertTrue(retry.left > status.right, "Retry follows the status")
+        }
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN Retry is still a full touch target`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            // A quiet link to look at, but a thumb still needs the whole 48.
+            val retry = onNodeWithText(getString(Res.string.conversation_retry)).getUnclippedBoundsInRoot()
+            assertTrue(retry.bottom - retry.top >= 48.dp, "was ${retry.bottom - retry.top}")
+        }
 
     // ---- how a waiting status is laid out -------------------------------------
 

@@ -320,7 +320,7 @@
     <string name="conversation_composer_idle">Message the %1$s…</string>
     <string name="conversation_composer_waiting">Waiting for this answer to finish…</string>
     <string name="conversation_composer_leave">You can leave — the answer will wait for you</string>
-    <string name="conversation_not_sent">Not sent — the hub didn’t get it</string>
+    <string name="conversation_not_sent">Not sent</string>
     <string name="conversation_retry">Retry</string>
     <string name="conversation_sent">Sent</string>
     <string name="conversation_thought">Thought for %1$ds</string>

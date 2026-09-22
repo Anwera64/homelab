@@ -65,30 +65,17 @@ fun MessageBubble(
 @Composable
 fun TurnStatusLine(
     label: String,
-    detail: String?,
+    detail: String,
     modifier: Modifier = Modifier,
-    tone: TurnStatusTone = TurnStatusTone.Working,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
-    val labelColour =
-        when (tone) {
-            TurnStatusTone.Working -> colors.textMuted
-            TurnStatusTone.Wrong -> colors.error
-        }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs),
     ) {
-        Text(text = label, style = type.labelStrong, color = labelColour)
-        if (detail != null) {
-            Text(text = detail, style = type.caption, color = colors.textMuted)
-        }
+        Text(text = label, style = type.labelStrong, color = colors.textMuted)
+        Text(text = detail, style = type.caption, color = colors.textMuted)
     }
-}
-
-enum class TurnStatusTone {
-    Working,
-    Wrong,
 }
