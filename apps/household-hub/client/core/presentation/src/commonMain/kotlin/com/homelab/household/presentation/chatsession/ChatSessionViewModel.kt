@@ -9,9 +9,11 @@ import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 class ChatSessionViewModel(
     private val streamChatTurnUseCase: StreamChatTurnUseCase,
     private val getSessionUseCase: GetSessionUseCase,
+    private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
 ) : ViewModel() {
@@ -68,6 +71,7 @@ class ChatSessionViewModel(
         autoApproveWrites: Boolean = false,
     ) {
         val currentSession = _uiState.value.session ?: return
+        val lastAssistantId = _uiState.value.lastAssistantMessageId
         val tempMessageId = "temp-user-${currentSession.id}-${nextTempMessageNumber++}"
         val userMsg =
             ChatMessage(
@@ -82,14 +86,73 @@ class ChatSessionViewModel(
             it.copy(
                 messages = it.messages + userMsg,
                 streamingMessage = "",
+                turnState = TurnState.Streaming,
                 errorMessage = null,
             )
         }
 
+        follow(
+            turn =
+                streamChatTurnUseCase(
+                    sessionId = currentSession.id,
+                    content = content,
+                    autoApproveWrites = autoApproveWrites,
+                    afterAssistantMessageId = lastAssistantId,
+                ),
+            sessionId = currentSession.id,
+            userMessageId = tempMessageId,
+        )
+    }
+
+    /**
+     * Asks for the answer again after the model failed to produce one.
+     *
+     * The question is already on the hub and stays where it is; only the answer is asked for
+     * again, which is exactly what the screen promises.
+     */
+    fun regenerate() {
+        val currentSession = _uiState.value.session ?: return
+        if (_uiState.value.turnState != TurnState.Failed) return
+
+        _uiState.update { it.copy(streamingMessage = "", turnState = TurnState.Streaming, errorMessage = null) }
+
+        follow(
+            turn =
+                regenerateAnswerUseCase(
+                    sessionId = currentSession.id,
+                    afterAssistantMessageId = _uiState.value.lastAssistantMessageId,
+                ),
+            sessionId = currentSession.id,
+            userMessageId = null,
+        )
+    }
+
+    /**
+     * Follows a turn to whichever end it reaches, and puts the outcome where it belongs.
+     *
+     * The distinction the old version got wrong: a failure *before* the first word means the
+     * question never arrived, so it is marked on the user's message and offered again. A failure
+     * after it means the question is on the hub and being answered — so the partial text stays,
+     * and the state goes on the turn rather than on a question that was never at fault.
+     *
+     * [userMessageId] is null when regenerating, because there is no new question to blame.
+     */
+    private fun follow(
+        turn: Flow<ChatStreamEvent>,
+        sessionId: String,
+        userMessageId: String?,
+    ) {
         viewModelScope.launch {
             var accumulated = ""
-            streamChatTurnUseCase(currentSession.id, content, autoApproveWrites)
+            var delivered = false
+
+            turn
                 .catch { e ->
+                    if (delivered) {
+                        // The question arrived; only the wait broke. Keep what was being read.
+                        _uiState.update { it.copy(turnState = TurnState.Failed) }
+                        return@catch
+                    }
                     val failedStatus =
                         if (e is ServerOfflineException) {
                             MessageStatus.FAILED_OFFLINE
@@ -99,18 +162,20 @@ class ChatSessionViewModel(
                     _uiState.update { state ->
                         state.copy(
                             streamingMessage = null,
+                            turnState = TurnState.Idle,
                             errorMessage = e.message ?: "Streaming failed",
                             messages =
                                 state.messages.map { msg ->
-                                    if (msg.id == tempMessageId) msg.copy(status = failedStatus) else msg
+                                    if (msg.id == userMessageId) msg.copy(status = failedStatus) else msg
                                 },
                         )
                     }
                 }.collect { event ->
                     when (event) {
                         is ChatStreamEvent.Delta -> {
+                            delivered = true
                             accumulated += event.content
-                            _uiState.update { it.copy(streamingMessage = accumulated) }
+                            _uiState.update { it.copy(streamingMessage = accumulated, turnState = TurnState.Streaming) }
                         }
 
                         is ChatStreamEvent.ToolApprovalProposal -> {
@@ -121,7 +186,7 @@ class ChatSessionViewModel(
                             val assistantMsg =
                                 ChatMessage(
                                     id = event.messageId,
-                                    sessionId = currentSession.id,
+                                    sessionId = sessionId,
                                     role = MessageRole.ASSISTANT,
                                     content = event.assistantContent,
                                     status = MessageStatus.SENT,
@@ -129,12 +194,26 @@ class ChatSessionViewModel(
                             _uiState.update { state ->
                                 state.copy(
                                     streamingMessage = null,
+                                    turnState = TurnState.Idle,
                                     messages =
                                         state.messages.map { msg ->
-                                            if (msg.id == tempMessageId) msg.copy(status = MessageStatus.SENT) else msg
+                                            if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
                                         } + assistantMsg,
                                 )
                             }
+                        }
+
+                        // The stream is gone but the hub has not finished; the words so far stay.
+                        is ChatStreamEvent.Reconnecting -> {
+                            _uiState.update { it.copy(turnState = TurnState.Reconnecting) }
+                        }
+
+                        is ChatStreamEvent.StillWorking -> {
+                            _uiState.update { it.copy(turnState = TurnState.StillWorking) }
+                        }
+
+                        is ChatStreamEvent.TurnFailed -> {
+                            _uiState.update { it.copy(turnState = TurnState.Failed) }
                         }
 
                         else -> {}

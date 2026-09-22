@@ -36,6 +36,7 @@ import com.homelab.household.domain.usecase.ObserveMessagesUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
 import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
 import com.homelab.household.domain.usecase.RedeemPinResetUseCase
+import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.RemoveMemberUseCase
 import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
@@ -84,6 +85,7 @@ import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RedeemPinResetUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RegenerateAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemberUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
@@ -111,6 +113,7 @@ val domainModule =
         factory<ObserveMessagesUseCase> { ObserveMessagesUseCaseImpl(get()) }
         factory<RetryMessageUseCase> { RetryMessageUseCaseImpl(get()) }
         factory<StreamChatTurnUseCase> { StreamChatTurnUseCaseImpl(get()) }
+        factory<RegenerateAnswerUseCase> { RegenerateAnswerUseCaseImpl(get()) }
 
         // Auth use cases
         factory<LoginUseCase> { LoginUseCaseImpl(get()) }

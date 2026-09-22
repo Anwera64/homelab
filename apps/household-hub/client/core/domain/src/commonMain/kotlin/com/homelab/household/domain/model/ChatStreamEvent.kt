@@ -31,4 +31,32 @@ sealed interface ChatStreamEvent {
         val agentName: String = "",
         val toolsExecuted: List<Map<String, Any?>> = emptyList(),
     ) : ChatStreamEvent
+
+    /**
+     * The stream is gone and the answer is being fetched instead.
+     *
+     * Emitted once, when recovery starts. Without it the phone would sit on a half-written answer
+     * with no sign that anything was still happening — the recovery is silent by nature, since it
+     * is polling rather than streaming.
+     */
+    data object Reconnecting : ChatStreamEvent
+
+    /**
+     * The active wait ended; the turn did not.
+     *
+     * Durable execution means the hub keeps answering after the phone stops listening, so giving
+     * up on waiting is not the answer failing. This ends the flow normally — a thrown exception
+     * here would reach a person as "something went wrong" when nothing has, and the answer is
+     * still being written.
+     */
+    data object StillWorking : ChatStreamEvent
+
+    /**
+     * The hub is not working on this conversation and no answer arrived, so the turn died.
+     *
+     * Distinct from [StillWorking] because only this one is worth offering to do again, and
+     * distinct from a thrown failure because the question itself was delivered: what failed is the
+     * answer, which is a different sentence on screen and a different button under it.
+     */
+    data object TurnFailed : ChatStreamEvent
 }

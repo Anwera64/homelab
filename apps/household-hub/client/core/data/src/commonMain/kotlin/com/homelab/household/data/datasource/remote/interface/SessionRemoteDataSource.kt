@@ -54,4 +54,13 @@ interface SessionRemoteDataSource {
         content: String,
         autoApproveWrites: Boolean,
     ): Flow<ChatStreamEvent>
+
+    /**
+     * A fresh answer to the question already in the conversation, streamed the same way.
+     *
+     * Carries no content: the question is the one the hub already stored. Refuses with
+     * [SessionConflictException] both when a turn is running and when there is nothing unanswered
+     * to answer again.
+     */
+    fun openRegenerateStream(sessionId: String): Flow<ChatStreamEvent>
 }

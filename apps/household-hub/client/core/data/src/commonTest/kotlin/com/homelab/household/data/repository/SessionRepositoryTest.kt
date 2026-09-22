@@ -18,6 +18,7 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import dev.mokkery.verify
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
 import kotlinx.coroutines.flow.emptyFlow
@@ -58,12 +59,14 @@ class SessionRepositoryTest {
         id: String,
         messages: List<ChatMessageReadDto>,
         isSecret: Boolean = false,
+        turnRunning: Boolean = false,
     ) = SessionDetailReadDto(
         id = id,
         user_id = "u-1",
         title = "Kitchen Planning",
         is_secret = isSecret,
         messages = messages,
+        turn_running = turnRunning,
     )
 
     private fun repository(
@@ -225,7 +228,8 @@ class SessionRepositoryTest {
             everySuspend { remote.fetchSession("s-1") } calls {
                 polls++
                 if (polls == 1) {
-                    detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Hello")))
+                    // Still generating: without this the poll would rightly call the turn dead.
+                    detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Hello")), turnRunning = true)
                 } else {
                     detailDto(
                         "s-1",
@@ -247,22 +251,20 @@ class SessionRepositoryTest {
         }
 
     @Test
-    fun `GIVEN the hub busy and never finishing WHEN a turn is sent THEN it gives up rather than waiting forever`() =
+    fun `GIVEN the hub busy and never finishing WHEN a turn is sent THEN the wait ends quietly rather than failing`() =
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
             every { remote.openChatStream(any(), any(), any()) } returns flow { throw SessionConflictException() }
             everySuspend { remote.fetchSession("s-1") } returns
-                detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Hello")))
+                detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Hello")), turnRunning = true)
 
             // WHEN
-            val thrown =
-                assertFailsWith<DomainException> {
-                    repository(remote, pollDelayMs = 1000).streamChatTurn("s-1", "Hello").toList()
-                }
+            val events = repository(remote, pollDelayMs = 1000).streamChatTurn("s-1", "Hello").toList()
 
-            // THEN
-            assertTrue(thrown.message!!.contains("timed out"))
+            // THEN — this used to throw. A long answer with tool calls may still be landing, and
+            // telling someone their question failed because we stopped watching is a lie.
+            assertEquals(ChatStreamEvent.StillWorking, events.last())
         }
 
     @Test
@@ -295,6 +297,194 @@ class SessionRepositoryTest {
 
             // THEN
             verifySuspend(VerifyMode.exactly(0)) { remote.fetchSession(any()) }
+        }
+
+    // ---- recovering the right answer ---------------------------------------
+
+    /**
+     * The half of recovery that is easy to get wrong.
+     *
+     * A conversation that has been going a while already ends in an assistant message. "Poll until
+     * an assistant message appears" is satisfied by that one on the first read, a second after the
+     * stream died, while the real answer is still being written. Every test below exists because
+     * the id is what tells the new answer from the old one.
+     */
+    @Test
+    fun `GIVEN a conversation that already has an answer WHEN the stream drops THEN the old answer is not mistaken for the new one`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Three things, in order"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            var polls = 0
+            everySuspend { remote.fetchSession("s-1") } calls {
+                polls++
+                val messages =
+                    mutableListOf(
+                        messageDto("m1", "s-1", "user", "Last week's question"),
+                        messageDto("m2", "s-1", "assistant", "Last week's answer"),
+                        messageDto("m3", "s-1", "user", "What's left before Friday?"),
+                    )
+                if (polls >= 3) {
+                    messages += messageDto("m4", "s-1", "assistant", "The panel review is tomorrow")
+                }
+                detailDto("s-1", messages, turnRunning = polls < 3)
+            }
+
+            // WHEN
+            val events =
+                repository(remote, pollDelayMs = 10)
+                    .streamChatTurn("s-1", "What's left before Friday?", afterAssistantMessageId = "m2")
+                    .toList()
+
+            // THEN
+            val done = events.last() as ChatStreamEvent.Done
+            assertEquals("The panel review is tomorrow", done.assistantContent)
+            assertEquals("m4", done.messageId)
+        }
+
+    @Test
+    fun `GIVEN a conversation with no answers yet WHEN the stream drops THEN the first assistant message is the one`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Well"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(
+                        messageDto("m1", "s-1", "user", "Hello"),
+                        messageDto("m2", "s-1", "assistant", "Hello yourself"),
+                    ),
+                )
+
+            // WHEN
+            val events =
+                repository(remote, pollDelayMs = 10)
+                    .streamChatTurn("s-1", "Hello", afterAssistantMessageId = null)
+                    .toList()
+
+            // THEN
+            assertEquals("Hello yourself", (events.last() as ChatStreamEvent.Done).assistantContent)
+        }
+
+    @Test
+    fun `GIVEN a stream that dies before a single word arrives WHEN a turn is sent THEN nothing is recovered`() =
+        runTest {
+            // GIVEN — nothing was delivered, so the question failed rather than the answer.
+            val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow { throw ServerOfflineException("Stream dropped") }
+
+            // WHEN
+            assertFailsWith<ServerOfflineException> {
+                repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Hello").toList()
+            }
+
+            // THEN
+            verifySuspend(VerifyMode.exactly(0)) { remote.fetchSession(any()) }
+        }
+
+    @Test
+    fun `GIVEN the hub no longer working on the turn and no answer WHEN it is polled THEN the turn is reported failed`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Plan"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(messageDto("m1", "s-1", "user", "Plan meals")),
+                    turnRunning = false,
+                )
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Plan meals").toList()
+
+            // THEN — it stops as soon as it knows, rather than waiting out the full minute.
+            assertEquals(ChatStreamEvent.TurnFailed, events.last())
+        }
+
+    @Test
+    fun `GIVEN a turn still running after a minute WHEN it is polled THEN the wait ends but the turn does not`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Three things"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(messageDto("m1", "s-1", "user", "What's left before Friday?")),
+                    turnRunning = true,
+                )
+
+            // WHEN
+            val events =
+                repository(remote, pollDelayMs = 1000)
+                    .streamChatTurn("s-1", "What's left before Friday?")
+                    .toList()
+
+            // THEN — never an exception: giving up on waiting is not the answer failing.
+            assertEquals(ChatStreamEvent.StillWorking, events.last())
+        }
+
+    @Test
+    fun `GIVEN the hub busy with this conversation WHEN a turn is sent THEN it waits for the running turn the same way`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns flow { throw SessionConflictException() }
+            var polls = 0
+            everySuspend { remote.fetchSession("s-1") } calls {
+                polls++
+                val messages =
+                    mutableListOf(
+                        messageDto("m1", "s-1", "user", "Hello"),
+                        messageDto("m2", "s-1", "assistant", "An older answer"),
+                    )
+                if (polls >= 2) messages += messageDto("m3", "s-1", "assistant", "Recovered response")
+                detailDto("s-1", messages, turnRunning = polls < 2)
+            }
+
+            // WHEN
+            val events =
+                repository(remote, pollDelayMs = 10)
+                    .streamChatTurn("s-1", "Hello", afterAssistantMessageId = "m2")
+                    .toList()
+
+            // THEN
+            assertEquals("Recovered response", (events.last() as ChatStreamEvent.Done).assistantContent)
+        }
+
+    @Test
+    fun `GIVEN an answer that failed WHEN it is asked for again THEN the question is not sent again`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
+            every { remote.openRegenerateStream(any()) } returns
+                flowOf(ChatStreamEvent.Done(messageId = "m9", assistantContent = "A fresh answer"))
+
+            // WHEN
+            val events = repository(remote).regenerateTurn("s-1").toList()
+
+            // THEN
+            assertEquals("A fresh answer", (events.last() as ChatStreamEvent.Done).assistantContent)
+            verify(VerifyMode.exactly(0)) { remote.openChatStream(any(), any(), any()) }
         }
 
     // ---- retrying ----------------------------------------------------------

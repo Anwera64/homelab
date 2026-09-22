@@ -16,6 +16,9 @@ object SessionDataMapper {
             isSecretLocked = false,
             createdAt = dto.created_at,
             updatedAt = dto.updated_at,
+            lastMessagePreview = dto.last_message_preview,
+            agentName = dto.agent_name,
+            agentAvatar = dto.agent_avatar,
         )
 
     fun toDomain(dto: SessionDetailReadDto): ConversationSession =
@@ -29,5 +32,6 @@ object SessionDataMapper {
             isSecretLocked = false,
             createdAt = dto.created_at,
             updatedAt = dto.updated_at,
+            turnRunning = dto.turn_running,
         )
 }

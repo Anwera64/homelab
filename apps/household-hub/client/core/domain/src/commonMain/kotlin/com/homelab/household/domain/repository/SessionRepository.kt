@@ -25,10 +25,30 @@ interface SessionRepository {
 
     suspend fun deleteSession(sessionId: String)
 
+    /**
+     * Sends a turn and follows it to an end, whatever kind of end it turns out to be.
+     *
+     * [afterAssistantMessageId] is the newest assistant message the caller already has, and it is
+     * what makes recovery possible. When a stream dies part-way the hub keeps generating, so the
+     * answer has to be fetched afterwards — but the transcript already holds the *previous*
+     * answer, and "the last assistant message" matches that one immediately. Polling for an id
+     * that is not this one is the difference between waiting for the real answer and handing back
+     * something the person read ten minutes ago. Null means the conversation has no answers yet,
+     * so any assistant message is new.
+     */
     fun streamChatTurn(
         sessionId: String,
         content: String,
         autoApproveWrites: Boolean = false,
+        afterAssistantMessageId: String? = null,
+    ): Flow<ChatStreamEvent>
+
+    /**
+     * Asks for a fresh answer to the question already in the conversation, without asking it again.
+     */
+    fun regenerateTurn(
+        sessionId: String,
+        afterAssistantMessageId: String? = null,
     ): Flow<ChatStreamEvent>
 
     suspend fun approveToolProposal(
