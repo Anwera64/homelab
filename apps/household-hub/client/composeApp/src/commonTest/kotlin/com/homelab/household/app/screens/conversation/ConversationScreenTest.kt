@@ -1,16 +1,28 @@
 package com.homelab.household.app.screens.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import com.homelab.household.app.components.NOT_SENT_GLYPH_TAG
+import com.homelab.household.app.components.RETRY_GLYPH_TAG
+import com.homelab.household.app.components.SENT_GLYPH_TAG
+import com.homelab.household.app.components.THINKING_DOTS_TAG
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.conversation_composer_leave
 import com.homelab.household.app.resources.conversation_composer_waiting
@@ -18,15 +30,24 @@ import com.homelab.household.app.resources.conversation_failed_line
 import com.homelab.household.app.resources.conversation_failed_title
 import com.homelab.household.app.resources.conversation_not_sent
 import com.homelab.household.app.resources.conversation_reconnecting
+import com.homelab.household.app.resources.conversation_reconnecting_detail
 import com.homelab.household.app.resources.conversation_retry
+import com.homelab.household.app.resources.conversation_sent
 import com.homelab.household.app.resources.conversation_still_working
+import com.homelab.household.app.resources.conversation_still_working_detail
+import com.homelab.household.app.resources.conversation_thinking
+import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.resources.tool_calendar_read_done
+import com.homelab.household.app.resources.tool_calendar_read_failed
+import com.homelab.household.app.resources.tool_calendar_read_running
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * A conversation, in each of the four ways a turn can end.
@@ -216,6 +237,162 @@ class ConversationScreenTest {
             onNode(hasSetTextAction()).assertTextContains("Hi")
         }
 
+    /**
+     * The silence between sending and the first word, which is the longest in the app: a model
+     * being loaded into memory, or one that thinks before it writes. It used to be an empty bubble
+     * and nothing else, which reads as nothing having happened at all.
+     */
+    @Test
+    fun before_the_first_word_arrives_the_screen_says_it_is_thinking() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thinking)).assertIsDisplayed()
+        }
+
+    @Test
+    fun the_first_word_takes_the_dots_place() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Answering")))
+
+            // Words are their own sign that something is happening; two at once is noise.
+            onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
+            onNodeWithText("Three things, in order of how much ", substring = true).assertIsDisplayed()
+        }
+
+    // ---- a turn you can watch ----------------------------------------------
+
+    @Test
+    fun the_newest_question_says_it_was_sent() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished exchange")))
+
+            onNodeWithText(getString(Res.string.conversation_sent)).assertIsDisplayed()
+        }
+
+    /**
+     * The check beside "Sent", seen by day and at night.
+     *
+     * The canvas drew it and the first build left it out, which on a dark phone read as a glyph
+     * that had vanished. Measured from the rendered pixels rather than read off the code: 3:1 is
+     * the floor for a graphic that carries meaning.
+     */
+    @Test
+    fun the_sent_check_can_be_seen_by_day_and_at_night() {
+        listOf(false, true).forEach { night ->
+            runComposeUiTest {
+                setContent {
+                    StillTheme(darkTheme = night) {
+                        ConversationContent(
+                            state = stateNamed("A finished exchange"),
+                            onComposerTextChange = {},
+                            onSend = {},
+                            onRetry = {},
+                            onTryAgain = {},
+                            onBack = {},
+                        )
+                    }
+                }
+
+                val contrast = contrastWithin(onNodeWithTag(SENT_GLYPH_TAG).captureToImage().toPixelMap())
+
+                val theme = if (night) "at night" else "by day"
+                assertTrue(contrast >= 3.0, "the check reads at only $contrast:1 $theme")
+            }
+        }
+    }
+
+    /** The contrast between the lightest and darkest pixels of an image: ink against its ground. */
+    private fun contrastWithin(pixels: PixelMap): Double {
+        var darkest = 1f
+        var lightest = 0f
+        for (x in 0 until pixels.width) {
+            for (y in 0 until pixels.height) {
+                val luminance = pixels[x, y].luminance()
+                darkest = minOf(darkest, luminance)
+                lightest = maxOf(lightest, luminance)
+            }
+        }
+        return (lightest + 0.05) / (darkest + 0.05)
+    }
+
+    @Test
+    fun a_question_that_never_landed_does_not_claim_to_have_been_sent() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            onNodeWithText(getString(Res.string.conversation_sent)).assertDoesNotExist()
+        }
+
+    @Test
+    fun while_an_answer_is_being_written_the_composer_says_it_is_waiting() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            // It used to keep its idle words while refusing every send, which read as broken.
+            onNodeWithText(getString(Res.string.conversation_composer_waiting)).assertIsDisplayed()
+        }
+
+    /**
+     * A model's thoughts stream far faster than anyone reads, so showing them was a blur of
+     * letters. The screen says it is thinking, and nothing more.
+     */
+    @Test
+    fun a_model_thinking_shows_only_the_status() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking out loud")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thinking)).assertIsDisplayed()
+            onNodeWithText("the user is asking", substring = true).assertDoesNotExist()
+            onNodeWithText("list the events in order", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun a_tool_is_named_in_words_while_it_runs() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Using a tool")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_running)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thought, 3)).assertIsDisplayed()
+            onNodeWithText("calendar_read", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun the_trail_sits_above_an_answer_as_it_arrives() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("The answer arrives, with its trail")))
+
+            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_finished_answer_keeps_its_trail() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished answer and its trail")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+        }
+
+    @Test
+    fun a_tool_that_could_not_run_says_so_in_the_trail() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A tool that couldn't run")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_failed)).assertIsDisplayed()
+        }
+
+    /** A failed turn has a card of its own to show; the dots would say it was still coming. */
+    @Test
+    fun an_answer_that_failed_shows_no_dots() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("The answer failed")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
+        }
+
     @Test
     fun every_previewed_state_draws() {
         provider.values.toList().forEach { state ->
@@ -225,5 +402,88 @@ class ConversationScreenTest {
                 onNodeWithText("Home Coordinator").assertIsDisplayed()
             }
         }
+    }
+
+    // ---- a question that never landed ----------------------------------------
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN it carries the error glyph and a retry glyph`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            onNodeWithTag(NOT_SENT_GLYPH_TAG, useUnmergedTree = true).assertExists()
+            onNodeWithTag(RETRY_GLYPH_TAG, useUnmergedTree = true).assertExists()
+        }
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN Retry sits on the same line after Not sent`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            val status = onNodeWithText(getString(Res.string.conversation_not_sent)).getUnclippedBoundsInRoot()
+            val retry =
+                onNodeWithText(getString(Res.string.conversation_retry), useUnmergedTree = true)
+                    .getUnclippedBoundsInRoot()
+            val statusMiddle = (status.top + status.bottom) / 2
+            val retryMiddle = (retry.top + retry.bottom) / 2
+            assertTrue((statusMiddle - retryMiddle).value in -1f..1f, "one line, not stacked")
+            assertTrue(retry.left > status.right, "Retry follows the status")
+        }
+
+    @Test
+    fun `GIVEN a question that never landed WHEN it is shown THEN Retry is still a full touch target`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Never reached the hub")))
+
+            // A quiet link to look at, but a thumb still needs the whole 48.
+            val retry = onNodeWithText(getString(Res.string.conversation_retry)).getUnclippedBoundsInRoot()
+            assertTrue(retry.bottom - retry.top >= 48.dp, "was ${retry.bottom - retry.top}")
+        }
+
+    // ---- how a waiting status is laid out -------------------------------------
+
+    @Test
+    fun `GIVEN a model thinking WHEN the dots show THEN the word sits under them`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking, before the first word")))
+
+            val dots = onNodeWithTag(THINKING_DOTS_TAG).getUnclippedBoundsInRoot()
+            val word =
+                onNodeWithText(getString(Res.string.conversation_thinking), useUnmergedTree = true)
+                    .getUnclippedBoundsInRoot()
+            assertEquals(dots.left, word.left, "the word starts where the dots do")
+            assertTrue(word.top > dots.top, "the word is below the dots, not beside them")
+        }
+
+    @Test
+    fun `GIVEN a dropped stream WHEN it reconnects THEN the detail sits under the label`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Stream dropped, reconnecting")))
+
+            assertStacked(
+                label = getString(Res.string.conversation_reconnecting),
+                detail = getString(Res.string.conversation_reconnecting_detail),
+            )
+        }
+
+    @Test
+    fun `GIVEN a turn past a minute WHEN it is still working THEN the detail sits under the label`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Still working after a minute")))
+
+            assertStacked(
+                label = getString(Res.string.conversation_still_working),
+                detail = getString(Res.string.conversation_still_working_detail),
+            )
+        }
+
+    private fun ComposeUiTest.assertStacked(
+        label: String,
+        detail: String,
+    ) {
+        val top = onNodeWithText(label).getUnclippedBoundsInRoot()
+        val under = onNodeWithText(detail).getUnclippedBoundsInRoot()
+        assertEquals(top.left, under.left, "label and detail share a left edge")
+        assertTrue(under.top >= top.bottom, "the detail is on its own row, under the label")
     }
 }

@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,9 @@ from app.domain.exceptions import (
     ZeroLeakViolationException,
     InvalidOperationException,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -326,7 +330,10 @@ class ProcessChatTurnUseCase:
             (last_message.metadata_json or {}).get("privacy_trigger_detected", False)
         )
 
-        async for event in self._stream_answer(
+        # The question was written down long ago, so there is nothing to wait for before saying so.
+        yield {"type": "accepted"}
+
+        async for event in self._answer_or_say_it_failed(
             session=session,
             agent=agent,
             current_user=current_user,
@@ -359,9 +366,14 @@ class ProcessChatTurnUseCase:
             await self.session_repo.update(session)
             await self.uow.commit()
 
+        # The earliest honest thing to tell the phone. From here on the question is on the hub, so
+        # whatever breaks is the answer's problem, never the question's - and the phone stops
+        # offering to send it again.
+        yield {"type": "accepted"}
+
         recent_messages = await self.session_repo.get_messages(session.id, limit=30)
 
-        async for event in self._stream_answer(
+        async for event in self._answer_or_say_it_failed(
             session=session,
             agent=agent,
             current_user=current_user,
@@ -370,6 +382,47 @@ class ProcessChatTurnUseCase:
             auto_approve_writes=auto_approve_writes,
         ):
             yield event
+
+    async def _answer_or_say_it_failed(self, **kwargs):
+        """
+        [_stream_answer], and the one ending it cannot reach on its own.
+
+        By the time this runs the question is on the hub — both callers write it down first, and
+        regenerating reads one that was written down long ago. So a model that dies here has lost
+        the answer and nothing else, and that is a different sentence on screen from a question
+        that never arrived: this one offers a fresh answer, the other offers to send it again.
+        Telling someone the wrong one is what sends them into asking twice.
+
+        A turn refused before any of that — an archived conversation, an agent in the trash, a
+        session that is not yours — raises out of `_open_turn` instead and never reaches here.
+        """
+        session = kwargs["session"]
+        try:
+            async for event in self._stream_answer(**kwargs):
+                yield event
+        except Exception as exc:
+            logger.error(
+                "Answer failed for session %s: %s", session.id, exc, exc_info=True
+            )
+            yield {"type": "turn_failed", "error": str(exc)}
+
+    @staticmethod
+    async def _relay(stream, final_content_parts: List[str], tool_calls: Optional[List[LLMToolCall]] = None):
+        """
+        One model stream, turned into what the phone is sent.
+
+        Reasoning goes out as it arrives and is never kept: it is worth watching and worth nothing
+        afterwards, so it stays out of `final_content_parts` and out of the saved answer. Words go
+        out and are kept. Tool calls are collected for the caller when it asks for them.
+        """
+        async for chunk in stream:
+            if chunk.delta_reasoning:
+                yield {"type": "reasoning", "content": chunk.delta_reasoning}
+            if chunk.delta_content:
+                final_content_parts.append(chunk.delta_content)
+                yield {"type": "delta", "content": chunk.delta_content}
+            if tool_calls is not None and chunk.tool_calls:
+                tool_calls.extend(chunk.tool_calls)
 
     async def _stream_answer(
         self,
@@ -416,16 +469,17 @@ class ProcessChatTurnUseCase:
         iterations = 0
 
         if not agent_tools:
-            async for chunk in self.llm_client.stream_chat_completion(
-                messages=llm_messages,
-                model=agent.model_alias or "qwen3:14b",
-                temperature=agent.temperature,
-                top_p=agent.top_p,
-                tools=None,
+            async for event in self._relay(
+                self.llm_client.stream_chat_completion(
+                    messages=llm_messages,
+                    model=agent.model_alias or "qwen3:14b",
+                    temperature=agent.temperature,
+                    top_p=agent.top_p,
+                    tools=None,
+                ),
+                final_content_parts,
             ):
-                if chunk.delta_content:
-                    final_content_parts.append(chunk.delta_content)
-                    yield {"type": "delta", "content": chunk.delta_content}
+                yield event
         else:
             while iterations < self.max_iterations:
                 iterations += 1
@@ -437,37 +491,50 @@ class ProcessChatTurnUseCase:
                             content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
                         )
                     )
-                    async for chunk in self.llm_client.stream_chat_completion(
+                    async for event in self._relay(
+                        self.llm_client.stream_chat_completion(
+                            messages=llm_messages,
+                            model=agent.model_alias or "qwen3:14b",
+                            temperature=agent.temperature,
+                            top_p=agent.top_p,
+                            tools=None,
+                        ),
+                        final_content_parts,
+                    ):
+                        yield event
+                    break
+
+                # Streamed rather than blocking. A blocking call sends nothing back until the whole
+                # response exists, so a thinking model deciding on a tool used to hold the socket
+                # silent until it timed out, and an agent with tools answered in one lump at the end.
+                # Ollama sends a tool call whole, in one chunk, so it is simply collected.
+                decision_starts_at = len(final_content_parts)
+                tool_calls: List[LLMToolCall] = []
+                async for event in self._relay(
+                    self.llm_client.stream_chat_completion(
                         messages=llm_messages,
                         model=agent.model_alias or "qwen3:14b",
                         temperature=agent.temperature,
                         top_p=agent.top_p,
-                        tools=None,
-                    ):
-                        if chunk.delta_content:
-                            final_content_parts.append(chunk.delta_content)
-                            yield {"type": "delta", "content": chunk.delta_content}
-                    break
+                        tools=agent_tools,
+                    ),
+                    final_content_parts,
+                    tool_calls,
+                ):
+                    yield event
 
-                resp = await self.llm_client.chat_completion(
-                    messages=llm_messages,
-                    model=agent.model_alias or "qwen3:14b",
-                    temperature=agent.temperature,
-                    top_p=agent.top_p,
-                    tools=agent_tools if agent_tools else None,
-                )
-
-                if not resp.tool_calls:
-                    if resp.content:
-                        final_content_parts.append(resp.content)
-                        yield {"type": "delta", "content": resp.content}
+                if not tool_calls:
                     break
 
                 llm_messages.append(
-                    LLMMessage(role="assistant", content=resp.content, tool_calls=resp.tool_calls)
+                    LLMMessage(
+                        role="assistant",
+                        content="".join(final_content_parts[decision_starts_at:]),
+                        tool_calls=tool_calls,
+                    )
                 )
 
-                for tc in resp.tool_calls:
+                for tc in tool_calls:
                     if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
                         proposal_info = {
                             "tool": tc.name,
@@ -516,16 +583,17 @@ class ProcessChatTurnUseCase:
                         )
 
                 # After executing tools, stream final synthesis to the user
-                async for chunk in self.llm_client.stream_chat_completion(
-                    messages=llm_messages,
-                    model=agent.model_alias or "qwen3:14b",
-                    temperature=agent.temperature,
-                    top_p=agent.top_p,
-                    tools=None,
+                async for event in self._relay(
+                    self.llm_client.stream_chat_completion(
+                        messages=llm_messages,
+                        model=agent.model_alias or "qwen3:14b",
+                        temperature=agent.temperature,
+                        top_p=agent.top_p,
+                        tools=None,
+                    ),
+                    final_content_parts,
                 ):
-                    if chunk.delta_content:
-                        final_content_parts.append(chunk.delta_content)
-                        yield {"type": "delta", "content": chunk.delta_content}
+                    yield event
                 break
 
         final_content = "".join(final_content_parts)

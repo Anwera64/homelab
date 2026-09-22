@@ -54,6 +54,8 @@ class HearthIconsTest {
             "chevronRight",
             // Sign in: the PIN pad's delete key, drawn on the PIN artboard rather than the sheet
             "delete",
+            // The receipt under a question the hub has, drawn on the Chat Turn States canvas
+            "sent",
         )
 
     private val solidShapeCounts =

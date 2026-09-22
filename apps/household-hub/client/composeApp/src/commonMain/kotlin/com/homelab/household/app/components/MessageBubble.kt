@@ -58,37 +58,24 @@ fun MessageBubble(
 /**
  * The line that sits where an answer stopped.
  *
- * Inline rather than in a row of its own, and at the end of the text rather than the foot of the
- * screen: that is where the eye already is when the words stop arriving.
+ * At the end of the text rather than the foot of the screen: that is where the eye already is
+ * when the words stop arriving. The label says what is happening and the detail, on the row
+ * beneath it, says what that means for you.
  */
 @Composable
 fun TurnStatusLine(
     label: String,
-    detail: String?,
+    detail: String,
     modifier: Modifier = Modifier,
-    tone: TurnStatusTone = TurnStatusTone.Working,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
-    val labelColour =
-        when (tone) {
-            TurnStatusTone.Working -> colors.textMuted
-            TurnStatusTone.Wrong -> colors.error
-        }
 
-    Row(
+    Column(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs),
     ) {
-        Text(text = label, style = type.labelStrong, color = labelColour)
-        if (detail != null) {
-            Text(text = detail, style = type.caption, color = colors.textMuted)
-        }
+        Text(text = label, style = type.labelStrong, color = colors.textMuted)
+        Text(text = detail, style = type.caption, color = colors.textMuted)
     }
-}
-
-enum class TurnStatusTone {
-    Working,
-    Wrong,
 }

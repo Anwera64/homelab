@@ -6,6 +6,7 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
 
 /**
@@ -51,6 +52,53 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             question,
                             said("m-2", "The panel review is tomorrow at 14:30.", MessageRole.ASSISTANT),
                         ),
+                ),
+            // Sent, and nothing back yet: the model is being loaded or is thinking. The longest
+            // silence in the app, and the one that used to draw an empty bubble.
+            "Thinking, before the first word" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                ),
+            // The rest of a turn you can watch, frame by frame as the Chat Turn States canvas draws it.
+            "Thinking out loud" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                    isThinking = true,
+                ),
+            "Using a tool" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "",
+                    turnState = TurnState.Streaming,
+                    activeTool = "calendar_read",
+                    trail = listOf(TurnRecord.Thought(3)),
+                ),
+            "The answer arrives, with its trail" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "Tomorrow's fairly light. The panel review at 14:30 is the only fixed",
+                    turnState = TurnState.Streaming,
+                    trail = listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")),
+                ),
+            "A finished answer and its trail" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            question,
+                            said("m-2", "Tomorrow's fairly light. Nothing in the evening.", MessageRole.ASSISTANT),
+                        ),
+                    trails = mapOf("m-2" to listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read"))),
+                ),
+            "A tool that couldn't run" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "I couldn't reach your calendar just now, so I can't say for certain.",
+                    turnState = TurnState.Streaming,
+                    trail = listOf(TurnRecord.Thought(2), TurnRecord.ToolFailed("calendar_read")),
                 ),
             "Answering" to
                 agent.copy(

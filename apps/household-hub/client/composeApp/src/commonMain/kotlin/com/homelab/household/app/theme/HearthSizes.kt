@@ -40,6 +40,14 @@ data class HearthSizes(
     /** One of the six dots over the PIN pad. */
     val pinDot: Dp = 16.dp,
     /**
+     * One of the three dots an agent thinks behind, before its first word.
+     *
+     * Smaller than [pinDot], which stands alone on a fixed-shape screen: these sit inside a
+     * message bubble beside text, and at the PIN pad's size they read as content rather than as
+     * an answer on its way.
+     */
+    val thinkingDot: Dp = 6.dp,
+    /**
      * One caption line, held open whether or not there are words in it. A fixed-shape screen
      * cannot let a line arriving shove what is under it, so the PIN pad reserves this much.
      */

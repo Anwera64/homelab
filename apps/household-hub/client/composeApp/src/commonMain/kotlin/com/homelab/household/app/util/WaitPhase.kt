@@ -52,9 +52,11 @@ fun waitPhase(
  * - once a pattern is on show it stays for `motion.minimumVisible` after the answer arrives, which
  *   is what stops a hub replying at 260 ms from flashing a skeleton for a single frame.
  *
- * Under `StillMotion` it short-circuits to [busy] with no delay pending at all. That is not only
- * for speed: a Compose UI test synchronises on idleness, and a coroutine parked on a `delay` under
- * a virtual-time scheduler either holds the test open or fast-forwards it into [WaitPhase.Slow].
+ * Under `StillMotion` it short-circuits to [busy] with no delay pending at all, and answers on the
+ * first frame rather than from an effect. That is not only for speed: a Compose UI test
+ * synchronises on idleness, and a coroutine parked on a `delay` under a virtual-time scheduler
+ * either holds the test open or fast-forwards it into [WaitPhase.Slow]; and a static preview draws
+ * only the first frame, so a wait decided in an effect would never appear in one.
  */
 @Composable
 fun rememberWaitPhase(busy: Boolean): WaitPhase {
@@ -63,10 +65,7 @@ fun rememberWaitPhase(busy: Boolean): WaitPhase {
     var shownAt by remember { mutableStateOf<TimeMark?>(null) }
 
     LaunchedEffect(busy, motion) {
-        if (!motion.animate) {
-            phase = if (busy) WaitPhase.Showing else WaitPhase.Hidden
-            return@LaunchedEffect
-        }
+        if (!motion.animate) return@LaunchedEffect
 
         if (busy) {
             val started = TimeSource.Monotonic.markNow()
@@ -92,5 +91,6 @@ fun rememberWaitPhase(busy: Boolean): WaitPhase {
         }
     }
 
+    if (!motion.animate) return if (busy) WaitPhase.Showing else WaitPhase.Hidden
     return phase
 }

@@ -6,7 +6,9 @@ import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -74,10 +76,21 @@ class DefensiveSseStreamReader(
                 ChatStreamEvent.ToolExecuting(tool = tool)
             }
 
+            "accepted" -> {
+                ChatStreamEvent.Accepted
+            }
+
+            "reasoning" -> {
+                ChatStreamEvent.Reasoning(element["content"]?.jsonPrimitive?.content ?: "")
+            }
+
             "tool_result" -> {
-                val tool = element["tool"]?.jsonPrimitive?.content ?: ""
-                val success = element["success"]?.jsonPrimitive?.booleanOrNull ?: true
-                val error = element["error"]?.jsonPrimitive?.content
+                // The hub puts the outcome inside `data`. Reading it from the top level, as this
+                // did, made every tool nameless and every failure a success.
+                val outcome = element["data"] as? JsonObject ?: element
+                val tool = outcome["tool"]?.jsonPrimitive?.content ?: ""
+                val success = outcome["success"]?.jsonPrimitive?.booleanOrNull ?: true
+                val error = outcome["error"]?.jsonPrimitive?.contentOrNull
                 ChatStreamEvent.ToolResult(tool = tool, success = success, error = error)
             }
 
@@ -85,6 +98,17 @@ class DefensiveSseStreamReader(
                 val tool = element["tool"]?.jsonPrimitive?.content ?: ""
                 val message = element["message"]?.jsonPrimitive?.content ?: ""
                 ChatStreamEvent.ToolApprovalProposal(tool = tool, message = message)
+            }
+
+            // The two ways the hub says a turn went wrong. Dropping these as unknown types is
+            // what left a failed turn looking exactly like one that had not started yet.
+            "turn_failed" -> {
+                ChatStreamEvent.TurnFailed
+            }
+
+            "error" -> {
+                val message = element["error"]?.jsonPrimitive?.content ?: ""
+                ChatStreamEvent.StreamError(message)
             }
 
             "done" -> {

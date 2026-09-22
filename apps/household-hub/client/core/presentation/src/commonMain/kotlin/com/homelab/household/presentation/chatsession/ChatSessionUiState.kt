@@ -29,6 +29,27 @@ sealed interface TurnState {
     data object Failed : TurnState
 }
 
+/**
+ * One line of the trail an answer leaves above itself: what the agent did on the way to it.
+ *
+ * Tools keep the backend's name here; turning it into words for a person is the screen's job, so
+ * no raw identifier reaches anyone (design notes §2).
+ */
+sealed interface TurnRecord {
+    /** Every stretch of thinking in the turn, summed — one record however often it stopped to think. */
+    data class Thought(
+        val seconds: Int,
+    ) : TurnRecord
+
+    data class ToolDone(
+        val tool: String,
+    ) : TurnRecord
+
+    data class ToolFailed(
+        val tool: String,
+    ) : TurnRecord
+}
+
 data class ChatSessionUiState(
     val isLoading: Boolean = false,
     val session: ConversationSession? = null,
@@ -44,6 +65,20 @@ data class ChatSessionUiState(
      */
     val composerText: String = "",
     val turnState: TurnState = TurnState.Idle,
+    /**
+     * Whether the model is thinking before it writes or picks a tool. Only the fact of it: its
+     * thoughts stream faster than anyone can read, so the phone never keeps a word of them.
+     */
+    val isThinking: Boolean = false,
+    /** The tool running right now, by its backend name. */
+    val activeTool: String? = null,
+    /** What the turn being answered has done so far. */
+    val trail: List<TurnRecord> = emptyList(),
+    /**
+     * Each finished answer's trail, by message id. Kept apart from the messages so the trail stays
+     * above its answer once the turn is done, rather than vanishing the moment the words land.
+     */
+    val trails: Map<String, List<TurnRecord>> = emptyMap(),
     /**
      * Who is answering. Held on the state rather than read off the session, because a chat that
      * has not been created yet still has an agent to name — the hero greeting is drawn before
@@ -69,6 +104,20 @@ data class ChatSessionUiState(
                 TurnState.Streaming, TurnState.Reconnecting, TurnState.StillWorking -> false
                 TurnState.Idle, TurnState.Failed -> true
             }
+
+    /**
+     * Waiting on a turn that has said nothing at all yet: no word, no thought, no tool.
+     *
+     * The only wait worth calling slow. A model loading into memory is silent; a model visibly
+     * thinking or using a tool is not slow, it is busy, and saying otherwise would be untrue.
+     */
+    val isSilent: Boolean
+        get() =
+            turnState == TurnState.Streaming &&
+                streamingMessage.isNullOrEmpty() &&
+                !isThinking &&
+                activeTool == null &&
+                trail.isEmpty()
 
     /** A conversation nobody has spoken in yet: the hero greeting rather than a transcript. */
     val isNew: Boolean

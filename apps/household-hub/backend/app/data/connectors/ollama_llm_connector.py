@@ -163,10 +163,12 @@ class OllamaLLMConnector(ILLMClient):
                             choice = chunk_data.get("choices", [{}])[0]
                             delta = choice.get("delta", {})
                             content_delta = delta.get("content") or ""
+                            reasoning_delta = delta.get("reasoning") or ""
                             tool_calls = self._parse_tool_calls(delta.get("tool_calls"))
                             finish_reason = choice.get("finish_reason")
                             yield LLMResponseChunk(
                                 delta_content=content_delta,
+                                delta_reasoning=reasoning_delta,
                                 tool_calls=tool_calls,
                                 finish_reason=finish_reason,
                             )

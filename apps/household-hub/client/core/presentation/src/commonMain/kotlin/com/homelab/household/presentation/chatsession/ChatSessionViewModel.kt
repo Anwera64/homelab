@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToLong
+import kotlin.time.Duration
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 class ChatSessionViewModel(
     private val streamChatTurnUseCase: StreamChatTurnUseCase,
@@ -33,6 +37,8 @@ class ChatSessionViewModel(
     private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
+    /** Times the thinking for the trail's "Thought for N s". Injected so a test can move it. */
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatSessionUiState())
     val uiState: StateFlow<ChatSessionUiState> = _uiState.asStateFlow()
@@ -170,12 +176,9 @@ class ChatSessionViewModel(
 
         // The message is on its way, so the composer lets go of it — and not a moment earlier.
         _uiState.update {
-            it.copy(
+            it.startingTurn().copy(
                 messages = it.messages + userMsg,
-                streamingMessage = "",
-                turnState = TurnState.Streaming,
                 composerText = "",
-                errorMessage = null,
             )
         }
 
@@ -202,7 +205,7 @@ class ChatSessionViewModel(
         val currentSession = _uiState.value.session ?: return
         if (_uiState.value.turnState != TurnState.Failed) return
 
-        _uiState.update { it.copy(streamingMessage = "", turnState = TurnState.Streaming, errorMessage = null) }
+        _uiState.update { it.startingTurn() }
 
         follow(
             turn =
@@ -234,6 +237,23 @@ class ChatSessionViewModel(
             var accumulated = ""
             var delivered = false
 
+            // Thinking is timed from the first thought of each stretch to whatever ends it — a
+            // tool, the first word, the end of the turn — and summed across the turn.
+            var thinkingSince: TimeMark? = null
+            var thought = Duration.ZERO
+            val tools = mutableListOf<TurnRecord>()
+
+            fun stopThinking() {
+                thinkingSince?.let { thought += it.elapsedNow() }
+                thinkingSince = null
+            }
+
+            fun trail(): List<TurnRecord> =
+                buildList {
+                    if (thought > Duration.ZERO) add(TurnRecord.Thought(thought.toShownSeconds()))
+                    addAll(tools)
+                }
+
             turn
                 .catch { e ->
                     if (delivered) {
@@ -260,10 +280,51 @@ class ChatSessionViewModel(
                     }
                 }.collect { event ->
                     when (event) {
+                        // The hub has the question. The receipt says so now rather than when the
+                        // answer lands, which on a cold model can be a minute away.
+                        is ChatStreamEvent.Accepted -> {
+                            delivered = true
+                            _uiState.update { state ->
+                                state.copy(
+                                    messages =
+                                        state.messages.map { msg ->
+                                            if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
+                                        },
+                                )
+                            }
+                        }
+
+                        is ChatStreamEvent.Reasoning -> {
+                            if (thinkingSince == null) thinkingSince = timeSource.markNow()
+                            _uiState.update { it.copy(isThinking = true) }
+                        }
+
+                        is ChatStreamEvent.ToolExecuting -> {
+                            stopThinking()
+                            _uiState.update { it.copy(activeTool = event.tool, isThinking = false, trail = trail()) }
+                        }
+
+                        is ChatStreamEvent.ToolResult -> {
+                            tools +=
+                                when {
+                                    event.success -> TurnRecord.ToolDone(event.tool)
+                                    else -> TurnRecord.ToolFailed(event.tool)
+                                }
+                            _uiState.update { it.copy(activeTool = null, trail = trail()) }
+                        }
+
                         is ChatStreamEvent.Delta -> {
                             delivered = true
+                            if (accumulated.isEmpty()) stopThinking()
                             accumulated += event.content
-                            _uiState.update { it.copy(streamingMessage = accumulated, turnState = TurnState.Streaming) }
+                            _uiState.update {
+                                it.copy(
+                                    streamingMessage = accumulated,
+                                    turnState = TurnState.Streaming,
+                                    isThinking = false,
+                                    trail = trail(),
+                                )
+                            }
                         }
 
                         is ChatStreamEvent.ToolApprovalProposal -> {
@@ -279,6 +340,8 @@ class ChatSessionViewModel(
                                     content = event.assistantContent,
                                     status = MessageStatus.SENT,
                                 )
+                            stopThinking()
+                            val finished = trail()
                             _uiState.update { state ->
                                 state.copy(
                                     streamingMessage = null,
@@ -287,6 +350,16 @@ class ChatSessionViewModel(
                                         state.messages.map { msg ->
                                             if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
                                         } + assistantMsg,
+                                    isThinking = false,
+                                    activeTool = null,
+                                    trail = emptyList(),
+                                    trails =
+                                        if (finished.isEmpty()) {
+                                            state.trails
+                                        } else {
+                                            state.trails +
+                                                (event.messageId to finished)
+                                        },
                                 )
                             }
                         }
@@ -301,7 +374,15 @@ class ChatSessionViewModel(
                         }
 
                         is ChatStreamEvent.TurnFailed -> {
-                            _uiState.update { it.copy(turnState = TurnState.Failed) }
+                            stopThinking()
+                            _uiState.update {
+                                it.copy(
+                                    turnState = TurnState.Failed,
+                                    isThinking = false,
+                                    activeTool = null,
+                                    trail = trail(),
+                                )
+                            }
                         }
 
                         else -> {}
@@ -343,3 +424,17 @@ class ChatSessionViewModel(
         }
     }
 }
+
+/** A new turn: nothing is carried over from the last one's thinking, tools or failure. */
+private fun ChatSessionUiState.startingTurn() =
+    copy(
+        streamingMessage = "",
+        turnState = TurnState.Streaming,
+        errorMessage = null,
+        isThinking = false,
+        activeTool = null,
+        trail = emptyList(),
+    )
+
+/** Whole seconds, and never zero: a turn that thought at all thought for "1 s", not "0 s". */
+private fun Duration.toShownSeconds(): Int = maxOf(1L, (inWholeMilliseconds / 1000.0).roundToLong()).toInt()

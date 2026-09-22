@@ -150,3 +150,45 @@ async def test_ollama_connector_error_handling():
         await connector_timeout.chat_completion(messages=[LLMMessage(role="user", content="Hi")], model="qwen3:14b")
     assert "timed out" in str(exc_info2.value).lower()
     await connector_timeout.close()
+
+
+@pytest.mark.asyncio
+async def test_a_thinking_model_s_reasoning_is_kept_rather_than_thrown_away():
+    """
+    Qwen3 puts its thinking in `reasoning`, not `content` — measured against the real Ollama, 370
+    of a tool call's 372 chunks were reasoning and none was content. Reading only `content` threw
+    every one of them away, so the phone saw nothing at all for as long as the model thought.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sse_lines = (
+            'data: {"choices": [{"delta": {"reasoning": "Okay, the user wants"}}]}\n\n'
+            'data: {"choices": [{"delta": {"reasoning": " tomorrow."}}]}\n\n'
+            'data: {"choices": [{"delta": {"content": "Tomorrow is light."}}]}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, content=sse_lines.encode("utf-8"), headers={"content-type": "text/event-stream"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    connector = OllamaLLMConnector(base_url="http://mock-ollama:11434", client=client)
+
+    chunks = [
+        chunk
+        async for chunk in connector.stream_chat_completion(
+            messages=[LLMMessage(role="user", content="What's on tomorrow?")], model="qwen3:14b"
+        )
+    ]
+
+    assert "".join(c.delta_reasoning for c in chunks) == "Okay, the user wants tomorrow."
+    assert "".join(c.delta_content for c in chunks) == "Tomorrow is light."
+    await connector.close()
+
+
+def test_the_wait_for_the_model_covers_a_cold_load():
+    """
+    Loading qwen3:14b into memory takes 52.6 s on this hub, measured. A 60 s ceiling left seven
+    seconds for everything else, which is why turns timed out; 120 covers the load with room.
+    """
+    from app.core.config import Settings
+
+    assert Settings.model_fields["OLLAMA_TIMEOUT_SECONDS"].default == 120.0
