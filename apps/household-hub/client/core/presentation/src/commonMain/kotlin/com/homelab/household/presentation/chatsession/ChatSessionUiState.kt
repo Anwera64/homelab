@@ -34,6 +34,15 @@ data class ChatSessionUiState(
     val session: ConversationSession? = null,
     val messages: List<ChatMessage> = emptyList(),
     val streamingMessage: String? = null,
+    /**
+     * What is typed but not yet sent.
+     *
+     * It lives here rather than in the composer because only this knows when a message has really
+     * gone. The screen used to clear it the moment Send was tapped, so a send that failed took the
+     * message with it and looked like nothing had happened at all — and nothing typed is ever
+     * cleared (design notes §2).
+     */
+    val composerText: String = "",
     val turnState: TurnState = TurnState.Idle,
     /**
      * Who is answering. Held on the state rather than read off the session, because a chat that

@@ -123,6 +123,10 @@ class ChatSessionViewModel(
         }
     }
 
+    fun composerTextChanged(text: String) {
+        _uiState.update { it.copy(composerText = text) }
+    }
+
     fun sendMessage(
         content: String,
         autoApproveWrites: Boolean = false,
@@ -164,11 +168,13 @@ class ChatSessionViewModel(
                 status = MessageStatus.SENDING,
             )
 
+        // The message is on its way, so the composer lets go of it — and not a moment earlier.
         _uiState.update {
             it.copy(
                 messages = it.messages + userMsg,
                 streamingMessage = "",
                 turnState = TurnState.Streaming,
+                composerText = "",
                 errorMessage = null,
             )
         }

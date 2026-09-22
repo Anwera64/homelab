@@ -450,6 +450,40 @@ class ChatSessionViewModelTest {
             assertEquals("Here is the week.", state.messages.last { it.role == MessageRole.ASSISTANT }.content)
         }
 
+    // ---- what happens to what you typed ------------------------------------
+
+    @Test
+    fun a_message_that_was_taken_leaves_the_composer() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(ChatStreamEvent.Done(messageId = "m-1", assistantContent = "Hello back"))
+
+            viewModel.composerTextChanged("Hi")
+            viewModel.sendMessage("Hi")
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.uiState.value.composerText)
+        }
+
+    @Test
+    fun a_message_that_could_not_be_sent_stays_in_the_composer() =
+        runTest(testDispatcher) {
+            // A brand new chat, and the hub refuses to create one. Nothing typed is ever cleared
+            // (design notes §2): losing the message is worse than the failure that caused it.
+            everySuspend { listAgentsUseCase() } returns emptyList()
+
+            viewModel.open(null)
+            advanceUntilIdle()
+            viewModel.composerTextChanged("Hi")
+            viewModel.sendMessage("Hi")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("Hi", state.composerText)
+            assertNotNull(state.errorMessage, "a send that went nowhere has to say so")
+        }
+
     @Test
     fun trying_again_does_nothing_when_the_turn_did_not_fail() =
         runTest(testDispatcher) {
