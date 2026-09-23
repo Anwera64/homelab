@@ -2,15 +2,20 @@ package com.homelab.household.presentation.chatsession
 
 import app.cash.turbine.test
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
+import com.homelab.household.domain.usecase.GetAgentUseCase
+import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
+import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
@@ -23,6 +28,7 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify
 import dev.mokkery.verify.VerifyMode
+import dev.mokkery.verifySuspend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
@@ -56,6 +62,9 @@ class ChatSessionViewModelTest {
     private val createSessionUseCase = mock<CreateSessionUseCase>(MockMode.autofill)
     private val approveToolProposalUseCase = mock<ApproveToolProposalUseCase>()
     private val toggleSecretModeUseCase = mock<ToggleSecretModeUseCase>()
+    private val getAgentUseCase = mock<GetAgentUseCase>(MockMode.autofill)
+    private val getCurrentUserUseCase = mock<GetCurrentUserUseCase>(MockMode.autofill)
+    private val listHouseholdMembersUseCase = mock<ListHouseholdMembersUseCase>(MockMode.autofill)
 
     private lateinit var viewModel: ChatSessionViewModel
 
@@ -71,6 +80,9 @@ class ChatSessionViewModelTest {
                 regenerateAnswerUseCase = regenerateAnswerUseCase,
                 approveToolProposalUseCase = approveToolProposalUseCase,
                 toggleSecretModeUseCase = toggleSecretModeUseCase,
+                getAgentUseCase = getAgentUseCase,
+                getCurrentUserUseCase = getCurrentUserUseCase,
+                listHouseholdMembersUseCase = listHouseholdMembersUseCase,
             )
     }
 
@@ -84,6 +96,9 @@ class ChatSessionViewModelTest {
             regenerateAnswerUseCase = regenerateAnswerUseCase,
             approveToolProposalUseCase = approveToolProposalUseCase,
             toggleSecretModeUseCase = toggleSecretModeUseCase,
+            getAgentUseCase = getAgentUseCase,
+            getCurrentUserUseCase = getCurrentUserUseCase,
+            listHouseholdMembersUseCase = listHouseholdMembersUseCase,
             timeSource = timeSource,
         )
 
@@ -694,5 +709,156 @@ class ChatSessionViewModelTest {
 
             assertEquals(TurnState.Idle, viewModel.uiState.value.turnState)
             verify(VerifyMode.exactly(0)) { regenerateAnswerUseCase(any(), any()) }
+        }
+
+    // ---- choosing who a new chat talks to ----------------------------------
+
+    private val coordinator =
+        AgentPersonality(
+            id = "agent-coord",
+            slug = "assistant",
+            name = "Home Coordinator",
+            description = "Schedules, meals, keeping the week straight.",
+            avatar = "🏡",
+            systemPrompt = "",
+            isBuiltin = true,
+        )
+
+    private val researcher =
+        AgentPersonality(
+            id = "agent-research",
+            slug = "researcher",
+            name = "Academic Researcher",
+            description = "Papers, references, reading long PDFs properly.",
+            avatar = "📚",
+            systemPrompt = "",
+            toolPermissions = listOf("searxng_search", "pdf_reader"),
+            isBuiltin = true,
+        )
+
+    private val scout =
+        AgentPersonality(
+            id = "agent-scout",
+            slug = "scout",
+            name = "Hardware Scout",
+            avatar = "🔧",
+            systemPrompt = "",
+            ownerId = "user-liam",
+        )
+
+    private fun TestScope.newChatWithAgents(membersListed: Boolean = true) {
+        everySuspend { listAgentsUseCase() } returns listOf(coordinator, researcher, scout)
+        everySuspend { getCurrentUserUseCase() } returns
+            User(id = "user-emma", fullName = "Emma Doyle", isAdmin = true, isActive = true)
+        if (membersListed) {
+            everySuspend { listHouseholdMembersUseCase() } returns
+                listOf(User(id = "user-liam", fullName = "Liam Doyle", isAdmin = false, isActive = true))
+        } else {
+            everySuspend { listHouseholdMembersUseCase() } throws RuntimeException("members down")
+        }
+        viewModel.open(null)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `GIVEN the hub lists agents WHEN a new chat opens THEN every agent is offered and the Coordinator is chosen`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf("agent-coord", "agent-research", "agent-scout"), state.agents.map { it.id })
+            assertEquals(AgentOwner.Member("Liam"), state.agents.last().owner)
+            assertEquals("agent-coord", state.selectedAgentId)
+            assertEquals("Home Coordinator", state.agentName)
+            assertFalse(state.agentsFailed)
+            assertTrue(state.canChangeAgent)
+        }
+
+    @Test
+    fun `GIVEN the members cannot be listed WHEN a new chat opens THEN the agents are still offered`() =
+        runTest(testDispatcher) {
+            newChatWithAgents(membersListed = false)
+
+            val state = viewModel.uiState.value
+            assertEquals(3, state.agents.size)
+            assertEquals(AgentOwner.Unknown, state.agents.last().owner)
+            assertFalse(state.agentsFailed)
+        }
+
+    @Test
+    fun `GIVEN the agent list fails WHEN a new chat opens THEN the Coordinator still greets and the list is marked failed`() =
+        runTest(testDispatcher) {
+            everySuspend { listAgentsUseCase() } throws RuntimeException("agents down")
+            everySuspend { getAgentUseCase("assistant") } returns coordinator
+
+            viewModel.open(null)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state.agentsFailed)
+            assertEquals("agent-coord", state.selectedAgentId)
+            assertEquals("Home Coordinator", state.agentName)
+            assertEquals(listOf("agent-coord"), state.agents.map { it.id })
+            assertNull(state.errorMessage, "a missing list must not block the chat")
+        }
+
+    @Test
+    fun `GIVEN a new chat WHEN another agent is picked THEN the greeting becomes theirs`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+
+            viewModel.selectAgent("agent-research")
+
+            val state = viewModel.uiState.value
+            assertEquals("agent-research", state.selectedAgentId)
+            assertEquals("Academic Researcher", state.agentName)
+            assertEquals("📚", state.agentAvatar)
+            assertEquals("Papers, references, reading long PDFs properly.", state.agentTagline)
+        }
+
+    @Test
+    fun `GIVEN a picked agent WHEN the first message is sent THEN the chat is created with that agent`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+            everySuspend { createSessionUseCase(any(), any(), any()) } returns
+                ConversationSession(id = "s-new", userId = "user-emma", agentId = "agent-research")
+            every { streamChatTurnUseCase("s-new", "Hi", false, any()) } returns
+                flowOf(ChatStreamEvent.Done(messageId = "m-1", assistantContent = "Hello"))
+
+            viewModel.selectAgent("agent-research")
+            viewModel.sendMessage("Hi")
+            advanceUntilIdle()
+
+            verifySuspend { createSessionUseCase("agent-research", any(), any()) }
+            assertFalse(viewModel.uiState.value.canChangeAgent)
+        }
+
+    @Test
+    fun `GIVEN a chat that has started WHEN another agent is picked THEN nothing changes`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            val before = viewModel.uiState.value
+
+            viewModel.selectAgent("agent-research")
+
+            assertEquals(before, viewModel.uiState.value)
+        }
+
+    @Test
+    fun `GIVEN the list failed WHEN asked again THEN the agents arrive and the choice is kept`() =
+        runTest(testDispatcher) {
+            everySuspend { listAgentsUseCase() } throws RuntimeException("agents down")
+            everySuspend { getAgentUseCase("assistant") } returns coordinator
+            viewModel.open(null)
+            advanceUntilIdle()
+
+            everySuspend { listAgentsUseCase() } returns listOf(coordinator, researcher, scout)
+            viewModel.retryAgents()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.agentsFailed)
+            assertEquals(3, state.agents.size)
+            assertEquals("agent-coord", state.selectedAgentId)
         }
 }

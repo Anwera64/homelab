@@ -10,13 +10,15 @@ import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
+import com.homelab.household.domain.usecase.GetAgentUseCase
+import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
+import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
-import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +39,12 @@ class ChatSessionViewModel(
     private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
+    /** Finds the Coordinator by its slug when the whole list cannot be had. */
+    private val getAgentUseCase: GetAgentUseCase,
+    /** Tells "yours" apart from someone else's agent in the picker. */
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    /** Names the owner of someone else's agent in the picker. */
+    private val listHouseholdMembersUseCase: ListHouseholdMembersUseCase,
     /** Times the thinking for the trail's "Thought for N s". Injected so a test can move it. */
     private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
@@ -59,8 +67,8 @@ class ChatSessionViewModel(
      *
      * A null [sessionId] is the hero + : the screen shows the agent's greeting and nothing is
      * created on the hub until the first message is sent, so a chat nobody spoke in is never left
-     * behind. Slice 3 always answers with the built-in coordinator; choosing an agent arrives with
-     * the Agents screen, and a session is bound to one agent for its life either way.
+     * behind. It starts with the built-in Coordinator; [selectAgent] can change that until the
+     * first message, after which the session is bound to its agent for life.
      */
     fun open(sessionId: String?) {
         if (sessionId != null) {
@@ -73,21 +81,73 @@ class ChatSessionViewModel(
     private fun startNewChat() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            try {
-                val agent = defaultAgent()
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        session = null,
-                        messages = emptyList(),
-                        agentName = agent?.name.orEmpty(),
-                        agentAvatar = agent?.avatar.orEmpty(),
-                        agentTagline = agent?.description.orEmpty(),
-                    )
+            // A list that cannot be had is not a chat that cannot start: the Coordinator is fetched
+            // on its own, and the picker says what went missing.
+            val listed = runCatchingSafe { listAgentsUseCase() }.getOrNull()
+            val agent =
+                if (listed != null) {
+                    listed.firstOrNull { it.slug == BUILT_IN_AGENT_SLUG } ?: listed.firstOrNull()
+                } else {
+                    runCatchingSafe { getAgentUseCase(BUILT_IN_AGENT_SLUG) }.getOrNull()
                 }
-            } catch (e: Throwable) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Failed to start a chat") }
+            val choices = choicesFor(listed ?: listOfNotNull(agent))
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    session = null,
+                    messages = emptyList(),
+                    agents = choices,
+                    agentsFailed = listed == null,
+                    selectedAgentId = agent?.id,
+                    agentName = agent?.name.orEmpty(),
+                    agentAvatar = agent?.avatar.orEmpty(),
+                    agentTagline = agent?.description.orEmpty(),
+                )
             }
+        }
+    }
+
+    /**
+     * Who is signed in and who else lives here only decide the owner chip, so either failing
+     * leaves the cards without it rather than without the cards.
+     */
+    private suspend fun choicesFor(agents: List<AgentPersonality>): List<AgentChoice> {
+        if (agents.isEmpty()) return emptyList()
+        val myId = runCatchingSafe { getCurrentUserUseCase() }.getOrNull()?.id
+        val membersById =
+            runCatchingSafe { listHouseholdMembersUseCase() }
+                .getOrNull()
+                .orEmpty()
+                .associateBy { it.id }
+        return agents.map { it.toAgentChoice(myId, membersById) }
+    }
+
+    /**
+     * Starts the new chat with another agent. Ignored once the chat exists: a conversation keeps
+     * the agent it was started with (design notes §4).
+     */
+    fun selectAgent(agentId: String) {
+        _uiState.update { state ->
+            val choice = state.agents.firstOrNull { it.id == agentId }
+            if (!state.canChangeAgent || choice == null) {
+                state
+            } else {
+                state.copy(
+                    selectedAgentId = choice.id,
+                    agentName = choice.name,
+                    agentAvatar = choice.avatar,
+                    agentTagline = choice.tagline,
+                )
+            }
+        }
+    }
+
+    /** Asks for the list again after it failed. Whatever is chosen stays chosen. */
+    fun retryAgents() {
+        viewModelScope.launch {
+            val listed = runCatchingSafe { listAgentsUseCase() }.getOrNull() ?: return@launch
+            val choices = choicesFor(listed)
+            _uiState.update { it.copy(agents = choices, agentsFailed = false) }
         }
     }
 
@@ -144,8 +204,13 @@ class ChatSessionViewModel(
             // The conversation is created by the first thing said in it, not by opening the screen.
             viewModelScope.launch {
                 try {
-                    val agent = defaultAgent() ?: error("No agent to talk to")
-                    val created = createSessionUseCase(agentId = agent.id)
+                    // The chosen agent, or — if opening could not find even the Coordinator — one
+                    // more try now that the hub may be back.
+                    val agentId =
+                        _uiState.value.selectedAgentId
+                            ?: defaultAgent()?.id
+                            ?: error("No agent to talk to")
+                    val created = createSessionUseCase(agentId = agentId)
                     _uiState.update { it.copy(session = created) }
                     send(content, autoApproveWrites)
                 } catch (e: Throwable) {
@@ -408,7 +473,7 @@ class ChatSessionViewModel(
     }
 
     private companion object {
-        /** The seeded Home & Life Coordinator. Slice 7 lets you pick a different one. */
+        /** The seeded Home & Life Coordinator, which every new chat starts with. */
         const val BUILT_IN_AGENT_SLUG = "assistant"
     }
 
