@@ -11,6 +11,7 @@ import pytest
 import httpx
 
 from tests.auth_helpers import register_admin
+from app.data.mappers.session_data_mapper import SessionDataMapper
 
 
 async def _member_and_agent(client: httpx.AsyncClient, slug: str = "assistant") -> tuple[str, str]:
@@ -131,3 +132,117 @@ async def test_messages_are_indexed_by_the_session_they_belong_to(client: httpx.
     columns = {tuple(column.name for column in index.columns) for index in indexes}
 
     assert ("session_id", "created_at") in columns
+
+
+@pytest.mark.parametrize(
+    "content, expected",
+    [
+        pytest.param(
+            "**Panel review** at 14:30\n\n- item",
+            "Panel review at 14:30 item",
+            id="bold_and_bullet",
+        ),
+        pytest.param(
+            "a *very* _good_ __day__",
+            "a very good day",
+            id="italic_and_bold_markers",
+        ),
+        pytest.param(
+            "snake_case_name stays put",
+            "snake_case_name stays put",
+            id="underscore_inside_a_word_is_not_emphasis",
+        ),
+        pytest.param(
+            "2 * 3 is not emphasis",
+            "2 * 3 is not emphasis",
+            id="lone_asterisk_is_not_emphasis",
+        ),
+        pytest.param(
+            "run `docker ps` first",
+            "run docker ps first",
+            id="inline_code",
+        ),
+        pytest.param(
+            "Use the following command:\n\n```bash\ndocker restart <name>\n```\n\nThis stops it.",
+            "Use the following command: docker restart <name> This stops it.",
+            id="fenced_code_block",
+        ),
+        pytest.param(
+            "### 1. **Beach: Play**\n\nText",
+            "1. Beach: Play Text",
+            id="heading_keeps_its_own_number",
+        ),
+        pytest.param(
+            "*   Drink water\n*   Walk",
+            "Drink water Walk",
+            id="bullets_with_extra_padding",
+        ),
+        pytest.param(
+            "1. One\n2. Two",
+            "One Two",
+            id="numbered_list_markers_are_stripped",
+        ),
+        pytest.param(
+            "1. **Age?**\n   - **Toddlers?** Beach.",
+            "Age? Toddlers? Beach.",
+            id="nested_bullet_under_a_numbered_item",
+        ),
+        pytest.param(
+            "see [the forecast](https://met.no/x)",
+            "see the forecast",
+            id="link",
+        ),
+        pytest.param(
+            "![Map of the trail](https://x/map.png)",
+            "Map of the trail",
+            id="image",
+        ),
+        pytest.param(
+            "> Check the weather.",
+            "Check the weather.",
+            id="blockquote",
+        ),
+        pytest.param(
+            "Before\n\n---\n\nAfter",
+            "Before After",
+            id="divider_dashes",
+        ),
+        pytest.param(
+            "Before\n\n***\n\nAfter",
+            "Before After",
+            id="divider_asterisks",
+        ),
+        pytest.param(
+            "Before\n\n___\n\nAfter",
+            "Before After",
+            id="divider_underscores",
+        ),
+        pytest.param(
+            "| Factor | Beach |\n| :--- | :--- |\n| **Crowds** | High |",
+            "Factor Beach Crowds High",
+            id="table",
+        ),
+        pytest.param(
+            "Yes — nothing after 18:00 on Thursday.",
+            "Yes — nothing after 18:00 on Thursday.",
+            id="plain_text_is_untouched",
+        ),
+    ],
+)
+def test_the_preview_strips_markdown_markers(content: str, expected: str):
+    """GIVEN a message with Markdown markers THEN the Chats row preview shows plain text."""
+    assert SessionDataMapper._preview(content) == expected
+
+
+def test_the_preview_truncates_after_stripping_markers():
+    """GIVEN a marked-up message longer than the limit THEN stripping happens before truncation."""
+    content = "**" + "a" * 130 + "**"
+
+    preview = SessionDataMapper._preview(content)
+
+    assert preview == "a" * 119 + "…"
+
+
+def test_the_preview_of_nothing_is_still_nothing():
+    """GIVEN no content THEN the stripper does not turn None into a string."""
+    assert SessionDataMapper._preview(None) is None

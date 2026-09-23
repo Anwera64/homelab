@@ -18,7 +18,8 @@ import com.homelab.household.app.theme.HearthTheme
  * One turn in a conversation.
  *
  * A question is a bubble on the right; an answer is prose on the left with no chrome around it,
- * because it is the thing you came to read and a card would only put a frame on it.
+ * because it is the thing you came to read and a card would only put a frame on it. The answer's
+ * Markdown is drawn ([AnswerText]); the question stays exactly as it was typed.
  */
 @Composable
 fun MessageBubble(
@@ -48,7 +49,7 @@ fun MessageBubble(
                 Text(text = content, style = type.body, color = colors.onPrimary)
             }
         } else {
-            Text(text = content, style = type.bodyLarge, color = colors.textPrimary)
+            AnswerText(content = content)
         }
 
         status?.invoke()

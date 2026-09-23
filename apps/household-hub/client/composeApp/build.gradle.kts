@@ -43,6 +43,7 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.runtime.compose)
             implementation(libs.navigation3.ui)
             implementation(libs.koin.compose.viewmodel)
+            implementation(libs.jetbrains.markdown)
         }
         androidMain.dependencies {
             // The preview renderer is Android- and desktop-only; commonMain keeps
