@@ -258,7 +258,7 @@ class ConversationScreenTest {
 
             // Words are their own sign that something is happening; two at once is noise.
             onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
-            onNodeWithText("Three things, in order of how much ", substring = true).assertIsDisplayed()
+            onNodeWithText("Three things, in order of how much", substring = true).assertIsDisplayed()
         }
 
     // ---- a turn you can watch ----------------------------------------------
