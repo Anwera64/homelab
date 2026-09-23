@@ -317,6 +317,14 @@
     <!-- Conversation -->
     <string name="conversation_back">Back to chats</string>
     <string name="conversation_greeting">Evening, %1$s</string>
+    <string name="conversation_change_agent">Change agent</string>
+    <string name="agent_picker_title">Who do you want to talk to?</string>
+    <string name="agent_picker_caption">A chat stays with the agent you start it with.</string>
+    <string name="agent_picker_failed_title">The other agents didn’t load</string>
+    <string name="agent_picker_failed_line">The hub answered but didn’t send the list. You can keep going with %1$s, or ask again.</string>
+    <string name="agent_owner_built_in">built in</string>
+    <string name="agent_owner_yours">yours</string>
+    <string name="agent_owner_member">%1$s’s</string>
     <string name="conversation_composer_idle">Message the %1$s…</string>
     <string name="conversation_composer_waiting">Waiting for this answer to finish…</string>
     <string name="conversation_composer_leave">You can leave — the answer will wait for you</string>

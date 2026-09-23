@@ -37,6 +37,8 @@ fun ConversationScreen(
         onTryAgain = viewModel::regenerate,
         onBack = onBack,
         memberName = profile.member?.fullName.orEmpty(),
+        onSelectAgent = viewModel::selectAgent,
+        onRetryAgents = viewModel::retryAgents,
         modifier = modifier,
     )
 }

@@ -5,6 +5,8 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.presentation.chatsession.AgentChoice
+import com.homelab.household.presentation.chatsession.AgentOwner
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
@@ -31,6 +33,37 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
             agentTagline = "Schedules, meals, keeping the week straight.",
         )
 
+    private val coordinator =
+        AgentChoice(
+            id = "agent-coord",
+            name = "Home Coordinator",
+            avatar = "🏡",
+            tagline = "Schedules, meals, keeping the week straight.",
+            owner = AgentOwner.BuiltIn,
+            tools = listOf("calendar_read", "searxng_search"),
+        )
+
+    private val choices =
+        listOf(
+            coordinator,
+            AgentChoice(
+                id = "agent-research",
+                name = "Academic Researcher",
+                avatar = "📚",
+                tagline = "Papers, references, reading long PDFs properly.",
+                owner = AgentOwner.BuiltIn,
+                tools = listOf("searxng_search", "pdf_reader"),
+            ),
+            AgentChoice(
+                id = "agent-scout",
+                name = "Hardware Scout",
+                avatar = "🔧",
+                tagline = "Parts, prices, whether that GPU is worth it.",
+                owner = AgentOwner.Member("Liam"),
+                tools = listOf("searxng_search"),
+            ),
+        )
+
     private val question = said("m-1", "What's left before Friday?", MessageRole.USER)
 
     private val partialAnswer =
@@ -44,7 +77,16 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
     private val named =
         listOf(
             // New Chat: the same screen with the greeting where the transcript will be.
-            "New chat" to agent.copy(session = null),
+            "New chat" to agent.copy(session = null, agents = choices, selectedAgentId = coordinator.id),
+            // The hub answered but not with the list: the Coordinator still greets, and the picker
+            // says what is missing.
+            "New chat, agents didn't load" to
+                agent.copy(
+                    session = null,
+                    agents = listOf(coordinator),
+                    selectedAgentId = coordinator.id,
+                    agentsFailed = true,
+                ),
             "A finished exchange" to
                 agent.copy(
                     messages =
