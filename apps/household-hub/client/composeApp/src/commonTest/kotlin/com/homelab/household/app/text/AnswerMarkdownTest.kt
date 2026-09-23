@@ -334,6 +334,71 @@ class AnswerMarkdownTest {
     }
 
     @Test
+    fun `GIVEN a mail address in angle brackets WHEN the answer is drawn THEN the brackets go and it opens mail`() {
+        // GIVEN
+        val markdown = "write to <a@b.no> today"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("write to a@b.no today", block.text.text)
+        assertEquals(listOf("a@b.no" to "mailto:a@b.no"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a bare mailto address WHEN the answer is drawn THEN all of it opens mail`() {
+        // GIVEN
+        val markdown = "write to mailto:anton.haushalt@example.com today"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("write to mailto:anton.haushalt@example.com today", block.text.text)
+        assertEquals(
+            listOf("mailto:anton.haushalt@example.com" to "mailto:anton.haushalt@example.com"),
+            block.text.links(),
+        )
+    }
+
+    @Test
+    fun `GIVEN a bare mail address WHEN the answer is drawn THEN it opens mail`() {
+        // GIVEN
+        val markdown = "write to anton@example.com."
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(listOf("anton@example.com" to "mailto:anton@example.com"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a mail address in code WHEN the answer is drawn THEN it stays code and opens nothing`() {
+        // GIVEN
+        val markdown = "set `admin@nas.local` as the sender"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(emptyList(), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a mail link with its address as the words WHEN the answer is drawn THEN it opens once`() {
+        // GIVEN
+        val markdown = "[a@b.no](mailto:a@b.no)"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(listOf("a@b.no" to "mailto:a@b.no"), block.text.links())
+    }
+
+    @Test
     fun `GIVEN a link inside bold WHEN the answer is drawn THEN it is both emphasised and opens`() {
         // GIVEN
         val markdown = "**read [the forecast](https://met.no/x)**"

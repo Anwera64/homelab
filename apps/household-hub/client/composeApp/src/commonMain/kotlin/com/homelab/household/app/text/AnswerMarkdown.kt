@@ -16,6 +16,9 @@ import org.intellij.markdown.flavours.gfm.GFMElementTypes
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 import org.intellij.markdown.parser.MarkdownParser
+import org.intellij.markdown.parser.sequentialparsers.SequentialParser
+import org.intellij.markdown.parser.sequentialparsers.SequentialParserManager
+import org.intellij.markdown.parser.sequentialparsers.impl.AutolinkParser
 
 /** The looks an answer's Markdown can take on; built from the theme, or fixed in a test. */
 @Immutable
@@ -68,8 +71,27 @@ fun answerBlocks(
     markdown: String,
     styles: AnswerStyles,
 ): List<AnswerBlock> {
-    val root = MarkdownParser(GFMFlavourDescriptor()).buildMarkdownTreeFromString(markdown)
+    val root = MarkdownParser(AnswerFlavour).buildMarkdownTreeFromString(markdown)
     return BlockWalker(markdown, styles).walk(root)
+}
+
+/**
+ * GFM, except a mail address in angle brackets is one autolink like a web one. Plain GFM leaves
+ * `<`, the address and `>` as three loose pieces, so the brackets would show.
+ */
+private object AnswerFlavour : GFMFlavourDescriptor() {
+    private val autolinks =
+        AutolinkParser(
+            listOf(MarkdownTokenTypes.AUTOLINK, GFMTokenTypes.GFM_AUTOLINK, MarkdownTokenTypes.EMAIL_AUTOLINK),
+        )
+
+    override val sequentialParserManager =
+        object : SequentialParserManager() {
+            override fun getParserSequence(): List<SequentialParser> =
+                super@AnswerFlavour.sequentialParserManager.getParserSequence().map {
+                    if (it is AutolinkParser) autolinks else it
+                }
+        }
 }
 
 private val HEADINGS =
@@ -99,6 +121,13 @@ private val SPACE = setOf(MarkdownTokenTypes.EOL, MarkdownTokenTypes.WHITE_SPACE
 
 /** The only kinds of address a tap may open: the web and mail, never a script or a file. */
 private val OPENABLE = setOf("https", "http", "mailto")
+
+/**
+ * A mail address in the prose, with or without `mailto:` in front. The parser only finds bare web
+ * addresses, so mail ones are found in the finished text instead.
+ */
+private val MAIL_ADDRESS =
+    Regex("""(mailto:)?[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}""", RegexOption.IGNORE_CASE)
 
 private class BlockWalker(
     private val src: String,
@@ -257,7 +286,8 @@ private class BlockWalker(
 
             MarkdownElementTypes.AUTOLINK -> {
                 val address = node.source().removePrefix("<").removeSuffix(">")
-                link(address) { append(address) }
+                val mail = node.children.any { it.type == MarkdownTokenTypes.EMAIL_AUTOLINK }
+                link(if (mail) "mailto:$address" else address) { append(address) }
             }
 
             GFMTokenTypes.GFM_AUTOLINK -> {
@@ -331,7 +361,27 @@ private class BlockWalker(
 
     private fun ASTNode.source(): String = getTextInNode(src).toString()
 
-    private fun text(build: AnnotatedString.Builder.() -> Unit): AnnotatedString = buildAnnotatedString(build).trimmed()
+    private fun text(build: AnnotatedString.Builder.() -> Unit): AnnotatedString =
+        buildAnnotatedString(build).trimmed().withMailLinks()
+
+    /** Each mail address the model wrote bare opens mail, unless it is code or a link already. */
+    private fun AnnotatedString.withMailLinks(): AnnotatedString {
+        val bare =
+            MAIL_ADDRESS.findAll(text).map { it.range.first to it.range.last + 1 }.filter { (start, end) ->
+                getLinkAnnotations(start, end).isEmpty() &&
+                    spanStyles.none { it.item == styles.code && it.start < end && start < it.end }
+            }
+        if (bare.none()) return this
+        return AnnotatedString
+            .Builder(this)
+            .apply {
+                bare.forEach { (start, end) ->
+                    val address = text.substring(start, end)
+                    val mail = if (address.startsWith("mailto:", ignoreCase = true)) address else "mailto:$address"
+                    addLink(LinkAnnotation.Url(mail, styles.link), start, end)
+                }
+            }.toAnnotatedString()
+    }
 }
 
 private fun AnnotatedString.trimmed(): AnnotatedString {
