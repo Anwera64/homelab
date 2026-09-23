@@ -23,10 +23,12 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 /**
- * The members repository maps DTOs to domain models and is the one place that notices a changed PIN
- * hands back a new token. Everything else it does is pass a refusal along untouched.
+ * The members repository maps DTOs to domain models, keeps the new token a changed PIN hands back,
+ * and forgets this phone's session once its member has left. Everything else it does is pass a
+ * refusal along untouched.
  */
 class MembersRepositoryTest {
     private val emmaDto =
@@ -222,6 +224,46 @@ class MembersRepositoryTest {
 
             // THEN
             verifySuspend(VerifyMode.exactly(1)) { remote.leaveHousehold("111111") }
+        }
+
+    @Test
+    fun `GIVEN a member leaving WHEN the hub agrees THEN the kept token and member are forgotten`() =
+        runTest {
+            // GIVEN
+            val remote = mock<MembersRemoteDataSource>()
+            everySuspend { remote.leaveHousehold("111111") } returns Unit
+            val tokens =
+                InMemorySessionStorage().apply {
+                    saveTokens("emma-token")
+                    saveUser(emmaDto)
+                }
+
+            // WHEN
+            repository(remote, tokens).leaveHousehold("111111")
+
+            // THEN
+            assertNull(tokens.getAccessToken())
+            assertNull(tokens.getUser())
+        }
+
+    @Test
+    fun `GIVEN a wrong PIN WHEN a member tries to leave THEN the kept session is left alone`() =
+        runTest {
+            // GIVEN
+            val remote = mock<MembersRemoteDataSource>()
+            everySuspend { remote.leaveHousehold("000000") } throws WrongPinException(attemptsLeft = 2)
+            val tokens =
+                InMemorySessionStorage().apply {
+                    saveTokens("emma-token")
+                    saveUser(emmaDto)
+                }
+
+            // WHEN
+            assertFailsWith<WrongPinException> { repository(remote, tokens).leaveHousehold("000000") }
+
+            // THEN
+            assertEquals("emma-token", tokens.getAccessToken())
+            assertEquals(emmaDto, tokens.getUser())
         }
 
     @Test
