@@ -1,5 +1,8 @@
 package com.homelab.household.app.components
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -7,6 +10,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DefaultSpacing
@@ -106,5 +110,32 @@ class MessageBubbleTest {
             val intro = onNodeWithText("Here’s the plan:").getUnclippedBoundsInRoot()
             val heading = onNodeWithText("Saturday").getUnclippedBoundsInRoot()
             assertEquals(DefaultSpacing.xl, heading.top - intro.bottom)
+        }
+
+    @Test
+    fun `GIVEN an answer that is a link WHEN you tap it THEN its address opens`() =
+        runComposeUiTest {
+            // GIVEN
+            val answer = "[the forecast](https://met.no/x)"
+            val opened = mutableListOf<String>()
+            val uriHandler =
+                object : UriHandler {
+                    override fun openUri(uri: String) {
+                        opened += uri
+                    }
+                }
+            setContent {
+                StillTheme {
+                    CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+                        MessageBubble(content = answer, fromMe = false)
+                    }
+                }
+            }
+
+            // WHEN
+            onNodeWithText("the forecast").performClick()
+
+            // THEN
+            assertEquals(listOf("https://met.no/x"), opened)
         }
 }
