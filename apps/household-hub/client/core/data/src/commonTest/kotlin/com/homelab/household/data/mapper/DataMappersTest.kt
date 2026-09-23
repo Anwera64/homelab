@@ -114,7 +114,6 @@ class DataMappersTest {
                 description = "Coordinates tasks",
                 avatar = "🤖",
                 system_prompt = "You are an assistant",
-                model_alias = "qwen3:14b",
                 temperature = 0.7f,
                 top_p = 0.9f,
                 tool_permissions = listOf("calendar_read"),

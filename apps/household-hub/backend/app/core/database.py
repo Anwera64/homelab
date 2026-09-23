@@ -29,6 +29,7 @@ AsyncSessionLocal = async_sessionmaker(
 from app.data.models.base import Base
 import app.data.models.user_model
 import app.data.models.space_model
+import app.data.models.llm_model_model
 import app.data.models.agent_model
 import app.data.models.session_model
 import app.data.models.memory_model

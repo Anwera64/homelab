@@ -44,7 +44,7 @@ class AgentRepositoryImpl(IAgentRepository):
             model.description = agent.description
             model.avatar = agent.avatar
             model.system_prompt = agent.system_prompt
-            model.model_alias = agent.model_alias
+            model.llm_model_id = agent.llm_model_id
             model.temperature = agent.temperature
             model.top_p = agent.top_p
             model.tool_permissions = agent.tool_permissions

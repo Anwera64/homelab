@@ -31,7 +31,9 @@ async def test_built_in_agents_seeded(client: httpx.AsyncClient):
     # Verify attributes
     researcher = next(a for a in agents if a["slug"] == "researcher")
     assert researcher["is_builtin"] is True
-    assert researcher["model_alias"] == "qwen3:14b"
+    # Built-ins follow the household default model rather than naming one
+    assert researcher["llm_model_id"] is None
+    assert "model_alias" not in researcher
     assert "pdf_reader" in researcher["tool_permissions"]
 
 
@@ -65,7 +67,6 @@ async def test_custom_agent_creation_and_ownership(client: httpx.AsyncClient):
         "description": "Synthesizes complex architectural and urban design papers.",
         "avatar": "📚",
         "system_prompt": "You are a specialized paper synthesizer.",
-        "model_alias": "qwen3:14b",
         "temperature": 0.4,
         "tool_permissions": ["pdf_reader"],
     }

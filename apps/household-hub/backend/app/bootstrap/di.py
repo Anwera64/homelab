@@ -18,6 +18,7 @@ from app.data.datasources.agent_data_source import SqliteAgentDataSource
 from app.data.datasources.session_data_source import SqliteSessionDataSource
 from app.data.datasources.memory_data_source import SqliteMemoryDataSource
 from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
+from app.data.datasources.llm_model_data_source import SqliteLLMModelDataSource
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.gossip_data_source import SqliteGossipDataSource
@@ -31,6 +32,7 @@ from app.data.mappers.agent_data_mapper import AgentDataMapper
 from app.data.mappers.session_data_mapper import SessionDataMapper
 from app.data.mappers.memory_data_mapper import MemoryDataMapper
 from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
+from app.data.mappers.llm_model_data_mapper import LLMModelDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.gossip_data_mapper import GossipDataMapper
@@ -44,6 +46,7 @@ from app.data.repositories.agent_repository_impl import AgentRepositoryImpl
 from app.data.repositories.session_repository_impl import SessionRepositoryImpl
 from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
 from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
+from app.data.repositories.llm_model_repository_impl import LLMModelRepositoryImpl
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
 from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
@@ -102,6 +105,8 @@ from app.domain.use_cases.agents.list_trash_agents import ListTrashAgentsUseCase
 from app.domain.use_cases.agents.purge_trash_agent import PurgeTrashAgentUseCase
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUseCase
+from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
+from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCase
 
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
@@ -164,6 +169,7 @@ _agent_mapper = AgentDataMapper()
 _session_mapper = SessionDataMapper()
 _memory_mapper = MemoryDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
+_llm_model_mapper = LLMModelDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
 _document_mapper = DocumentDataMapper()
 _gossip_mapper = GossipDataMapper()
@@ -198,6 +204,7 @@ def get_container(session: AsyncSession):
     session_ds = SqliteSessionDataSource(session)
     memory_ds = SqliteMemoryDataSource(session)
     system_setting_ds = SqliteSystemSettingDataSource(session)
+    llm_model_ds = SqliteLLMModelDataSource(session)
     calendar_cred_ds = SqliteCalendarCredentialDataSource(session)
     document_ds = SqliteDocumentDataSource(session)
     gossip_ds = SqliteGossipDataSource(session)
@@ -210,6 +217,8 @@ def get_container(session: AsyncSession):
     session_repo = SessionRepositoryImpl(session_ds, _session_mapper)
     memory_repo = MemoryRepositoryImpl(memory_ds, _memory_mapper)
     system_setting_repo = SystemSettingRepositoryImpl(system_setting_ds, _system_setting_mapper)
+    llm_model_repo = LLMModelRepositoryImpl(llm_model_ds, _llm_model_mapper)
+    model_resolver = ResolveAgentModelUseCase(llm_model_repo)
     calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
     gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
@@ -258,6 +267,7 @@ def get_container(session: AsyncSession):
         tool_executor=tool_executor,
         tool_lister=tool_lister,
         uow=uow,
+        model_resolver=model_resolver,
     )
 
     reflect_turn_uc = ReflectTurnUseCase(
@@ -266,8 +276,8 @@ def get_container(session: AsyncSession):
         gossip_repo=gossip_repo,
         session_repo=session_repo,
         uow=uow,
+        model_resolver=model_resolver,
         confidence_threshold=settings.MEMORY_REFLECTION_CONFIDENCE_THRESHOLD,
-        model=settings.DEFAULT_LLM_MODEL,
     )
 
     async def _run_background_reflection(
@@ -482,6 +492,7 @@ def get_container(session: AsyncSession):
 
         # Lifecycle & Background Maintenance
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
+        SyncDefaultModelUseCase: SyncDefaultModelUseCase(llm_model_repo, uow),
         PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
     }
 

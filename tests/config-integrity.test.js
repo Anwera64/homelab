@@ -11,6 +11,7 @@ const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
 const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
 const SEARXNG_SETTINGS_PATH = path.join(ROOT_DIR, 'config/searxng/settings.yml');
+const OLLAMA_MODELS_DIR = path.join(ROOT_DIR, 'config/ollama-models');
 
 test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const caddyfileContent = fs.readFileSync(CADDYFILE_PATH, 'utf8');
@@ -232,6 +233,32 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       /version:\s*2/.test(servicesYamlContent),
       'Homepage services.yaml Jellyfin widget must specify version: 2 to prevent legacy /emby/ calls'
     );
+  });
+
+  await t.test('Ollama model manifest entries are complete and point at tracked Modelfiles', () => {
+    const manifestPath = path.join(OLLAMA_MODELS_DIR, 'models.json');
+    assert.ok(fs.existsSync(manifestPath), 'config/ollama-models/models.json must exist');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.ok(Array.isArray(manifest.models) && manifest.models.length > 0, 'manifest must list at least one model');
+
+    for (const model of manifest.models) {
+      for (const key of ['name', 'gguf_url', 'sha256', 'modelfile']) {
+        assert.ok(model[key], `manifest entry ${model.name || '?'} must have ${key}`);
+      }
+      assert.match(model.sha256, /^[0-9a-f]{64}$/, `${model.name} sha256 must be 64 lowercase hex chars`);
+      assert.ok(model.gguf_url.startsWith('https://huggingface.co/'), `${model.name} must download from huggingface.co`);
+      const modelfile = path.join(OLLAMA_MODELS_DIR, model.modelfile);
+      assert.ok(fs.existsSync(modelfile), `${model.name} Modelfile ${model.modelfile} must be tracked in config/ollama-models`);
+      assert.match(fs.readFileSync(modelfile, 'utf8'), /^FROM \/root\/\.ollama\/imports\//m, `${model.name} Modelfile must build FROM the imports folder`);
+    }
+
+    const rvn = manifest.models.find((m) => m.name === 'qwen3.8-rvn');
+    assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
+    assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
+    const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 16384']) {
+      assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
+    }
   });
 
   await t.test('Ollama models live in a named volume, not on the Windows share', () => {

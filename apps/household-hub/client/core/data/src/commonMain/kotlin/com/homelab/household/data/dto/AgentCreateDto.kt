@@ -10,7 +10,6 @@ data class AgentCreateDto(
     val description: String = "",
     val avatar: String = "🤖",
     @SerialName("system_prompt") val system_prompt: String,
-    @SerialName("model_alias") val model_alias: String = "qwen3:14b",
     val temperature: Float = 0.7f,
     @SerialName("top_p") val top_p: Float = 0.9f,
     @SerialName("tool_permissions") val tool_permissions: List<String> = emptyList(),

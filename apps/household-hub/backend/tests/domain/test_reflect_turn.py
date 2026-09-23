@@ -6,15 +6,32 @@ from app.domain.entities.session import ConversationSession
 from app.domain.entities.memory import AgentMemory
 from app.domain.entities.gossip_milestone import GossipMilestone
 from app.domain.entities.llm_message import LLMResponse
+from app.domain.entities.llm_model import LLMModel
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
 
 class FakeLLMClient:
     def __init__(self, response_json_str: str):
         self.response_json_str = response_json_str
 
+        self.models_asked = []
+
     async def chat_completion(self, messages, model, temperature=0.7, top_p=0.9, tools=None):
+        self.models_asked.append(model)
         return LLMResponse(content=self.response_json_str)
+
+
+class FakeLLMModelRepository:
+    async def get_default(self):
+        return LLMModel(id="m1", provider_model="house-model", display_name="House", is_default=True)
+
+    async def get_by_id(self, model_id: str):
+        return None
+
+
+def _house_resolver():
+    return ResolveAgentModelUseCase(FakeLLMModelRepository())
 
 
 class FakeMemoryRepository:
@@ -113,6 +130,7 @@ async def test_reflect_turn_extracts_memories_and_milestones():
         gossip_repo=gossip_repo,
         session_repo=sess_repo,
         uow=uow,
+        model_resolver=_house_resolver(),
         confidence_threshold=0.70,
     )
 
@@ -128,6 +146,9 @@ async def test_reflect_turn_extracts_memories_and_milestones():
         is_turn_secret=False,
         is_first_turn=True,
     )
+
+    # 0. Reflection asks the household default model, whatever it is called
+    assert llm.models_asked == ["house-model"]
 
     # 1. Title was updated on first turn
     assert session.title == "Dietary Preferences and Jury"
@@ -176,6 +197,7 @@ async def test_reflect_turn_secret_mode_barrier():
         gossip_repo=gossip_repo,
         session_repo=sess_repo,
         uow=uow,
+        model_resolver=_house_resolver(),
     )
 
     result = await use_case.execute(
@@ -238,6 +260,7 @@ async def test_reflect_turn_memory_deduplication():
         gossip_repo=gossip_repo,
         session_repo=sess_repo,
         uow=uow,
+        model_resolver=_house_resolver(),
     )
 
     result = await use_case.execute(
@@ -299,6 +322,7 @@ async def test_reflect_turn_milestone_sanitization_and_deduplication():
         gossip_repo=gossip_repo,
         session_repo=sess_repo,
         uow=uow,
+        model_resolver=_house_resolver(),
     )
 
     result = await use_case.execute(

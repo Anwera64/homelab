@@ -17,7 +17,7 @@ class AgentBase(BaseModel):
     description: Optional[str] = ""
     avatar: Optional[str] = "🤖"
     system_prompt: str
-    model_alias: Optional[str] = "qwen3:14b"
+    llm_model_id: Optional[str] = None
     temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(0.9, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = []
@@ -41,7 +41,7 @@ class AgentUpdate(BaseModel):
     description: Optional[str] = None
     avatar: Optional[str] = None
     system_prompt: Optional[str] = None
-    model_alias: Optional[str] = None
+    llm_model_id: Optional[str] = None
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
     tool_permissions: Optional[List[str]] = None

@@ -16,7 +16,7 @@ class AgentPersonality:
     description: str = ""
     avatar: str = "🤖"
     system_prompt: str = ""
-    model_alias: str = "qwen3:14b"
+    llm_model_id: str | None = None
     temperature: float = 0.7
     top_p: float = 0.9
     tool_permissions: List[str] = field(default_factory=list)

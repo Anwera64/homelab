@@ -14,7 +14,6 @@ BUILTIN_AGENTS: List[Dict[str, Any]] = [
             "synthesizing complex documents, reading architectural papers, and extracting exact citations. "
             "You maintain an objective, thorough, and rigorous research tone."
         ),
-        "model_alias": "qwen3:14b",
         "temperature": 0.3,
         "top_p": 0.85,
         "tool_permissions": ["pdf_reader", "searxng_search", "document_writer"],
@@ -30,7 +29,6 @@ BUILTIN_AGENTS: List[Dict[str, Any]] = [
             "coordinate dinners, manage grocery lists, and stay aligned. You maintain a warm, proactive, "
             "and helpful household companion tone."
         ),
-        "model_alias": "qwen3:14b",
         "temperature": 0.7,
         "top_p": 0.9,
         "tool_permissions": ["calendar_read", "calendar_write", "searxng_search"],
@@ -55,7 +53,6 @@ class SeedBuiltinAgentsUseCase:
                         description=spec["description"],
                         avatar=spec["avatar"],
                         system_prompt=spec["system_prompt"],
-                        model_alias=spec["model_alias"],
                         temperature=spec["temperature"],
                         top_p=spec["top_p"],
                         tool_permissions=spec["tool_permissions"],

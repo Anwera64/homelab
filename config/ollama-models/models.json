@@ -1,0 +1,10 @@
+{
+  "models": [
+    {
+      "name": "qwen3.8-rvn",
+      "gguf_url": "https://huggingface.co/0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF/resolve/main/RVN-IQ3_M.gguf",
+      "sha256": "a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b",
+      "modelfile": "qwen3.8-rvn.Modelfile"
+    }
+  ]
+}

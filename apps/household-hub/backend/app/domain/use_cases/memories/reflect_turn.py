@@ -13,6 +13,7 @@ from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +64,8 @@ class ReflectTurnUseCase:
         gossip_repo: IGossipRepository,
         session_repo: ISessionRepository,
         uow: IUnitOfWork,
+        model_resolver: ResolveAgentModelUseCase,
         confidence_threshold: float = 0.70,
-        model: str = "qwen3:14b",
     ):
         self.llm_client = llm_client
         self.memory_repo = memory_repo
@@ -72,7 +73,7 @@ class ReflectTurnUseCase:
         self.session_repo = session_repo
         self.uow = uow
         self.confidence_threshold = confidence_threshold
-        self.model = model
+        self.model_resolver = model_resolver
 
     async def execute(
         self,
@@ -100,7 +101,7 @@ class ReflectTurnUseCase:
 
         response = await self.llm_client.chat_completion(
             messages=messages,
-            model=self.model,
+            model=await self.model_resolver.default(),
             temperature=0.1,
         )
 

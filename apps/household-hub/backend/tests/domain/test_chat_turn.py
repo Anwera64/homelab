@@ -18,7 +18,9 @@ from app.domain.exceptions import (
     InvalidOperationException,
     LLMInferenceException,
 )
+from app.domain.entities.llm_model import LLMModel
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
 
 class FakeSessionRepository:
@@ -77,6 +79,23 @@ class FakeLLMClient:
             yield LLMResponseChunk(delta_content=resp.content, tool_calls=resp.tool_calls)
 
 
+class FakeLLMModelRepository:
+    def __init__(self, models=None):
+        self.models = {m.id: m for m in (models or [])}
+
+    async def get_default(self):
+        return next((m for m in self.models.values() if m.is_default), None)
+
+    async def get_by_id(self, model_id: str):
+        return self.models.get(model_id)
+
+
+def _house_resolver():
+    return ResolveAgentModelUseCase(
+        FakeLLMModelRepository([LLMModel(id="m1", provider_model="house-model", display_name="House", is_default=True)])
+    )
+
+
 class FakeContextAssembler:
     async def execute(self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False):
         return [
@@ -116,7 +135,7 @@ class FakeUnitOfWork:
 @pytest.mark.asyncio
 async def test_process_chat_turn_simple():
     user = User(id="u1", full_name="Alex")
-    agent = AgentPersonality(id="a1", name="Assistant", model_alias="qwen3:14b")
+    agent = AgentPersonality(id="a1", name="Assistant")
     session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
 
     session_repo = FakeSessionRepository(sessions=[session])
@@ -131,6 +150,7 @@ async def test_process_chat_turn_simple():
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor,
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -160,6 +180,7 @@ async def test_process_chat_turn_privacy_trigger():
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -197,6 +218,7 @@ async def test_process_chat_turn_with_tool_execution():
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor,
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -232,6 +254,7 @@ async def test_process_chat_turn_write_tool_confirmation():
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor,
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -267,6 +290,7 @@ async def test_execute_stream_progressive_token_streaming_no_tools():
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor,
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -320,6 +344,7 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor,
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -377,6 +402,7 @@ async def test_regenerate_stream_answers_again_without_asking_again():
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -414,6 +440,7 @@ async def test_regenerate_stream_refuses_when_the_last_turn_was_answered():
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -451,6 +478,7 @@ async def test_regenerate_stream_keeps_the_privacy_the_question_was_asked_with()
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -492,6 +520,7 @@ async def test_an_answer_that_dies_is_reported_as_the_answer_and_not_the_questio
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -521,6 +550,7 @@ async def test_regenerating_an_answer_that_dies_also_says_the_answer_failed():
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -546,6 +576,7 @@ async def test_a_turn_that_never_opens_is_not_reported_as_a_failed_answer():
         context_assembler=FakeContextAssembler(),
         tool_executor=FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -566,6 +597,7 @@ def _use_case(session_repo, agent, llm_client, tool_executor=None):
         context_assembler=FakeContextAssembler(),
         tool_executor=tool_executor or FakeToolExecutor(),
         tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
         uow=FakeUnitOfWork(),
     )
 
@@ -728,3 +760,33 @@ async def test_regenerating_is_accepted_straight_away():
 
     assert events[0] == {"type": "accepted"}
 
+
+
+@pytest.mark.asyncio
+async def test_a_turn_asks_the_model_the_household_default_resolves_to():
+    """GIVEN an agent that follows the household default WHEN it answers THEN the model asked is the default's."""
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+    llm_client = FakeLLMClient(responses=[LLMResponse(content="Hi")])
+
+    await _use_case(FakeSessionRepository(sessions=[session]), agent, llm_client).execute(
+        session_id="s1", current_user=user, content="Hello"
+    )
+
+    assert [call["model"] for call in llm_client.chat_calls] == ["house-model"]
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_turn_asks_the_model_the_household_default_resolves_to():
+    """GIVEN an agent that follows the household default WHEN it streams an answer THEN the model asked is the default's."""
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Hi", finish_reason="stop")]])
+
+    [ev async for ev in _use_case(FakeSessionRepository(sessions=[session]), agent, llm_client).execute_stream(
+        session_id="s1", current_user=user, content="Hello"
+    )]
+
+    assert [call["model"] for call in llm_client.stream_calls] == ["house-model"]

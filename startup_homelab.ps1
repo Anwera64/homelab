@@ -241,20 +241,42 @@ if ($failedContainers.Count -gt 0) {
     if ($aiEnabled) {
         $ollamaRunning = (docker inspect ollama --format "{{.State.Status}}" 2>$null) -eq "running"
         if ($ollamaRunning) {
-            Write-Host "Checking local AI starter models in Ollama..." -ForegroundColor Cyan
-            $requiredModels = @("qwen3:14b", "bge-m3")
+            Write-Host "Checking local AI models in Ollama..." -ForegroundColor Cyan
+            # The manifest names the models; the backend's DEFAULT_LLM_MODEL picks which one agents use.
+            $manifest = Get-Content (Join-Path $PSScriptRoot "config\ollama-models\models.json") -Raw | ConvertFrom-Json
             $installedModelsRaw = (docker exec ollama ollama list 2>$null) -join "`n"
-            foreach ($model in $requiredModels) {
-                if ($installedModelsRaw -notmatch [regex]::Escape($model)) {
-                    Write-Host "  [+] Pulling missing starter model '$model' into the ollama_models volume..." -ForegroundColor Yellow
-                    docker exec ollama ollama pull $model
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Host "  [SUCCESS] Model '$model' is ready!" -ForegroundColor Green
-                    } else {
-                        Write-Host "  [WARNING] Failed to pull model '$model'. You can pull it later via 'docker exec ollama ollama pull $model'." -ForegroundColor Yellow
-                    }
+            $importsDir = Join-Path $PSScriptRoot "config\ollama\imports"
+            New-Item -ItemType Directory -Force -Path $importsDir | Out-Null
+            foreach ($model in $manifest.models) {
+                $name = $model.name
+                if ($installedModelsRaw -match "(?m)^$([regex]::Escape($name))(:latest)?\s") {
+                    Write-Host "  * Model '$name' is ready." -ForegroundColor Green
+                    continue
+                }
+
+                Write-Host "  [+] Downloading model '$name' into the ollama_models volume (this can take a while)..." -ForegroundColor Yellow
+                $gguf = Join-Path $importsDir "$name.gguf"
+                curl.exe -fL --retry 5 -C - -o $gguf $model.gguf_url
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "  [WARNING] Download of '$name' failed; it will be retried on the next start." -ForegroundColor Yellow
+                    continue
+                }
+
+                $hash = (Get-FileHash -Path $gguf -Algorithm SHA256).Hash.ToLower()
+                if ($hash -ne $model.sha256) {
+                    Write-Host "  [WARNING] '$name' does not match its SHA256 ($hash); discarding it." -ForegroundColor Yellow
+                    Remove-Item $gguf -Force -ErrorAction SilentlyContinue
+                    continue
+                }
+
+                Copy-Item -Path (Join-Path $PSScriptRoot "config\ollama-models\$($model.modelfile)") -Destination (Join-Path $importsDir $model.modelfile) -Force
+                docker exec ollama ollama create $name -f "/root/.ollama/imports/$($model.modelfile)"
+                $created = $LASTEXITCODE -eq 0
+                Remove-Item $gguf -Force -ErrorAction SilentlyContinue
+                if ($created) {
+                    Write-Host "  [SUCCESS] Model '$name' is ready!" -ForegroundColor Green
                 } else {
-                    Write-Host "  * Model '$model' is ready." -ForegroundColor Green
+                    Write-Host "  [WARNING] Ollama could not register '$name'; it will be retried on the next start." -ForegroundColor Yellow
                 }
             }
         }

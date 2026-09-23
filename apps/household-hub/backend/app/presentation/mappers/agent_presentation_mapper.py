@@ -13,7 +13,7 @@ class AgentPresentationMapper:
             description=entity.description or "",
             avatar=entity.avatar or "🤖",
             system_prompt=entity.system_prompt,
-            model_alias=entity.model_alias or "qwen3:14b",
+            llm_model_id=entity.llm_model_id,
             temperature=entity.temperature,
             top_p=entity.top_p,
             tool_permissions=entity.tool_permissions or [],

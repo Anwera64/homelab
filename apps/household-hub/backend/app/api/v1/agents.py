@@ -168,7 +168,7 @@ async def create_agent(
         description=payload.description or "",
         avatar=payload.avatar or "🤖",
         system_prompt=payload.system_prompt,
-        model_alias=payload.model_alias or "qwen3:14b",
+        llm_model_id=payload.llm_model_id,
         temperature=payload.temperature if payload.temperature is not None else 0.7,
         top_p=payload.top_p if payload.top_p is not None else 0.9,
         tool_permissions=payload.tool_permissions or [],
