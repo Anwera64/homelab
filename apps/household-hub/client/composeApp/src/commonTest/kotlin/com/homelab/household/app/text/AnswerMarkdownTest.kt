@@ -309,6 +309,26 @@ class AnswerMarkdownTest {
     }
 
     @Test
+    fun `GIVEN a compact table with bold headers after a paragraph WHEN the answer is drawn THEN it still becomes rows`() {
+        // GIVEN
+        val markdown =
+            "Here's a high-level timeline of the key phases:\n\n" +
+                "| **Date / Period** | **Event** |\n|---|---|\n" +
+                "| **Early April 1989** | Student gatherings begin. |\n" +
+                "| **Mid-April 1989** | Students begin a **hunger strike**. |"
+
+        // WHEN
+        val blocks = answerBlocks(markdown, styles)
+
+        // THEN
+        val rows = blocks.filterIsInstance<Row>()
+        assertEquals(listOf("Early April 1989", "Mid-April 1989"), rows.map { it.label.text })
+        assertEquals("Event: Student gatherings begin.", rows[0].cells.single().text)
+        assertEquals("Event: Students begin a hunger strike.", rows[1].cells.single().text)
+        assertTrue(blocks.none { "|" in it.plain() })
+    }
+
+    @Test
     fun `GIVEN a fenced code block WHEN the answer is drawn THEN the code shows as written in mono`() {
         // GIVEN
         val markdown = "```bash\ndocker restart <container_name_or_id>\n```"

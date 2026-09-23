@@ -55,8 +55,46 @@ class DefensiveSseStreamReaderTest {
             assertEquals(1, events.size)
             val delta = events[0] as ChatStreamEvent.Delta
             assertTrue(!delta.content.contains("<|im_start|>"))
-            assertTrue(!delta.content.contains("###"))
-            assertTrue(delta.content.contains("Filtered content"))
+            assertTrue(delta.content.contains("Filtered content###"))
+        }
+
+    /** A table's separator row is Markdown, not a model delimiter; without its dashes it is no table. */
+    @Test
+    fun `GIVEN a delta with a table separator WHEN it is read THEN the dashes survive`() =
+        runTest {
+            // GIVEN
+            val ssePayload =
+                """
+                data: {"type": "delta", "content": "|---|---|"}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            // WHEN
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            // THEN
+            assertEquals("|---|---|", (events.single() as ChatStreamEvent.Delta).content)
+        }
+
+    @Test
+    fun `GIVEN a delta with a heading and a divider WHEN it is read THEN both survive`() =
+        runTest {
+            // GIVEN
+            val ssePayload =
+                """
+                data: {"type": "delta", "content": "### Plan\n\n---"}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            // WHEN
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            // THEN
+            assertEquals("### Plan\n\n---", (events.single() as ChatStreamEvent.Delta).content)
         }
 
     /**

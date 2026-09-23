@@ -15,14 +15,13 @@ import kotlinx.serialization.json.jsonPrimitive
 class DefensiveSseStreamReader(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
+    /** Model delimiters only. `###` and `---` are Markdown the answer is drawn from, so they pass. */
     private val controlTokens =
         listOf(
             "<|im_start|>",
             "<|im_end|>",
             "<|endoftext|>",
             "<|startoftext|>",
-            "###",
-            "---",
         )
 
     fun readEvents(channel: ByteReadChannel): Flow<ChatStreamEvent> =
