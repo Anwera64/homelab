@@ -23,7 +23,7 @@ import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataS
 import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
-import com.homelab.household.data.network.PublicEndpoints
+import com.homelab.household.data.network.installBearerAuth
 import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -43,9 +43,6 @@ import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.plugins.auth.Auth
-import io.ktor.client.plugins.auth.providers.BearerTokens
-import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -82,20 +79,7 @@ val dataModule =
                             LogLevel.INFO
                         }
                 }
-                install(Auth) {
-                    bearer {
-                        loadTokens {
-                            val access = storage.getAccessToken()
-                            val refresh = storage.getRefreshToken()
-                            if (access != null) {
-                                BearerTokens(accessToken = access, refreshToken = refresh ?: "")
-                            } else {
-                                null
-                            }
-                        }
-                        sendWithoutRequest { request -> !PublicEndpoints.isPublic(request.url.buildString()) }
-                    }
-                }
+                installBearerAuth(storage)
                 val events: AuthEventsLocalDataSource = get()
                 signOutOnUnauthorized(storage) { events.raiseSignedOut() }
             }

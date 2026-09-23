@@ -11,9 +11,10 @@ import com.homelab.household.domain.model.User
 import com.homelab.household.domain.repository.MembersRepository
 
 /**
- * Orchestration and mapping for the household's members. The only decision it makes of its own is
- * the one in [changePin]: a changed PIN invalidates the old token, so the fresh one has to replace
- * what is kept on this phone before anything else uses it.
+ * Orchestration and mapping for the household's members. The only decisions it makes of its own
+ * are about what this phone keeps: a changed PIN invalidates the old token, so [changePin] puts the
+ * fresh one in its place before anything else uses it; and a member who has left has no session
+ * left to keep, so [leaveHousehold] forgets theirs.
  */
 class MembersRepositoryImpl(
     private val remote: MembersRemoteDataSource,
@@ -41,5 +42,8 @@ class MembersRepositoryImpl(
 
     override suspend fun removeMember(memberId: String) = remote.removeMember(memberId)
 
-    override suspend fun leaveHousehold(pin: String) = remote.leaveHousehold(pin)
+    override suspend fun leaveHousehold(pin: String) {
+        remote.leaveHousehold(pin)
+        storage.clear()
+    }
 }
