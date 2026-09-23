@@ -10,7 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import com.homelab.household.app.text.AnswerBlock
 import com.homelab.household.app.text.AnswerStyles
@@ -42,6 +44,7 @@ fun AnswerText(
                 italic = SpanStyle(fontStyle = FontStyle.Italic),
                 code = SpanStyle(fontFamily = type.mono.fontFamily, fontWeight = type.mono.fontWeight),
                 muted = SpanStyle(color = colors.textMuted),
+                link = TextLinkStyles(SpanStyle(color = colors.primary, textDecoration = TextDecoration.Underline)),
             )
         }
     val blocks = remember(content, styles) { answerBlocks(content, styles) }

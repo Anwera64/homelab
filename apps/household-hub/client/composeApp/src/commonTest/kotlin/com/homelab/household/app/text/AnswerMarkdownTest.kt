@@ -2,7 +2,9 @@ package com.homelab.household.app.text
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -26,10 +28,15 @@ class AnswerMarkdownTest {
             italic = SpanStyle(fontStyle = FontStyle.Italic),
             code = SpanStyle(fontFamily = FontFamily.Monospace),
             muted = SpanStyle(color = Color.Gray),
+            link = TextLinkStyles(SpanStyle(color = Color.Blue)),
         )
 
     private fun AnnotatedString.styledBy(style: SpanStyle): List<String> =
         spanStyles.filter { it.item == style }.map { text.substring(it.start, it.end) }
+
+    /** Each link as the words it covers and the address it opens. */
+    private fun AnnotatedString.links(): List<Pair<String, String>> =
+        getLinkAnnotations(0, length).map { text.substring(it.start, it.end) to (it.item as LinkAnnotation.Url).url }
 
     private fun AnswerBlock.plain(): String =
         when (this) {
@@ -248,6 +255,107 @@ class AnswerMarkdownTest {
 
         // THEN
         assertEquals("Map of the trail", block.text.text)
+    }
+
+    @Test
+    fun `GIVEN a link WHEN the answer is drawn THEN its words open the address`() {
+        // GIVEN
+        val markdown = "see [the forecast](https://met.no/x) first"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(listOf("the forecast" to "https://met.no/x"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN web and mail links WHEN the answer is drawn THEN http and mailto open too`() {
+        // GIVEN
+        val markdown = "the [NAS](http://nas.local) or [write](MAILTO:a@b.no)"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(listOf("NAS" to "http://nas.local", "write" to "MAILTO:a@b.no"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a link to a script or a file WHEN the answer is drawn THEN its words show but open nothing`() {
+        // GIVEN
+        val markdown = "[click](javascript:alert(1)) or [this](file:///etc/passwd) or [that](/relative)"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("click or this or that", block.text.text)
+        assertEquals(emptyList(), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN an address in angle brackets WHEN the answer is drawn THEN the brackets go and it opens`() {
+        // GIVEN
+        val markdown = "see <https://met.no> first"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("see https://met.no first", block.text.text)
+        assertEquals(listOf("https://met.no" to "https://met.no"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a bare address in the prose WHEN the answer is drawn THEN it opens`() {
+        // GIVEN
+        val markdown = "see https://met.no/x today"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("see https://met.no/x today", block.text.text)
+        assertEquals(listOf("https://met.no/x" to "https://met.no/x"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a bare www address WHEN the answer is drawn THEN it opens over https`() {
+        // GIVEN
+        val markdown = "try www.met.no today"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("try www.met.no today", block.text.text)
+        assertEquals(listOf("www.met.no" to "https://www.met.no"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a link inside bold WHEN the answer is drawn THEN it is both emphasised and opens`() {
+        // GIVEN
+        val markdown = "**read [the forecast](https://met.no/x)**"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(listOf("read the forecast"), block.text.styledBy(styles.emphasis))
+        assertEquals(listOf("the forecast" to "https://met.no/x"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN an image WHEN the answer is drawn THEN its alt text opens nothing`() {
+        // GIVEN
+        val markdown = "![Map of the trail](https://example.org/map.png)"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals(emptyList(), block.text.links())
     }
 
     @Test

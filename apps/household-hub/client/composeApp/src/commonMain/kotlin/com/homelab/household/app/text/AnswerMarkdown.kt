@@ -2,8 +2,11 @@ package com.homelab.household.app.text
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -14,13 +17,14 @@ import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 import org.intellij.markdown.parser.MarkdownParser
 
-/** The four looks an answer's Markdown can take on; built from the theme, or fixed in a test. */
+/** The looks an answer's Markdown can take on; built from the theme, or fixed in a test. */
 @Immutable
 data class AnswerStyles(
     val emphasis: SpanStyle,
     val italic: SpanStyle,
     val code: SpanStyle,
     val muted: SpanStyle,
+    val link: TextLinkStyles,
 )
 
 /** The space above a block, named for why it is there; the screen turns each into a spacing step. */
@@ -55,9 +59,10 @@ sealed interface AnswerBlock {
 /**
  * An answer's Markdown as the blocks the conversation draws.
  *
- * A subset only: emphasis, code, lists, headings, quotes, tables and dividers. Links keep their
- * words and images their alt text; anything else — HTML, a marker that has not closed yet — shows
- * as the model wrote it, so nothing the model said is ever lost.
+ * A subset only: emphasis, code, lists, headings, quotes, tables, dividers and links. A link opens
+ * when it goes to the web or to mail — written as `[words](address)`, in angle brackets or bare —
+ * and otherwise keeps just its words; images keep their alt text. Anything else — HTML, a marker
+ * that has not closed yet — shows as the model wrote it, so nothing the model said is ever lost.
  */
 fun answerBlocks(
     markdown: String,
@@ -91,6 +96,9 @@ private val LINKS =
 private val LISTS = setOf(MarkdownElementTypes.UNORDERED_LIST, MarkdownElementTypes.ORDERED_LIST)
 
 private val SPACE = setOf(MarkdownTokenTypes.EOL, MarkdownTokenTypes.WHITE_SPACE)
+
+/** The only kinds of address a tap may open: the web and mail, never a script or a file. */
+private val OPENABLE = setOf("https", "http", "mailto")
 
 private class BlockWalker(
     private val src: String,
@@ -230,6 +238,12 @@ private class BlockWalker(
                 withStyle(styles.code) { append(node.source().trim('`').trim()) }
             }
 
+            MarkdownElementTypes.INLINE_LINK -> {
+                val destination = node.children.firstOrNull { it.type == MarkdownElementTypes.LINK_DESTINATION }
+                val address = destination?.source()?.removePrefix("<")?.removeSuffix(">")
+                link(address) { node.linkText()?.let { linkText(it) } }
+            }
+
             in LINKS -> {
                 node.linkText()?.let { linkText(it) }
             }
@@ -242,7 +256,13 @@ private class BlockWalker(
             }
 
             MarkdownElementTypes.AUTOLINK -> {
-                append(node.source().removePrefix("<").removeSuffix(">"))
+                val address = node.source().removePrefix("<").removeSuffix(">")
+                link(address) { append(address) }
+            }
+
+            GFMTokenTypes.GFM_AUTOLINK -> {
+                val address = node.source()
+                link(if (address.startsWith("www.")) "https://$address" else address) { append(address) }
             }
 
             MarkdownTokenTypes.BLOCK_QUOTE -> {
@@ -272,6 +292,16 @@ private class BlockWalker(
             .dropWhile { it.type == MarkdownTokenTypes.LBRACKET }
             .dropLastWhile { it.type == MarkdownTokenTypes.RBRACKET }
             .forEach { inline(it) }
+    }
+
+    /** [words] that open [address] when tapped, if it is one a tap may open; just the words if not. */
+    private fun AnnotatedString.Builder.link(
+        address: String?,
+        words: AnnotatedString.Builder.() -> Unit,
+    ) {
+        val scheme = address?.substringBefore(':', missingDelimiterValue = "")?.lowercase()
+        if (address == null || scheme !in OPENABLE) return words()
+        withLink(LinkAnnotation.Url(address, styles.link)) { words() }
     }
 
     private fun ASTNode.linkText(): ASTNode? = children.firstOrNull { it.type == MarkdownElementTypes.LINK_TEXT }
