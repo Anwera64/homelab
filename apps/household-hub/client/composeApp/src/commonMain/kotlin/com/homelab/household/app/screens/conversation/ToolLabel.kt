@@ -17,6 +17,12 @@ import com.homelab.household.app.resources.tool_note_running
 import com.homelab.household.app.resources.tool_pdf_done
 import com.homelab.household.app.resources.tool_pdf_failed
 import com.homelab.household.app.resources.tool_pdf_running
+import com.homelab.household.app.resources.tool_permission_calendar_read
+import com.homelab.household.app.resources.tool_permission_calendar_write
+import com.homelab.household.app.resources.tool_permission_generic
+import com.homelab.household.app.resources.tool_permission_note
+import com.homelab.household.app.resources.tool_permission_pdf
+import com.homelab.household.app.resources.tool_permission_search
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.app.resources.tool_search_running
@@ -28,6 +34,8 @@ data class ToolLabel(
     val done: StringResource,
     val failed: StringResource,
     val icon: HearthIcon,
+    /** What the agent is allowed to do, in words a person picking an agent can weigh. */
+    val permission: StringResource,
 )
 
 /**
@@ -38,12 +46,20 @@ data class ToolLabel(
  */
 fun toolLabel(tool: String): ToolLabel = labels[tool] ?: generic
 
+/**
+ * The permission a tool stands for — what an agent may do, not what it is doing right now — for
+ * the small chips on an agent card in the picker. As with [toolLabel], no raw backend name ever
+ * reaches a person (design notes §2).
+ */
+fun toolPermissionLabel(tool: String): StringResource = toolLabel(tool).permission
+
 private val generic =
     ToolLabel(
         running = Res.string.tool_generic_running,
         done = Res.string.tool_generic_done,
         failed = Res.string.tool_generic_failed,
         icon = HearthIcon.ToolGeneric,
+        permission = Res.string.tool_permission_generic,
     )
 
 private val labels =
@@ -54,6 +70,7 @@ private val labels =
                 done = Res.string.tool_calendar_read_done,
                 failed = Res.string.tool_calendar_read_failed,
                 icon = HearthIcon.Schedule,
+                permission = Res.string.tool_permission_calendar_read,
             ),
         "calendar_write" to
             ToolLabel(
@@ -61,6 +78,7 @@ private val labels =
                 done = Res.string.tool_calendar_write_done,
                 failed = Res.string.tool_calendar_write_failed,
                 icon = HearthIcon.CalendarAdd,
+                permission = Res.string.tool_permission_calendar_write,
             ),
         "searxng_search" to
             ToolLabel(
@@ -68,6 +86,7 @@ private val labels =
                 done = Res.string.tool_search_done,
                 failed = Res.string.tool_search_failed,
                 icon = HearthIcon.Search,
+                permission = Res.string.tool_permission_search,
             ),
         "pdf_reader" to
             ToolLabel(
@@ -75,6 +94,7 @@ private val labels =
                 done = Res.string.tool_pdf_done,
                 failed = Res.string.tool_pdf_failed,
                 icon = HearthIcon.Document,
+                permission = Res.string.tool_permission_pdf,
             ),
         "document_writer" to
             ToolLabel(
@@ -82,5 +102,6 @@ private val labels =
                 done = Res.string.tool_note_done,
                 failed = Res.string.tool_note_failed,
                 icon = HearthIcon.Document,
+                permission = Res.string.tool_permission_note,
             ),
     )
