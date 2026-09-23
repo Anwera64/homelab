@@ -1,3 +1,5 @@
+import re
+
 from app.domain.entities.session import ConversationSession, ChatMessage
 from app.data.datasources.session_data_source import SessionListRow
 from app.data.models.session_model import SessionModel, MessageModel
@@ -5,6 +7,45 @@ from app.data.models.session_model import SessionModel, MessageModel
 # Long enough to recognise a conversation by, short enough that a list of forty rows is not a
 # transcript. The phone never truncates: a row shows what it is given.
 PREVIEW_LENGTH = 120
+
+# A Chats row is plain text, not a rendered document, so Markdown syntax is noise there. Each
+# pattern below unwraps one construct down to the text a reader cares about, and the order they
+# run in (below) matters: list markers are stripped before heading hashes, so a numbered list
+# ("1. One") loses its number while a heading that merely starts with a number ("### 1. Play")
+# does not — its line only starts with a digit once "### " is already gone.
+_FENCED_CODE_RE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
+_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_TABLE_SEPARATOR_RE = re.compile(r"^(?=.*-)(?=.*\|)[ \t|:-]+$", re.MULTILINE)
+_DIVIDER_RE = re.compile(r"^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$", re.MULTILINE)
+_NUMBERED_LIST_RE = re.compile(r"^[ \t]*\d+\.[ \t]+", re.MULTILINE)
+_BULLET_RE = re.compile(r"^[ \t]*[-*+][ \t]+", re.MULTILINE)
+_HEADING_RE = re.compile(r"^[ \t]*#{1,6}[ \t]+", re.MULTILINE)
+_BLOCKQUOTE_RE = re.compile(r"^[ \t]*>[ \t]?", re.MULTILINE)
+_BOLD_STAR_RE = re.compile(r"(?<!\w)\*\*(\S(?:.*?\S)?)\*\*(?!\w)")
+_BOLD_UNDERSCORE_RE = re.compile(r"(?<!\w)__(\S(?:.*?\S)?)__(?!\w)")
+_ITALIC_STAR_RE = re.compile(r"(?<!\w)\*(\S(?:.*?\S)?)\*(?!\w)")
+_ITALIC_UNDERSCORE_RE = re.compile(r"(?<!\w)_(\S(?:.*?\S)?)_(?!\w)")
+
+
+def _strip_markdown_markers(content: str) -> str:
+    """Unwrap Markdown syntax to the text underneath it, leaving whitespace for the caller to collapse."""
+    content = _FENCED_CODE_RE.sub(r"\1", content)
+    content = _INLINE_CODE_RE.sub(r"\1", content)
+    content = _IMAGE_RE.sub(r"\1", content)
+    content = _LINK_RE.sub(r"\1", content)
+    content = _TABLE_SEPARATOR_RE.sub("", content)
+    content = _DIVIDER_RE.sub("", content)
+    content = _NUMBERED_LIST_RE.sub("", content)
+    content = _BULLET_RE.sub("", content)
+    content = _HEADING_RE.sub("", content)
+    content = _BLOCKQUOTE_RE.sub("", content)
+    content = _BOLD_STAR_RE.sub(r"\1", content)
+    content = _BOLD_UNDERSCORE_RE.sub(r"\1", content)
+    content = _ITALIC_STAR_RE.sub(r"\1", content)
+    content = _ITALIC_UNDERSCORE_RE.sub(r"\1", content)
+    return content.replace("|", " ")
 
 
 class SessionDataMapper:
@@ -22,7 +63,7 @@ class SessionDataMapper:
     def _preview(content: str | None) -> str | None:
         if content is None:
             return None
-        collapsed = " ".join(content.split())
+        collapsed = " ".join(_strip_markdown_markers(content).split())
         if len(collapsed) <= PREVIEW_LENGTH:
             return collapsed
         return collapsed[: PREVIEW_LENGTH - 1].rstrip() + "…"
