@@ -41,6 +41,13 @@ data class HearthMotion(
     val waveStagger: Duration = 90.milliseconds,
     /** How far a dot lifts at the top of the wave. A [Dp], which is why it lives here. */
     val waveLift: Dp = 4.dp,
+    /**
+     * One ring spreading out of the new-chat avatar's ⇄ badge. It plays once per new-chat
+     * arrival and never loops, because in this system motion means waiting.
+     */
+    val nudge: Duration = 1200.milliseconds,
+    /** How far behind the first ring the second one runs. */
+    val nudgeStagger: Duration = 600.milliseconds,
     /** False draws every animated component's resting frame instead of starting it. */
     val animate: Boolean = true,
 )

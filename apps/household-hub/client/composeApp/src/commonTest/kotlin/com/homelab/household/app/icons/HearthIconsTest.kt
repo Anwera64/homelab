@@ -26,7 +26,7 @@ class HearthIconsTest {
             "send",
             "attach",
             "back",
-            "agentSwitch",
+            "agentSwap",
             "retry",
             "streaming",
             // Privacy

@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Values come from the palette proof, sections 04 (Copenhagen Day) and 05 (Midnight Espresso). */
@@ -218,6 +219,17 @@ class HearthThemeTest {
         assertEquals(Duration.ZERO, StillMotion.hold)
         assertEquals(Duration.ZERO, StillMotion.minimumVisible)
         assertEquals(8.seconds, StillMotion.slow, "the slow line must never appear by accident")
+    }
+
+    /**
+     * The new-chat avatar's ring plays once per arrival, never loops (design notes §6.21): the
+     * app's own scale carries its timing, and the still scale keeps drawing only the badge.
+     */
+    @Test
+    fun the_nudge_rings_time_a_single_pass_out_of_the_agent_swap_badge() {
+        assertEquals(1200.milliseconds, DefaultMotion.nudge)
+        assertEquals(600.milliseconds, DefaultMotion.nudgeStagger)
+        assertFalse(StillMotion.animate, "StillMotion draws the badge only, never the rings")
     }
 
     private fun assertColor(

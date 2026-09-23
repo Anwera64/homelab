@@ -48,7 +48,12 @@ enum class HearthIcon(
         ),
     ),
     Back("back", strokes("M14.4 5.6 8 12l6.4 6.4")),
-    AgentSwitch("agentSwitch", strokes("M6.4 9.6 12 15.2l5.6-5.6")),
+
+    /** Marks the new-chat avatar that opens the agent picker. */
+    AgentSwap(
+        "agentSwap",
+        strokes("M6.2 8.6h11.6", "M14.6 5.4l3.2 3.2-3.2 3.2", "M17.8 15.4H6.2", "M9.4 12.2l-3.2 3.2 3.2 3.2"),
+    ),
     Retry("retry", strokes("M18.8 12a6.8 6.8 0 1 1-2-4.8", "M18.6 4.6V8h-3.4")),
     Streaming("streaming", solids(circle(12.0, 12.0, 1.1), circle(6.4, 12.0, 1.1), circle(17.6, 12.0, 1.1))),
 
