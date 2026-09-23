@@ -20,7 +20,7 @@ class UpdateAgentUseCase:
         description: Optional[str] = None,
         avatar: Optional[str] = None,
         system_prompt: Optional[str] = None,
-        model_alias: Optional[str] = None,
+        llm_model_id: Optional[str] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         tool_permissions: Optional[List[str]] = None,
@@ -52,8 +52,8 @@ class UpdateAgentUseCase:
                 agent.avatar = avatar
             if system_prompt is not None:
                 agent.system_prompt = system_prompt
-            if model_alias is not None:
-                agent.model_alias = model_alias
+            if llm_model_id is not None:
+                agent.llm_model_id = llm_model_id
             if temperature is not None:
                 agent.temperature = temperature
             if top_p is not None:

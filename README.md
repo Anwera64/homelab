@@ -17,7 +17,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 ## 🌟 Key Features
 
 * **🧠 Local AI & Autonomous Research Engine:**
-  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting `qwen3:14b` and `bge-m3`.
+  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting the household chat model, `qwen3.8-rvn` (an uncensored Qwen3.8-27B that fits the GPU with a 16k context).
   * **SearXNG:** Self-hosted private search aggregator powering agent tools with real-time JSON search results (Brave, Wikipedia, Wikidata, Arxiv, Bing, WolframAlpha) without tracking or rate limits.
 * **🍿 Hardware-Accelerated Streaming:** **Jellyfin** with full NVIDIA NVENC/NVDEC hardware transcoding for 4K HDR/Dolby Vision playback.
 * **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
@@ -188,13 +188,14 @@ Run the automated startup script:
 
 * **Start Stack (with 24h Update Check & Auto-Prune):** `.\startup_homelab.ps1`
   * Fully initializes both the Media automation pipeline and the AI stack (`profiles: ["ai"]`).
-  * Automatically verifies and pulls required Ollama models (`qwen3:14b`, `bge-m3`).
+  * Downloads, SHA256-checks and registers every model listed in `config/ollama-models/models.json` that Ollama is missing.
   * Automatically registers and activates the Open WebUI memory loading indicator filter.
 * **Start Media Stack Only (Without AI Services):** `.\startup_homelab.ps1 -DisableAI`
 * **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
 * **Force Update on Boot:** `.\startup_homelab.ps1 -ForceUpdate`
 * **Stop Stack:** `.\stop_homelab.ps1`
-* **Ollama Model Storage:** models live in the `ollama_models` Docker volume (inside Docker's own disk, for fast loads), not in `config/ollama`. Keys and Modelfiles stay in `config/ollama`.
+* **Ollama Model Storage:** models live in the `ollama_models` Docker volume (inside Docker's own disk, for fast loads), not in `config/ollama`. Keys stay in `config/ollama`; the tracked Modelfiles live in `config/ollama-models`.
+* **Switching the Chat Model:** add the model to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the Household Hub backend to its name, and restart both. Agents follow the household default, so nothing else changes. To change an installed model's Modelfile (e.g. its context size), re-run `docker exec ollama ollama create <name> -f /root/.ollama/imports/<modelfile>` after copying it there. An embedding model such as `bge-m3` can be added the same way once a feature needs it.
 * **Reclaim Disk Space After Removing Models or Images** (admin PowerShell; Docker is down for a few minutes):
   ```powershell
   .\compact_docker_disk.ps1

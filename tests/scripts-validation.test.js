@@ -62,15 +62,25 @@ test('PowerShell Automation Scripts Suite', async (t) => {
     );
   });
 
-  await t.test('startup_homelab.ps1 requires only the Ollama models the apps use', () => {
+  await t.test('startup_homelab.ps1 provisions the Ollama models listed in the manifest', () => {
     assert.ok(
-      startupContent.includes('$requiredModels = @("qwen3:14b", "bge-m3")'),
-      'startup_homelab.ps1 must require exactly qwen3:14b and bge-m3'
+      startupContent.includes('config\\ollama-models\\models.json'),
+      'startup_homelab.ps1 must read the tracked model manifest config/ollama-models/models.json'
     );
     assert.ok(
-      !startupContent.includes('deepseek-v4-flash'),
-      'startup_homelab.ps1 must not require the unused deepseek-v4-flash model'
+      startupContent.includes('Get-FileHash') && startupContent.includes('SHA256'),
+      'startup_homelab.ps1 must verify each downloaded GGUF against its SHA256'
     );
+    assert.ok(
+      /ollama create/.test(startupContent),
+      'startup_homelab.ps1 must register each model with ollama create'
+    );
+    for (const retired of ['qwen3:14b', 'bge-m3', 'deepseek-v4-flash', '$requiredModels']) {
+      assert.ok(
+        !startupContent.includes(retired),
+        `startup_homelab.ps1 must not name models itself (found ${retired}); the manifest does`
+      );
+    }
   });
 
   await t.test('stop_homelab.ps1 terminates Docker stack and legacy processes', () => {

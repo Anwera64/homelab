@@ -30,8 +30,8 @@ The backend is structured into decoupled architectural layers strictly enforced 
   * **Zero-Leak Boundary:** Enforced server-side. Even the Household Admin is forbidden (`403 Forbidden`) from viewing or querying another user's personal space.
 * **Dynamic Agent Catalog, Soft-Delete & Lifecycle Management:**
   * **Built-in Baseline Models:** Seeded automatically on startup:
-    * `researcher`: Academic & Document Researcher (`qwen3:14b`, Temp: 0.3, tools: `pdf_reader`, `searxng_search`, `document_writer`).
-    * `assistant`: Home & Life Coordinator (`qwen3:14b`, Temp: 0.7, tools: `calendar_read`, `calendar_write`, `searxng_search`).
+    * `researcher`: Academic & Document Researcher (household default model, Temp: 0.3, tools: `pdf_reader`, `searxng_search`, `document_writer`).
+    * `assistant`: Home & Life Coordinator (household default model, Temp: 0.7, tools: `calendar_read`, `calendar_write`, `searxng_search`).
   * **Custom Models:** Any household member can create specialized agents with custom system prompts, temperatures, and tool permissions.
   * **Ownership:** Only the creator can edit or delete their custom model.
   * **7-Day Undo Grace Period:** Deleting a custom model soft-deletes it (`deleted_at`), moving it to `/api/v1/agents/trash`. The owner can restore it within 7 days via `/api/v1/agents/{id}/restore`.
@@ -44,7 +44,7 @@ The backend is structured into decoupled architectural layers strictly enforced 
   * **PyMuPDF Document Reader & Extractor:** Non-blocking PDF parsing with chunked streaming upload validation (64KB chunks), sectioning, citation extraction, and scanned 0-text rejection (`422 Unprocessable Entity`).
   * **Relational Document Store:** SQLite persistence with auto-incrementing version tracking and raw `.md` download endpoint.
 * **AI Inference, Tool Execution & Attributed Gossip Bus (Stage 3):**
-  * **Local Ollama Inference (`qwen3:14b` on RTX 5080):** OpenAI-compatible chat completion and streaming pipelines with persistent connection pooling.
+  * **Local Ollama Inference (household default model, `DEFAULT_LLM_MODEL`, on RTX 5080):** OpenAI-compatible chat completion and streaming pipelines with persistent connection pooling.
   * **Progressive Token-by-Token SSE Streaming:** Real-time word-by-word streaming via `/sessions/{id}/stream`. Bypasses non-streaming calls for toolless agents and streams synthesized answers post-tool execution.
   * **Prompt Injection Neutralization:** Strips control tokens (`System:`, `<|im_start|>`, `###`, `---`) from user memories and milestones prior to system prompt compilation.
   * **Autonomous Memory Reflection & Deduplication:** Background extraction runs post-turn. Semantic in-place deduplication updates confidence and refreshes timestamps instead of inserting duplicate rows.

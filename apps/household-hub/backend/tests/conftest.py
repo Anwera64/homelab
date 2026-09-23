@@ -52,10 +52,18 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUseCase
         from app.domain.use_cases.spaces.get_shared_space import GetSharedSpaceUseCase
         from app.data.persistence.unit_of_work import SqliteUnitOfWork
+        from app.data.datasources.llm_model_data_source import SqliteLLMModelDataSource
+        from app.data.repositories.llm_model_repository_impl import LLMModelRepositoryImpl
+        from app.data.mappers.llm_model_data_mapper import LLMModelDataMapper
+        from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCase
+        from app.core.config import settings
 
         uow = SqliteUnitOfWork(session)
         agent_repo = AgentRepositoryImpl(SqliteAgentDataSource(session), AgentDataMapper())
         space_repo = SpaceRepositoryImpl(SqliteSpaceDataSource(session), SpaceDataMapper())
+        model_repo = LLMModelRepositoryImpl(SqliteLLMModelDataSource(session), LLMModelDataMapper())
+        # What the hub does on startup: the default model comes from the setting.
+        await SyncDefaultModelUseCase(model_repo, uow).execute(settings.DEFAULT_LLM_MODEL)
         await SeedBuiltinAgentsUseCase(agent_repo, uow).execute()
         await GetSharedSpaceUseCase(space_repo, uow).execute()
         await session.commit()

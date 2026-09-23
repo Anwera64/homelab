@@ -15,7 +15,6 @@ BUILTIN_AGENTS = [
             "technical literature synthesis, architectural theory, citations, complex document "
             "summarization, and fact-grounded reasoning."
         ),
-        "model_alias": "qwen3:14b",
         "temperature": 0.3,
         "top_p": 0.9,
         "tool_permissions": ["pdf_reader", "searxng_search", "document_writer"],
@@ -32,7 +31,6 @@ BUILTIN_AGENTS = [
             "You are the Household Hub Assistant. You help household members coordinate schedules, "
             "plan meals, organize everyday logistics, and provide concise morning briefings."
         ),
-        "model_alias": "qwen3:14b",
         "temperature": 0.7,
         "top_p": 0.9,
         "tool_permissions": ["calendar_read", "calendar_write", "searxng_search"],

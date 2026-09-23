@@ -158,3 +158,8 @@ class SessionBusyException(DomainException):
     """Raised when a concurrent turn is already processing for a session."""
     pass
 
+
+
+class ModelNotConfiguredException(LLMInferenceException):
+    """Raised when an agent's model cannot be resolved: no household default, or a pin to a model that is gone."""
+    pass

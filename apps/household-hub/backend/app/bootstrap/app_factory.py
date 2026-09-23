@@ -11,6 +11,7 @@ from app.presentation.api.exception_handlers import register_exception_handlers
 from app.presentation.api import deps as pres_deps
 from app.bootstrap.di import setup_dependency_injection, get_container
 from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUseCase
+from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCase
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app import __version__
 
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
         await init_db()
         async with AsyncSessionLocal() as session:
             container = get_container(session)
+            await container[SyncDefaultModelUseCase].execute(settings.DEFAULT_LLM_MODEL)
             await container[SeedBuiltinAgentsUseCase].execute()
             await container[pres_deps.get_shared_space_use_case].execute()
             await container[PurgeExpiredTrashAgentsUseCase].execute()

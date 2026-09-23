@@ -1,0 +1,11 @@
+# Qwen3.8-27B RVN (abliterated), IQ3_M: fits the RTX 5080 entirely with a 16k context.
+FROM /root/.ollama/imports/qwen3.8-rvn.gguf
+RENDERER qwen3.8
+PARSER qwen3.5
+PARAMETER num_ctx 16384
+PARAMETER temperature 1
+PARAMETER top_k 20
+PARAMETER top_p 0.95
+PARAMETER min_p 0
+PARAMETER presence_penalty 0
+PARAMETER repeat_penalty 1

@@ -22,6 +22,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 /** The wire for everything an admin does to the household's agents. */
 class KtorAgentRemoteDataSourceTest {
@@ -34,7 +35,7 @@ class KtorAgentRemoteDataSourceTest {
         "description": "General helper",
         "avatar": "🦙",
         "system_prompt": "You are helpful.",
-        "model_alias": "qwen3:14b",
+        "llm_model_id": null,
         "temperature": 0.7,
         "top_p": 0.9,
         "tool_permissions": ["search"],
@@ -137,7 +138,6 @@ class KtorAgentRemoteDataSourceTest {
                     description = "General helper",
                     avatar = "🦙",
                     system_prompt = "You are helpful.",
-                    model_alias = "llama3:8b",
                     temperature = 0.5f,
                     top_p = 0.95f,
                     tool_permissions = listOf("search"),
@@ -150,10 +150,11 @@ class KtorAgentRemoteDataSourceTest {
             assertEquals("/api/v1/agents", path)
             assertSameJson(
                 """{"slug": "llama", "name": "Llama", "description": "General helper", "avatar": "🦙",
-                "system_prompt": "You are helpful.", "model_alias": "llama3:8b", "temperature": 0.5,
+                "system_prompt": "You are helpful.", "temperature": 0.5,
                 "top_p": 0.95, "tool_permissions": ["search"]}""",
                 sent,
             )
+            assertFalse(sent.orEmpty().contains("model_alias"))
             assertEquals("a-1", agent.id)
         }
 

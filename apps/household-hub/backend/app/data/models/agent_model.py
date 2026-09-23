@@ -20,7 +20,7 @@ class AgentModel(Base):
     description = Column(Text, nullable=False, default="")
     avatar = Column(String(64), nullable=False, default="🤖")
     system_prompt = Column(Text, nullable=False)
-    model_alias = Column(String(64), nullable=False, default="qwen3:14b")
+    llm_model_id = Column(String(36), ForeignKey("llm_models.id", ondelete="SET NULL"), nullable=True)
     temperature = Column(Float, nullable=False, default=0.7)
     top_p = Column(Float, nullable=False, default=0.9)
     tool_permissions = Column(JSON, nullable=False, default=list)

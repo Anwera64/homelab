@@ -10,6 +10,8 @@ config/homepage/logs/
 !config/caddy/Caddyfile
 !config/caddy/Dockerfile
 config/ollama/
+!config/ollama-models/
+!config/ollama-models/**
 !config/searxng/
 !config/searxng/**
 config/open-webui/*

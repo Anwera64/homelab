@@ -14,6 +14,7 @@ from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 from app.domain.exceptions import (
     EntityNotFoundException,
     ZeroLeakViolationException,
@@ -54,6 +55,7 @@ class ProcessChatTurnUseCase:
         tool_executor: ExecuteToolUseCase,
         tool_lister: ListAvailableToolsUseCase,
         uow: IUnitOfWork,
+        model_resolver: ResolveAgentModelUseCase,
         max_iterations: int = 5,
     ):
         self.session_repo = session_repo
@@ -63,6 +65,7 @@ class ProcessChatTurnUseCase:
         self.tool_executor = tool_executor
         self.tool_lister = tool_lister
         self.uow = uow
+        self.model_resolver = model_resolver
         self.max_iterations = max_iterations
 
     def _check_privacy_triggers(self, text: str) -> bool:
@@ -104,6 +107,8 @@ class ProcessChatTurnUseCase:
             raise InvalidOperationException(
                 f"Agent '{agent.name}' is deactivated and cannot accept new messages."
             )
+
+        model = await self.model_resolver.for_agent(agent)
 
         # 1. Natural Language Privacy Guard
         privacy_trigger_detected = self._check_privacy_triggers(content)
@@ -171,7 +176,7 @@ class ProcessChatTurnUseCase:
                 )
                 final_resp = await self.llm_client.chat_completion(
                     messages=llm_messages,
-                    model=agent.model_alias or "qwen3:14b",
+                    model=model,
                     temperature=agent.temperature,
                     top_p=agent.top_p,
                     tools=None,
@@ -181,7 +186,7 @@ class ProcessChatTurnUseCase:
 
             resp = await self.llm_client.chat_completion(
                 messages=llm_messages,
-                model=agent.model_alias or "qwen3:14b",
+                model=model,
                 temperature=agent.temperature,
                 top_p=agent.top_p,
                 tools=agent_tools if agent_tools else None,
@@ -434,6 +439,7 @@ class ProcessChatTurnUseCase:
         auto_approve_writes: bool,
     ):
         """Generate and persist the answer. Everything a turn does once the question is settled."""
+        model = await self.model_resolver.for_agent(agent)
         is_turn_secret = privacy_trigger_detected or session.is_secret
         suggest_secret_mode = privacy_trigger_detected and not session.is_secret
 
@@ -472,7 +478,7 @@ class ProcessChatTurnUseCase:
             async for event in self._relay(
                 self.llm_client.stream_chat_completion(
                     messages=llm_messages,
-                    model=agent.model_alias or "qwen3:14b",
+                    model=model,
                     temperature=agent.temperature,
                     top_p=agent.top_p,
                     tools=None,
@@ -494,7 +500,7 @@ class ProcessChatTurnUseCase:
                     async for event in self._relay(
                         self.llm_client.stream_chat_completion(
                             messages=llm_messages,
-                            model=agent.model_alias or "qwen3:14b",
+                            model=model,
                             temperature=agent.temperature,
                             top_p=agent.top_p,
                             tools=None,
@@ -513,7 +519,7 @@ class ProcessChatTurnUseCase:
                 async for event in self._relay(
                     self.llm_client.stream_chat_completion(
                         messages=llm_messages,
-                        model=agent.model_alias or "qwen3:14b",
+                        model=model,
                         temperature=agent.temperature,
                         top_p=agent.top_p,
                         tools=agent_tools,
@@ -586,7 +592,7 @@ class ProcessChatTurnUseCase:
                 async for event in self._relay(
                     self.llm_client.stream_chat_completion(
                         messages=llm_messages,
-                        model=agent.model_alias or "qwen3:14b",
+                        model=model,
                         temperature=agent.temperature,
                         top_p=agent.top_p,
                         tools=None,

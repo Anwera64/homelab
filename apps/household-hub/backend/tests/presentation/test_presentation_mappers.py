@@ -59,12 +59,13 @@ def test_agent_presentation_mapper():
         description="Helper",
         avatar="🏡",
         system_prompt="Help",
-        model_alias="qwen3:14b",
+        llm_model_id="m-1",
         created_at=now,
     )
     resp = AgentPresentationMapper.to_response(agent)
     assert resp.slug == "assistant"
-    assert resp.model_alias == "qwen3:14b"
+    assert resp.llm_model_id == "m-1"
+    assert not hasattr(resp, "model_alias")
 
 
 def test_session_and_message_presentation_mapper():
