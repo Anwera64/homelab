@@ -287,7 +287,7 @@ private class BlockWalker(
             MarkdownElementTypes.AUTOLINK -> {
                 val address = node.source().removePrefix("<").removeSuffix(">")
                 val mail = node.children.any { it.type == MarkdownTokenTypes.EMAIL_AUTOLINK }
-                link(if (mail) "mailto:$address" else address) { append(address) }
+                link(if (mail) "mailto:$address" else address) { append(withoutMailto(address)) }
             }
 
             GFMTokenTypes.GFM_AUTOLINK -> {
@@ -364,7 +364,10 @@ private class BlockWalker(
     private fun text(build: AnnotatedString.Builder.() -> Unit): AnnotatedString =
         buildAnnotatedString(build).trimmed().withMailLinks()
 
-    /** Each mail address the model wrote bare opens mail, unless it is code or a link already. */
+    /**
+     * Each mail address the model wrote bare opens mail, unless it is code or a link already. Only
+     * the address shows: a `mailto:` in front of it goes, whatever styles it had staying on.
+     */
     private fun AnnotatedString.withMailLinks(): AnnotatedString {
         val bare =
             MAIL_ADDRESS.findAll(text).map { it.range.first to it.range.last + 1 }.filter { (start, end) ->
@@ -372,17 +375,25 @@ private class BlockWalker(
                     spanStyles.none { it.item == styles.code && it.start < end && start < it.end }
             }
         if (bare.none()) return this
-        return AnnotatedString
-            .Builder(this)
-            .apply {
-                bare.forEach { (start, end) ->
-                    val address = text.substring(start, end)
-                    val mail = if (address.startsWith("mailto:", ignoreCase = true)) address else "mailto:$address"
-                    addLink(LinkAnnotation.Url(mail, styles.link), start, end)
+        val source = this
+        return buildAnnotatedString {
+            var at = 0
+            bare.forEach { (start, end) ->
+                if (start > at) append(source.subSequence(at, start))
+                val address = withoutMailto(source.text.substring(start, end))
+                withLink(LinkAnnotation.Url("mailto:$address", styles.link)) {
+                    append(source.subSequence(end - address.length, end))
                 }
-            }.toAnnotatedString()
+                at = end
+            }
+            if (source.length > at) append(source.subSequence(at, source.length))
+        }
     }
 }
+
+/** A mail address as it reads, without the `mailto:` a link needs. */
+private fun withoutMailto(address: String): String =
+    if (address.startsWith("mailto:", ignoreCase = true)) address.substring("mailto:".length) else address
 
 private fun AnnotatedString.trimmed(): AnnotatedString {
     val start = text.indexOfFirst { !it.isWhitespace() }

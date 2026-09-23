@@ -347,7 +347,7 @@ class AnswerMarkdownTest {
     }
 
     @Test
-    fun `GIVEN a bare mailto address WHEN the answer is drawn THEN all of it opens mail`() {
+    fun `GIVEN a bare mailto address WHEN the answer is drawn THEN only the address shows and it opens mail`() {
         // GIVEN
         val markdown = "write to mailto:anton.haushalt@example.com today"
 
@@ -355,11 +355,38 @@ class AnswerMarkdownTest {
         val block = only(markdown)
 
         // THEN
-        assertEquals("write to mailto:anton.haushalt@example.com today", block.text.text)
+        assertEquals("write to anton.haushalt@example.com today", block.text.text)
         assertEquals(
-            listOf("mailto:anton.haushalt@example.com" to "mailto:anton.haushalt@example.com"),
+            listOf("anton.haushalt@example.com" to "mailto:anton.haushalt@example.com"),
             block.text.links(),
         )
+    }
+
+    @Test
+    fun `GIVEN a mailto address in angle brackets WHEN the answer is drawn THEN only the address shows`() {
+        // GIVEN
+        val markdown = "write to <mailto:a@b.no> today"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("write to a@b.no today", block.text.text)
+        assertEquals(listOf("a@b.no" to "mailto:a@b.no"), block.text.links())
+    }
+
+    @Test
+    fun `GIVEN a bold mailto address WHEN the answer is drawn THEN the address stays bold`() {
+        // GIVEN
+        val markdown = "**mailto:a@b.no** or later"
+
+        // WHEN
+        val block = only(markdown)
+
+        // THEN
+        assertEquals("a@b.no or later", block.text.text)
+        assertEquals(listOf("a@b.no"), block.text.styledBy(styles.emphasis))
+        assertEquals(listOf("a@b.no" to "mailto:a@b.no"), block.text.links())
     }
 
     @Test
