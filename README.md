@@ -111,6 +111,7 @@ graph TD
 ├── .env.example                # Environment variables template
 ├── startup_homelab.ps1         # One-click healthcheck & startup script
 ├── stop_homelab.ps1            # Clean shutdown script
+├── compact_docker_disk.ps1     # Shrinks Docker's virtual disk after removing models/images
 ├── enable_virtualization.ps1   # Windows Hyper-V / WSL2 setup helper
 ├── AGENTS.md                   # Strict development & pair-programming rules
 ├── ROADMAP.md                  # Master architecture & enhancement roadmap
@@ -193,6 +194,11 @@ Run the automated startup script:
 * **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
 * **Force Update on Boot:** `.\startup_homelab.ps1 -ForceUpdate`
 * **Stop Stack:** `.\stop_homelab.ps1`
+* **Ollama Model Storage:** models live in the `ollama_models` Docker volume (inside Docker's own disk, for fast loads), not in `config/ollama`. Keys and Modelfiles stay in `config/ollama`.
+* **Reclaim Disk Space After Removing Models or Images** (admin PowerShell; Docker is down for a few minutes):
+  ```powershell
+  .\compact_docker_disk.ps1
+  ```
 * **Watchtower Manual Update Check:**
   ```powershell
   docker compose run --rm watchtower --run-once

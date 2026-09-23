@@ -371,6 +371,8 @@ services:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
       - ${CONFIG_PATH}/ollama:/root/.ollama
+      # Models stay inside Docker's own disk: loading them over the Windows share took minutes.
+      - ollama_models:/root/.ollama/models
     deploy:
       resources:
         reservations:
@@ -398,4 +400,6 @@ services:
     restart: unless-stopped
 volumes:
   tailscale_sock:
+  ollama_models:
+    name: ollama_models
 
