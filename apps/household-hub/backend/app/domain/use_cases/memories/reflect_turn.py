@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import re
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from app.domain.entities.gossip_milestone import GossipMilestone
 from app.domain.entities.llm_message import LLMMessage
@@ -13,6 +13,7 @@ from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.chat.current_date_line import current_date_line
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,17 @@ Guidelines:
 """
 
 
+# Kept apart from EXTRACTION_SYSTEM_PROMPT so that prompt stays the same on every call.
+DATE_RESOLUTION_GUIDANCE = (
+    "Write dates as absolute dates: turn relative ones such as \"tomorrow\" or \"on Friday\" into the "
+    "calendar date they mean, in memories and milestones alike, and count expires_at from today."
+)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 @dataclass
 class ReflectTurnResult:
     session_title: Optional[str] = None
@@ -66,6 +78,7 @@ class ReflectTurnUseCase:
         uow: IUnitOfWork,
         model_resolver: ResolveAgentModelUseCase,
         confidence_threshold: float = 0.70,
+        clock: Callable[[], datetime] = _utc_now,
     ):
         self.llm_client = llm_client
         self.memory_repo = memory_repo
@@ -74,6 +87,9 @@ class ReflectTurnUseCase:
         self.uow = uow
         self.confidence_threshold = confidence_threshold
         self.model_resolver = model_resolver
+        # Tells the model what day it is, so "Friday" and expiry dates land on real days. Injected
+        # so a test can fix it.
+        self.clock = clock
 
     async def execute(
         self,
@@ -87,6 +103,7 @@ class ReflectTurnUseCase:
         is_secret_session: bool = False,
         is_turn_secret: bool = False,
         is_first_turn: bool = False,
+        timezone_name: Optional[str] = None,
     ) -> ReflectTurnResult:
         prompt = (
             f"User '{username}': {user_message}\n"
@@ -96,6 +113,10 @@ class ReflectTurnUseCase:
 
         messages = [
             LLMMessage(role="system", content=EXTRACTION_SYSTEM_PROMPT),
+            LLMMessage(
+                role="system",
+                content=f"{current_date_line(self.clock(), timezone_name)} {DATE_RESOLUTION_GUIDANCE}",
+            ),
             LLMMessage(role="user", content=prompt),
         ]
 

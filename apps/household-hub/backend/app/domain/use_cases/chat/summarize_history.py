@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.entities.session import ChatMessage
@@ -7,6 +7,7 @@ from app.domain.exceptions import DomainException
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.chat.current_date_line import sent_at_stamp, timezone_label
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
@@ -23,7 +24,12 @@ _INSTRUCTIONS = (
     "turn could need: facts and figures, decisions, the member's preferences and plans, questions "
     "still open, and the sources an answer relied on (titles and URLs). Drop greetings, filler and "
     "anything repeated. Write plain prose in the third person, at most {words} words. Reply with "
-    "the summary only."
+    "the summary only.\n\n"
+    # The summary is read on later days (#39): a relative date in it would go stale, and a "today"
+    # would contradict the real date the chat prompt carries.
+    "Each message shows when it was sent. Write every date as a calendar date, working out words "
+    "like 'tomorrow' or 'on Friday' from the date of the message that used them. Never write "
+    "'today', 'tomorrow' or 'yesterday' in the summary: it is read on later days."
 )
 
 
@@ -56,7 +62,7 @@ class SummarizeHistoryUseCase:
         self.history_tokens = history_tokens
         self.summary_tokens = summary_tokens
 
-    async def execute(self, session_id: str) -> bool:
+    async def execute(self, session_id: str, timezone_name: Optional[str] = None) -> bool:
         """Whether a new summary was saved."""
         session = await self.session_repo.get_by_id(session_id)
         if session is None:
@@ -75,7 +81,7 @@ class SummarizeHistoryUseCase:
 
         try:
             response = await self.llm_client.chat_completion(
-                messages=self._prompt(session.history_summary, folded),
+                messages=self._prompt(session.history_summary, folded, timezone_name),
                 model=await self.model_resolver.default(),
                 temperature=0.1,
                 tools=None,
@@ -94,14 +100,22 @@ class SummarizeHistoryUseCase:
             await self.uow.commit()
         return True
 
-    def _prompt(self, previous: str | None, folded: List[ChatMessage]) -> List[LLMMessage]:
+    def _prompt(
+        self, previous: str | None, folded: List[ChatMessage], timezone_name: Optional[str]
+    ) -> List[LLMMessage]:
         # About 0.7 words per token.
         words = int(self.summary_tokens * 0.7)
-        transcript = "\n\n".join(f"{m.role}: {m.content}" for m in folded)
+        # Each message stamped with when it was sent, so "tomorrow" is read against its own day.
+        transcript = "\n\n".join(
+            f"[{sent_at_stamp(m.created_at, timezone_name)}] {m.role}: {m.content}" for m in folded
+        )
         return [
             LLMMessage(role="system", content=_INSTRUCTIONS.format(words=words)),
             LLMMessage(role="user", content=f"Summary so far:\n{previous or '(none yet)'}"),
-            LLMMessage(role="user", content=f"New messages:\n{transcript}"),
+            LLMMessage(
+                role="user",
+                content=f"New messages (times in {timezone_label(timezone_name)}):\n{transcript}",
+            ),
         ]
 
 

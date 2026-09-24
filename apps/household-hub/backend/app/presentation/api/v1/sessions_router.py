@@ -204,6 +204,7 @@ async def chat_turn(
     agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     reflection_runner = Depends(get_background_reflection_runner),
+    x_timezone: Optional[str] = Header(None, alias="X-Timezone"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -223,6 +224,7 @@ async def chat_turn(
             current_user=current_user,
             content=payload.content,
             auto_approve_writes=payload.auto_approve_writes,
+            timezone_name=x_timezone,
         )
 
         asyncio.create_task(
@@ -237,6 +239,7 @@ async def chat_turn(
                 is_secret_session=result.is_secret,
                 is_turn_secret=result.is_turn_secret,
                 is_first_turn=is_first_turn,
+                timezone_name=x_timezone,
             )
         )
 
@@ -258,6 +261,7 @@ async def regenerate_answer(
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
     turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
+    x_timezone: Optional[str] = Header(None, alias="X-Timezone"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -305,6 +309,7 @@ async def regenerate_answer(
                 agent_name=agent_name,
                 is_first_turn=is_first_turn,
                 regenerate=True,
+                timezone_name=x_timezone,
             )
         finally:
             await lock_registry.release(session_id)
@@ -323,6 +328,7 @@ async def chat_turn_stream(
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
     turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
+    x_timezone: Optional[str] = Header(None, alias="X-Timezone"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -360,6 +366,7 @@ async def chat_turn_stream(
                 agent_id=agent_id,
                 agent_name=agent_name,
                 is_first_turn=is_first_turn,
+                timezone_name=x_timezone,
             )
         finally:
             await lock_registry.release(session_id)
