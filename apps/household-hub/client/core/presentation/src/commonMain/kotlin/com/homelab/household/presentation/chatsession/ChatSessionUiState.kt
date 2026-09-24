@@ -106,6 +106,24 @@ data class ChatSessionUiState(
                 activeTool == null &&
                 parts.isEmpty()
 
+    /**
+     * A live turn with nothing on screen saying it is still going: no words yet, the model
+     * thinking, or a tool just finished and the next words not here.
+     *
+     * The dots used to show only before the first word, so once an answer had begun, a tool
+     * finishing or the model stopping to think left it looking finished. Words arriving say it
+     * themselves, and a running tool has its own chip.
+     */
+    val isWaitingForWords: Boolean
+        get() =
+            turnState == TurnState.Streaming &&
+                activeTool == null &&
+                (streamingMessage.isNullOrEmpty() || isThinking || endsOnAStep)
+
+    /** The answer so far stops on a step rather than on words. No parts at all is not a step. */
+    private val endsOnAStep: Boolean
+        get() = parts.isNotEmpty() && parts.last() !is AnswerPart.Text
+
     /** A conversation nobody has spoken in yet: the hero greeting rather than a transcript. */
     val isNew: Boolean
         get() = messages.isEmpty() && streamingMessage == null

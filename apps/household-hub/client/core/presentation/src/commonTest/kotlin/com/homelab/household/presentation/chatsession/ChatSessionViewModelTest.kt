@@ -765,6 +765,44 @@ class ChatSessionViewModelTest {
             assertFalse(state.isThinking, "once the answer begins, the thinking steps aside")
         }
 
+    /** The chip goes when the tool is done; something has to say the answer is still coming. */
+    @Test
+    fun `GIVEN a tool that finished after the first words WHEN the next words have not come THEN the turn is waiting for them`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Let me check."))
+                    emit(ChatStreamEvent.ToolExecuting("web_search"))
+                    emit(ChatStreamEvent.ToolResult("web_search", success = true))
+                    awaitCancellation()
+                }
+
+            viewModel.sendMessage("Will Saturday stay dry?")
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isWaitingForWords)
+        }
+
+    @Test
+    fun `GIVEN a turn waiting after a tool WHEN the next words arrive THEN it is no longer waiting`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Let me check."))
+                    emit(ChatStreamEvent.ToolExecuting("web_search"))
+                    emit(ChatStreamEvent.ToolResult("web_search", success = true))
+                    emit(ChatStreamEvent.Delta("It stays dry."))
+                    awaitCancellation()
+                }
+
+            viewModel.sendMessage("Will Saturday stay dry?")
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isWaitingForWords)
+        }
+
     @Test
     fun `GIVEN a finished answer WHEN the hub sends no parts THEN the message keeps the parts it streamed`() =
         runTest(testDispatcher) {

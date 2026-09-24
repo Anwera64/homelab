@@ -433,6 +433,33 @@ class ConversationScreenTest {
             onNodeWithText("The panel review is tomorrow at 14:30.").assertIsDisplayed()
         }
 
+    /** The chip went when the tool finished; without the dots the answer looked finished too. */
+    @Test
+    fun `GIVEN a tool that finished and no new words yet WHEN drawn THEN the dots show under the tool line`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Between a tool and the next words")))
+
+            val tool = onNodeWithText(getString(Res.string.tool_calendar_read_done)).getUnclippedBoundsInRoot()
+            val dots = onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue(tool.bottom <= dots.top, "the dots sit where the next words will go")
+        }
+
+    @Test
+    fun `GIVEN the model thinking after its first words WHEN drawn THEN the dots show`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Thinking mid-answer")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertIsDisplayed()
+        }
+
+    @Test
+    fun `GIVEN words arriving WHEN drawn THEN there are no dots`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Answering")))
+
+            onNodeWithTag(THINKING_DOTS_TAG).assertDoesNotExist()
+        }
+
     @Test
     fun a_tool_that_could_not_run_says_so_in_the_trail() =
         runComposeUiTest {

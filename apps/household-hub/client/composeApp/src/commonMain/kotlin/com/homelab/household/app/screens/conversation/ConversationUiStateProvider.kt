@@ -156,6 +156,26 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                 ),
+            // The tool is done and the next words are not here yet: still working, and it says so.
+            "Between a tool and the next words" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "Let me check your calendar.",
+                    turnState = TurnState.Streaming,
+                    parts =
+                        listOf(
+                            AnswerPart.Text("Let me check your calendar."),
+                            AnswerPart.ToolDone("calendar_read"),
+                        ),
+                ),
+            "Thinking mid-answer" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "Let me check your calendar.",
+                    turnState = TurnState.Streaming,
+                    isThinking = true,
+                    parts = listOf(AnswerPart.Text("Let me check your calendar.")),
+                ),
             "A tool that couldn't run" to
                 agent.copy(
                     messages = listOf(question),

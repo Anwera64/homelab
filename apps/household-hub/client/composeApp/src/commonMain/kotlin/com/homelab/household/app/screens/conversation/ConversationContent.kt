@@ -102,10 +102,10 @@ fun ConversationContent(
     val type = HearthTheme.typography
     val transcript = rememberLazyListState()
 
-    // Sent, and not a word back yet — the hub loading a model, or the model thinking before it
-    // writes. It obeys the same four beats as every other wait (design notes §6.21), so a hub that
-    // answers quickly draws none of it.
-    val thinking = state.turnState == TurnState.Streaming && state.streamingMessage.isNullOrEmpty()
+    // A live turn with nothing saying it is still going: no word back yet, the model thinking, or
+    // a tool done and the next words not here. It obeys the same four beats as every other wait
+    // (design notes §6.21), so a quick hub, or a pause between words, draws none of it.
+    val thinking = state.isWaitingForWords
     val thinkingPhase = rememberWaitPhase(thinking)
 
     // "Slow" is timed on silence alone. A model visibly thinking or using a tool is busy, not
