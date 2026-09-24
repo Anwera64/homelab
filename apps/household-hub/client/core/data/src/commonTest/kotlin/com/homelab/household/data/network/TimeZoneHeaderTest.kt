@@ -34,7 +34,7 @@ class TimeZoneHeaderTest {
             client.get("/api/v1/agents")
 
             // THEN
-            assertEquals(listOf("America/Lima", "America/Lima"), capturedHeaders)
+            assertEquals(listOf<String?>("America/Lima", "America/Lima"), capturedHeaders)
         }
 
     @Test
@@ -59,6 +59,6 @@ class TimeZoneHeaderTest {
             client.get("/api/v1/agents")
 
             // THEN
-            assertEquals(listOf("America/Lima", "Asia/Tokyo"), capturedHeaders)
+            assertEquals(listOf<String?>("America/Lima", "Asia/Tokyo"), capturedHeaders)
         }
 }

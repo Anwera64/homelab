@@ -1,3 +1,5 @@
 package com.homelab.household.data.network
 
-actual fun deviceTimeZoneId(): String = java.util.TimeZone.getDefault().id
+import java.util.TimeZone
+
+actual fun deviceTimeZoneId(): String = TimeZone.getDefault().id
