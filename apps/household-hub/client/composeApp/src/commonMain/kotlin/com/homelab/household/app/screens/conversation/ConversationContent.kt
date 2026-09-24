@@ -1,6 +1,7 @@
 package com.homelab.household.app.screens.conversation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.dp
 import com.homelab.household.app.components.AnswerText
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
@@ -125,7 +127,9 @@ fun ConversationContent(
 
     // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this the
     // words land below the fold and the screen sits still while the agent talks.
-    // Thinking, a tool and the steps grow the answer too, before a single word of it arrives.
+    // Thinking, a tool and the steps grow the answer too, before a single word of it arrives. So
+    // do the dots and the slow line, a beat after the wait begins rather than with it, which is
+    // why their phases are keys: without them "Thinking" appeared behind the composer.
     LaunchedEffect(
         itemCount,
         state.streamingMessage,
@@ -133,6 +137,8 @@ fun ConversationContent(
         state.isThinking,
         state.activeTool,
         state.parts,
+        thinkingPhase,
+        slowPhase,
     ) {
         if (itemCount == 0) return@LaunchedEffect
 
@@ -384,7 +390,12 @@ private fun Answer(
                 }
             }
         }
-        status?.invoke()
+        if (status != null) {
+            // Held clear of the steps above it, so waiting reads as the turn still going rather
+            // than as one more step. Nothing above it, nothing to hold clear of.
+            val clearance = if (runs.isEmpty()) 0.dp else HearthTheme.spacing.sm
+            Box(modifier = Modifier.padding(top = clearance)) { status() }
+        }
     }
 }
 

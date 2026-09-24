@@ -444,6 +444,17 @@ class ConversationScreenTest {
             assertTrue(tool.bottom <= dots.top, "the dots sit where the next words will go")
         }
 
+    /** Close under the steps, the dots read as one more step rather than as the turn still going. */
+    @Test
+    fun `GIVEN a tool that finished and no new words yet WHEN drawn THEN the dots stand at least 16dp clear of the tool line`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Between a tool and the next words")))
+
+            val tool = onNodeWithText(getString(Res.string.tool_calendar_read_done)).getUnclippedBoundsInRoot()
+            val dots = onNodeWithTag(THINKING_DOTS_TAG).getUnclippedBoundsInRoot()
+            assertTrue(dots.top - tool.bottom >= 16.dp, "gap was ${dots.top - tool.bottom}")
+        }
+
     @Test
     fun `GIVEN the model thinking after its first words WHEN drawn THEN the dots show`() =
         runComposeUiTest {
