@@ -212,6 +212,65 @@ async def test_facts_from_a_member_who_left_are_told_in_the_past():
     assert "Emma mentioned" in system_prompt
 
 
+def _assembler(history_tokens: int = 6000) -> AssembleAgentContextUseCase:
+    return AssembleAgentContextUseCase(
+        memory_repo=FakeMemoryRepository(), gossip_repo=FakeGossipRepository(), history_tokens=history_tokens
+    )
+
+
+def _chat(count: int, characters: int):
+    return [
+        ChatMessage(id=f"m{i}", session_id="s1", role="user" if i % 2 else "assistant", content=f"{i}:" + "x" * characters)
+        for i in range(1, count + 1)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_summary_WHEN_assembled_THEN_it_sits_between_the_system_prompt_and_the_messages():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", system_prompt="You are helpful.")
+    messages = _chat(3, 10)
+
+    assembled = await _assembler().execute(
+        user=user, agent=agent, recent_messages=messages, history_summary="Alex planned a trip to Lima."
+    )
+
+    assert assembled[0].role == "system" and assembled[0].content.startswith("You are helpful.")
+    assert assembled[1].role == "system"
+    assert assembled[1].content == "[Earlier in this conversation]:\nAlex planned a trip to Lima."
+    assert [m.content for m in assembled[2:]] == [m.content for m in messages]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_more_messages_than_the_budget_WHEN_assembled_THEN_the_newest_are_kept_whole_and_the_question_is_last():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    # Thirty messages of about 100 tokens each against a budget of 1,000.
+    messages = _chat(30, 300)
+
+    assembled = await _assembler(history_tokens=1000).execute(user=user, agent=agent, recent_messages=messages)
+
+    sent = [m.content for m in assembled[1:]]
+    assert sent == [m.content for m in messages[-len(sent):]]
+    assert 5 <= len(sent) <= 10
+    # Nothing is cut short, and no old-style snippet summary appears.
+    assert all(len(content) == len(original.content) for content, original in zip(sent, messages[-len(sent):]))
+    assert not any("Summary of earlier conversation" in m.content for m in assembled)
+    assert assembled[-1].content == messages[-1].content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_question_bigger_than_the_budget_WHEN_assembled_THEN_it_is_still_sent_whole():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    messages = _chat(3, 300)
+    messages[-1].content = "q" * 9000
+
+    assembled = await _assembler(history_tokens=1000).execute(user=user, agent=agent, recent_messages=messages)
+
+    assert [m.content for m in assembled[1:]] == ["q" * 9000]
+
+
 FIXED_NOW = datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
 
 

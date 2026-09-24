@@ -199,3 +199,59 @@ def test_agents_stop_naming_models_and_follow_the_household_default():
                 assert names == {"researcher": "qwen3:14b", "assistant": "qwen3:14b", "custom": "llama3:8b"}
         finally:
             engine.dispose()
+
+
+_BEFORE_RESEARCHER_WARMS_UP = "226eae49047c"
+
+
+def _agents_at(database_url: str, rows) -> dict:
+    """Migrates a fresh database to just before the change, inserts agents, and upgrades to head."""
+    from sqlalchemy import text
+
+    config = _alembic_config(database_url)
+    command.upgrade(config, _BEFORE_RESEARCHER_WARMS_UP)
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as conn:
+            for slug, temperature, is_builtin in rows:
+                conn.execute(
+                    text(
+                        "INSERT INTO agent_personalities (id, slug, name, description, avatar, system_prompt, "
+                        "temperature, top_p, tool_permissions, is_builtin, is_active, created_at, updated_at) "
+                        "VALUES (:slug, :slug, :slug, '', '🤖', 'prompt', :t, 0.85, '[]', :b, 1, "
+                        "'2026-01-01', '2026-01-01')"
+                    ),
+                    {"slug": slug, "t": temperature, "b": is_builtin},
+                )
+        command.upgrade(config, "head")
+        with engine.connect() as conn:
+            upgraded = dict(conn.execute(text("SELECT slug, temperature FROM agent_personalities")).all())
+        command.downgrade(config, _BEFORE_RESEARCHER_WARMS_UP)
+        with engine.connect() as conn:
+            downgraded = dict(conn.execute(text("SELECT slug, temperature FROM agent_personalities")).all())
+        return {"upgraded": upgraded, "downgraded": downgraded}
+    finally:
+        engine.dispose()
+
+
+def test_GIVEN_the_builtin_researcher_at_0_3_WHEN_migrated_THEN_it_runs_at_0_6_and_back_on_downgrade():
+    """
+    The Researcher ran a thinking model at 0.3, far below its own 1.0, and sent garbled tool names.
+    Only the untouched built-in moves: a temperature someone chose stays theirs.
+    """
+    with tempfile.TemporaryDirectory() as workspace:
+        result = _agents_at(
+            f"sqlite:///{Path(workspace) / 'warm.db'}",
+            [("researcher", 0.3, True), ("custom", 0.3, False)],
+        )
+
+    assert result["upgraded"] == {"researcher": 0.6, "custom": 0.3}
+    assert result["downgraded"] == {"researcher": 0.3, "custom": 0.3}
+
+
+def test_GIVEN_a_researcher_someone_retuned_WHEN_migrated_THEN_its_temperature_is_left_alone():
+    with tempfile.TemporaryDirectory() as workspace:
+        result = _agents_at(f"sqlite:///{Path(workspace) / 'edited.db'}", [("researcher", 0.45, True)])
+
+    assert result["upgraded"] == {"researcher": 0.45}
+    assert result["downgraded"] == {"researcher": 0.45}

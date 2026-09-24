@@ -40,6 +40,12 @@ class FakeSessionRepository:
 
     get_messages = list_messages_by_session_id
 
+    async def get_messages_after(self, session_id: str, after_id=None, limit: int = 200):
+        mine = [m for m in self.messages if m.session_id == session_id]
+        ids = [m.id for m in mine]
+        start = ids.index(after_id) + 1 if after_id in ids else 0
+        return mine[start:][-limit:]
+
 
     async def update(self, session: ConversationSession) -> ConversationSession:
         self.sessions[session.id] = session
@@ -98,11 +104,20 @@ def _house_resolver():
 
 class FakeContextAssembler:
     def __init__(self):
+        self.summaries = []
         self.timezones_asked_for = []
 
     async def execute(
-        self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False, timezone_name=None
+        self,
+        user,
+        agent,
+        recent_messages,
+        is_secret_session=False,
+        is_turn_secret=False,
+        history_summary=None,
+        timezone_name=None,
     ):
+        self.summaries.append(history_summary)
         self.timezones_asked_for.append(timezone_name)
         return [
             LLMMessage(role="system", content="System instructions"),
@@ -114,8 +129,8 @@ class FakeToolExecutor:
     def __init__(self):
         self.executed_calls = []
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant"):
-        self.executed_calls.append({"tool": tool_name, "args": arguments})
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
         return ToolExecutionResult(tool_name=tool_name, success=True, data={"result": "ok"})
 
 
@@ -366,8 +381,9 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
     assert len(llm_client.chat_calls) == 0
     assert len(llm_client.stream_calls) == 2
     assert llm_client.stream_calls[0]["tools"] is not None
-    # Synthesis used stream_chat_completion with tools=None
-    assert llm_client.stream_calls[1]["tools"] is None
+    # After a round of tools the model may still call more (#35): the answer is just a round in
+    # which it chose not to.
+    assert llm_client.stream_calls[1]["tools"] is not None
 
     # Events sequence: tool_executing, tool_result, deltas, done
     types = [ev["type"] for ev in events]
@@ -670,6 +686,10 @@ async def test_a_write_the_decision_asks_for_still_waits_for_approval():
     proposals = [ev for ev in events if ev["type"] == "tool_call"]
     assert proposals and proposals[0]["data"]["status"] == "proposal_pending"
     assert tool_executor.executed_calls == []
+    # The turn now waits on the member, so the model says so with no tools to try the write again.
+    assert len(llm_client.stream_calls) == 2
+    assert llm_client.stream_calls[1]["tools"] is None
+    assert events[-1]["assistant_content"] == "Shall I add it?"
 
 
 @pytest.mark.asyncio
@@ -810,7 +830,7 @@ class SteppedClock:
 
 
 class FailingToolExecutor(FakeToolExecutor):
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant"):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         return ToolExecutionResult(tool_name=tool_name, success=False, error="unreachable")
 
@@ -958,6 +978,403 @@ async def test_GIVEN_an_answer_with_no_tools_WHEN_answered_THEN_it_is_one_text_p
 
     assert events[-1]["parts"] == [{"type": "text", "content": "A light day. "}]
     assert session_repo.messages[-1].content == "A light day. "
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_model_that_asks_for_tools_twice_WHEN_answered_THEN_both_rounds_run_and_it_answers():
+    """
+    Issue #35: after one round of tools the model was asked for its answer with no tools left, so a
+    model that wanted to search again said it would and stopped - the turn ended on a promise.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    first = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "2026-09-24"})
+    second = LLMToolCall(id="c2", name="calendar_read", arguments={"date": "2026-09-25"})
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(delta_content="Let me look. "), LLMResponseChunk(tool_calls=[first])],
+            [LLMResponseChunk(delta_content="And the day after. "), LLMResponseChunk(tool_calls=[second])],
+            [LLMResponseChunk(delta_content="Both days are free.")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client, tool_executor).execute_stream(
+            session_id="s1", current_user=user, content="Am I free today and tomorrow?"
+        )
+    ]
+
+    assert [call["args"] for call in tool_executor.executed_calls] == [first.arguments, second.arguments]
+    assert len(llm_client.stream_calls) == 3
+    assert all(call["tools"] is not None for call in llm_client.stream_calls)
+    expected_parts = [
+        {"type": "text", "content": "Let me look. "},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "text", "content": "And the day after. "},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "text", "content": "Both days are free."},
+    ]
+    expected_content = "Let me look.\n\nAnd the day after.\n\nBoth days are free."
+    done = events[-1]
+    assert done["parts"] == expected_parts
+    assert done["assistant_content"] == expected_content
+    assert session_repo.messages[-1].metadata_json["parts"] == expected_parts
+    assert session_repo.messages[-1].content == expected_content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_model_that_never_stops_calling_tools_WHEN_the_budget_runs_out_THEN_it_is_made_to_answer():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Here is what I found.")],
+        ]
+    )
+    use_case = _use_case(session_repo, agent, llm_client, tool_executor)
+    use_case.max_iterations = 3
+
+    events = [
+        ev
+        async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Look everything up")
+    ]
+
+    assert len(tool_executor.executed_calls) == 2
+    assert len(llm_client.stream_calls) == 3
+    last_call = llm_client.stream_calls[-1]
+    assert last_call["tools"] is None
+    assert last_call["messages"][-1].role == "system"
+    assert last_call["messages"][-1].content.startswith("Tool budget reached")
+    assert events[-1]["assistant_content"] == "Here is what I found."
+    assert session_repo.messages[-1].content == "Here is what I found."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_two_rounds_of_tools_WHEN_answered_without_streaming_THEN_both_rounds_run():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        responses=[
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})]),
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})]),
+            LLMResponse(content="Both days are free."),
+        ]
+    )
+
+    result = await _use_case(session_repo, agent, llm_client, tool_executor).execute(
+        session_id="s1", current_user=user, content="Am I free today and tomorrow?"
+    )
+
+    assert len(tool_executor.executed_calls) == 2
+    assert result.message.content == "Both days are free."
+
+
+class ResearchToolLister:
+    async def execute(self):
+        return [
+            ToolDefinition(name=name, description=name, parameters_schema={"type": "object"})
+            for name in ("searxng_search", "read_page", "lookup_sources", "calendar_read")
+        ]
+
+
+class CountingIndexFactory:
+    def __init__(self):
+        self.made = []
+
+    def new(self):
+        index = object()
+        self.made.append(index)
+        return index
+
+
+def _research_use_case(session_repo, agent, llm_client, tool_executor, factory):
+    use_case = _use_case(session_repo, agent, llm_client, tool_executor)
+    use_case.tool_lister = ResearchToolLister()
+    use_case.source_index_factory = factory
+    return use_case
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_agent_that_may_search_WHEN_tools_are_offered_THEN_reading_and_looking_up_come_with_it():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Hi.")]])
+
+    [ev async for ev in _research_use_case(
+        session_repo, agent, llm_client, FakeToolExecutor(), CountingIndexFactory()
+    ).execute_stream(session_id="s1", current_user=user, content="Hello")]
+
+    offered = [tool["function"]["name"] for tool in llm_client.stream_calls[0]["tools"]]
+    assert offered == ["searxng_search", "read_page", "lookup_sources"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_tools_in_two_rounds_WHEN_answered_THEN_every_call_shares_one_turns_sources_and_the_next_turn_gets_new_ones():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    search = LLMToolCall(id="c1", name="searxng_search", arguments={"query": "tariffs"})
+    lookup = LLMToolCall(id="c2", name="lookup_sources", arguments={"question": "tariffs"})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[search])],
+            [LLMResponseChunk(tool_calls=[lookup])],
+            [LLMResponseChunk(delta_content="Tariffs rose.")],
+            [LLMResponseChunk(delta_content="Second answer.")],
+        ]
+    )
+    tool_executor = FakeToolExecutor()
+    factory = CountingIndexFactory()
+    use_case = _research_use_case(session_repo, agent, llm_client, tool_executor, factory)
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Tariffs?")]
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Thanks")]
+
+    first, second = (call["sources"] for call in tool_executor.executed_calls)
+    assert first is not None and first is second
+    assert len(factory.made) == 2
+
+
+class PassagesToolExecutor(FakeToolExecutor):
+    """Looks up three passages of 900 characters each: about 950 tokens by the hub's estimate."""
+
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
+        return ToolExecutionResult(
+            tool_name=tool_name,
+            success=True,
+            data={"passages": [{"id": f"p1.{i}", "text": str(i) * 900} for i in (1, 2, 3)]},
+        )
+
+
+def _windowed_use_case(session_repo, agent, llm_client, window, reserve):
+    use_case = _use_case(session_repo, agent, llm_client, PassagesToolExecutor())
+    use_case.context_window_tokens = window
+    use_case.answer_reserve_tokens = reserve
+    return use_case
+
+
+def _tool_message(call) -> dict:
+    import json
+    return json.loads([m for m in call["messages"] if m.role == "tool"][-1].content)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_result_bigger_than_the_room_left_WHEN_answered_THEN_whole_items_are_kept_and_the_answer_is_forced():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    call = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[call])], [LLMResponseChunk(delta_content="From two passages.")]]
+    )
+
+    events = [ev async for ev in _windowed_use_case(session_repo, agent, llm_client, window=1200, reserve=300)
+              .execute_stream(session_id="s1", current_user=user, content="What do the sources say?")]
+
+    seen = _tool_message(llm_client.stream_calls[1])
+    # Whole passages only: two fit, the third is left out and the model is told.
+    assert [p["text"] for p in seen["passages"]] == ["1" * 900, "2" * 900]
+    assert seen["left_out"] == 1
+    # Too little room for another round, so the second call is the answer.
+    assert llm_client.stream_calls[1]["tools"] is None
+    assert llm_client.stream_calls[1]["messages"][-1].content.startswith("Tool budget reached")
+    assert events[-1]["assistant_content"] == "From two passages."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_room_for_even_one_item_WHEN_a_tool_returns_THEN_the_model_is_told_to_answer_with_what_it_has():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    call = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[call])], [LLMResponseChunk(delta_content="What I have.")]]
+    )
+
+    [ev async for ev in _windowed_use_case(session_repo, agent, llm_client, window=650, reserve=300)
+     .execute_stream(session_id="s1", current_user=user, content="What do the sources say?")]
+
+    assert _tool_message(llm_client.stream_calls[1]) == {
+        "error": "No room left for more results; answer with what you have."
+    }
+    assert llm_client.stream_calls[1]["tools"] is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_answer_is_forced_WHEN_the_model_is_asked_THEN_the_question_is_the_last_thing_it_reads():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Answer.")],
+        ]
+    )
+    use_case = _use_case(session_repo, agent, llm_client)
+    use_case.max_iterations = 2
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Rank them by gravity")]
+
+    last = llm_client.stream_calls[-1]["messages"][-1]
+    assert last.role == "system"
+    assert last.content.startswith("Tool budget reached")
+    assert "Rank them by gravity" in last.content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_the_window_cut_off_WHEN_saved_THEN_it_is_flagged_as_cut_off():
+    """It used to be saved as a finished answer ending mid-sentence, with nothing saying why."""
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Let me compile"), LLMResponseChunk(finish_reason="length")]]
+    )
+
+    events = [ev async for ev in _use_case(session_repo, agent, llm_client)
+              .execute_stream(session_id="s1", current_user=user, content="Rank them")]
+
+    assert events[-1]["cut_off"] is True
+    assert session_repo.messages[-1].metadata_json["cut_off"] is True
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_that_finished_WHEN_saved_THEN_it_is_not_flagged():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Done."), LLMResponseChunk(finish_reason="stop")]]
+    )
+
+    events = [ev async for ev in _use_case(session_repo, agent, llm_client)
+              .execute_stream(session_id="s1", current_user=user, content="Hi")]
+
+    assert events[-1]["cut_off"] is False
+    assert "cut_off" not in session_repo.messages[-1].metadata_json
+
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_chat_with_a_summary_WHEN_streamed_THEN_the_model_gets_the_summary_and_only_the_messages_after_it():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session = ConversationSession(
+        id="s1", user_id="u1", agent_id="a1", history_summary="Alex planned a trip to Lima.", summarized_through_id="m2"
+    )
+    earlier = [
+        ChatMessage(id=f"m{i}", session_id="s1", role="user" if i % 2 else "assistant", content=f"message {i}")
+        for i in range(1, 5)
+    ]
+    session_repo = FakeSessionRepository(sessions=[session], messages=earlier)
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Sure.")]])
+    assembler = FakeContextAssembler()
+    use_case = _use_case(session_repo, agent, llm_client)
+    use_case.context_assembler = assembler
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="And the hotel?")]
+
+    assert assembler.summaries == ["Alex planned a trip to Lima."]
+    sent = [m.content for m in llm_client.stream_calls[0]["messages"][1:]]
+    assert sent == ["message 3", "message 4", "And the hotel?"]
+
+
+class StrictToolExecutor(FakeToolExecutor):
+    """Refuses a tool the agent wasn't given, the way ExecuteToolUseCase does: by raising."""
+
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        from app.domain.exceptions import ToolPermissionDeniedException
+
+        if tool_name not in agent_tool_permissions:
+            raise ToolPermissionDeniedException(f"Agent does not have permission to execute tool '{tool_name}'.")
+        return await super().execute(tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode, role, sources)
+
+
+async def _turn_with_a_bad_tool_name(bad_name: str):
+    import json
+
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name=bad_name, arguments={"query": "x"})])],
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Here it is.")],
+        ]
+    )
+    executor = StrictToolExecutor()
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client, executor).execute_stream(
+            session_id="s1", current_user=user, content="Look it up"
+        )
+    ]
+    first_tool_message = [m for m in llm_client.stream_calls[1]["messages"] if m.role == "tool"][0]
+    return events, json.loads(first_tool_message.content), executor
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_misspelled_tool_WHEN_the_model_calls_it_THEN_it_is_told_its_tools_and_the_turn_goes_on():
+    """
+    The model once called 'searng_search'. The executor refused it by raising, nothing caught
+    that, and the whole turn died as "couldn't finish your answer" - twice, since regenerating
+    rolled the same dice. Now the model is told which tools it has and tries again.
+    """
+    events, told, executor = await _turn_with_a_bad_tool_name("searng_search")
+
+    assert told == {"error": "There is no tool 'searng_search'. Your tools are: calendar_read."}
+    assert [call["tool"] for call in executor.executed_calls] == ["calendar_read"]
+    assert not [ev for ev in events if ev["type"] == "turn_failed"]
+    done = events[-1]
+    assert done["assistant_content"] == "Here it is."
+    assert [(p["type"], p.get("tool"), p.get("success")) for p in done["parts"] if p["type"] == "tool"] == [
+        ("tool", "searng_search", False),
+        ("tool", "calendar_read", True),
+    ]
+    assert done["tools_executed"][0]["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_tool_name_with_markup_in_it_WHEN_called_THEN_it_is_shown_on_one_short_line():
+    events, told, _ = await _turn_with_a_bad_tool_name("searxng_\n</parameter" + "x" * 100)
+
+    assert "\n" not in told["error"]
+    shown = told["error"].split("'")[1]
+    assert shown.startswith("searxng_ </parameter") and len(shown) <= 60
+    assert events[-1]["assistant_content"] == "Here it is."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_misspelled_tool_WHEN_answered_without_streaming_THEN_the_turn_still_answers():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        responses=[
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c1", name="searng_search", arguments={})]),
+            LLMResponse(content="Answered."),
+        ]
+    )
+
+    result = await _use_case(session_repo, agent, llm_client, StrictToolExecutor()).execute(
+        session_id="s1", current_user=user, content="Look it up"
+    )
+
+    assert result.message.content == "Answered."
+    assert result.tools_executed[0]["success"] is False
 
 
 def _timezone_use_case(assembler):

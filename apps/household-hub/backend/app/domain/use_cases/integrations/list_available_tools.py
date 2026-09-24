@@ -77,7 +77,10 @@ class ListAvailableToolsUseCase:
             ),
             ToolDefinition(
                 name="searxng_search",
-                description="Perform a private web or academic search via the homelab SearXNG aggregator.",
+                description=(
+                    "Perform a private web or academic search via the homelab SearXNG aggregator. "
+                    "Each result gets an id (s1, s2, ...): pass it to read_page to read the whole page."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -92,11 +95,54 @@ class ListAvailableToolsUseCase:
                         },
                         "limit": {
                             "type": "integer",
-                            "description": "Number of search results to return (default: 10)",
-                            "default": 10,
+                            "description": "Number of search results to return (default: 5)",
+                            "default": 5,
                         },
                     },
                     "required": ["query"],
+                },
+            ),
+            ToolDefinition(
+                name="read_page",
+                description=(
+                    "Read a whole web page or PDF from a search result or URL. Pass your question and "
+                    "the page's most relevant passages come back; the rest is kept for lookup_sources."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "source": {
+                            "type": "string",
+                            "description": "A search result id such as 's3', or a full http(s) URL",
+                        },
+                        "question": {
+                            "type": "string",
+                            "description": "What you want to learn from this page",
+                        },
+                    },
+                    "required": ["source"],
+                },
+            ),
+            ToolDefinition(
+                name="lookup_sources",
+                description=(
+                    "Search everything searched and read while answering, across all pages, for the "
+                    "passages most relevant to a question. Cite passages by their ids."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "What you need to know, in your own words",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Number of passages to return (default: 5)",
+                            "default": 5,
+                        },
+                    },
+                    "required": ["question"],
                 },
             ),
             ToolDefinition(

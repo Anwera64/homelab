@@ -10,6 +10,7 @@ from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.gossip_repository import IGossipRepository
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import current_date_line
+from app.domain.use_cases.chat.token_estimate import estimate_tokens
 
 
 def _utc_now() -> datetime:
@@ -42,13 +43,14 @@ class AssembleAgentContextUseCase:
         memory_repo: IMemoryRepository,
         gossip_repo: IGossipRepository,
         user_repo: Optional[IUserRepository] = None,
-        max_context_tokens: int = 8192,
+        history_tokens: int = 6000,
         clock: Callable[[], datetime] = _utc_now,
     ):
         self.memory_repo = memory_repo
         self.gossip_repo = gossip_repo
         self.user_repo = user_repo
-        self.max_context_tokens = max_context_tokens
+        # How much of the window the conversation's own messages may take, word for word.
+        self.history_tokens = history_tokens
         # Tells the agent what day it is. Injected so a test can fix it.
         self.clock = clock
 
@@ -66,6 +68,7 @@ class AssembleAgentContextUseCase:
         is_secret_session: bool = False,
         is_turn_secret: bool = False,
         timezone_name: Optional[str] = None,
+        history_summary: Optional[str] = None,
     ) -> List[LLMMessage]:
         is_secret = is_secret_session or is_turn_secret
 
@@ -145,24 +148,27 @@ class AssembleAgentContextUseCase:
             LLMMessage(role="system", content=full_system_text)
         ]
 
-        # Lazy context compression on recent messages:
-        # If message history is very long (> 20 messages), keep oldest summary + last 15 turns
-        if len(recent_messages) > 20:
-            older_slice = recent_messages[:-15]
-            recent_slice = recent_messages[-15:]
-            summary_snippets = [
-                f"{msg.role}: {msg.content[:100]}..." for msg in older_slice if msg.content
-            ]
-            summary_content = "[Summary of earlier conversation]:\n" + "\n".join(summary_snippets)
-            llm_messages.append(LLMMessage(role="system", content=summary_content))
-            for msg in recent_slice:
-                llm_messages.append(
-                    LLMMessage(role=msg.role, content=msg.content or "")
-                )
-        else:
-            for msg in recent_messages:
-                llm_messages.append(
-                    LLMMessage(role=msg.role, content=msg.content or "")
-                )
+        # 6. The conversation: what came before in the chat's own summary, then the newest messages
+        # word for word, as many as fit [history_tokens], with the question always last and whole.
+        # Older messages used to be sent as their first 100 characters, which kept nothing useful;
+        # the summary is written after turns by SummarizeHistoryUseCase, and a message it hasn't
+        # caught up with yet is left out whole for a turn rather than cut short.
+        if history_summary:
+            llm_messages.append(
+                LLMMessage(role="system", content=f"[Earlier in this conversation]:\n{history_summary}")
+            )
+        for msg in self._newest_that_fit(recent_messages):
+            llm_messages.append(LLMMessage(role=msg.role, content=msg.content or ""))
 
         return llm_messages
+
+    def _newest_that_fit(self, messages: List[ChatMessage]) -> List[ChatMessage]:
+        kept: List[ChatMessage] = []
+        used = 0.0
+        for msg in reversed(messages):
+            cost = estimate_tokens(msg.content)
+            if kept and used + cost > self.history_tokens:
+                break
+            kept.append(msg)
+            used += cost
+        return list(reversed(kept))

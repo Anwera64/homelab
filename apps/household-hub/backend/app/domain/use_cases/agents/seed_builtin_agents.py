@@ -14,7 +14,8 @@ BUILTIN_AGENTS: List[Dict[str, Any]] = [
             "synthesizing complex documents, reading architectural papers, and extracting exact citations. "
             "You maintain an objective, thorough, and rigorous research tone."
         ),
-        "temperature": 0.3,
+        # A thinking model reasons and calls tools worse when run much colder than it was tuned for.
+        "temperature": 0.6,
         "top_p": 0.85,
         "tool_permissions": ["pdf_reader", "searxng_search", "document_writer"],
         "is_builtin": True,

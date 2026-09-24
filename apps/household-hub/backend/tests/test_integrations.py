@@ -26,13 +26,11 @@ async def test_list_tools_endpoint(client: httpx.AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) == 5
     names = [t["name"] for t in data]
-    assert "calendar_read" in names
-    assert "calendar_write" in names
-    assert "searxng_search" in names
-    assert "pdf_reader" in names
-    assert "document_writer" in names
+    assert sorted(names) == sorted([
+        "calendar_read", "calendar_write", "searxng_search", "read_page", "lookup_sources",
+        "pdf_reader", "document_writer",
+    ])
 
 
 @pytest.mark.asyncio

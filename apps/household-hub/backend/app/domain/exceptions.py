@@ -103,6 +103,16 @@ class SearchServiceException(DomainException):
     pass
 
 
+class PageReadException(DomainException):
+    """Raised when a web page cannot be fetched or has no readable text."""
+    pass
+
+
+class EmbeddingException(DomainException):
+    """Raised when the embedding model cannot turn texts into vectors."""
+    pass
+
+
 class DocumentParsingException(DomainException):
     """Raised when a document cannot be parsed."""
     pass

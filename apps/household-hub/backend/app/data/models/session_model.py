@@ -23,6 +23,12 @@ class SessionModel(Base):
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
+    # The rolling summary of everything up to and including summarized_through_id. Written only by
+    # save_history_summary's own UPDATE, never through the ORM object's normal save path, so a
+    # session update elsewhere can't carry a stale copy back over it.
+    history_summary = Column(Text, nullable=True)
+    summarized_through_id = Column(String(36), nullable=True)
+
     # Relationships
     user = relationship("UserModel", back_populates="sessions")
     agent = relationship("AgentModel", back_populates="sessions")
