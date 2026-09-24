@@ -49,6 +49,8 @@ sealed interface ChatStreamEvent {
         val isTurnSecret: Boolean = false,
         val agentName: String = "",
         val toolsExecuted: List<Map<String, Any?>> = emptyList(),
+        /** The answer as the hub saved it, in order. Empty from a hub that does not keep parts yet. */
+        val parts: List<AnswerPart> = emptyList(),
     ) : ChatStreamEvent
 
     /**

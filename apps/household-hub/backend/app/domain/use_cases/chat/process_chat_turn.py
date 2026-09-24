@@ -1,8 +1,9 @@
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from app.domain.entities.user import User
 from app.domain.entities.session import ChatMessage, ConversationSession
@@ -35,6 +36,64 @@ class ChatTurnResult:
     is_turn_secret: bool = False
 
 
+class _AnswerParts:
+    """
+    What an answer did, in the order it did it: stretches of text, of thinking, and the tools
+    between them.
+
+    The answer used to be saved as one string, with its tools in a separate list, so nothing
+    recorded where in the text a tool had run: the phone drew every tool above the whole answer
+    and ran the stretches either side of it together (#33). Thinking is kept as how long it took,
+    never what was thought.
+    """
+
+    def __init__(self, clock: Callable[[], float]) -> None:
+        self._clock = clock
+        self._thinking_since: Optional[float] = None
+        self.parts: List[Dict[str, Any]] = []
+
+    def thinking(self) -> None:
+        if self._thinking_since is None:
+            self._thinking_since = self._clock()
+
+    def text(self, content: str) -> None:
+        self.stop_thinking()
+        if self.parts and self.parts[-1]["type"] == "text":
+            self.parts[-1]["content"] += content
+        else:
+            self.parts.append({"type": "text", "content": content})
+
+    def tool(self, name: str, success: bool) -> None:
+        self.stop_thinking()
+        self.parts.append({"type": "tool", "tool": name, "success": success})
+
+    def stop_thinking(self) -> None:
+        """Ends a stretch of thinking: whole seconds, rounded half up, and never zero."""
+        if self._thinking_since is None:
+            return
+        elapsed = self._clock() - self._thinking_since
+        self._thinking_since = None
+        self.parts.append({"type": "thought", "seconds": max(1, int(elapsed + 0.5))})
+
+    def content(self) -> str:
+        """
+        The answer as plain text: its stretches, with a paragraph between two that a tool came
+        between, so what was written before a tool and after it do not run together.
+        """
+        written = ""
+        tool_since_text = False
+        for part in self.parts:
+            if part["type"] == "tool":
+                tool_since_text = True
+            elif part["type"] == "text":
+                if written and tool_since_text:
+                    written = written.rstrip() + "\n\n" + part["content"].lstrip()
+                else:
+                    written += part["content"]
+                tool_since_text = False
+        return written
+
+
 class ProcessChatTurnUseCase:
     PRIVACY_TRIGGERS = [
         r"\bkeep this between us\b",
@@ -57,6 +116,7 @@ class ProcessChatTurnUseCase:
         uow: IUnitOfWork,
         model_resolver: ResolveAgentModelUseCase,
         max_iterations: int = 5,
+        clock: Callable[[], float] = time.monotonic,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -67,6 +127,8 @@ class ProcessChatTurnUseCase:
         self.uow = uow
         self.model_resolver = model_resolver
         self.max_iterations = max_iterations
+        # Times each stretch of thinking for the answer's parts. Injected so a test can move it.
+        self.clock = clock
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -412,22 +474,35 @@ class ProcessChatTurnUseCase:
             yield {"type": "turn_failed", "error": str(exc)}
 
     @staticmethod
-    async def _relay(stream, final_content_parts: List[str], tool_calls: Optional[List[LLMToolCall]] = None):
+    async def _relay(
+        stream,
+        final_content_parts: List[str],
+        answer: _AnswerParts,
+        tool_calls: Optional[List[LLMToolCall]] = None,
+    ):
         """
         One model stream, turned into what the phone is sent.
 
         Reasoning goes out as it arrives and is never kept: it is worth watching and worth nothing
         afterwards, so it stays out of `final_content_parts` and out of the saved answer. Words go
         out and are kept. Tool calls are collected for the caller when it asks for them.
+
+        [answer] records each in its place. A stretch of thinking ends at the first word, at a tool
+        call - so the tool's own running time is not counted as thought - or with the stream.
         """
         async for chunk in stream:
             if chunk.delta_reasoning:
+                answer.thinking()
                 yield {"type": "reasoning", "content": chunk.delta_reasoning}
             if chunk.delta_content:
+                answer.text(chunk.delta_content)
                 final_content_parts.append(chunk.delta_content)
                 yield {"type": "delta", "content": chunk.delta_content}
-            if tool_calls is not None and chunk.tool_calls:
-                tool_calls.extend(chunk.tool_calls)
+            if chunk.tool_calls:
+                answer.stop_thinking()
+                if tool_calls is not None:
+                    tool_calls.extend(chunk.tool_calls)
+        answer.stop_thinking()
 
     async def _stream_answer(
         self,
@@ -472,6 +547,7 @@ class ProcessChatTurnUseCase:
 
         tools_executed: List[Dict[str, Any]] = []
         final_content_parts: List[str] = []
+        answer = _AnswerParts(self.clock)
         iterations = 0
 
         if not agent_tools:
@@ -484,6 +560,7 @@ class ProcessChatTurnUseCase:
                     tools=None,
                 ),
                 final_content_parts,
+                answer,
             ):
                 yield event
         else:
@@ -506,6 +583,7 @@ class ProcessChatTurnUseCase:
                             tools=None,
                         ),
                         final_content_parts,
+                        answer,
                     ):
                         yield event
                     break
@@ -525,6 +603,7 @@ class ProcessChatTurnUseCase:
                         tools=agent_tools,
                     ),
                     final_content_parts,
+                    answer,
                     tool_calls,
                 ):
                     yield event
@@ -576,6 +655,7 @@ class ProcessChatTurnUseCase:
                             "error": tool_result.error,
                         }
                         tools_executed.append(exec_info)
+                        answer.tool(tc.name, tool_result.success)
                         yield {"type": "tool_result", "data": exec_info}
                         llm_messages.append(
                             LLMMessage(
@@ -598,11 +678,12 @@ class ProcessChatTurnUseCase:
                         tools=None,
                     ),
                     final_content_parts,
+                    answer,
                 ):
                     yield event
                 break
 
-        final_content = "".join(final_content_parts)
+        final_content = answer.content()
 
         async with self.uow:
             asst_msg = ChatMessage(
@@ -611,6 +692,7 @@ class ProcessChatTurnUseCase:
                 content=final_content,
                 metadata_json={
                     "tools_executed": tools_executed,
+                    "parts": answer.parts,
                     "privacy_trigger_detected": privacy_trigger_detected,
                     "suggest_secret_mode": suggest_secret_mode,
                 },
@@ -629,5 +711,6 @@ class ProcessChatTurnUseCase:
             "agent_id": agent.id,
             "agent_name": agent.name,
             "tools_executed": tools_executed,
+            "parts": answer.parts,
         }
 

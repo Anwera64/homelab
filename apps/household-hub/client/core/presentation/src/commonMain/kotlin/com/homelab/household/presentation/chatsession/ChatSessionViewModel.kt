@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
@@ -49,7 +50,7 @@ class ChatSessionViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     /** Names the owner of someone else's agent in the picker. */
     private val listHouseholdMembersUseCase: ListHouseholdMembersUseCase,
-    /** Times the thinking for the trail's "Thought for N s". Injected so a test can move it. */
+    /** Times each stretch of thinking for the answer's "Thought for N s". Injected so a test can move it. */
     private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatSessionUiState())
@@ -363,7 +364,7 @@ class ChatSessionViewModel(
      * [userMessageId] is null when regenerating, because there is no new question to blame.
      *
      * [resuming] picks up a turn already under way: the question is known to have arrived, and the
-     * words and trail on screen are where this one carries on from rather than starts over.
+     * words and parts on screen are where this one carries on from rather than starts over.
      */
     private fun follow(
         turn: Flow<ChatStreamEvent>,
@@ -374,29 +375,12 @@ class ChatSessionViewModel(
         followJob?.cancel()
         followingUserMessageId = userMessageId
         val carriedText = if (resuming) _uiState.value.streamingMessage.orEmpty() else ""
-        val carriedTrail = if (resuming) _uiState.value.trail else emptyList()
+        val carriedParts = if (resuming) _uiState.value.parts else emptyList()
         followJob =
             viewModelScope.launch {
                 var accumulated = carriedText
                 var delivered = resuming
-
-                // Thinking is timed from the first thought of each stretch to whatever ends it — a
-                // tool, the first word, the end of the turn — and summed across the turn.
-                var thinkingSince: TimeMark? = null
-                var thought = Duration.ZERO
-                val tools = mutableListOf<TurnRecord>()
-
-                fun stopThinking() {
-                    thinkingSince?.let { thought += it.elapsedNow() }
-                    thinkingSince = null
-                }
-
-                fun trail(): List<TurnRecord> =
-                    buildList {
-                        addAll(carriedTrail)
-                        if (thought > Duration.ZERO) add(TurnRecord.Thought(thought.toShownSeconds()))
-                        addAll(tools)
-                    }
+                val answer = AnswerPartsBuilder(timeSource, carriedParts)
 
                 turn
                     .catch { e ->
@@ -445,40 +429,36 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.Reasoning -> {
-                                if (thinkingSince == null) thinkingSince = timeSource.markNow()
+                                answer.thinking()
                                 _uiState.update { it.copy(isThinking = true) }
                             }
 
                             is ChatStreamEvent.ToolExecuting -> {
-                                stopThinking()
+                                answer.stopThinking()
                                 _uiState.update {
                                     it.copy(
                                         activeTool = event.tool,
                                         isThinking = false,
-                                        trail = trail(),
+                                        parts = answer.parts(),
                                     )
                                 }
                             }
 
                             is ChatStreamEvent.ToolResult -> {
-                                tools +=
-                                    when {
-                                        event.success -> TurnRecord.ToolDone(event.tool)
-                                        else -> TurnRecord.ToolFailed(event.tool)
-                                    }
-                                _uiState.update { it.copy(activeTool = null, trail = trail()) }
+                                answer.tool(event.tool, event.success)
+                                _uiState.update { it.copy(activeTool = null, parts = answer.parts()) }
                             }
 
                             is ChatStreamEvent.Delta -> {
                                 delivered = true
-                                if (accumulated.isEmpty()) stopThinking()
                                 accumulated += event.content
+                                answer.text(event.content)
                                 _uiState.update {
                                     it.copy(
                                         streamingMessage = accumulated,
                                         turnState = TurnState.Streaming,
                                         isThinking = false,
-                                        trail = trail(),
+                                        parts = answer.parts(),
                                     )
                                 }
                             }
@@ -488,6 +468,7 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.Done -> {
+                                answer.stopThinking()
                                 val assistantMsg =
                                     ChatMessage(
                                         id = event.messageId,
@@ -495,9 +476,11 @@ class ChatSessionViewModel(
                                         role = MessageRole.ASSISTANT,
                                         content = event.assistantContent,
                                         status = MessageStatus.SENT,
+                                        // The hub's record wins: it saw the whole turn, where this
+                                        // phone may have joined it part way. An older hub sends
+                                        // none, and what was watched here is the next best thing.
+                                        parts = event.parts.ifEmpty { answer.parts() },
                                     )
-                                stopThinking()
-                                val finished = trail()
                                 _uiState.update { state ->
                                     state.copy(
                                         streamingMessage = null,
@@ -514,14 +497,7 @@ class ChatSessionViewModel(
                                             } + assistantMsg,
                                         isThinking = false,
                                         activeTool = null,
-                                        trail = emptyList(),
-                                        trails =
-                                            if (finished.isEmpty()) {
-                                                state.trails
-                                            } else {
-                                                state.trails +
-                                                    (event.messageId to finished)
-                                            },
+                                        parts = emptyList(),
                                     )
                                 }
                             }
@@ -536,13 +512,13 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.TurnFailed -> {
-                                stopThinking()
+                                answer.stopThinking()
                                 _uiState.update {
                                     it.copy(
                                         turnState = TurnState.Failed,
                                         isThinking = false,
                                         activeTool = null,
-                                        trail = trail(),
+                                        parts = answer.parts(),
                                     )
                                 }
                             }
@@ -595,8 +571,54 @@ private fun ChatSessionUiState.startingTurn() =
         errorMessage = null,
         isThinking = false,
         activeTool = null,
-        trail = emptyList(),
+        parts = emptyList(),
     )
+
+/**
+ * An answer's parts, built as its events arrive: each stretch of text, each stretch of thinking,
+ * and each tool, in the order they happened.
+ *
+ * Thinking is timed from the first thought of a stretch to whatever ends it: a word, a tool, the
+ * end of the turn. A tool's own running time is not thinking. [carried] is what a resumed turn
+ * already showed, which it carries on from rather than starts over.
+ */
+private class AnswerPartsBuilder(
+    private val timeSource: TimeSource,
+    carried: List<AnswerPart>,
+) {
+    private val parts = carried.toMutableList()
+    private var thinkingSince: TimeMark? = null
+
+    fun parts(): List<AnswerPart> = parts.toList()
+
+    fun thinking() {
+        if (thinkingSince == null) thinkingSince = timeSource.markNow()
+    }
+
+    fun stopThinking() {
+        val since = thinkingSince ?: return
+        thinkingSince = null
+        parts += AnswerPart.Thought(since.elapsedNow().toShownSeconds())
+    }
+
+    fun text(content: String) {
+        stopThinking()
+        val last = parts.lastOrNull()
+        if (last is AnswerPart.Text) {
+            parts[parts.lastIndex] = last.copy(content = last.content + content)
+        } else {
+            parts += AnswerPart.Text(content)
+        }
+    }
+
+    fun tool(
+        name: String,
+        succeeded: Boolean,
+    ) {
+        stopThinking()
+        parts += if (succeeded) AnswerPart.ToolDone(name) else AnswerPart.ToolFailed(name)
+    }
+}
 
 /** Whole seconds, and never zero: a turn that thought at all thought for "1 s", not "0 s". */
 private fun Duration.toShownSeconds(): Int = maxOf(1L, (inWholeMilliseconds / 1000.0).roundToLong()).toInt()

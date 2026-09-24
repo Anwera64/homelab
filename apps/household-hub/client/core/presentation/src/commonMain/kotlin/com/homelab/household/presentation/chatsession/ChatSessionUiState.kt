@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.chatsession
 
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
@@ -29,27 +30,6 @@ sealed interface TurnState {
     data object Failed : TurnState
 }
 
-/**
- * One line of the trail an answer leaves above itself: what the agent did on the way to it.
- *
- * Tools keep the backend's name here; turning it into words for a person is the screen's job, so
- * no raw identifier reaches anyone (design notes §2).
- */
-sealed interface TurnRecord {
-    /** Every stretch of thinking in the turn, summed — one record however often it stopped to think. */
-    data class Thought(
-        val seconds: Int,
-    ) : TurnRecord
-
-    data class ToolDone(
-        val tool: String,
-    ) : TurnRecord
-
-    data class ToolFailed(
-        val tool: String,
-    ) : TurnRecord
-}
-
 data class ChatSessionUiState(
     val isLoading: Boolean = false,
     val session: ConversationSession? = null,
@@ -72,13 +52,8 @@ data class ChatSessionUiState(
     val isThinking: Boolean = false,
     /** The tool running right now, by its backend name. */
     val activeTool: String? = null,
-    /** What the turn being answered has done so far. */
-    val trail: List<TurnRecord> = emptyList(),
-    /**
-     * Each finished answer's trail, by message id. Kept apart from the messages so the trail stays
-     * above its answer once the turn is done, rather than vanishing the moment the words land.
-     */
-    val trails: Map<String, List<TurnRecord>> = emptyMap(),
+    /** The answer being written, in the order it happened: its text, its thinking and its tools. */
+    val parts: List<AnswerPart> = emptyList(),
     /**
      * Who is answering. Held on the state rather than read off the session, because a chat that
      * has not been created yet still has an agent to name — the hero greeting is drawn before
@@ -129,7 +104,25 @@ data class ChatSessionUiState(
                 streamingMessage.isNullOrEmpty() &&
                 !isThinking &&
                 activeTool == null &&
-                trail.isEmpty()
+                parts.isEmpty()
+
+    /**
+     * A live turn with nothing on screen saying it is still going: no words yet, the model
+     * thinking, or a tool just finished and the next words not here.
+     *
+     * The dots used to show only before the first word, so once an answer had begun, a tool
+     * finishing or the model stopping to think left it looking finished. Words arriving say it
+     * themselves, and a running tool has its own chip.
+     */
+    val isWaitingForWords: Boolean
+        get() =
+            turnState == TurnState.Streaming &&
+                activeTool == null &&
+                (streamingMessage.isNullOrEmpty() || isThinking || endsOnAStep)
+
+    /** The answer so far stops on a step rather than on words. No parts at all is not a step. */
+    private val endsOnAStep: Boolean
+        get() = parts.isNotEmpty() && parts.last() !is AnswerPart.Text
 
     /** A conversation nobody has spoken in yet: the hero greeting rather than a transcript. */
     val isNew: Boolean

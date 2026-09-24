@@ -595,3 +595,28 @@ async def test_archive_session_endpoint(client: httpx.AsyncClient):
 
 
 
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_saved_with_its_parts_WHEN_the_conversation_is_read_THEN_the_parts_come_back_in_order(
+    client: httpx.AsyncClient,
+):
+    """A reopened conversation draws each tool where it ran, so the parts must survive the round trip (#33)."""
+    _, member_token, agent_id = await setup_environment(client)
+    headers = {"Authorization": f"Bearer {member_token}"}
+    session_id = (await client.post("/api/v1/sessions", json={"agent_id": agent_id}, headers=headers)).json()["id"]
+    parts = [
+        {"type": "thought", "seconds": 6},
+        {"type": "text", "content": "Let me check."},
+        {"type": "tool", "tool": "web_search", "success": True},
+        {"type": "text", "content": "It stays dry."},
+    ]
+    await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "assistant", "content": "Let me check.\n\nIt stays dry.", "metadata_json": {"parts": parts}},
+        headers=headers,
+    )
+
+    detail = (await client.get(f"/api/v1/sessions/{session_id}", headers=headers)).json()
+
+    assert detail["messages"][-1]["metadata_json"]["parts"] == parts

@@ -332,6 +332,12 @@
     <string name="conversation_retry">Retry</string>
     <string name="conversation_sent">Sent</string>
     <string name="conversation_thought">Thought for %1$ds</string>
+    <plurals name="conversation_steps">
+        <item quantity="one">%1$d step</item>
+        <item quantity="other">%1$d steps</item>
+    </plurals>
+    <string name="conversation_steps_show">Show steps</string>
+    <string name="conversation_steps_hide">Hide steps</string>
     <string name="tool_calendar_read_running">Checking your calendar…</string>
     <string name="tool_calendar_read_done">Checked your calendar</string>
     <string name="tool_calendar_read_failed">Couldn’t check your calendar</string>
