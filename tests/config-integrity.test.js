@@ -256,9 +256,22 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
     assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
     const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
-    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 16384']) {
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 32768']) {
       assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
     }
+
+    // The hub budgets each turn against this window; the two must agree or answers get cut off.
+    const hubConfig = fs.readFileSync(path.join(ROOT_DIR, 'apps/household-hub/backend/app/core/config.py'), 'utf8');
+    const hubWindow = hubConfig.match(/LLM_CONTEXT_TOKENS:\s*int\s*=\s*(\d+)/);
+    assert.ok(hubWindow, 'the hub must declare LLM_CONTEXT_TOKENS');
+    assert.equal(hubWindow[1], rvnModelfile.match(/PARAMETER num_ctx (\d+)/)[1], 'LLM_CONTEXT_TOKENS must match the Modelfile num_ctx');
+
+    // The embedder runs on the CPU so the chat model keeps the whole GPU.
+    const embedder = manifest.models.find((m) => m.name === 'bge-m3-cpu');
+    assert.ok(embedder, 'manifest must provision bge-m3-cpu, the source index embedder');
+    assert.equal(embedder.sha256, 'daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c');
+    const embedderModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, embedder.modelfile), 'utf8');
+    assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
   });
 
   await t.test('Ollama models live in a named volume, not on the Windows share', () => {

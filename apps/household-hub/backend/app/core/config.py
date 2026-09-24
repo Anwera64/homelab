@@ -37,7 +37,15 @@ class Settings(BaseSettings):
     DEFAULT_LLM_MODEL: str = "qwen3.8-rvn"
     # Model calls an agent gets per turn. Every one but the last may call tools; the last is made to answer.
     MAX_TOOL_CALL_ITERATIONS: int = 8
-    MAX_CONTEXT_TOKENS: int = 8192
+    # The chat model's window. Must match num_ctx in config/ollama-models/<model>.Modelfile.
+    LLM_CONTEXT_TOKENS: int = 32768
+    # Kept free in every turn for thinking and the answer, so research can never crowd it out.
+    ANSWER_RESERVE_TOKENS: int = 4096
+    # A chat's newest messages, word for word; older ones live in its summary of this size.
+    HISTORY_TOKENS: int = 6000
+    HISTORY_SUMMARY_TOKENS: int = 1000
+    # Embeds what a turn reads, for its source index. Runs on the CPU (see its Modelfile).
+    EMBEDDING_MODEL: str = "bge-m3-cpu"
     MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
     MAX_GOSSIP_SUMMARY_LENGTH: int = 250
     

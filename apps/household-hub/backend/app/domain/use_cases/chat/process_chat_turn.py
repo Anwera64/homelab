@@ -17,6 +17,7 @@ from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.turn_sources import TurnSources
+from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 from app.domain.exceptions import (
     EntityNotFoundException,
@@ -106,11 +107,9 @@ class _ContextBudget:
     how many it left out. Text is never cut mid-way; when not even one item fits, the model is told
     to answer with what it has.
 
-    Tokens are estimated from characters, pessimistically, since the hub has no tokenizer. With no
-    window set there is no limit.
+    Tokens are estimated from characters (see token_estimate). With no window set there is no limit.
     """
 
-    CHARACTERS_PER_TOKEN = 3
     # Less room than this and another round would only crowd the answer.
     SMALLEST_ROUND_TOKENS = 256
     NO_ROOM = "No room left for more results; answer with what you have."
@@ -133,27 +132,24 @@ class _ContextBudget:
         """The result as the model will read it, and whether the turn has run out of room."""
         room = self.room(messages, tools)
         whole = json.dumps(result)
-        if self._estimate(whole) <= room:
+        if estimate_tokens(whole) <= room:
             return whole, False
         items_key = next((key for key, value in result.items() if isinstance(value, list) and value), None)
         if items_key is not None:
             items = result[items_key]
             for keep in range(len(items) - 1, 0, -1):
                 trimmed = json.dumps({**result, items_key: items[:keep], "left_out": len(items) - keep})
-                if self._estimate(trimmed) <= room:
+                if estimate_tokens(trimmed) <= room:
                     return trimmed, False
         return json.dumps({"error": self.NO_ROOM}), True
 
     def _tokens(self, messages: List[LLMMessage], tools: Optional[List[Dict[str, Any]]]) -> float:
-        characters = len(json.dumps(tools)) if tools else 0
+        tokens = estimate_tokens(json.dumps(tools)) if tools else 0.0
         for message in messages:
-            characters += len(message.content or "")
+            tokens += estimate_tokens(message.content)
             for call in message.tool_calls or []:
-                characters += len(call.name) + len(json.dumps(call.arguments))
-        return characters / self.CHARACTERS_PER_TOKEN
-
-    def _estimate(self, text: str) -> float:
-        return len(text) / self.CHARACTERS_PER_TOKEN
+                tokens += estimate_tokens(call.name + json.dumps(call.arguments))
+        return tokens
 
 
 class ProcessChatTurnUseCase:
@@ -261,13 +257,14 @@ class ProcessChatTurnUseCase:
             await self.uow.commit()
 
         # 3. Assemble Prompt & Context
-        recent_messages = await self.session_repo.get_messages(session.id, limit=30)
+        recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
         llm_messages = await self.context_assembler.execute(
             user=current_user,
             agent=agent,
             recent_messages=recent_messages,
             is_secret_session=session.is_secret,
             is_turn_secret=is_turn_secret,
+            history_summary=session.history_summary,
         )
 
         # 4. Resolve Tool Schemas for Agent
@@ -456,7 +453,7 @@ class ProcessChatTurnUseCase:
         """
         session, agent = await self._open_turn(session_id, current_user)
 
-        recent_messages = await self.session_repo.get_messages(session.id, limit=30)
+        recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
         last_message = recent_messages[-1] if recent_messages else None
         if last_message is None or last_message.role != "user":
             raise InvalidOperationException(
@@ -508,7 +505,7 @@ class ProcessChatTurnUseCase:
         # offering to send it again.
         yield {"type": "accepted"}
 
-        recent_messages = await self.session_repo.get_messages(session.id, limit=30)
+        recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
 
         async for event in self._answer_or_say_it_failed(
             session=session,
@@ -609,6 +606,7 @@ class ProcessChatTurnUseCase:
             recent_messages=recent_messages,
             is_secret_session=session.is_secret,
             is_turn_secret=is_turn_secret,
+            history_summary=session.history_summary,
         )
 
         tool_defs_res = self.tool_lister.execute()

@@ -40,6 +40,12 @@ class FakeSessionRepository:
 
     get_messages = list_messages_by_session_id
 
+    async def get_messages_after(self, session_id: str, after_id=None, limit: int = 200):
+        mine = [m for m in self.messages if m.session_id == session_id]
+        ids = [m.id for m in mine]
+        start = ids.index(after_id) + 1 if after_id in ids else 0
+        return mine[start:][-limit:]
+
 
     async def update(self, session: ConversationSession) -> ConversationSession:
         self.sessions[session.id] = session
@@ -97,7 +103,11 @@ def _house_resolver():
 
 
 class FakeContextAssembler:
-    async def execute(self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False):
+    def __init__(self):
+        self.summaries = []
+
+    async def execute(self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False, history_summary=None):
+        self.summaries.append(history_summary)
         return [
             LLMMessage(role="system", content="System instructions"),
             *[LLMMessage(role=m.role, content=m.content) for m in recent_messages],
@@ -1243,3 +1253,28 @@ async def test_GIVEN_an_answer_that_finished_WHEN_saved_THEN_it_is_not_flagged()
 
     assert events[-1]["cut_off"] is False
     assert "cut_off" not in session_repo.messages[-1].metadata_json
+
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_chat_with_a_summary_WHEN_streamed_THEN_the_model_gets_the_summary_and_only_the_messages_after_it():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session = ConversationSession(
+        id="s1", user_id="u1", agent_id="a1", history_summary="Alex planned a trip to Lima.", summarized_through_id="m2"
+    )
+    earlier = [
+        ChatMessage(id=f"m{i}", session_id="s1", role="user" if i % 2 else "assistant", content=f"message {i}")
+        for i in range(1, 5)
+    ]
+    session_repo = FakeSessionRepository(sessions=[session], messages=earlier)
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Sure.")]])
+    assembler = FakeContextAssembler()
+    use_case = _use_case(session_repo, agent, llm_client)
+    use_case.context_assembler = assembler
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="And the hotel?")]
+
+    assert assembler.summaries == ["Alex planned a trip to Lima."]
+    sent = [m.content for m in llm_client.stream_calls[0]["messages"][1:]]
+    assert sent == ["message 3", "message 4", "And the hotel?"]

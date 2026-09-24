@@ -58,6 +58,9 @@ from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
 from app.data.connectors.pymupdf_document_reader import PyMuPDFDocumentReader
 from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
 from app.data.connectors.ollama_llm_connector import OllamaLLMConnector
+from app.data.connectors.ollama_embedder import OllamaEmbedder
+from app.data.connectors.http_page_reader import HttpPageReader
+from app.data.datasources.sqlite_source_index import SqliteSourceIndexFactory
 
 # Security & Persistence
 from app.data.security.bcrypt_hasher import BcryptPasswordHasher
@@ -150,6 +153,7 @@ from app.domain.use_cases.gossip.manage_gossip_milestones import (
 )
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
 
 # Singletons for stateless services
@@ -188,6 +192,10 @@ _ollama_connector = OllamaLLMConnector(
     base_url=settings.OLLAMA_BASE_URL,
     timeout_seconds=settings.OLLAMA_TIMEOUT_SECONDS,
 )
+_embedder = OllamaEmbedder(base_url=settings.OLLAMA_BASE_URL, model=settings.EMBEDDING_MODEL)
+# Each streamed turn gets a fresh index from this; nothing one turn reads is seen by another.
+_source_index_factory = SqliteSourceIndexFactory(embedder=_embedder)
+_page_reader = HttpPageReader()
 
 
 
@@ -244,7 +252,7 @@ def get_container(session: AsyncSession):
         memory_repo=memory_repo,
         gossip_repo=gossip_repo,
         user_repo=user_repo,
-        max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+        history_tokens=settings.HISTORY_TOKENS,
     )
 
     tool_lister = ListAvailableToolsUseCase()
@@ -257,6 +265,7 @@ def get_container(session: AsyncSession):
         cipher=_secret_cipher,
         uow=uow,
         allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
+        page_reader=_page_reader,
     )
 
     chat_turn_uc = ProcessChatTurnUseCase(
@@ -269,6 +278,18 @@ def get_container(session: AsyncSession):
         uow=uow,
         model_resolver=model_resolver,
         max_iterations=settings.MAX_TOOL_CALL_ITERATIONS,
+        source_index_factory=_source_index_factory,
+        context_window_tokens=settings.LLM_CONTEXT_TOKENS,
+        answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
+    )
+
+    summarize_history_uc = SummarizeHistoryUseCase(
+        session_repo=session_repo,
+        llm_client=_ollama_connector,
+        model_resolver=model_resolver,
+        uow=uow,
+        history_tokens=settings.HISTORY_TOKENS,
+        summary_tokens=settings.HISTORY_SUMMARY_TOKENS,
     )
 
     reflect_turn_uc = ReflectTurnUseCase(
@@ -309,6 +330,7 @@ def get_container(session: AsyncSession):
                     is_turn_secret=is_turn_secret,
                     is_first_turn=is_first_turn,
                 )
+                await bg_container[pres_deps.get_summarize_history_use_case].execute(session_id)
         except Exception as exc:
             logger.error("Background reflection failed for session %s: %s", session_id, exc, exc_info=True)
 
@@ -366,6 +388,12 @@ def get_container(session: AsyncSession):
                         )
                     except Exception as ref_exc:
                         logger.error("Background reflection in stream failed for session %s: %s", session_id, ref_exc, exc_info=True)
+                    # After reflection, so the facts it keeps are taken from the words before they
+                    # are folded into the summary.
+                    try:
+                        await bg_container[pres_deps.get_summarize_history_use_case].execute(session_id)
+                    except Exception as sum_exc:
+                        logger.error("Background history summary failed for session %s: %s", session_id, sum_exc, exc_info=True)
         except Exception as exc:
             logger.error("Background chat stream failed for session %s: %s", session_id, exc, exc_info=True)
             await queue.put({"type": "error", "error": str(exc)})
@@ -476,6 +504,7 @@ def get_container(session: AsyncSession):
             cipher=_secret_cipher,
             uow=uow,
             allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
+            page_reader=_page_reader,
         ),
 
         # Gossip Bus & Stage 3 Chat
@@ -486,6 +515,7 @@ def get_container(session: AsyncSession):
         pres_deps.get_assemble_agent_context_use_case: context_assembler,
         pres_deps.get_process_chat_turn_use_case: chat_turn_uc,
         pres_deps.get_reflect_turn_use_case: reflect_turn_uc,
+        pres_deps.get_summarize_history_use_case: summarize_history_uc,
         pres_deps.get_background_reflection_runner: _run_background_reflection,
         pres_deps.get_background_chat_stream_runner: _run_background_chat_stream,
         pres_deps.get_llm_client: _ollama_connector,

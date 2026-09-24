@@ -79,6 +79,8 @@ class SessionDataMapper:
             is_archived=model.is_archived,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            history_summary=model.history_summary,
+            summarized_through_id=model.summarized_through_id,
         )
 
     @staticmethod
@@ -92,6 +94,8 @@ class SessionDataMapper:
             is_archived=entity.is_archived,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
+            history_summary=entity.history_summary,
+            summarized_through_id=entity.summarized_through_id,
         )
 
     @staticmethod

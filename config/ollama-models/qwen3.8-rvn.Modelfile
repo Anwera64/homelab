@@ -1,8 +1,11 @@
-# Qwen3.8-27B RVN (abliterated), IQ3_M: fits the RTX 5080 entirely with a 16k context.
+# Qwen3.8-27B RVN (abliterated), IQ3_M: fits the RTX 5080 entirely with a 32k context.
+# Only 16 of its 64 layers keep a KV cache, so context is cheap: 1 GiB per 16k tokens (f16).
+# Measured 2026-09-24: weights 11,467 MiB + KV 2,048 MiB at 32k, of 14,953 MiB free.
+# The hub's LLM_CONTEXT_TOKENS must match num_ctx.
 FROM /root/.ollama/imports/qwen3.8-rvn.gguf
 RENDERER qwen3.8
 PARSER qwen3.5
-PARAMETER num_ctx 16384
+PARAMETER num_ctx 32768
 PARAMETER temperature 1
 PARAMETER top_k 20
 PARAMETER top_p 0.95

@@ -1,0 +1,5 @@
+# BGE-M3 (FP16), the source index embedder. On the CPU: the chat model needs the whole GPU,
+# and embedding short passages is quick enough there. Passages are ~800 characters.
+FROM /root/.ollama/imports/bge-m3-cpu.gguf
+PARAMETER num_gpu 0
+PARAMETER num_ctx 2048
