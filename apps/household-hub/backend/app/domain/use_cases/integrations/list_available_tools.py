@@ -105,8 +105,8 @@ class ListAvailableToolsUseCase:
             ToolDefinition(
                 name="read_page",
                 description=(
-                    "Read a whole web page from a search result or URL. Its text is stored for this "
-                    "answer, not returned: use lookup_sources to read the parts you need."
+                    "Read a whole web page or PDF from a search result or URL. Pass your question and "
+                    "the page's most relevant passages come back; the rest is kept for lookup_sources."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -115,6 +115,10 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "description": "A search result id such as 's3', or a full http(s) URL",
                         },
+                        "question": {
+                            "type": "string",
+                            "description": "What you want to learn from this page",
+                        },
                     },
                     "required": ["source"],
                 },
@@ -122,8 +126,8 @@ class ListAvailableToolsUseCase:
             ToolDefinition(
                 name="lookup_sources",
                 description=(
-                    "Find the passages most relevant to a question among everything searched and read "
-                    "while answering. Cite passages by their ids."
+                    "Search everything searched and read while answering, across all pages, for the "
+                    "passages most relevant to a question. Cite passages by their ids."
                 ),
                 parameters_schema={
                     "type": "object",

@@ -52,11 +52,11 @@ def test_GIVEN_a_tool_budget_setting_WHEN_the_container_is_built_THEN_the_chat_t
     assert container[deps.get_process_chat_turn_use_case].max_iterations == 3
 
 
-def test_GIVEN_no_override_WHEN_settings_load_THEN_the_window_budgets_match_a_32k_model(
+def test_GIVEN_no_override_WHEN_settings_load_THEN_the_window_budgets_match_the_28k_model(
     settings_without_overrides: Settings,
 ):
     s = settings_without_overrides
-    assert (s.LLM_CONTEXT_TOKENS, s.ANSWER_RESERVE_TOKENS) == (32768, 4096)
+    assert (s.LLM_CONTEXT_TOKENS, s.ANSWER_RESERVE_TOKENS) == (28672, 4096)
     assert (s.HISTORY_TOKENS, s.HISTORY_SUMMARY_TOKENS) == (6000, 1000)
     assert s.EMBEDDING_MODEL == "bge-m3-cpu"
     assert not hasattr(s, "MAX_CONTEXT_TOKENS")

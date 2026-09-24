@@ -34,6 +34,7 @@ RECEIPT_SNIPPET_CHARACTERS = 120
 INLINE_SNIPPET_CHARACTERS = 300
 DEFAULT_SEARCH_RESULTS = 5
 DEFAULT_LOOKUP_PASSAGES = 5
+READ_PAGE_PASSAGES = 3
 
 
 def effective_tool_permissions(permissions: List[str]) -> List[str]:
@@ -142,11 +143,16 @@ class ExecuteToolUseCase:
                     )
                 page = await self.page_reader.read(url)
                 passages = await sources.add_page(page)
-                return ToolExecutionResult(
-                    tool_name=tool_name,
-                    success=True,
-                    data={"page": sources.last_page_id, "title": page.title, "url": page.url, "passages": len(passages)},
-                )
+                data = {"page": sources.last_page_id, "title": page.title, "url": page.url, "passages": len(passages)}
+                # Read with the question, the page's best passages come straight back: a model that
+                # has to remember to look them up afterwards often doesn't, and then the page is wasted.
+                question = str(arguments.get("question", "")).strip()
+                if question:
+                    data["relevant"] = [
+                        {"id": p.id, "text": p.text}
+                        for p in await sources.lookup(question, k=READ_PAGE_PASSAGES, within=sources.last_page_id)
+                    ]
+                return ToolExecutionResult(tool_name=tool_name, success=True, data=data)
 
             elif tool_name == "lookup_sources":
                 question = str(arguments.get("question", ""))

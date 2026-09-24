@@ -231,3 +231,46 @@ def test_GIVEN_a_paragraph_longer_than_the_size_WHEN_chunked_THEN_it_is_split_be
 
 def test_GIVEN_blank_text_WHEN_chunked_THEN_there_are_no_chunks():
     assert chunk_text("  \n\n  ", size=50) == []
+
+
+# --- read_page with a question ------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_question_WHEN_a_page_is_read_THEN_its_best_passages_come_back_with_the_receipt():
+    """
+    The first real research turn read two pages into the index and never looked anything up, so
+    nothing it read reached the answer. Reading with the question hands the passages over at once.
+    """
+    index = ListIndex()
+    sources = TurnSources(index)
+    # Another page already read mentions cotton too; only this page's passages may come back.
+    await index.add([SourcePassage(id="p9.1", title="Old", url="https://old", text="cotton elsewhere")])
+    page_text = "\n\n".join(
+        [f"cotton paragraph {i} " + "word " * 150 for i in range(5)] + ["steel " + "word " * 150]
+    )
+
+    result = await _run(
+        _executor(page_reader=FakePageReader(text=page_text)),
+        "read_page",
+        {"source": "https://news.example/a", "question": "cotton"},
+        sources,
+    )
+
+    passages = result.data["relevant"]
+    assert 1 <= len(passages) <= 3
+    assert all(p["id"].startswith("p1.") for p in passages)
+    assert all("cotton" in p["text"] for p in passages)
+    indexed = {p.id: p.text for p in index.passages}
+    assert all(p["text"] == indexed[p["id"]] for p in passages)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_question_WHEN_a_page_is_read_THEN_only_the_receipt_comes_back():
+    result = await _run(
+        _executor(page_reader=FakePageReader(text="cotton text")),
+        "read_page",
+        {"source": "https://news.example/a"},
+        TurnSources(ListIndex()),
+    )
+
+    assert "relevant" not in result.data

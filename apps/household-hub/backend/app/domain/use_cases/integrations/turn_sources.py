@@ -54,8 +54,13 @@ class TurnSources:
             return source
         return self._urls.get(source)
 
-    async def lookup(self, question: str, k: int = 5) -> List[SourcePassage]:
-        return await self._index.search(question, k=k)
+    async def lookup(self, question: str, k: int = 5, within: Optional[str] = None) -> List[SourcePassage]:
+        """The passages that best answer [question]; only page [within]'s (e.g. "p2") when given."""
+        if within is None:
+            return await self._index.search(question, k=k)
+        # The index ranks everything read; look deep enough that this page's best are among them.
+        found = await self._index.search(question, k=max(k * 10, 50))
+        return [p for p in found if p.id.startswith(f"{within}.")][:k]
 
 
 def chunk_text(text: str, size: int = PASSAGE_CHARACTERS) -> List[str]:
