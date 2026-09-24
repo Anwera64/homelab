@@ -385,11 +385,18 @@ async def resume_turn_stream(
     received. Everything after it follows, live if the turn is still being written. 410 Gone means
     the hub no longer holds that turn — long finished, or another has started — and the saved
     message is where the answer is.
+
+    With no id at all — a phone that opened the conversation mid-turn, or was restarted — the turn
+    the hub holds is followed from its first event.
     """
     await get_session_uc.execute(session_id=session_id, current_user=current_user)
 
-    turn_id, _, seq = (last_event_id or last_event_id_header or "").partition(":")
     log = turn_logs.get(session_id)
+    resume_from = last_event_id or last_event_id_header
+    if resume_from is None and log is not None:
+        return StreamingResponse(_sse(log), media_type="text/event-stream")
+
+    turn_id, _, seq = (resume_from or "").partition(":")
     if log is None or log.turn_id != turn_id or not seq.isdigit():
         raise HTTPException(
             status_code=status.HTTP_410_GONE,

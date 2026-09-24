@@ -6,6 +6,7 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
@@ -187,6 +188,7 @@ class ChatSessionViewModel(
                         isSecretLocked = session.isSecretLocked,
                     )
                 }
+                pickUpUnansweredQuestion(session, messages)
             } catch (e: Throwable) {
                 _uiState.update {
                     it.copy(
@@ -266,6 +268,39 @@ class ChatSessionViewModel(
                 ),
             sessionId = currentSession.id,
             userMessageId = tempMessageId,
+        )
+    }
+
+    /**
+     * A conversation opened with its last question still unanswered — sent, then left before the
+     * answer came, or the app closed.
+     *
+     * Leaving the screen stopped the listening, not the hub: if it is still writing, the answer is
+     * followed from its first word, as if the screen had never been left. If it is not, and no
+     * answer came, the turn died, and the screen says so and offers another go instead of showing
+     * a question that looks like it is waiting on nothing.
+     */
+    private fun pickUpUnansweredQuestion(
+        session: ConversationSession,
+        messages: List<ChatMessage>,
+    ) {
+        if (messages.lastOrNull()?.role != MessageRole.USER) return
+
+        if (!session.turnRunning) {
+            _uiState.update { it.copy(turnState = TurnState.Failed) }
+            return
+        }
+
+        _uiState.update { it.startingTurn().copy(turnState = TurnState.Reconnecting) }
+        follow(
+            turn =
+                resumeTurnUseCase(
+                    sessionId = session.id,
+                    afterAssistantMessageId = _uiState.value.lastAssistantMessageId,
+                ),
+            sessionId = session.id,
+            userMessageId = null,
+            resuming = true,
         )
     }
 

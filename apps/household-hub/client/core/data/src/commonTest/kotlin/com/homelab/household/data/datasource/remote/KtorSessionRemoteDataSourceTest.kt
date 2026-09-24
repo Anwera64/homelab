@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -401,10 +402,32 @@ class KtorSessionRemoteDataSourceTest {
         }
 
     @Test
-    fun `GIVEN no turn streamed in this conversation WHEN it is resumed THEN it is gone`() =
+    fun `GIVEN a conversation opened mid-turn WHEN it is resumed THEN the hub is asked for its turn from the start`() =
+        runTest {
+            // GIVEN — nothing streamed on this phone yet: the screen was reopened, or the app restarted.
+            var path: String? = null
+            var asked: String? = "unset"
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    asked = request.url.parameters["last_event_id"]
+                    respondSse(twoEventTurnSse)
+                }
+
+            // WHEN
+            val events = dataSource(engine).resumeTurnStream("s-1").toList()
+
+            // THEN
+            assertEquals("/api/v1/sessions/s-1/chat/stream", path)
+            assertNull(asked)
+            assertEquals(2, events.size)
+        }
+
+    @Test
+    fun `GIVEN a conversation with no turn held WHEN it is resumed with nothing remembered THEN it is gone`() =
         runTest {
             // GIVEN
-            val engine = MockEngine { throw AssertionError("no request should be made") }
+            val engine = MockEngine { respondJson("""{"detail": "gone"}""", HttpStatusCode.Gone) }
 
             // WHEN / THEN
             assertFailsWith<TurnGoneException> {
@@ -464,22 +487,25 @@ class KtorSessionRemoteDataSourceTest {
 
                 """.trimIndent()
             var postCount = 0
+            var asked: String? = "unset"
             val engine =
                 MockEngine { request ->
                     if (request.method == HttpMethod.Post) {
                         postCount += 1
                         if (postCount == 1) respondSse(twoEventTurnSse) else respondSse(noIdSse)
                     } else {
-                        throw AssertionError("no request should be made")
+                        asked = request.url.parameters["last_event_id"]
+                        respondSse(noIdSse)
                     }
                 }
             val dataSource = dataSource(engine)
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
             dataSource.openChatStream("s-1", "Hello again", autoApproveWrites = false).toList()
 
-            // WHEN / THEN
-            assertFailsWith<TurnGoneException> {
-                dataSource.resumeTurnStream("s-1").toList()
-            }
+            // WHEN
+            dataSource.resumeTurnStream("s-1").toList()
+
+            // THEN — the new turn is asked for from its start, never after the old turn's last event.
+            assertNull(asked)
         }
 }

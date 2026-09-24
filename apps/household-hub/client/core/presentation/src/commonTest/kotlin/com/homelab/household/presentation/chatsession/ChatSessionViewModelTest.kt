@@ -531,6 +531,105 @@ class ChatSessionViewModelTest {
             verify(VerifyMode.exactly(0)) { resumeTurnUseCase(any(), any()) }
         }
 
+    // ---- opening a conversation mid-turn --------------------------------------
+
+    private fun question(id: String = "m1") =
+        ChatMessage(
+            id = id,
+            sessionId = "s-1",
+            role = MessageRole.USER,
+            content = "Plan the week",
+            status = MessageStatus.SENT,
+        )
+
+    private fun answer(id: String = "m2") =
+        ChatMessage(
+            id = id,
+            sessionId = "s-1",
+            role = MessageRole.ASSISTANT,
+            content = "Here's the week",
+            status = MessageStatus.SENT,
+        )
+
+    @Test
+    fun `GIVEN a question still being answered WHEN the conversation is opened THEN the answer streams in`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = true)
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
+            every { resumeTurnUseCase("s-1", any()) } returns
+                flowOf(ChatStreamEvent.Reconnecting, ChatStreamEvent.Delta("Monday"))
+
+            // WHEN
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals("Monday", state.streamingMessage)
+            assertEquals(TurnState.Streaming, state.turnState)
+            assertFalse(state.canSend)
+        }
+
+    @Test
+    fun `GIVEN a question still being answered WHEN the conversation is opened and the answer finishes THEN it lands`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = true)
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
+            every { resumeTurnUseCase("s-1", any()) } returns
+                flowOf(
+                    ChatStreamEvent.Delta("Monday"),
+                    ChatStreamEvent.Done(messageId = "m2", assistantContent = "Monday", agentName = "Assistant"),
+                )
+
+            // WHEN
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals("Monday", state.messages.last().content)
+            assertNull(state.streamingMessage)
+            assertEquals(TurnState.Idle, state.turnState)
+        }
+
+    @Test
+    fun `GIVEN a question whose answer never came WHEN the conversation is opened THEN it offers to try again`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = false)
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
+
+            // WHEN
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.Failed, state.turnState)
+            assertTrue(state.canSend)
+            verify(VerifyMode.exactly(0)) { resumeTurnUseCase(any(), any()) }
+        }
+
+    @Test
+    fun `GIVEN a conversation that ends in an answer WHEN it is opened THEN nothing is waited for`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question(), answer()))
+
+            // WHEN
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.Idle, state.turnState)
+            assertNull(state.streamingMessage)
+            verify(VerifyMode.exactly(0)) { resumeTurnUseCase(any(), any()) }
+        }
+
     // ---- what the agent says that is not the answer ------------------------
 
     @Test

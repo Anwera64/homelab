@@ -71,10 +71,11 @@ interface SessionRemoteDataSource {
      *
      * The ids are this layer's business, the way a browser's `EventSource` keeps its own
      * `Last-Event-ID`: [openChatStream] and [openRegenerateStream] remember the last one each
-     * conversation received, and this asks for what came after it.
+     * conversation received, and this asks for what came after it. With none remembered — the
+     * conversation was opened mid-turn, or the app restarted — it asks for the turn from its start.
      *
-     * Throws [TurnGoneException] when there is nothing to resume from — no id remembered, or the hub
-     * has let the turn go — which means the answer is to be read from the conversation instead.
+     * Throws [TurnGoneException] when the hub holds no such turn, which means the answer is to be
+     * read from the conversation instead.
      */
     fun resumeTurnStream(sessionId: String): Flow<ChatStreamEvent>
 }

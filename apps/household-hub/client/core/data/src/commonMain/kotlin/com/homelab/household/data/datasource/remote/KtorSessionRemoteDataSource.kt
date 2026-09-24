@@ -125,11 +125,11 @@ class KtorSessionRemoteDataSource(
 
     override fun resumeTurnStream(sessionId: String): Flow<ChatStreamEvent> =
         openTurnStream(sessionId) {
-            // No id remembered means nothing was ever streamed for this conversation, or the phone
-            // never got far enough to receive one: either way there is nothing to resume from.
-            val lastEventId = lastEventIds[sessionId] ?: throw TurnGoneException()
+            // No id remembered — the conversation was opened mid-turn, or the app restarted — asks
+            // for the turn the hub holds from its first event. Whether there is one is the hub's call.
+            val lastEventId = lastEventIds[sessionId]
             client.prepareGet("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
-                parameter("last_event_id", lastEventId)
+                if (lastEventId != null) parameter("last_event_id", lastEventId)
             }
         }
 

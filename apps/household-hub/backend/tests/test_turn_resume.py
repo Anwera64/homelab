@@ -219,3 +219,47 @@ async def test_resuming_a_running_turn_follows_it_live(client: httpx.AsyncClient
     resumed = await asyncio.wait_for(resuming, timeout=2)
     await asyncio.wait_for(sending, timeout=2)
     assert [event_id for event_id, _ in _frames(resumed.text)[:-1]] == [f"{turn}:3", f"{turn}:4"]
+
+
+@pytest.mark.asyncio
+async def test_resuming_with_no_id_follows_the_current_turn_from_its_start(client: httpx.AsyncClient, scripted):
+    """GIVEN a turn paused after two events WHEN resumed with no id THEN every event arrives, from 1."""
+    hold = asyncio.Event()
+    scripted(hold=hold, hold_after=2)
+    token, session_id = await _session(client)
+    registry = pres_deps.get_turn_log_registry()
+
+    sending = asyncio.create_task(_send(client, token, session_id))
+    for _ in range(100):
+        log = registry.get(session_id)
+        if log is not None and len(log.events) == 2:
+            break
+        await asyncio.sleep(0.01)
+    turn = registry.get(session_id).turn_id
+
+    resuming = asyncio.create_task(
+        client.get(
+            f"/api/v1/sessions/{session_id}/chat/stream",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    )
+    await asyncio.sleep(0.05)
+    hold.set()
+
+    resumed = await asyncio.wait_for(resuming, timeout=2)
+    await asyncio.wait_for(sending, timeout=2)
+    assert resumed.status_code == 200
+    assert [event_id for event_id, _ in _frames(resumed.text)[:-1]] == [f"{turn}:{n}" for n in range(1, 5)]
+
+
+@pytest.mark.asyncio
+async def test_resuming_with_no_id_when_nothing_is_held_is_gone(client: httpx.AsyncClient):
+    """GIVEN no turn held WHEN resumed with no id THEN 410."""
+    token, session_id = await _session(client)
+
+    resumed = await client.get(
+        f"/api/v1/sessions/{session_id}/chat/stream",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert resumed.status_code == 410
