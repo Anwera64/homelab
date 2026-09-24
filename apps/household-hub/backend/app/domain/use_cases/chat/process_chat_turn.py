@@ -548,140 +548,106 @@ class ProcessChatTurnUseCase:
         tools_executed: List[Dict[str, Any]] = []
         final_content_parts: List[str] = []
         answer = _AnswerParts(self.clock)
-        iterations = 0
+        awaiting_approval = False
 
-        if not agent_tools:
+        # One model call per round, until a round calls no tool: that round is the answer (#35).
+        # The model may keep using tools until the last round of the budget, which is made to
+        # answer with none. A write waiting on the member ends the turn the same way, so the model
+        # says it is waiting rather than trying the write again.
+        for round_number in range(1, self.max_iterations + 1):
+            if not agent_tools or awaiting_approval:
+                tools = None
+            elif round_number == self.max_iterations:
+                llm_messages.append(
+                    LLMMessage(
+                        role="system",
+                        content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
+                    )
+                )
+                tools = None
+            else:
+                tools = agent_tools
+
+            # Streamed rather than blocking. A blocking call sends nothing back until the whole
+            # response exists, so a thinking model deciding on a tool used to hold the socket
+            # silent until it timed out, and an agent with tools answered in one lump at the end.
+            # Ollama sends a tool call whole, in one chunk, so it is simply collected.
+            decision_starts_at = len(final_content_parts)
+            tool_calls: List[LLMToolCall] = []
             async for event in self._relay(
                 self.llm_client.stream_chat_completion(
                     messages=llm_messages,
                     model=model,
                     temperature=agent.temperature,
                     top_p=agent.top_p,
-                    tools=None,
+                    tools=tools,
                 ),
                 final_content_parts,
                 answer,
+                tool_calls,
             ):
                 yield event
-        else:
-            while iterations < self.max_iterations:
-                iterations += 1
 
-                if iterations == self.max_iterations:
+            if tools is None or not tool_calls:
+                break
+
+            llm_messages.append(
+                LLMMessage(
+                    role="assistant",
+                    content="".join(final_content_parts[decision_starts_at:]),
+                    tool_calls=tool_calls,
+                )
+            )
+
+            for tc in tool_calls:
+                if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
+                    proposal_info = {
+                        "tool": tc.name,
+                        "status": "proposal_pending",
+                        "arguments": tc.arguments,
+                        "message": f"Action '{tc.name}' requires member confirmation.",
+                    }
+                    tools_executed.append(proposal_info)
+                    awaiting_approval = True
+                    yield {"type": "tool_call", "data": proposal_info}
                     llm_messages.append(
                         LLMMessage(
-                            role="system",
-                            content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
+                            role="tool",
+                            tool_call_id=tc.id,
+                            name=tc.name,
+                            content=json.dumps(proposal_info),
                         )
                     )
-                    async for event in self._relay(
-                        self.llm_client.stream_chat_completion(
-                            messages=llm_messages,
-                            model=model,
-                            temperature=agent.temperature,
-                            top_p=agent.top_p,
-                            tools=None,
-                        ),
-                        final_content_parts,
-                        answer,
-                    ):
-                        yield event
-                    break
-
-                # Streamed rather than blocking. A blocking call sends nothing back until the whole
-                # response exists, so a thinking model deciding on a tool used to hold the socket
-                # silent until it timed out, and an agent with tools answered in one lump at the end.
-                # Ollama sends a tool call whole, in one chunk, so it is simply collected.
-                decision_starts_at = len(final_content_parts)
-                tool_calls: List[LLMToolCall] = []
-                async for event in self._relay(
-                    self.llm_client.stream_chat_completion(
-                        messages=llm_messages,
-                        model=model,
-                        temperature=agent.temperature,
-                        top_p=agent.top_p,
-                        tools=agent_tools,
-                    ),
-                    final_content_parts,
-                    answer,
-                    tool_calls,
-                ):
-                    yield event
-
-                if not tool_calls:
-                    break
-
-                llm_messages.append(
-                    LLMMessage(
+                else:
+                    yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
+                    tool_result = await self.tool_executor.execute(
+                        tool_name=tc.name,
+                        arguments=tc.arguments,
+                        user_id=current_user.id,
+                        agent_tool_permissions=agent.tool_permissions,
+                        is_secret_mode=is_turn_secret,
                         role="assistant",
-                        content="".join(final_content_parts[decision_starts_at:]),
-                        tool_calls=tool_calls,
                     )
-                )
-
-                for tc in tool_calls:
-                    if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
-                        proposal_info = {
-                            "tool": tc.name,
-                            "status": "proposal_pending",
-                            "arguments": tc.arguments,
-                            "message": f"Action '{tc.name}' requires member confirmation.",
-                        }
-                        tools_executed.append(proposal_info)
-                        yield {"type": "tool_call", "data": proposal_info}
-                        llm_messages.append(
-                            LLMMessage(
-                                role="tool",
-                                tool_call_id=tc.id,
-                                name=tc.name,
-                                content=json.dumps(proposal_info),
-                            )
+                    exec_info = {
+                        "tool": tc.name,
+                        "success": tool_result.success,
+                        "arguments": tc.arguments,
+                        "data": tool_result.data,
+                        "error": tool_result.error,
+                    }
+                    tools_executed.append(exec_info)
+                    answer.tool(tc.name, tool_result.success)
+                    yield {"type": "tool_result", "data": exec_info}
+                    llm_messages.append(
+                        LLMMessage(
+                            role="tool",
+                            tool_call_id=tc.id,
+                            name=tc.name,
+                            content=json.dumps(
+                                tool_result.data if tool_result.success else {"error": tool_result.error}
+                            ),
                         )
-                    else:
-                        yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
-                        tool_result = await self.tool_executor.execute(
-                            tool_name=tc.name,
-                            arguments=tc.arguments,
-                            user_id=current_user.id,
-                            agent_tool_permissions=agent.tool_permissions,
-                            is_secret_mode=is_turn_secret,
-                            role="assistant",
-                        )
-                        exec_info = {
-                            "tool": tc.name,
-                            "success": tool_result.success,
-                            "arguments": tc.arguments,
-                            "data": tool_result.data,
-                            "error": tool_result.error,
-                        }
-                        tools_executed.append(exec_info)
-                        answer.tool(tc.name, tool_result.success)
-                        yield {"type": "tool_result", "data": exec_info}
-                        llm_messages.append(
-                            LLMMessage(
-                                role="tool",
-                                tool_call_id=tc.id,
-                                name=tc.name,
-                                content=json.dumps(
-                                    tool_result.data if tool_result.success else {"error": tool_result.error}
-                                ),
-                            )
-                        )
-
-                # After executing tools, stream final synthesis to the user
-                async for event in self._relay(
-                    self.llm_client.stream_chat_completion(
-                        messages=llm_messages,
-                        model=model,
-                        temperature=agent.temperature,
-                        top_p=agent.top_p,
-                        tools=None,
-                    ),
-                    final_content_parts,
-                    answer,
-                ):
-                    yield event
-                break
+                    )
 
         final_content = answer.content()
 

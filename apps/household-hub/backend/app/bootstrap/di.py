@@ -268,6 +268,7 @@ def get_container(session: AsyncSession):
         tool_lister=tool_lister,
         uow=uow,
         model_resolver=model_resolver,
+        max_iterations=settings.MAX_TOOL_CALL_ITERATIONS,
     )
 
     reflect_turn_uc = ReflectTurnUseCase(

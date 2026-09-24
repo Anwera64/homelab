@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     # Long enough to cover a cold load of the model into memory: 31 s for qwen3.8-rvn from the Docker volume, measured.
     OLLAMA_TIMEOUT_SECONDS: float = 120.0
     DEFAULT_LLM_MODEL: str = "qwen3.8-rvn"
-    MAX_TOOL_CALL_ITERATIONS: int = 5
+    # Model calls an agent gets per turn. Every one but the last may call tools; the last is made to answer.
+    MAX_TOOL_CALL_ITERATIONS: int = 8
     MAX_CONTEXT_TOKENS: int = 8192
     MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
     MAX_GOSSIP_SUMMARY_LENGTH: int = 250

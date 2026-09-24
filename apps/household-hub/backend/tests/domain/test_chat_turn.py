@@ -360,8 +360,9 @@ async def test_execute_stream_tool_execution_followed_by_streamed_synthesis():
     assert len(llm_client.chat_calls) == 0
     assert len(llm_client.stream_calls) == 2
     assert llm_client.stream_calls[0]["tools"] is not None
-    # Synthesis used stream_chat_completion with tools=None
-    assert llm_client.stream_calls[1]["tools"] is None
+    # After a round of tools the model may still call more (#35): the answer is just a round in
+    # which it chose not to.
+    assert llm_client.stream_calls[1]["tools"] is not None
 
     # Events sequence: tool_executing, tool_result, deltas, done
     types = [ev["type"] for ev in events]
@@ -664,6 +665,10 @@ async def test_a_write_the_decision_asks_for_still_waits_for_approval():
     proposals = [ev for ev in events if ev["type"] == "tool_call"]
     assert proposals and proposals[0]["data"]["status"] == "proposal_pending"
     assert tool_executor.executed_calls == []
+    # The turn now waits on the member, so the model says so with no tools to try the write again.
+    assert len(llm_client.stream_calls) == 2
+    assert llm_client.stream_calls[1]["tools"] is None
+    assert events[-1]["assistant_content"] == "Shall I add it?"
 
 
 @pytest.mark.asyncio
@@ -952,3 +957,101 @@ async def test_GIVEN_an_answer_with_no_tools_WHEN_answered_THEN_it_is_one_text_p
 
     assert events[-1]["parts"] == [{"type": "text", "content": "A light day. "}]
     assert session_repo.messages[-1].content == "A light day. "
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_model_that_asks_for_tools_twice_WHEN_answered_THEN_both_rounds_run_and_it_answers():
+    """
+    Issue #35: after one round of tools the model was asked for its answer with no tools left, so a
+    model that wanted to search again said it would and stopped - the turn ended on a promise.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    first = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "2026-09-24"})
+    second = LLMToolCall(id="c2", name="calendar_read", arguments={"date": "2026-09-25"})
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(delta_content="Let me look. "), LLMResponseChunk(tool_calls=[first])],
+            [LLMResponseChunk(delta_content="And the day after. "), LLMResponseChunk(tool_calls=[second])],
+            [LLMResponseChunk(delta_content="Both days are free.")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client, tool_executor).execute_stream(
+            session_id="s1", current_user=user, content="Am I free today and tomorrow?"
+        )
+    ]
+
+    assert [call["args"] for call in tool_executor.executed_calls] == [first.arguments, second.arguments]
+    assert len(llm_client.stream_calls) == 3
+    assert all(call["tools"] is not None for call in llm_client.stream_calls)
+    expected_parts = [
+        {"type": "text", "content": "Let me look. "},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "text", "content": "And the day after. "},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "text", "content": "Both days are free."},
+    ]
+    expected_content = "Let me look.\n\nAnd the day after.\n\nBoth days are free."
+    done = events[-1]
+    assert done["parts"] == expected_parts
+    assert done["assistant_content"] == expected_content
+    assert session_repo.messages[-1].metadata_json["parts"] == expected_parts
+    assert session_repo.messages[-1].content == expected_content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_model_that_never_stops_calling_tools_WHEN_the_budget_runs_out_THEN_it_is_made_to_answer():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Here is what I found.")],
+        ]
+    )
+    use_case = _use_case(session_repo, agent, llm_client, tool_executor)
+    use_case.max_iterations = 3
+
+    events = [
+        ev
+        async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Look everything up")
+    ]
+
+    assert len(tool_executor.executed_calls) == 2
+    assert len(llm_client.stream_calls) == 3
+    last_call = llm_client.stream_calls[-1]
+    assert last_call["tools"] is None
+    assert last_call["messages"][-1].role == "system"
+    assert last_call["messages"][-1].content.startswith("Tool budget reached")
+    assert events[-1]["assistant_content"] == "Here is what I found."
+    assert session_repo.messages[-1].content == "Here is what I found."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_two_rounds_of_tools_WHEN_answered_without_streaming_THEN_both_rounds_run():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tool_executor = FakeToolExecutor()
+    llm_client = FakeLLMClient(
+        responses=[
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})]),
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})]),
+            LLMResponse(content="Both days are free."),
+        ]
+    )
+
+    result = await _use_case(session_repo, agent, llm_client, tool_executor).execute(
+        session_id="s1", current_user=user, content="Am I free today and tomorrow?"
+    )
+
+    assert len(tool_executor.executed_calls) == 2
+    assert result.message.content == "Both days are free."

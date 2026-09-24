@@ -31,3 +31,22 @@ def test_ollama_connector_defaults_to_the_compose_service():
 
 def test_searxng_connector_defaults_to_the_compose_service():
     assert SearXNGSearchConnector().base_url == "http://searxng:8080"
+
+
+def test_GIVEN_no_override_WHEN_settings_load_THEN_an_agent_gets_eight_model_calls_per_turn(
+    settings_without_overrides: Settings,
+):
+    assert settings_without_overrides.MAX_TOOL_CALL_ITERATIONS == 8
+
+
+def test_GIVEN_a_tool_budget_setting_WHEN_the_container_is_built_THEN_the_chat_turn_uses_it(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from app.bootstrap import di
+    from app.presentation.api import deps
+
+    monkeypatch.setattr(di.settings, "MAX_TOOL_CALL_ITERATIONS", 3)
+
+    container = di.get_container(session=None)
+
+    assert container[deps.get_process_chat_turn_use_case].max_iterations == 3
