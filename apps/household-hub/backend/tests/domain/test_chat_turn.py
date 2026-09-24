@@ -636,7 +636,8 @@ async def test_a_tool_decision_shows_its_words_as_they_come():
     types = [ev["type"] for ev in events]
     first_tool = types.index("tool_executing")
     assert [ev["content"] for ev in events[:first_tool] if ev["type"] == "delta"] == ["Let me ", "check. "]
-    assert events[-1]["assistant_content"] == "Let me check. Tomorrow is light."
+    # The stretch before the tool and the one after are paragraphs apart, not run together (#33).
+    assert events[-1]["assistant_content"] == "Let me check.\n\nTomorrow is light."
 
 
 @pytest.mark.asyncio
@@ -790,3 +791,164 @@ async def test_a_streamed_turn_asks_the_model_the_household_default_resolves_to(
     )]
 
     assert [call["model"] for call in llm_client.stream_calls] == ["house-model"]
+
+
+class SteppedClock:
+    """Reads the given instants in order, one per call: each stretch of thinking reads it twice."""
+
+    def __init__(self, *instants: float):
+        self._instants = list(instants)
+
+    def __call__(self) -> float:
+        return self._instants.pop(0)
+
+
+class FailingToolExecutor(FakeToolExecutor):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant"):
+        self.executed_calls.append({"tool": tool_name, "args": arguments})
+        return ToolExecutionResult(tool_name=tool_name, success=False, error="unreachable")
+
+
+def _parts_use_case(session_repo, agent, llm_client, tool_executor=None, clock=None):
+    use_case = _use_case(session_repo, agent, llm_client, tool_executor)
+    if clock is not None:
+        use_case.clock = clock
+    return use_case
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_text_a_tool_then_text_WHEN_answered_THEN_the_parts_keep_that_order():
+    """
+    Issue #33: an answer that wrote, used a tool, and wrote again was saved as one string, so the
+    phone could not tell where the tool happened and the two stretches ran together.
+    """
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={"date": "2026-09-23"})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [
+                LLMResponseChunk(delta_content="Let me "),
+                LLMResponseChunk(delta_content="check. "),
+                LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls"),
+            ],
+            [LLMResponseChunk(delta_content="Tomorrow "), LLMResponseChunk(delta_content="is light.")],
+        ]
+    )
+
+    events = [
+        ev
+        async for ev in _parts_use_case(session_repo, agent, llm_client).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    expected = [
+        {"type": "text", "content": "Let me check. "},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "text", "content": "Tomorrow is light."},
+    ]
+    done = events[-1]
+    assert done["parts"] == expected
+    assert session_repo.messages[-1].metadata_json["parts"] == expected
+    assert done["assistant_content"] == "Let me check.\n\nTomorrow is light."
+    assert session_repo.messages[-1].content == "Let me check.\n\nTomorrow is light."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_thinking_before_each_stretch_WHEN_answered_THEN_each_stretch_is_its_own_thought():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [
+                LLMResponseChunk(delta_reasoning="I need "),
+                LLMResponseChunk(delta_reasoning="the calendar."),
+                LLMResponseChunk(delta_content="Let me check."),
+                LLMResponseChunk(tool_calls=[tc]),
+            ],
+            [LLMResponseChunk(delta_reasoning="Two events."), LLMResponseChunk(delta_content="Two things.")],
+        ]
+    )
+    # Stretch one runs 0 -> 6.2 s, stretch two 100 -> 108.6 s.
+    clock = SteppedClock(0.0, 6.2, 100.0, 108.6)
+
+    events = [
+        ev
+        async for ev in _parts_use_case(session_repo, agent, llm_client, clock=clock).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    assert events[-1]["parts"] == [
+        {"type": "thought", "seconds": 6},
+        {"type": "text", "content": "Let me check."},
+        {"type": "tool", "tool": "calendar_read", "success": True},
+        {"type": "thought", "seconds": 9},
+        {"type": "text", "content": "Two things."},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_thinking_that_ends_the_stream_WHEN_answered_THEN_it_is_a_thought_of_at_least_one_second():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Hi."), LLMResponseChunk(delta_reasoning="Done?")]]
+    )
+
+    events = [
+        ev
+        async for ev in _parts_use_case(session_repo, agent, llm_client, clock=SteppedClock(5.0, 5.1)).execute_stream(
+            session_id="s1", current_user=user, content="Hello"
+        )
+    ]
+
+    assert events[-1]["parts"] == [{"type": "text", "content": "Hi."}, {"type": "thought", "seconds": 1}]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_tool_that_fails_WHEN_answered_THEN_its_part_says_so():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    tc = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[tc])], [LLMResponseChunk(delta_content="I could not look.")]]
+    )
+
+    events = [
+        ev
+        async for ev in _parts_use_case(session_repo, agent, llm_client, FailingToolExecutor()).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    assert events[-1]["parts"] == [
+        {"type": "tool", "tool": "calendar_read", "success": False},
+        {"type": "text", "content": "I could not look."},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_with_no_tools_WHEN_answered_THEN_it_is_one_text_part_and_the_same_content():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="A light "), LLMResponseChunk(delta_content="day. ")]]
+    )
+
+    events = [
+        ev
+        async for ev in _parts_use_case(session_repo, agent, llm_client).execute_stream(
+            session_id="s1", current_user=user, content="What is on tomorrow?"
+        )
+    ]
+
+    assert events[-1]["parts"] == [{"type": "text", "content": "A light day. "}]
+    assert session_repo.messages[-1].content == "A light day. "
