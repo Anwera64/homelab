@@ -51,6 +51,15 @@ interface SessionRepository {
         afterAssistantMessageId: String? = null,
     ): Flow<ChatStreamEvent>
 
+    /**
+     * Picks up a turn this phone stopped hearing — the screen locked, the signal went — from the
+     * last word it received, or reads the saved answer when the hub has let the turn go.
+     */
+    fun resumeTurn(
+        sessionId: String,
+        afterAssistantMessageId: String? = null,
+    ): Flow<ChatStreamEvent>
+
     suspend fun approveToolProposal(
         sessionId: String,
         toolCallId: String,

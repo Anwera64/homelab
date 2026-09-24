@@ -228,4 +228,65 @@ class DefensiveSseStreamReaderTest {
             assertEquals(false, result.success)
             assertEquals("Unauthorized", result.error)
         }
+
+    /** `id:` lines let a data source remember where to resume a dropped stream from. */
+    @Test
+    fun `GIVEN frames with ids WHEN they are read THEN each id is reported after its event`() =
+        runTest {
+            // GIVEN
+            val ssePayload =
+                """
+                id: t:1
+                data: {"type": "delta", "content": "Hello"}
+
+                id: t:2
+                data: {"type": "delta", "content": " world"}
+
+                data: [DONE]
+
+                """.trimIndent()
+            val reportedIds = mutableListOf<String>()
+
+            // WHEN
+            val events =
+                reader
+                    .readEvents(
+                        ByteReadChannel(ssePayload.encodeToByteArray()),
+                        onEventId = { reportedIds.add(it) },
+                    ).toList()
+
+            // THEN
+            assertEquals(listOf("t:1", "t:2"), reportedIds)
+            assertEquals("Hello", (events[0] as ChatStreamEvent.Delta).content)
+            assertEquals(" world", (events[1] as ChatStreamEvent.Delta).content)
+        }
+
+    @Test
+    fun `GIVEN a frame without an id after one with an id WHEN read THEN no id is reported for it`() =
+        runTest {
+            // GIVEN
+            val ssePayload =
+                """
+                id: t:1
+                data: {"type": "delta", "content": "Hello"}
+
+                data: {"type": "delta", "content": " world"}
+
+                data: [DONE]
+
+                """.trimIndent()
+            val reportedIds = mutableListOf<String>()
+
+            // WHEN
+            val events =
+                reader
+                    .readEvents(
+                        ByteReadChannel(ssePayload.encodeToByteArray()),
+                        onEventId = { reportedIds.add(it) },
+                    ).toList()
+
+            // THEN
+            assertEquals(listOf("t:1"), reportedIds)
+            assertEquals(2, events.size)
+        }
 }

@@ -2,6 +2,7 @@ package com.homelab.household.data.datasource.remote.`interface`
 
 import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
+import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatStreamEvent
 import kotlinx.coroutines.flow.Flow
@@ -63,4 +64,17 @@ interface SessionRemoteDataSource {
      * to answer again.
      */
     fun openRegenerateStream(sessionId: String): Flow<ChatStreamEvent>
+
+    /**
+     * The rest of the turn this phone was last streaming in [sessionId], from the event after the
+     * last one it received — live if the hub is still writing it.
+     *
+     * The ids are this layer's business, the way a browser's `EventSource` keeps its own
+     * `Last-Event-ID`: [openChatStream] and [openRegenerateStream] remember the last one each
+     * conversation received, and this asks for what came after it.
+     *
+     * Throws [TurnGoneException] when there is nothing to resume from — no id remembered, or the hub
+     * has let the turn go — which means the answer is to be read from the conversation instead.
+     */
+    fun resumeTurnStream(sessionId: String): Flow<ChatStreamEvent>
 }

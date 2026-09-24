@@ -4,6 +4,7 @@ import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.mapper.ChatMessageDataMapper
 import com.homelab.household.data.mapper.SessionDataMapper
+import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SessionConflictException
@@ -14,6 +15,7 @@ import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -120,6 +122,11 @@ class SessionRepositoryImpl(
         afterAssistantMessageId: String?,
     ): Flow<ChatStreamEvent> = recoverable(remote.openRegenerateStream(sessionId), sessionId, afterAssistantMessageId)
 
+    override fun resumeTurn(
+        sessionId: String,
+        afterAssistantMessageId: String?,
+    ): Flow<ChatStreamEvent> = recoverReply(sessionId, afterAssistantMessageId, resumable = true)
+
     private fun recoverable(
         turn: Flow<ChatStreamEvent>,
         sessionId: String,
@@ -132,7 +139,10 @@ class SessionRepositoryImpl(
                 .catch { cause ->
                     val worthRecovering = cause is SessionConflictException || delivered
                     if (!worthRecovering) throw cause
-                    emitAll(recoverReply(sessionId, afterAssistantMessageId))
+                    // A conflict is a turn this stream never heard a word of, so there is nothing of
+                    // it to resume; only the conversation can say how it went.
+                    val resumable = cause !is SessionConflictException
+                    emitAll(recoverReply(sessionId, afterAssistantMessageId, resumable))
                     ended = true
                 }.collect { event ->
                     when (event) {
@@ -159,79 +169,139 @@ class SessionRepositoryImpl(
             // refusing every later message, since a turn it believes is running blocks one. Nothing
             // here knows what happened, so it goes and asks — and comes back with one of the three
             // endings, every one of which is something a person can read.
-            if (!ended) emitAll(recoverReply(sessionId, afterAssistantMessageId))
+            if (!ended) emitAll(recoverReply(sessionId, afterAssistantMessageId, resumable = true))
         }
 
     /**
-     * Wait for the answer the hub is still writing, and say which kind of ending this turn had.
+     * Get the rest of a turn this phone stopped hearing, and say which kind of ending it had.
      *
-     * [afterAssistantMessageId] is the whole trick. A conversation that has run for a while
-     * already ends in an assistant message, so "the last assistant message" matches the *previous*
-     * answer on the very first read — a second after the stream died, with the real answer still
-     * being generated. Waiting for an id that is not that one is the difference between the answer
-     * and a stale one.
+     * First choice is to pick the stream up where it stopped: the hub keeps each turn's events
+     * for a while, so the phone asks for everything after the last one it received and the answer
+     * carries on, word for word, with nothing missed and nothing said twice. [resumable] is false
+     * only when there is no stream of this turn to pick up.
      *
-     * Three ways out, and none of them is an exception. A new answer is [ChatStreamEvent.Done]. A
-     * hub that says no turn is running, with still no answer, means the turn died and is worth
-     * offering again — [ChatStreamEvent.TurnFailed]. Running past the ceiling is
-     * [ChatStreamEvent.StillWorking]: the wait ended, the turn did not, and telling someone their
-     * answer failed because we stopped watching would be a lie.
+     * When the hub has let the turn go, the conversation is read instead. [afterAssistantMessageId]
+     * matters there: a conversation that has run for a while already ends in an assistant message,
+     * so "the last assistant message" matches the *previous* answer on the first read, with the
+     * real one still being written. Waiting for an id that is not that one is the difference
+     * between the answer and a stale one.
      *
-     * A hub that has gone away entirely is still worth saying out loud, so that one throws.
+     * An unreachable hub is waited out, never thrown. It is what a locked phone looks like from
+     * here, and the turn it is waiting on is fine — telling someone their answer failed because
+     * the screen went dark was the bug. Every way out is an event: [ChatStreamEvent.Done],
+     * [ChatStreamEvent.TurnFailed] when the hub says nothing is running and no answer came, or
+     * [ChatStreamEvent.StillWorking] past the ceiling, which the screen can resume from later.
      */
     private fun recoverReply(
         sessionId: String,
         afterAssistantMessageId: String?,
+        resumable: Boolean,
     ): Flow<ChatStreamEvent> =
         flow {
-            // Say so before the first wait: polling makes no sound of its own, and the phone is
+            // Say so before the first wait: waiting makes no sound of its own, and the phone is
             // sitting on a half-written answer wondering whether anything is still happening.
             emit(ChatStreamEvent.Reconnecting)
 
+            var canResume = resumable
             var wait = pollDelayMs
             var waited = 0L
 
-            while (waited < MAX_RECOVERY_WAIT_MS) {
+            while (true) {
+                if (canResume) {
+                    when (resumeOnce(sessionId)) {
+                        Resumed.ENDED -> {
+                            return@flow
+                        }
+
+                        Resumed.GONE -> {
+                            // Nothing left to stream, so the conversation has the answer now.
+                            canResume = false
+                            continue
+                        }
+
+                        // Words arrived before it dropped again, so the hub is there: start the
+                        // wait over rather than spending the one that ran while the phone was away.
+                        Resumed.PROGRESSED -> {
+                            wait = pollDelayMs
+                            waited = 0L
+                        }
+
+                        Resumed.DROPPED -> {}
+                    }
+                } else {
+                    val ending = readEnding(sessionId, afterAssistantMessageId)
+                    if (ending != null) {
+                        emit(ending)
+                        return@flow
+                    }
+                }
+
+                if (waited >= MAX_RECOVERY_WAIT_MS) {
+                    emit(ChatStreamEvent.StillWorking)
+                    return@flow
+                }
                 delay(wait)
                 waited += wait
                 wait = (wait * 1.5).toLong()
+            }
+        }
 
-                val detail =
-                    runCatchingSafe { remote.fetchSession(sessionId) }
-                        .onFailure { failure ->
-                            if (failure is ServerOfflineException) {
-                                throw ServerOfflineException(
-                                    message = "Server connection lost while polling",
-                                    cause = failure,
-                                )
-                            }
-                        }.getOrNull()
+    private enum class Resumed { ENDED, GONE, PROGRESSED, DROPPED }
 
-                val reply =
-                    detail
-                        ?.messages
-                        ?.lastOrNull { it.role.equals("assistant", ignoreCase = true) }
-                        ?.takeIf { it.id != afterAssistantMessageId }
-
-                if (reply != null) {
-                    emit(
-                        ChatStreamEvent.Done(
-                            messageId = reply.id,
-                            assistantContent = reply.content,
-                            agentName = "Assistant",
-                        ),
-                    )
-                    return@flow
+    /** One try at the rest of the stream, passing along whatever it says. */
+    private suspend fun FlowCollector<ChatStreamEvent>.resumeOnce(sessionId: String): Resumed {
+        // A resumed stream that closes without an ending has nothing more to say, which is the
+        // same as the hub having let the turn go: the conversation knows the rest.
+        var outcome = Resumed.GONE
+        var heard = false
+        remote
+            .resumeTurnStream(sessionId)
+            .catch { cause ->
+                when (cause) {
+                    is TurnGoneException -> outcome = Resumed.GONE
+                    is ServerOfflineException -> outcome = if (heard) Resumed.PROGRESSED else Resumed.DROPPED
+                    else -> throw cause
                 }
-
-                if (detail != null && !detail.turn_running) {
-                    emit(ChatStreamEvent.TurnFailed)
-                    return@flow
+            }.collect { event ->
+                heard = true
+                when (event) {
+                    is ChatStreamEvent.StreamError -> throw DomainException(event.message)
+                    is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed -> outcome = Resumed.ENDED
+                    else -> Unit
                 }
+                emit(event)
+            }
+        return outcome
+    }
+
+    /** The ending the conversation shows, or null while it shows none yet. */
+    private suspend fun readEnding(
+        sessionId: String,
+        afterAssistantMessageId: String?,
+    ): ChatStreamEvent? {
+        val detail = runCatchingSafe { remote.fetchSession(sessionId) }.getOrNull() ?: return null
+        val reply =
+            detail.messages
+                .lastOrNull { it.role.equals("assistant", ignoreCase = true) }
+                ?.takeIf { it.id != afterAssistantMessageId }
+        return when {
+            reply != null -> {
+                ChatStreamEvent.Done(
+                    messageId = reply.id,
+                    assistantContent = reply.content,
+                    agentName = "Assistant",
+                )
             }
 
-            emit(ChatStreamEvent.StillWorking)
+            !detail.turn_running -> {
+                ChatStreamEvent.TurnFailed
+            }
+
+            else -> {
+                null
+            }
         }
+    }
 
     private fun ConversationSession.withLockState(): ConversationSession =
         if (isSecret && cache.isLocked(id)) copy(isSecretLocked = true) else this

@@ -17,6 +17,7 @@ import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
+import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import dev.mokkery.MockMode
@@ -31,6 +32,7 @@ import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -58,6 +60,7 @@ class ChatSessionViewModelTest {
     private val streamChatTurnUseCase = mock<StreamChatTurnUseCase>()
     private val getSessionUseCase = mock<GetSessionUseCase>()
     private val regenerateAnswerUseCase = mock<RegenerateAnswerUseCase>()
+    private val resumeTurnUseCase = mock<ResumeTurnUseCase>()
     private val listAgentsUseCase = mock<ListAgentsUseCase>(MockMode.autofill)
     private val createSessionUseCase = mock<CreateSessionUseCase>(MockMode.autofill)
     private val approveToolProposalUseCase = mock<ApproveToolProposalUseCase>()
@@ -78,6 +81,7 @@ class ChatSessionViewModelTest {
                 listAgentsUseCase = listAgentsUseCase,
                 createSessionUseCase = createSessionUseCase,
                 regenerateAnswerUseCase = regenerateAnswerUseCase,
+                resumeTurnUseCase = resumeTurnUseCase,
                 approveToolProposalUseCase = approveToolProposalUseCase,
                 toggleSecretModeUseCase = toggleSecretModeUseCase,
                 getAgentUseCase = getAgentUseCase,
@@ -94,6 +98,7 @@ class ChatSessionViewModelTest {
             listAgentsUseCase = listAgentsUseCase,
             createSessionUseCase = createSessionUseCase,
             regenerateAnswerUseCase = regenerateAnswerUseCase,
+            resumeTurnUseCase = resumeTurnUseCase,
             approveToolProposalUseCase = approveToolProposalUseCase,
             toggleSecretModeUseCase = toggleSecretModeUseCase,
             getAgentUseCase = getAgentUseCase,
@@ -427,6 +432,103 @@ class ChatSessionViewModelTest {
             val state = viewModel.uiState.value
             assertEquals(TurnState.Failed, state.turnState)
             assertTrue(state.canSend, "the turn is over, so the composer is free again")
+        }
+
+    // ---- coming back to a turn --------------------------------------------
+
+    @Test
+    fun `GIVEN an answer left still working while the phone was locked WHEN the app comes back THEN it carries on from the last word`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.Delta("Hel"),
+                    ChatStreamEvent.Reconnecting,
+                    ChatStreamEvent.StillWorking,
+                )
+            every { resumeTurnUseCase("s-1", any()) } returns
+                flowOf(ChatStreamEvent.Reconnecting, ChatStreamEvent.Delta("lo"))
+            viewModel.sendMessage("Say hello")
+            advanceUntilIdle()
+
+            // WHEN
+            viewModel.onForeground()
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals("Hello", state.streamingMessage)
+            assertEquals(TurnState.Streaming, state.turnState)
+        }
+
+    @Test
+    fun `GIVEN an answer resumed after the phone was locked WHEN it finishes THEN it lands as the answer`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Delta("Hel"),
+                    ChatStreamEvent.Reconnecting,
+                    ChatStreamEvent.StillWorking,
+                )
+            every { resumeTurnUseCase("s-1", any()) } returns
+                flowOf(
+                    ChatStreamEvent.Delta("lo"),
+                    ChatStreamEvent.Done(messageId = "m2", assistantContent = "Hello", agentName = "Assistant"),
+                )
+            viewModel.sendMessage("Say hello")
+            advanceUntilIdle()
+
+            // WHEN
+            viewModel.onForeground()
+            advanceUntilIdle()
+
+            // THEN
+            val state = viewModel.uiState.value
+            assertEquals("Hello", state.messages.last { it.role == MessageRole.ASSISTANT }.content)
+            assertEquals(MessageStatus.SENT, state.messages.first { it.role == MessageRole.USER }.status)
+            assertNull(state.streamingMessage)
+            assertEquals(TurnState.Idle, state.turnState)
+        }
+
+    @Test
+    fun `GIVEN a turn still reconnecting in the background WHEN the app comes back THEN it asks right away instead of waiting out the backoff`() =
+        runTest(testDispatcher) {
+            // GIVEN — the old wait never ends on its own, as a backoff delay would not for a while.
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Hel"))
+                    emit(ChatStreamEvent.Reconnecting)
+                    awaitCancellation()
+                }
+            every { resumeTurnUseCase("s-1", any()) } returns flowOf(ChatStreamEvent.Delta("lo"))
+            viewModel.sendMessage("Say hello")
+            advanceUntilIdle()
+
+            // WHEN
+            viewModel.onForeground()
+            advanceUntilIdle()
+
+            // THEN
+            assertEquals("Hello", viewModel.uiState.value.streamingMessage)
+        }
+
+    @Test
+    fun `GIVEN nothing being answered WHEN the app comes back THEN nothing is asked of the hub`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            loadedSession()
+
+            // WHEN
+            viewModel.onForeground()
+            advanceUntilIdle()
+
+            // THEN
+            verify(VerifyMode.exactly(0)) { resumeTurnUseCase(any(), any()) }
         }
 
     // ---- what the agent says that is not the answer ------------------------
