@@ -16,3 +16,4 @@ caldav>=3.3.0
 icalendar>=7.0.0
 cryptography>=43.0.0
 python-multipart>=0.0.12
+trafilatura>=2.2.0
