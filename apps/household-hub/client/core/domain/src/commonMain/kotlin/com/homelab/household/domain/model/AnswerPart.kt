@@ -19,11 +19,14 @@ sealed interface AnswerPart {
         val seconds: Int,
     ) : AnswerPart
 
+    /** [summary] is what the step shows about itself; null from a hub that did not send one. */
     data class ToolDone(
         val tool: String,
+        val summary: ToolSummary? = null,
     ) : AnswerPart
 
     data class ToolFailed(
         val tool: String,
+        val summary: ToolSummary? = null,
     ) : AnswerPart
 }

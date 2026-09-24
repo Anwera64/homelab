@@ -1,6 +1,7 @@
 package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.data.mapper.AnswerPartDataMapper
+import com.homelab.household.data.mapper.ToolSummaryDataMapper
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.utils.io.ByteReadChannel
@@ -112,7 +113,8 @@ class DefensiveSseStreamReader(
                 val tool = outcome["tool"]?.jsonPrimitive?.content ?: ""
                 val success = outcome["success"]?.jsonPrimitive?.booleanOrNull ?: true
                 val error = outcome["error"]?.jsonPrimitive?.contentOrNull
-                ChatStreamEvent.ToolResult(tool = tool, success = success, error = error)
+                val summary = ToolSummaryDataMapper.fromJson(outcome["summary"])
+                ChatStreamEvent.ToolResult(tool = tool, success = success, error = error, summary = summary)
             }
 
             "tool_approval_proposal", "tool_proposal" -> {
