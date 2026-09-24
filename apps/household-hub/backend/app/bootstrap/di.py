@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Optional
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -291,6 +292,7 @@ def get_container(session: AsyncSession):
         is_secret_session: bool,
         is_turn_secret: bool,
         is_first_turn: bool,
+        timezone_name: Optional[str] = None,
     ):
         try:
             async with AsyncSessionLocal() as bg_sess:
@@ -307,6 +309,7 @@ def get_container(session: AsyncSession):
                     is_secret_session=is_secret_session,
                     is_turn_secret=is_turn_secret,
                     is_first_turn=is_first_turn,
+                    timezone_name=timezone_name,
                 )
         except Exception as exc:
             logger.error("Background reflection failed for session %s: %s", session_id, exc, exc_info=True)
@@ -321,6 +324,7 @@ def get_container(session: AsyncSession):
         agent_name: str = "",
         is_first_turn: bool = False,
         regenerate: bool = False,
+        timezone_name: Optional[str] = None,
     ):
         try:
             async with AsyncSessionLocal() as bg_sess:
@@ -334,6 +338,7 @@ def get_container(session: AsyncSession):
                     bg_stream_uc.regenerate_stream(
                         session_id=session_id,
                         current_user=current_user,
+                        timezone_name=timezone_name,
                     )
                     if regenerate
                     else bg_stream_uc.execute_stream(
@@ -341,6 +346,7 @@ def get_container(session: AsyncSession):
                         current_user=current_user,
                         content=content,
                         auto_approve_writes=auto_approve_writes,
+                        timezone_name=timezone_name,
                     )
                 )
                 async for event in turn:
@@ -362,6 +368,7 @@ def get_container(session: AsyncSession):
                             is_secret_session=final_event.get("is_secret", False),
                             is_turn_secret=final_event.get("is_turn_secret", False),
                             is_first_turn=is_first_turn,
+                            timezone_name=timezone_name,
                         )
                     except Exception as ref_exc:
                         logger.error("Background reflection in stream failed for session %s: %s", session_id, ref_exc, exc_info=True)
