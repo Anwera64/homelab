@@ -8,10 +8,12 @@ import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.UserReadDto
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -84,6 +86,59 @@ class DataMappersTest {
         assertEquals("s-1", msg.sessionId)
         assertEquals(MessageRole.ASSISTANT, msg.role)
         assertEquals("Hello there", msg.content)
+    }
+
+    @Test
+    fun `GIVEN an answer saved with its parts WHEN mapped THEN the parts keep their order`() {
+        val dto =
+            Json { ignoreUnknownKeys = true }.decodeFromString<ChatMessageReadDto>(
+                """
+                {"id": "m-2", "session_id": "s-1", "role": "assistant", "content": "Let me check.\n\nIt stays dry.",
+                 "metadata_json": {"tools_executed": [], "parts": [
+                    {"type": "thought", "seconds": 6},
+                    {"type": "text", "content": "Let me check."},
+                    {"type": "tool", "tool": "web_search", "success": true},
+                    {"type": "tool", "tool": "calendar_read", "success": false},
+                    {"type": "text", "content": "It stays dry."}
+                 ]}}
+                """.trimIndent(),
+            )
+
+        val msg = ChatMessageDataMapper.toDomain(dto)
+
+        assertEquals(
+            listOf(
+                AnswerPart.Thought(6),
+                AnswerPart.Text("Let me check."),
+                AnswerPart.ToolDone("web_search"),
+                AnswerPart.ToolFailed("calendar_read"),
+                AnswerPart.Text("It stays dry."),
+            ),
+            msg.parts,
+        )
+    }
+
+    @Test
+    fun `GIVEN an answer saved before parts were kept WHEN mapped THEN it has none`() {
+        val dto =
+            Json { ignoreUnknownKeys = true }.decodeFromString<ChatMessageReadDto>(
+                """{"id": "m-1", "session_id": "s-1", "role": "assistant", "content": "Hi", "metadata_json": {"tools_executed": []}}""",
+            )
+
+        assertEquals(emptyList(), ChatMessageDataMapper.toDomain(dto).parts)
+    }
+
+    @Test
+    fun `GIVEN a part the phone does not know WHEN mapped THEN it is skipped and the rest kept`() {
+        val dto =
+            Json { ignoreUnknownKeys = true }.decodeFromString<ChatMessageReadDto>(
+                """
+                {"id": "m-1", "session_id": "s-1", "role": "assistant", "content": "Hi",
+                 "metadata_json": {"parts": [{"type": "image", "url": "x"}, {"type": "text", "content": "Hi"}]}}
+                """.trimIndent(),
+            )
+
+        assertEquals(listOf(AnswerPart.Text("Hi")), ChatMessageDataMapper.toDomain(dto).parts)
     }
 
     @Test

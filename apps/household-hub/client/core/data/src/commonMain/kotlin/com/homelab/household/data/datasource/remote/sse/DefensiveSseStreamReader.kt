@@ -1,5 +1,7 @@
 package com.homelab.household.data.datasource.remote.sse
 
+import com.homelab.household.data.mapper.AnswerPartDataMapper
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
@@ -136,12 +138,17 @@ class DefensiveSseStreamReader(
                 val suggestSecret = element["suggest_secret_mode"]?.jsonPrimitive?.booleanOrNull ?: false
                 val isTurnSecret = element["is_turn_secret"]?.jsonPrimitive?.booleanOrNull ?: false
                 val agentName = element["agent_name"]?.jsonPrimitive?.content ?: ""
+                val parts =
+                    AnswerPartDataMapper.fromJson(element["parts"]).map { part ->
+                        if (part is AnswerPart.Text) part.copy(content = sanitizeContent(part.content)) else part
+                    }
                 ChatStreamEvent.Done(
                     messageId = messageId,
                     assistantContent = assistantContent,
                     suggestSecretMode = suggestSecret,
                     isTurnSecret = isTurnSecret,
                     agentName = agentName,
+                    parts = parts,
                 )
             }
 

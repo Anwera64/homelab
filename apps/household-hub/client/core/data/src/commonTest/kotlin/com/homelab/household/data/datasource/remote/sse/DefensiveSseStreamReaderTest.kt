@@ -1,5 +1,6 @@
 package com.homelab.household.data.datasource.remote.sse
 
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.toList
@@ -36,6 +37,52 @@ class DefensiveSseStreamReaderTest {
             assertEquals(" world", (events[1] as ChatStreamEvent.Delta).content)
             assertTrue(events[2] is ChatStreamEvent.Done)
             assertEquals("Hello world", (events[2] as ChatStreamEvent.Done).assistantContent)
+        }
+
+    @Test
+    fun `GIVEN a done event with parts WHEN read THEN the parts arrive in order`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "done", "message_id": "m1", "assistant_content": "A.\n\nB", "parts": [{"type": "text", "content": "A."}, {"type": "tool", "tool": "web_search", "success": true}, {"type": "thought", "seconds": 3}, {"type": "text", "content": "B"}]}
+
+                """.trimIndent()
+
+            val done =
+                reader
+                    .readEvents(
+                        ByteReadChannel(ssePayload.encodeToByteArray()),
+                    ).toList()
+                    .single() as ChatStreamEvent.Done
+
+            assertEquals(
+                listOf(
+                    AnswerPart.Text("A."),
+                    AnswerPart.ToolDone("web_search"),
+                    AnswerPart.Thought(3),
+                    AnswerPart.Text("B"),
+                ),
+                done.parts,
+            )
+        }
+
+    @Test
+    fun `GIVEN a done event from a hub that keeps no parts WHEN read THEN it has none`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "done", "message_id": "m1", "assistant_content": "Hello"}
+
+                """.trimIndent()
+
+            val done =
+                reader
+                    .readEvents(
+                        ByteReadChannel(ssePayload.encodeToByteArray()),
+                    ).toList()
+                    .single() as ChatStreamEvent.Done
+
+            assertEquals(emptyList(), done.parts)
         }
 
     @Test

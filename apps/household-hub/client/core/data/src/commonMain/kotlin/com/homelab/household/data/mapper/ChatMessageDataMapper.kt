@@ -14,6 +14,7 @@ object ChatMessageDataMapper {
             content = dto.content,
             status = MessageStatus.SENT,
             createdAt = dto.created_at,
+            parts = AnswerPartDataMapper.fromJson(dto.metadata_json?.get("parts")),
         )
 
     private fun parseRole(role: String): MessageRole =
