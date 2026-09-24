@@ -79,6 +79,8 @@ def test_GIVEN_budget_settings_WHEN_the_container_is_built_THEN_the_turn_the_ass
     assert (turn.context_window_tokens, turn.answer_reserve_tokens) == (20000, 3000)
     assert turn.source_index_factory is not None
     assert turn.tool_executor.page_reader is not None
+    # Government and NGO reports are often PDFs; the page reader parses them with the upload reader.
+    assert turn.tool_executor.page_reader._document_reader is not None
     assert container[deps.get_assemble_agent_context_use_case].history_tokens == 5000
     summary = container[deps.get_summarize_history_use_case]
     assert (summary.history_tokens, summary.summary_tokens) == (5000, 900)

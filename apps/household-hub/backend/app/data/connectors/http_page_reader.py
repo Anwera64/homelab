@@ -9,11 +9,49 @@ import httpx
 import trafilatura
 
 from app.domain.entities.source_passage import WebPage
-from app.domain.exceptions import PageReadException
+from app.domain.exceptions import DomainException, PageReadException
+from app.domain.repositories.document_reader import IDocumentReader
 from app.domain.repositories.page_reader import IPageReader
 
 _TITLE_TAG_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 _ALLOWED_CONTENT_TYPES = ("text/html", "application/xhtml+xml")
+_PDF_CONTENT_TYPE = "application/pdf"
+
+# A default python-httpx User-Agent gets a 403 from plenty of otherwise-public pages (bot-shy
+# CDNs and hosts). These headers make the reader look like an ordinary desktop Chrome browser.
+_DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,*/*;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def _pdf_filename(url: str) -> str:
+    """Picks the last path segment of the URL to use as the PDF's filename, falling back to a
+    generic name when the URL has none (e.g. it ends in a slash)."""
+    path = urlsplit(url).path
+    name = path.rsplit("/", 1)[-1]
+    return name or "document.pdf"
+
+
+def _bot_protection_message(hostname: str, status_code: int, headers: httpx.Headers) -> Optional[str]:
+    """Detects the two JS-challenge bot-protection shapes seen in practice, where no amount of
+    retrying or header-tweaking will ever get a real page back:
+
+    - Cloudflare: a 403/503 with a `server: cloudflare` header, or a `cf-mitigated` header (sent
+      even when the `server` header is hidden or overridden).
+    - Sucuri/Cloudproxy: a redirect with no `Location` header at all -- the JS challenge issues a
+      redirect status but expects a browser to run a script rather than follow one.
+    """
+    server = headers.get("server", "").lower()
+    if status_code in (403, 503) and ("cloudflare" in server or "cf-mitigated" in headers):
+        return f"{hostname} is behind bot protection and can't be read; pick another source"
+    if 300 <= status_code < 400 and "location" not in headers and "sucuri" in server:
+        return f"{hostname} is behind bot protection and can't be read; pick another source"
+    return None
 
 
 async def _default_resolve(host: str) -> List[str]:
@@ -47,12 +85,16 @@ class HttpPageReader(IPageReader):
         resolve: Optional[Callable[[str], Awaitable[List[str]]]] = None,
         max_bytes: int = 2_000_000,
         max_redirects: int = 5,
+        document_reader: Optional[IDocumentReader] = None,
+        max_pdf_bytes: int = 20_000_000,
     ):
         self._external_client = client
         self._internal_client: Optional[httpx.AsyncClient] = None
         self._resolve = resolve or _default_resolve
         self.max_bytes = max_bytes
         self.max_redirects = max_redirects
+        self._document_reader = document_reader
+        self.max_pdf_bytes = max_pdf_bytes
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._external_client:
@@ -124,6 +166,19 @@ class HttpPageReader(IPageReader):
                 return title
         return fallback_url
 
+    async def _read_pdf(self, body: bytes, current_url: str) -> WebPage:
+        try:
+            parsed = await self._document_reader.parse_pdf(body, filename=_pdf_filename(current_url))
+        except DomainException as e:
+            raise PageReadException(str(e))
+
+        title = parsed.metadata.title.strip() if parsed.metadata.title else ""
+        title = title or current_url
+        text = parsed.plain_text
+        if not text or not text.strip():
+            raise PageReadException(f"'{current_url}' has no readable text")
+        return WebPage(url=current_url, title=title, text=text)
+
     async def read(self, url: str, timeout: float = 10.0) -> WebPage:
         client = await self._get_client()
         current_url = url
@@ -139,13 +194,17 @@ class HttpPageReader(IPageReader):
             # The Host header and SNI hostname are the ORIGINAL hostname, not the IP: the server
             # still needs it for virtual hosting, and TLS still needs it for SNI and certificate
             # verification. Only the socket connects to the vetted IP.
-            headers = {"Host": hostname}
+            headers = {**_DEFAULT_HEADERS, "Host": hostname}
             extensions = {"sni_hostname": hostname} if parts.scheme == "https" else {}
 
             try:
                 async with client.stream(
                     "GET", pinned_url, timeout=timeout, headers=headers, extensions=extensions
                 ) as response:
+                    bot_message = _bot_protection_message(hostname, response.status_code, response.headers)
+                    if bot_message:
+                        raise PageReadException(bot_message)
+
                     if 300 <= response.status_code < 400 and "location" in response.headers:
                         if hop >= self.max_redirects:
                             raise PageReadException(f"Too many redirects fetching '{url}'")
@@ -159,6 +218,23 @@ class HttpPageReader(IPageReader):
 
                     content_type = response.headers.get("content-type", "")
                     mime = content_type.split(";")[0].strip().lower()
+
+                    if mime == _PDF_CONTENT_TYPE:
+                        if self._document_reader is None:
+                            raise PageReadException(
+                                f"'{current_url}' is a PDF, and PDFs can't be read: no document reader is configured"
+                            )
+                        # PDFs aren't truncatable like HTML text: a cut-off PDF can't be parsed at
+                        # all, so an over-limit body is refused outright rather than capped.
+                        pdf_body = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            pdf_body.extend(chunk)
+                            if len(pdf_body) > self.max_pdf_bytes:
+                                raise PageReadException(
+                                    f"'{current_url}' is larger than the {self.max_pdf_bytes}-byte PDF limit"
+                                )
+                        return await self._read_pdf(bytes(pdf_body), current_url)
+
                     if mime not in _ALLOWED_CONTENT_TYPES:
                         raise PageReadException(
                             f"'{current_url}' is not a web page (content-type: {mime or 'unknown'})"

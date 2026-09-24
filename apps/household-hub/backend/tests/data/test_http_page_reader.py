@@ -1,7 +1,8 @@
 import httpx
 import pytest
 
-from app.domain.exceptions import PageReadException
+from app.domain.entities.document import DocumentMetadata, ParsedDocument
+from app.domain.exceptions import PageReadException, ScannedPdfException
 from app.data.connectors.http_page_reader import HttpPageReader
 
 
@@ -32,6 +33,23 @@ def make_resolve(mapping):
 
 def html_response(html: str = ARTICLE_HTML, status_code: int = 200, content_type: str = "text/html; charset=utf-8"):
     return httpx.Response(status_code, headers={"content-type": content_type}, content=html.encode("utf-8"))
+
+
+class FakeDocumentReader:
+    """A fake IDocumentReader that records its calls and returns/raises what the test sets up."""
+
+    def __init__(self, parsed: ParsedDocument = None, exception: Exception = None):
+        self.parsed = parsed
+        self.exception = exception
+        self.calls = []
+
+    async def parse_pdf(self, file_bytes, filename="document.pdf", max_pages=150, timeout=30.0):
+        self.calls.append(
+            {"file_bytes": file_bytes, "filename": filename, "max_pages": max_pages, "timeout": timeout}
+        )
+        if self.exception is not None:
+            raise self.exception
+        return self.parsed
 
 
 @pytest.mark.asyncio
@@ -251,3 +269,195 @@ async def test_GIVEN_a_large_page_WHEN_read_THEN_body_is_capped_at_max_bytes():
     page = await reader.read("http://public.example.com/huge")
 
     assert len(page.text) < len(big_html)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_any_request_WHEN_read_THEN_browser_like_default_headers_are_sent():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["user_agent"] = request.headers.get("user-agent")
+        captured["accept"] = request.headers.get("accept")
+        captured["accept_language"] = request.headers.get("accept-language")
+        return html_response()
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    await reader.read("http://public.example.com/article")
+
+    assert "Chrome" in captured["user_agent"]
+    assert "Mozilla" in captured["user_agent"]
+    assert "text/html" in captured["accept"]
+    assert "application/pdf" in captured["accept"]
+    assert "en-US" in captured["accept_language"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pdf_response_WHEN_read_THEN_the_document_reader_parses_it_and_returns_title_and_text():
+    pdf_bytes = b"%PDF-1.4 fake pdf content"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "application/pdf"}, content=pdf_bytes)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    parsed = ParsedDocument(
+        filename="report.pdf",
+        metadata=DocumentMetadata(title="A State Department Report"),
+        plain_text="The report body text goes here.",
+    )
+    fake_reader = FakeDocumentReader(parsed=parsed)
+    reader = HttpPageReader(
+        client=client,
+        resolve=make_resolve({"public.example.com": ["93.184.216.34"]}),
+        document_reader=fake_reader,
+    )
+
+    page = await reader.read("http://public.example.com/docs/report.pdf")
+
+    assert page.url == "http://public.example.com/docs/report.pdf"
+    assert page.title == "A State Department Report"
+    assert page.text == "The report body text goes here."
+    assert len(fake_reader.calls) == 1
+    assert fake_reader.calls[0]["file_bytes"] == pdf_bytes
+    assert fake_reader.calls[0]["filename"] == "report.pdf"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pdf_with_no_title_metadata_WHEN_read_THEN_title_falls_back_to_the_url():
+    pdf_bytes = b"%PDF-1.4 fake pdf content"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "application/pdf"}, content=pdf_bytes)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    parsed = ParsedDocument(
+        filename="document.pdf",
+        metadata=DocumentMetadata(title=""),
+        plain_text="Some body text.",
+    )
+    fake_reader = FakeDocumentReader(parsed=parsed)
+    reader = HttpPageReader(
+        client=client,
+        resolve=make_resolve({"public.example.com": ["93.184.216.34"]}),
+        document_reader=fake_reader,
+    )
+
+    page = await reader.read("http://public.example.com/file.pdf")
+
+    assert page.title == "http://public.example.com/file.pdf"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pdf_and_no_document_reader_configured_WHEN_read_THEN_exception_is_raised():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "application/pdf"}, content=b"%PDF-1.4 ...")
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    with pytest.raises(PageReadException, match="PDF"):
+        await reader.read("http://public.example.com/file.pdf")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pdf_larger_than_max_pdf_bytes_WHEN_read_THEN_exception_is_raised_and_reader_is_never_called():
+    big_pdf = b"%PDF-1.4 " + (b"x" * 2000)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "application/pdf"}, content=big_pdf)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    fake_reader = FakeDocumentReader(
+        parsed=ParsedDocument(filename="x.pdf", metadata=DocumentMetadata(title="X"), plain_text="text")
+    )
+    reader = HttpPageReader(
+        client=client,
+        resolve=make_resolve({"public.example.com": ["93.184.216.34"]}),
+        document_reader=fake_reader,
+        max_pdf_bytes=1000,
+    )
+
+    with pytest.raises(PageReadException):
+        await reader.read("http://public.example.com/big.pdf")
+
+    assert fake_reader.calls == []
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_scanned_pdf_WHEN_read_THEN_document_reader_exception_becomes_a_page_read_exception():
+    pdf_bytes = b"%PDF-1.4 scanned"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "application/pdf"}, content=pdf_bytes)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    fake_reader = FakeDocumentReader(
+        exception=ScannedPdfException("This document appears to be a scanned image with no embedded text layer.")
+    )
+    reader = HttpPageReader(
+        client=client,
+        resolve=make_resolve({"public.example.com": ["93.184.216.34"]}),
+        document_reader=fake_reader,
+    )
+
+    with pytest.raises(PageReadException, match="scanned image"):
+        await reader.read("http://public.example.com/scan.pdf")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_cloudflare_403_WHEN_read_THEN_bot_protection_message_is_raised():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, headers={"server": "cloudflare"}, content=b"<html>blocked</html>")
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    with pytest.raises(PageReadException, match="bot protection"):
+        await reader.read("http://public.example.com/blocked")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_cf_mitigated_header_WHEN_read_THEN_bot_protection_message_is_raised():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, headers={"cf-mitigated": "challenge"}, content=b"<html>blocked</html>")
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    with pytest.raises(PageReadException, match="bot protection"):
+        await reader.read("http://public.example.com/blocked")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_sucuri_redirect_with_no_location_WHEN_read_THEN_bot_protection_message_is_raised():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(307, headers={"server": "Sucuri/Cloudproxy"})
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    with pytest.raises(PageReadException, match="bot protection"):
+        await reader.read("http://public.example.com/blocked")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_plain_403_WHEN_read_THEN_returned_http_403_message_is_raised():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, headers={"server": "nginx"}, content=b"<html>forbidden</html>")
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+    reader = HttpPageReader(client=client, resolve=make_resolve({"public.example.com": ["93.184.216.34"]}))
+
+    with pytest.raises(PageReadException, match="returned HTTP 403"):
+        await reader.read("http://public.example.com/blocked")

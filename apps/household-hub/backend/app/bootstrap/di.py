@@ -195,7 +195,7 @@ _ollama_connector = OllamaLLMConnector(
 _embedder = OllamaEmbedder(base_url=settings.OLLAMA_BASE_URL, model=settings.EMBEDDING_MODEL)
 # Each streamed turn gets a fresh index from this; nothing one turn reads is seen by another.
 _source_index_factory = SqliteSourceIndexFactory(embedder=_embedder)
-_page_reader = HttpPageReader()
+_page_reader = HttpPageReader(document_reader=_document_reader)
 
 
 
