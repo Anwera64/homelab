@@ -210,3 +210,61 @@ async def test_facts_from_a_member_who_left_are_told_in_the_past():
 
     assert "Liam, who's no longer in the household, mentioned" in system_prompt
     assert "Emma mentioned" in system_prompt
+
+
+FIXED_NOW = datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
+
+
+def _dated_assembler(memories=None, milestones=None):
+    return AssembleAgentContextUseCase(
+        memory_repo=FakeMemoryRepository(personal=memories or []),
+        gossip_repo=FakeGossipRepository(milestones=milestones or []),
+        clock=lambda: FIXED_NOW,
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_agent_is_told_the_date_at_the_end_of_the_primacy_zone():
+    """#39: the date sits right after who they're speaking with, before anything in the recency zone."""
+    user = User(id="u1", full_name="Alex Rivera")
+    agent = AgentPersonality(id="a1", name="Assistant", system_prompt="You are a helpful homelab coordinator.")
+    memory = AgentMemory(
+        id="pm1", user_id="u1", scope="personal", category="preference",
+        content="Prefers almond milk with matcha", confidence=0.95, created_at=FIXED_NOW,
+    )
+    use_case = _dated_assembler(memories=[memory])
+
+    llm_messages = await use_case.execute(
+        user=user,
+        agent=agent,
+        recent_messages=[ChatMessage(role="user", content="What's new?")],
+        is_secret_session=True,
+        timezone_name="America/Mexico_City",
+    )
+
+    blocks = llm_messages[0].content.split("\n\n")
+    date_line = "Today is Thursday, 24 September 2026, 14:05 (America/Mexico_City)."
+    assert blocks[0] == "You are a helpful homelab coordinator."
+    assert blocks[1].startswith("You are speaking with Alex Rivera.")
+    assert blocks[2] == date_line
+    assert blocks[3].startswith("[CONFIDENTIALITY NOTICE")
+    # The recency zone keeps its order: memories, then the closing secret-mode reminder.
+    assert blocks[4:] == [
+        "[What I Know About You]:",
+        "- [Added Sep 2026] Prefers almond milk with matcha (confidence: 0.95)",
+        "[Reminder: Secret Mode is active. Keep all disclosures confidential.]",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_without_a_timezone_the_agent_is_told_the_date_in_utc():
+    user = User(id="u1", full_name="Alex Rivera")
+    agent = AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot")
+
+    llm_messages = await _dated_assembler().execute(
+        user=user,
+        agent=agent,
+        recent_messages=[ChatMessage(role="user", content="Hi")],
+    )
+
+    assert "Today is Thursday, 24 September 2026, 20:05 (UTC)." in llm_messages[0].content

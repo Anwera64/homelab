@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import Callable, List, Optional
 from datetime import datetime, timezone
 
 from app.domain.entities.user import User
@@ -9,6 +9,11 @@ from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.gossip_repository import IGossipRepository
 from app.domain.repositories.user_repository import IUserRepository
+from app.domain.use_cases.chat.current_date_line import current_date_line
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _sanitize_prompt_snippet(text: str, max_length: int = 500) -> str:
@@ -38,11 +43,14 @@ class AssembleAgentContextUseCase:
         gossip_repo: IGossipRepository,
         user_repo: Optional[IUserRepository] = None,
         max_context_tokens: int = 8192,
+        clock: Callable[[], datetime] = _utc_now,
     ):
         self.memory_repo = memory_repo
         self.gossip_repo = gossip_repo
         self.user_repo = user_repo
         self.max_context_tokens = max_context_tokens
+        # Tells the agent what day it is. Injected so a test can fix it.
+        self.clock = clock
 
     async def _active_member_ids(self) -> Optional[set]:
         """Who is still here, or None when nobody asked us to tell the difference."""
@@ -57,6 +65,7 @@ class AssembleAgentContextUseCase:
         recent_messages: List[ChatMessage],
         is_secret_session: bool = False,
         is_turn_secret: bool = False,
+        timezone_name: Optional[str] = None,
     ) -> List[LLMMessage]:
         is_secret = is_secret_session or is_turn_secret
 
@@ -83,6 +92,8 @@ class AssembleAgentContextUseCase:
         primacy_lines.append(
             f"You are speaking with {user.full_name}. Maintain helpful, attentive, and relational awareness."
         )
+        # Last in the primacy zone: read early, and the recency zone's order is left alone (#39).
+        primacy_lines.append(current_date_line(self.clock(), timezone_name))
         if is_secret:
             primacy_lines.append(
                 "[CONFIDENTIALITY NOTICE - SECRET MODE ACTIVE]: This conversation is strictly private. "
