@@ -82,6 +82,7 @@ from app.domain.use_cases.gossip.manage_gossip_milestones import (
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.repositories.llm_client import ILLMClient
 from app.presentation.api.session_lock import SessionLockRegistry
 from app.presentation.api.turn_log import TurnLogRegistry
@@ -302,6 +303,9 @@ def get_process_chat_turn_use_case() -> ProcessChatTurnUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_reflect_turn_use_case() -> ReflectTurnUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_summarize_history_use_case() -> SummarizeHistoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_background_reflection_runner():

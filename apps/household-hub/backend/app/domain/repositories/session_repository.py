@@ -26,3 +26,13 @@ class ISessionRepository(Protocol):
 
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[ChatMessage]:
         ...
+
+    async def get_messages_after(
+        self, session_id: str, after_id: Optional[str], limit: int = 200
+    ) -> List[ChatMessage]:
+        """The messages after [after_id] (all of them when None), oldest first, at most the newest [limit]."""
+        ...
+
+    async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
+        """Stores the summary and the last message it covers, and nothing else about the session."""
+        ...

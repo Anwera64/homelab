@@ -52,3 +52,12 @@ class SessionRepositoryImpl(ISessionRepository):
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[ChatMessage]:
         models = await self.data_source.get_messages(session_id, limit, before_id)
         return [self.mapper.to_domain_message(m) for m in models]
+
+    async def get_messages_after(
+        self, session_id: str, after_id: Optional[str], limit: int = 200
+    ) -> List[ChatMessage]:
+        models = await self.data_source.get_messages_after(session_id, after_id, limit)
+        return [self.mapper.to_domain_message(m) for m in models]
+
+    async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
+        await self.data_source.save_history_summary(session_id, summary, through_id)

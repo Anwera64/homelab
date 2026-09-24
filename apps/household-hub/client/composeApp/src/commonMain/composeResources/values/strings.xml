@@ -347,6 +347,12 @@
     <string name="tool_search_running">Searching the web…</string>
     <string name="tool_search_done">Searched the web</string>
     <string name="tool_search_failed">Couldn’t search the web</string>
+    <string name="tool_read_page_running">Reading a page…</string>
+    <string name="tool_read_page_done">Read a page</string>
+    <string name="tool_read_page_failed">Couldn’t read a page</string>
+    <string name="tool_lookup_running">Looking through the sources…</string>
+    <string name="tool_lookup_done">Looked through the sources</string>
+    <string name="tool_lookup_failed">Couldn’t look through the sources</string>
     <string name="tool_pdf_running">Reading the document…</string>
     <string name="tool_pdf_done">Read the document</string>
     <string name="tool_pdf_failed">Couldn’t read the document</string>

@@ -14,7 +14,16 @@ import kotlin.test.assertNotEquals
  */
 @OptIn(ExperimentalTestApi::class)
 class ToolLabelTest {
-    private val hubTools = listOf("calendar_read", "calendar_write", "document_writer", "pdf_reader", "searxng_search")
+    private val hubTools =
+        listOf(
+            "calendar_read",
+            "calendar_write",
+            "document_writer",
+            "pdf_reader",
+            "searxng_search",
+            "read_page",
+            "lookup_sources",
+        )
 
     @Test
     fun `GIVEN every tool the hub has WHEN it is shown THEN it has words of its own`() =
@@ -65,5 +74,30 @@ class ToolLabelTest {
             val shown = getString(toolPermissionLabel("a_tool_nobody_named"))
             assertFalse(shown.contains("a_tool_nobody_named"), "\"$shown\" names the raw tool")
             assertFalse(shown.contains('_'), "\"$shown\" reads like an identifier")
+        }
+
+    @Test
+    fun `GIVEN a page read while researching WHEN it is shown THEN it reads like reading a page`() =
+        runComposeUiTest {
+            val label = toolLabel("read_page")
+            assertEquals("Reading a page…", getString(label.running))
+            assertEquals("Read a page", getString(label.done))
+            assertEquals("Couldn’t read a page", getString(label.failed))
+        }
+
+    @Test
+    fun `GIVEN a look through what was read WHEN it is shown THEN it reads like looking through the sources`() =
+        runComposeUiTest {
+            val label = toolLabel("lookup_sources")
+            assertEquals("Looking through the sources…", getString(label.running))
+            assertEquals("Looked through the sources", getString(label.done))
+            assertEquals("Couldn’t look through the sources", getString(label.failed))
+        }
+
+    @Test
+    fun `GIVEN the research tools WHEN their permission is shown THEN it is searching the web they come with`() =
+        runComposeUiTest {
+            assertEquals("Search the web", getString(toolPermissionLabel("read_page")))
+            assertEquals("Search the web", getString(toolPermissionLabel("lookup_sources")))
         }
 }

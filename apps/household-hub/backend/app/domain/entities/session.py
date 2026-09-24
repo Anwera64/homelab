@@ -29,6 +29,12 @@ class ConversationSession:
     created_at: datetime = field(default_factory=get_utc_now)
     updated_at: datetime = field(default_factory=get_utc_now)
 
+    # The conversation so far, compressed: everything up to and including [summarized_through_id],
+    # in the model's own summary. Only messages after it are sent word for word. Written on its own
+    # by save_history_summary, never by update, so a turn saving the session can't undo it.
+    history_summary: str | None = None
+    summarized_through_id: str | None = None
+
     # What a Chats row draws beside the title. They belong to the agent and the newest message
     # rather than to the session itself, which is why they are read-only here: nothing sets them
     # on the way in, and the list query fills them on the way out.

@@ -47,6 +47,14 @@ class ISessionDataSource(Protocol):
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[MessageModel]:
         ...
 
+    async def get_messages_after(
+        self, session_id: str, after_id: Optional[str], limit: int = 200
+    ) -> List[MessageModel]:
+        ...
+
+    async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
+        ...
+
 
 class SqliteSessionDataSource(ISessionDataSource):
     def __init__(self, session: AsyncSession):
@@ -125,3 +133,35 @@ class SqliteSessionDataSource(ISessionDataSource):
         msg_stmt = msg_stmt.order_by(MessageModel.created_at.desc()).limit(limit)
         msg_res = await self.session.execute(msg_stmt)
         return list(reversed(msg_res.scalars().all()))
+
+    async def get_messages_after(
+        self, session_id: str, after_id: Optional[str], limit: int = 200
+    ) -> List[MessageModel]:
+        msg_stmt = select(MessageModel).where(MessageModel.session_id == session_id)
+        if after_id:
+            cursor_res = await self.session.execute(
+                select(MessageModel.created_at).where(
+                    (MessageModel.id == after_id) & (MessageModel.session_id == session_id)
+                )
+            )
+            cursor_created_at = cursor_res.scalar()
+            if cursor_created_at:
+                msg_stmt = msg_stmt.where(MessageModel.created_at > cursor_created_at)
+
+        msg_stmt = msg_stmt.order_by(MessageModel.created_at.desc()).limit(limit)
+        msg_res = await self.session.execute(msg_stmt)
+        return list(reversed(msg_res.scalars().all()))
+
+    async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
+        # Only these two columns move. updated_at is set back to itself so onupdate does not touch
+        # it — a background summary refresh must not reorder the Chats list.
+        await self.session.execute(
+            update(SessionModel)
+            .where(SessionModel.id == session_id)
+            .values(
+                history_summary=summary,
+                summarized_through_id=through_id,
+                updated_at=SessionModel.updated_at,
+            )
+        )
+        await self.session.flush()

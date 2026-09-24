@@ -14,6 +14,7 @@ from app.domain.repositories.document_repository import IDocumentRepository
 from app.domain.repositories.document_reader import IDocumentReader
 from app.domain.repositories.secret_cipher import ISecretCipher
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.repositories.page_reader import IPageReader
 
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
@@ -21,6 +22,27 @@ from app.domain.use_cases.integrations.update_calendar_event import UpdateCalend
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
 from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
 from app.domain.use_cases.integrations.manage_documents import SaveDocumentUseCase
+from app.domain.use_cases.integrations.turn_sources import TurnSources
+
+
+# Reading pages and looking up what was read are part of searching: an agent that may search may do both.
+RESEARCH_TOOLS = ["read_page", "lookup_sources"]
+
+# What a search result shows in the prompt. With a turn index the rest is in the index, so the
+# receipt only has to say what each result is; without one the snippet is all the model gets.
+RECEIPT_SNIPPET_CHARACTERS = 120
+INLINE_SNIPPET_CHARACTERS = 300
+DEFAULT_SEARCH_RESULTS = 5
+DEFAULT_LOOKUP_PASSAGES = 5
+READ_PAGE_PASSAGES = 3
+
+
+def effective_tool_permissions(permissions: List[str]) -> List[str]:
+    """The tools an agent may use: what it was given, plus reading and looking up when it may search."""
+    granted = list(permissions)
+    if "searxng_search" in granted:
+        granted += [tool for tool in RESEARCH_TOOLS if tool not in granted]
+    return granted
 
 
 class ExecuteToolUseCase:
@@ -34,6 +56,7 @@ class ExecuteToolUseCase:
         cipher: ISecretCipher,
         uow: IUnitOfWork,
         allow_calendar_delete: bool = True,
+        page_reader: Optional[IPageReader] = None,
     ):
         self.calendar_repo = calendar_repo
         self.calendar_connector = calendar_connector
@@ -43,6 +66,7 @@ class ExecuteToolUseCase:
         self.cipher = cipher
         self.uow = uow
         self.allow_calendar_delete = allow_calendar_delete
+        self.page_reader = page_reader
 
         # Initialize sub-use-cases
         self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, cipher)
@@ -62,9 +86,10 @@ class ExecuteToolUseCase:
         agent_tool_permissions: List[str],
         is_secret_mode: bool = False,
         role: str = "assistant",
+        sources: Optional[TurnSources] = None,
     ) -> ToolExecutionResult:
         # 1. Verify agent tool permission
-        if tool_name not in agent_tool_permissions:
+        if tool_name not in effective_tool_permissions(agent_tool_permissions):
             raise ToolPermissionDeniedException(
                 f"Agent does not have permission to execute tool '{tool_name}'."
             )
@@ -82,20 +107,62 @@ class ExecuteToolUseCase:
             if tool_name == "searxng_search":
                 query = arguments.get("query", "")
                 fresh = bool(arguments.get("fresh", False))
-                limit = int(arguments.get("limit", 10))
+                limit = int(arguments.get("limit", DEFAULT_SEARCH_RESULTS))
                 res = await self.search_uc.execute(query=query, role=role, fresh=fresh, limit=limit)
+                if sources is None:
+                    results = [
+                        {"title": r.title, "url": r.url, "snippet": r.snippet[:INLINE_SNIPPET_CHARACTERS]}
+                        for r in res.results
+                    ]
+                else:
+                    results = [
+                        {"id": p.id, "title": p.title, "url": p.url, "snippet": p.text[:RECEIPT_SNIPPET_CHARACTERS]}
+                        for p in await sources.add_search_results(res.results)
+                    ]
+                return ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=True,
+                    data={"query": res.query, "results": results},
+                )
+
+            elif tool_name in RESEARCH_TOOLS and sources is None:
+                return ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=False,
+                    error=f"'{tool_name}' only works during a chat turn, on what that turn has searched and read.",
+                )
+
+            elif tool_name == "read_page":
+                source = str(arguments.get("source", "")).strip()
+                url = sources.url_for(source)
+                if url is None:
+                    return ToolExecutionResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=f"'{source}' is neither a URL nor a search result from this turn.",
+                    )
+                page = await self.page_reader.read(url)
+                passages = await sources.add_page(page)
+                data = {"page": sources.last_page_id, "title": page.title, "url": page.url, "passages": len(passages)}
+                # Read with the question, the page's best passages come straight back: a model that
+                # has to remember to look them up afterwards often doesn't, and then the page is wasted.
+                question = str(arguments.get("question", "")).strip()
+                if question:
+                    data["relevant"] = [
+                        {"id": p.id, "text": p.text}
+                        for p in await sources.lookup(question, k=READ_PAGE_PASSAGES, within=sources.last_page_id)
+                    ]
+                return ToolExecutionResult(tool_name=tool_name, success=True, data=data)
+
+            elif tool_name == "lookup_sources":
+                question = str(arguments.get("question", ""))
+                k = int(arguments.get("limit", DEFAULT_LOOKUP_PASSAGES))
+                found = await sources.lookup(question, k=k)
                 return ToolExecutionResult(
                     tool_name=tool_name,
                     success=True,
                     data={
-                        "query": res.query,
-                        "category": res.category,
-                        "total_results": res.total_results,
-                        "is_cached": res.is_cached,
-                        "results": [
-                            {"title": r.title, "url": r.url, "snippet": r.snippet, "engine": r.engine}
-                            for r in res.results
-                        ],
+                        "passages": [{"id": p.id, "title": p.title, "url": p.url, "text": p.text} for p in found]
                     },
                 )
 

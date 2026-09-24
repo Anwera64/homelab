@@ -84,6 +84,10 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       'startup_homelab.ps1 must verify each downloaded GGUF against its SHA256'
     );
     assert.ok(
+      /ollama pull \$\(\$model\.ollama_pull\)/.test(startupContent),
+      'startup_homelab.ps1 must pull manifest entries that name an ollama_pull model'
+    );
+    assert.ok(
       /ollama create/.test(startupContent),
       'startup_homelab.ps1 must register each model with ollama create'
     );

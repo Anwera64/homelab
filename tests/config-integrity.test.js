@@ -241,24 +241,62 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.ok(Array.isArray(manifest.models) && manifest.models.length > 0, 'manifest must list at least one model');
 
+    // Two kinds of entry: a GGUF downloaded and checked against its SHA256 (for models the Ollama
+    // library doesn't carry), or a model pulled from the Ollama library, which verifies it itself.
     for (const model of manifest.models) {
-      for (const key of ['name', 'gguf_url', 'sha256', 'modelfile']) {
+      for (const key of ['name', 'modelfile']) {
         assert.ok(model[key], `manifest entry ${model.name || '?'} must have ${key}`);
       }
-      assert.match(model.sha256, /^[0-9a-f]{64}$/, `${model.name} sha256 must be 64 lowercase hex chars`);
-      assert.ok(model.gguf_url.startsWith('https://huggingface.co/'), `${model.name} must download from huggingface.co`);
       const modelfile = path.join(OLLAMA_MODELS_DIR, model.modelfile);
       assert.ok(fs.existsSync(modelfile), `${model.name} Modelfile ${model.modelfile} must be tracked in config/ollama-models`);
-      assert.match(fs.readFileSync(modelfile, 'utf8'), /^FROM \/root\/\.ollama\/imports\//m, `${model.name} Modelfile must build FROM the imports folder`);
+      const modelfileContent = fs.readFileSync(modelfile, 'utf8');
+      if (model.ollama_pull) {
+        assert.ok(!model.gguf_url, `${model.name} must name either ollama_pull or gguf_url, not both`);
+        assert.match(modelfileContent, new RegExp(`^FROM ${model.ollama_pull}$`, 'm'), `${model.name} Modelfile must build FROM the pulled ${model.ollama_pull}`);
+      } else {
+        for (const key of ['gguf_url', 'sha256']) {
+          assert.ok(model[key], `manifest entry ${model.name} must have ${key}`);
+        }
+        assert.match(model.sha256, /^[0-9a-f]{64}$/, `${model.name} sha256 must be 64 lowercase hex chars`);
+        assert.ok(model.gguf_url.startsWith('https://huggingface.co/'), `${model.name} must download from huggingface.co`);
+        assert.match(modelfileContent, /^FROM \/root\/\.ollama\/imports\//m, `${model.name} Modelfile must build FROM the imports folder`);
+      }
     }
 
     const rvn = manifest.models.find((m) => m.name === 'qwen3.8-rvn');
     assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
     assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
     const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
-    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 16384']) {
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 28672']) {
       assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
     }
+
+    // The hub budgets each turn against this window; the two must agree or answers get cut off.
+    const hubConfig = fs.readFileSync(path.join(ROOT_DIR, 'apps/household-hub/backend/app/core/config.py'), 'utf8');
+    const hubWindow = hubConfig.match(/LLM_CONTEXT_TOKENS:\s*int\s*=\s*(\d+)/);
+    assert.ok(hubWindow, 'the hub must declare LLM_CONTEXT_TOKENS');
+    assert.equal(hubWindow[1], rvnModelfile.match(/PARAMETER num_ctx (\d+)/)[1], 'LLM_CONTEXT_TOKENS must match the Modelfile num_ctx');
+
+    // The embedder runs on the CPU so the chat model keeps the whole GPU.
+    const embedder = manifest.models.find((m) => m.name === 'bge-m3-cpu');
+    assert.ok(embedder, 'manifest must provision bge-m3-cpu, the source index embedder');
+    assert.equal(embedder.ollama_pull, 'bge-m3', 'bge-m3-cpu is built from the Ollama library bge-m3');
+    const embedderModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, embedder.modelfile), 'utf8');
+    assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
+  });
+
+  await t.test('Every tool the hub offers has words of its own in the app', () => {
+    // A tool added on the hub without a label shows as the generic "Used a tool" (read_page and
+    // lookup_sources did, in #36). The hub's list and the app's label map must name the same tools.
+    const hubTools = fs.readFileSync(
+      path.join(ROOT_DIR, 'apps/household-hub/backend/app/domain/use_cases/integrations/list_available_tools.py'), 'utf8');
+    const appLabels = fs.readFileSync(
+      path.join(ROOT_DIR, 'apps/household-hub/client/composeApp/src/commonMain/kotlin/com/homelab/household/app/screens/conversation/ToolLabel.kt'), 'utf8');
+    const offered = [...hubTools.matchAll(/name="([a-z_]+)"/g)].map((m) => m[1]);
+    const labelled = new Set([...appLabels.matchAll(/^\s*"([a-z_]+)" to$/gm)].map((m) => m[1]));
+    assert.ok(offered.length >= 7, 'the hub tool list should be readable');
+    const missing = offered.filter((tool) => !labelled.has(tool));
+    assert.deepEqual(missing, [], `these hub tools have no label in ToolLabel.kt: ${missing.join(', ')}`);
   });
 
   await t.test('Ollama models live in a named volume, not on the Windows share', () => {

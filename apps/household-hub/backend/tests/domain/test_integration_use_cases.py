@@ -448,12 +448,14 @@ async def test_document_storage_create_append_replace():
 async def test_list_available_tools_openai_schemas():
     use_case = ListAvailableToolsUseCase()
     tools = use_case.execute()
-    assert len(tools) == 5
+    assert len(tools) == 7
     tool_names = {t.name for t in tools}
     assert tool_names == {
         "calendar_read",
         "calendar_write",
         "searxng_search",
+        "read_page",
+        "lookup_sources",
         "pdf_reader",
         "document_writer",
     }
