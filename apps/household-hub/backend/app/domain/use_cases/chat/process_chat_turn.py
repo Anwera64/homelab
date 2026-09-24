@@ -13,8 +13,10 @@ from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
-from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
+from app.domain.repositories.source_index import ISourceIndexFactory
+from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 from app.domain.exceptions import (
     EntityNotFoundException,
@@ -117,6 +119,7 @@ class ProcessChatTurnUseCase:
         model_resolver: ResolveAgentModelUseCase,
         max_iterations: int = 5,
         clock: Callable[[], float] = time.monotonic,
+        source_index_factory: Optional[ISourceIndexFactory] = None,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -129,6 +132,8 @@ class ProcessChatTurnUseCase:
         self.max_iterations = max_iterations
         # Times each stretch of thinking for the answer's parts. Injected so a test can move it.
         self.clock = clock
+        # One index per streamed turn: what a turn searched and read, for its tools to look up.
+        self.source_index_factory = source_index_factory
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -532,8 +537,9 @@ class ProcessChatTurnUseCase:
         )
         agent_tools = []
         if agent.tool_permissions:
+            granted = effective_tool_permissions(agent.tool_permissions)
             for td in available_tools_defs:
-                if td.name in agent.tool_permissions:
+                if td.name in granted:
                     agent_tools.append(
                         {
                             "type": "function",
@@ -549,6 +555,11 @@ class ProcessChatTurnUseCase:
         final_content_parts: List[str] = []
         answer = _AnswerParts(self.clock)
         awaiting_approval = False
+        sources = (
+            TurnSources(self.source_index_factory.new())
+            if agent_tools and self.source_index_factory is not None
+            else None
+        )
 
         # One model call per round, until a round calls no tool: that round is the answer (#35).
         # The model may keep using tools until the last round of the budget, which is made to
@@ -627,6 +638,7 @@ class ProcessChatTurnUseCase:
                         agent_tool_permissions=agent.tool_permissions,
                         is_secret_mode=is_turn_secret,
                         role="assistant",
+                        sources=sources,
                     )
                     exec_info = {
                         "tool": tc.name,

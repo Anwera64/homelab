@@ -108,8 +108,8 @@ class FakeToolExecutor:
     def __init__(self):
         self.executed_calls = []
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant"):
-        self.executed_calls.append({"tool": tool_name, "args": arguments})
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
         return ToolExecutionResult(tool_name=tool_name, success=True, data={"result": "ok"})
 
 
@@ -809,7 +809,7 @@ class SteppedClock:
 
 
 class FailingToolExecutor(FakeToolExecutor):
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant"):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         return ToolExecutionResult(tool_name=tool_name, success=False, error="unreachable")
 
@@ -1055,3 +1055,70 @@ async def test_GIVEN_two_rounds_of_tools_WHEN_answered_without_streaming_THEN_bo
 
     assert len(tool_executor.executed_calls) == 2
     assert result.message.content == "Both days are free."
+
+
+class ResearchToolLister:
+    async def execute(self):
+        return [
+            ToolDefinition(name=name, description=name, parameters_schema={"type": "object"})
+            for name in ("searxng_search", "read_page", "lookup_sources", "calendar_read")
+        ]
+
+
+class CountingIndexFactory:
+    def __init__(self):
+        self.made = []
+
+    def new(self):
+        index = object()
+        self.made.append(index)
+        return index
+
+
+def _research_use_case(session_repo, agent, llm_client, tool_executor, factory):
+    use_case = _use_case(session_repo, agent, llm_client, tool_executor)
+    use_case.tool_lister = ResearchToolLister()
+    use_case.source_index_factory = factory
+    return use_case
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_agent_that_may_search_WHEN_tools_are_offered_THEN_reading_and_looking_up_come_with_it():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(stream_chunks_list=[[LLMResponseChunk(delta_content="Hi.")]])
+
+    [ev async for ev in _research_use_case(
+        session_repo, agent, llm_client, FakeToolExecutor(), CountingIndexFactory()
+    ).execute_stream(session_id="s1", current_user=user, content="Hello")]
+
+    offered = [tool["function"]["name"] for tool in llm_client.stream_calls[0]["tools"]]
+    assert offered == ["searxng_search", "read_page", "lookup_sources"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_tools_in_two_rounds_WHEN_answered_THEN_every_call_shares_one_turns_sources_and_the_next_turn_gets_new_ones():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    search = LLMToolCall(id="c1", name="searxng_search", arguments={"query": "tariffs"})
+    lookup = LLMToolCall(id="c2", name="lookup_sources", arguments={"question": "tariffs"})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[search])],
+            [LLMResponseChunk(tool_calls=[lookup])],
+            [LLMResponseChunk(delta_content="Tariffs rose.")],
+            [LLMResponseChunk(delta_content="Second answer.")],
+        ]
+    )
+    tool_executor = FakeToolExecutor()
+    factory = CountingIndexFactory()
+    use_case = _research_use_case(session_repo, agent, llm_client, tool_executor, factory)
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Tariffs?")]
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Thanks")]
+
+    first, second = (call["sources"] for call in tool_executor.executed_calls)
+    assert first is not None and first is second
+    assert len(factory.made) == 2
