@@ -944,7 +944,8 @@ async def test_GIVEN_a_tool_that_fails_WHEN_answered_THEN_its_part_says_so():
     ]
 
     assert events[-1]["parts"] == [
-        {"type": "tool", "tool": "calendar_read", "success": False},
+        # Nothing said why, so the phone is told only that it failed (#40).
+        {"type": "tool", "tool": "calendar_read", "success": False, "summary": {"reason": "unknown"}},
         {"type": "text", "content": "I could not look."},
     ]
 
@@ -1364,3 +1365,131 @@ async def test_GIVEN_a_misspelled_tool_WHEN_answered_without_streaming_THEN_the_
 
     assert result.message.content == "Answered."
     assert result.tools_executed[0]["success"] is False
+
+
+# --- what each tool part shows on the phone (#40) -----------------------------------------------
+
+class ResearchToolExecutor(FakeToolExecutor):
+    """A search, a page that reads and one that is blocked, as the real tools answer them."""
+
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        self.executed_calls.append({"tool": tool_name, "args": arguments})
+        if tool_name == "searxng_search":
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=True,
+                data={
+                    "query": arguments["query"],
+                    "results": [
+                        {"id": "s1", "title": "Press freedom index", "url": "https://rsf.org/hk", "snippet": "…"},
+                        {"id": "s2", "title": "Hong Kong news", "url": "https://www.scmp.com/news", "snippet": "…"},
+                    ],
+                },
+            )
+        if arguments["source"] == "s1":
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=True,
+                data={"page": "p1", "title": "Press freedom index", "url": "https://rsf.org/hk", "passages": 3},
+            )
+        return ToolExecutionResult(
+            tool_name=tool_name,
+            success=False,
+            data={"url": "https://www.scmp.com/news"},
+            error="www.scmp.com is behind bot protection",
+            reason="blocked",
+        )
+
+
+class ResearchToolLister:
+    async def execute(self):
+        return [
+            ToolDefinition(name=name, description=name, parameters_schema={"type": "object"})
+            for name in ("searxng_search", "read_page", "lookup_sources")
+        ]
+
+
+async def _research_turn(session):
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session_repo = FakeSessionRepository(sessions=[session])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name="searxng_search", arguments={"query": "hk press"})])],
+            [
+                LLMResponseChunk(
+                    tool_calls=[
+                        LLMToolCall(id="c2", name="read_page", arguments={"source": "s1"}),
+                        LLMToolCall(id="c3", name="read_page", arguments={"source": "s2"}),
+                    ]
+                )
+            ],
+            [LLMResponseChunk(delta_content="One source was blocked.")],
+        ]
+    )
+    use_case = _parts_use_case(session_repo, agent, llm_client, ResearchToolExecutor())
+    use_case.tool_lister = ResearchToolLister()
+    events = [
+        ev
+        async for ev in use_case.execute_stream(
+            session_id=session.id, current_user=user, content="How free is the press in Hong Kong?"
+        )
+    ]
+    return events, session_repo
+
+
+RESEARCH_TOOL_PARTS = [
+    {
+        "type": "tool",
+        "tool": "searxng_search",
+        "success": True,
+        "summary": {
+            "query": "hk press",
+            "count": 2,
+            "sources": [
+                {"title": "Press freedom index", "url": "https://rsf.org/hk"},
+                {"title": "Hong Kong news", "url": "https://www.scmp.com/news"},
+            ],
+        },
+    },
+    {
+        "type": "tool",
+        "tool": "read_page",
+        "success": True,
+        "summary": {"sources": [{"title": "Press freedom index", "url": "https://rsf.org/hk"}]},
+    },
+    {
+        "type": "tool",
+        "tool": "read_page",
+        "success": False,
+        "summary": {"reason": "blocked", "sources": [{"title": "", "url": "https://www.scmp.com/news"}]},
+    },
+]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_search_and_two_reads_WHEN_answered_THEN_each_part_saves_what_it_found_or_why_not():
+    events, session_repo = await _research_turn(ConversationSession(id="s1", user_id="u1", agent_id="a1"))
+
+    tools = [p for p in events[-1]["parts"] if p["type"] == "tool"]
+    assert tools == RESEARCH_TOOL_PARTS
+    saved = [p for p in session_repo.messages[-1].metadata_json["parts"] if p["type"] == "tool"]
+    assert saved == RESEARCH_TOOL_PARTS
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_search_and_two_reads_WHEN_streamed_THEN_each_tool_result_carries_its_summary():
+    events, _ = await _research_turn(ConversationSession(id="s1", user_id="u1", agent_id="a1"))
+
+    streamed = [ev["data"]["summary"] for ev in events if ev.get("type") == "tool_result"]
+    assert streamed == [part["summary"] for part in RESEARCH_TOOL_PARTS]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_secret_chat_WHEN_researched_THEN_the_summaries_are_saved_like_the_rest_of_the_answer():
+    events, session_repo = await _research_turn(
+        ConversationSession(id="s1", user_id="u1", agent_id="a1", is_secret=True)
+    )
+
+    saved = [p for p in session_repo.messages[-1].metadata_json["parts"] if p["type"] == "tool"]
+    assert saved == RESEARCH_TOOL_PARTS
