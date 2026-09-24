@@ -6,6 +6,8 @@ from app.domain.exceptions import (
     ToolPermissionDeniedException,
     SecretModeLockException,
     DomainException,
+    PageReadException,
+    ToolFailureReason,
 )
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
@@ -140,8 +142,15 @@ class ExecuteToolUseCase:
                         tool_name=tool_name,
                         success=False,
                         error=f"'{source}' is neither a URL nor a search result from this turn.",
+                        reason=ToolFailureReason.NOT_FOUND,
                     )
-                page = await self.page_reader.read(url)
+                try:
+                    page = await self.page_reader.read(url)
+                except PageReadException as e:
+                    # The id is resolved only here, so the failed result says which page it was.
+                    return ToolExecutionResult(
+                        tool_name=tool_name, success=False, data={"url": url}, error=e.message, reason=e.reason
+                    )
                 passages = await sources.add_page(page)
                 data = {"page": sources.last_page_id, "title": page.title, "url": page.url, "passages": len(passages)}
                 # Read with the question, the page's best passages come straight back: a model that
@@ -333,6 +342,7 @@ class ExecuteToolUseCase:
                 tool_name=tool_name,
                 success=False,
                 error=e.message,
+                reason=getattr(e, "reason", None),
             )
         except Exception as e:
             return ToolExecutionResult(

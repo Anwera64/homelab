@@ -98,14 +98,36 @@ class CalendarAuthException(CalendarIntegrationException):
     pass
 
 
+class ToolFailureReason:
+    """
+    Why a tool failed, as a code the phone puts into words (#40). The exception's message is written
+    for the model and can carry internals; this is the part that is safe to show.
+    """
+
+    SERVICE_UNAVAILABLE = "service_unavailable"
+    BLOCKED = "blocked"
+    FORBIDDEN = "forbidden"
+    TOO_LARGE = "too_large"
+    NOT_A_PAGE = "not_a_page"
+    UNREADABLE = "unreadable"
+    NOT_FOUND = "not_found"
+    UNKNOWN = "unknown"
+
+
 class SearchServiceException(DomainException):
     """Raised when SearXNG query fails or times out."""
-    pass
+
+    def __init__(self, message: str = "The search service failed.", reason: str = ToolFailureReason.SERVICE_UNAVAILABLE):
+        super().__init__(message)
+        self.reason = reason
 
 
 class PageReadException(DomainException):
     """Raised when a web page cannot be fetched or has no readable text."""
-    pass
+
+    def __init__(self, message: str = "The page could not be read.", reason: str = ToolFailureReason.UNKNOWN):
+        super().__init__(message)
+        self.reason = reason
 
 
 class EmbeddingException(DomainException):

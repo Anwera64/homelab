@@ -286,3 +286,23 @@ async def test_searxng_connector_search_reuses_internal_client():
         assert client_after_first.is_closed
 
 
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "respond",
+    [
+        lambda request: httpx.Response(502, text="Bad gateway"),
+        lambda request: (_ for _ in ()).throw(httpx.ConnectError("refused", request=request)),
+    ],
+    ids=["http-error", "unreachable"],
+)
+async def test_searxng_failures_say_the_service_is_unavailable(respond):
+    """The phone says why a search failed from this code; the message is for the model (#40)."""
+    client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    connector = SearXNGSearchConnector(base_url="http://searxng:8080", client=client)
+
+    with pytest.raises(SearchServiceException) as raised:
+        await connector.search("dinner")
+
+    assert raised.value.reason == "service_unavailable"

@@ -9,7 +9,7 @@ import httpx
 import trafilatura
 
 from app.domain.entities.source_passage import WebPage
-from app.domain.exceptions import DomainException, PageReadException
+from app.domain.exceptions import DomainException, PageReadException, ToolFailureReason as Reason
 from app.domain.repositories.document_reader import IDocumentReader
 from app.domain.repositories.page_reader import IPageReader
 
@@ -54,6 +54,15 @@ def _bot_protection_message(hostname: str, status_code: int, headers: httpx.Head
     return None
 
 
+def _reason_for_status(status_code: int) -> str:
+    """What an HTTP error means for a person: the page is gone, the site said no, or it isn't answering."""
+    if status_code in (404, 410):
+        return Reason.NOT_FOUND
+    if status_code >= 500:
+        return Reason.SERVICE_UNAVAILABLE
+    return Reason.FORBIDDEN
+
+
 async def _default_resolve(host: str) -> List[str]:
     """Resolves a hostname to its IP address strings via the running loop's DNS, so tests never
     need real DNS: they inject a fake `resolve` instead."""
@@ -61,10 +70,10 @@ async def _default_resolve(host: str) -> List[str]:
     try:
         infos = await loop.getaddrinfo(host, None)
     except OSError as e:
-        raise PageReadException(f"Could not resolve host '{host}': {e}")
+        raise PageReadException(f"Could not resolve host '{host}': {e}", reason=Reason.NOT_FOUND)
     addresses = {info[4][0] for info in infos}
     if not addresses:
-        raise PageReadException(f"Could not resolve host '{host}': no addresses returned")
+        raise PageReadException(f"Could not resolve host '{host}': no addresses returned", reason=Reason.NOT_FOUND)
     return list(addresses)
 
 
@@ -127,18 +136,18 @@ class HttpPageReader(IPageReader):
             except PageReadException:
                 raise
             except Exception as e:
-                raise PageReadException(f"Could not resolve host '{host}': {e}")
+                raise PageReadException(f"Could not resolve host '{host}': {e}", reason=Reason.NOT_FOUND)
             try:
                 addresses = [ipaddress.ip_address(a) for a in resolved]
             except ValueError as e:
-                raise PageReadException(f"Could not resolve host '{host}': {e}")
+                raise PageReadException(f"Could not resolve host '{host}': {e}", reason=Reason.NOT_FOUND)
 
         for ip in addresses:
             mapped = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
             target = mapped if mapped is not None else ip
             if not target.is_global:
                 raise PageReadException(
-                    f"Refusing to fetch '{host}': resolves to non-public address {ip}"
+                    f"Refusing to fetch '{host}': resolves to non-public address {ip}", reason=Reason.NOT_A_PAGE
                 )
 
         return addresses[0]
@@ -170,13 +179,13 @@ class HttpPageReader(IPageReader):
         try:
             parsed = await self._document_reader.parse_pdf(body, filename=_pdf_filename(current_url))
         except DomainException as e:
-            raise PageReadException(str(e))
+            raise PageReadException(str(e), reason=Reason.UNREADABLE)
 
         title = parsed.metadata.title.strip() if parsed.metadata.title else ""
         title = title or current_url
         text = parsed.plain_text
         if not text or not text.strip():
-            raise PageReadException(f"'{current_url}' has no readable text")
+            raise PageReadException(f"'{current_url}' has no readable text", reason=Reason.UNREADABLE)
         return WebPage(url=current_url, title=title, text=text)
 
     async def read(self, url: str, timeout: float = 10.0) -> WebPage:
@@ -186,7 +195,7 @@ class HttpPageReader(IPageReader):
         for hop in range(self.max_redirects + 1):
             parts = urlsplit(current_url)
             if parts.scheme not in ("http", "https") or not parts.hostname:
-                raise PageReadException(f"Unsupported URL: '{current_url}'")
+                raise PageReadException(f"Unsupported URL: '{current_url}'", reason=Reason.NOT_A_PAGE)
 
             hostname = parts.hostname
             ip = await self._vetted_ip(hostname)
@@ -203,17 +212,18 @@ class HttpPageReader(IPageReader):
                 ) as response:
                     bot_message = _bot_protection_message(hostname, response.status_code, response.headers)
                     if bot_message:
-                        raise PageReadException(bot_message)
+                        raise PageReadException(bot_message, reason=Reason.BLOCKED)
 
                     if 300 <= response.status_code < 400 and "location" in response.headers:
                         if hop >= self.max_redirects:
-                            raise PageReadException(f"Too many redirects fetching '{url}'")
+                            raise PageReadException(f"Too many redirects fetching '{url}'", reason=Reason.UNREADABLE)
                         current_url = urljoin(current_url, response.headers["location"])
                         continue
 
                     if not (200 <= response.status_code < 300):
                         raise PageReadException(
-                            f"'{current_url}' returned HTTP {response.status_code}"
+                            f"'{current_url}' returned HTTP {response.status_code}",
+                            reason=_reason_for_status(response.status_code),
                         )
 
                     content_type = response.headers.get("content-type", "")
@@ -222,7 +232,8 @@ class HttpPageReader(IPageReader):
                     if mime == _PDF_CONTENT_TYPE:
                         if self._document_reader is None:
                             raise PageReadException(
-                                f"'{current_url}' is a PDF, and PDFs can't be read: no document reader is configured"
+                                f"'{current_url}' is a PDF, and PDFs can't be read: no document reader is configured",
+                                reason=Reason.UNREADABLE,
                             )
                         # PDFs aren't truncatable like HTML text: a cut-off PDF can't be parsed at
                         # all, so an over-limit body is refused outright rather than capped.
@@ -231,13 +242,15 @@ class HttpPageReader(IPageReader):
                             pdf_body.extend(chunk)
                             if len(pdf_body) > self.max_pdf_bytes:
                                 raise PageReadException(
-                                    f"'{current_url}' is larger than the {self.max_pdf_bytes}-byte PDF limit"
+                                    f"'{current_url}' is larger than the {self.max_pdf_bytes}-byte PDF limit",
+                                    reason=Reason.TOO_LARGE,
                                 )
                         return await self._read_pdf(bytes(pdf_body), current_url)
 
                     if mime not in _ALLOWED_CONTENT_TYPES:
                         raise PageReadException(
-                            f"'{current_url}' is not a web page (content-type: {mime or 'unknown'})"
+                            f"'{current_url}' is not a web page (content-type: {mime or 'unknown'})",
+                            reason=Reason.NOT_A_PAGE,
                         )
 
                     charset = "utf-8"
@@ -255,7 +268,7 @@ class HttpPageReader(IPageReader):
                             break
                     body = bytes(body[: self.max_bytes])
             except httpx.HTTPError as e:
-                raise PageReadException(f"Could not fetch '{current_url}': {e}")
+                raise PageReadException(f"Could not fetch '{current_url}': {e}", reason=Reason.SERVICE_UNAVAILABLE)
 
             try:
                 page_html = body.decode(charset, errors="replace")
@@ -266,9 +279,9 @@ class HttpPageReader(IPageReader):
                 trafilatura.extract, page_html, include_comments=False, include_tables=True
             )
             if not text or not text.strip():
-                raise PageReadException(f"'{current_url}' has no readable text")
+                raise PageReadException(f"'{current_url}' has no readable text", reason=Reason.UNREADABLE)
 
             title = await self._extract_title(page_html, current_url)
             return WebPage(url=current_url, title=title, text=text)
 
-        raise PageReadException(f"Too many redirects fetching '{url}'")
+        raise PageReadException(f"Too many redirects fetching '{url}'", reason=Reason.UNREADABLE)

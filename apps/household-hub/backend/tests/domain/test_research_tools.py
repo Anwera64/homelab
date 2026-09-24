@@ -274,3 +274,47 @@ async def test_GIVEN_no_question_WHEN_a_page_is_read_THEN_only_the_receipt_comes
     )
 
     assert "relevant" not in result.data
+
+
+# --- why a step failed, for the phone (#40) -----------------------------------------------------
+
+class BlockedPageReader(FakePageReader):
+    async def read(self, url: str, timeout: float = 10.0) -> WebPage:
+        self.urls.append(url)
+        raise PageReadException(f"{url} is behind bot protection", reason="blocked")
+
+
+class DownSearchConnector(FakeSearchConnector):
+    async def search(self, query, category="general", engines=None, fresh=False, limit=10, timeout=8.0):
+        from app.domain.exceptions import SearchServiceException
+
+        raise SearchServiceException("SearXNG unavailable", reason="service_unavailable")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_blocked_page_WHEN_read_THEN_the_result_carries_the_reason_and_the_page_it_was():
+    sources = TurnSources(ListIndex())
+    executor = _executor(page_reader=BlockedPageReader())
+    await _run(executor, "searxng_search", {"query": "tariffs"}, sources)
+
+    result = await _run(executor, "read_page", {"source": "s2"}, sources)
+
+    assert not result.success
+    assert result.reason == "blocked"
+    # The id is resolved here and nowhere else, so the phone learns which page from the result.
+    assert result.data == {"url": "https://news.example/tariffs/2"}
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_search_service_is_down_WHEN_searching_THEN_the_result_carries_the_reason():
+    result = await _run(_executor(search=DownSearchConnector()), "searxng_search", {"query": "q"})
+
+    assert not result.success
+    assert result.reason == "service_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_unknown_id_WHEN_a_page_is_read_THEN_the_reason_is_not_found():
+    result = await _run(_executor(), "read_page", {"source": "s9"}, TurnSources(ListIndex()))
+
+    assert result.reason == "not_found"

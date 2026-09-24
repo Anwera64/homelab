@@ -461,3 +461,105 @@ async def test_GIVEN_a_plain_403_WHEN_read_THEN_returned_http_403_message_is_rai
 
     with pytest.raises(PageReadException, match="returned HTTP 403"):
         await reader.read("http://public.example.com/blocked")
+
+
+# --- Why a read failed, as a code the phone can put into words (#40) ---------------------------
+
+PUBLIC = {"public.example.com": ["93.184.216.34"]}
+
+
+def reader_answering(respond, **kwargs):
+    client = httpx.AsyncClient(transport=httpx.MockTransport(respond), follow_redirects=False)
+    return HttpPageReader(client=client, resolve=make_resolve(PUBLIC), **kwargs)
+
+
+async def reason_for(reader, url="http://public.example.com/page"):
+    with pytest.raises(PageReadException) as raised:
+        await reader.read(url)
+    return raised.value.reason
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status, headers, reason",
+    [
+        (403, {"server": "cloudflare"}, "blocked"),
+        (503, {"cf-mitigated": "challenge"}, "blocked"),
+        (307, {"server": "Sucuri/Cloudproxy"}, "blocked"),
+        (403, {"server": "nginx"}, "forbidden"),
+        (401, {}, "forbidden"),
+        (429, {}, "forbidden"),
+        (404, {}, "not_found"),
+        (410, {}, "not_found"),
+        (500, {}, "service_unavailable"),
+        (502, {}, "service_unavailable"),
+    ],
+)
+async def test_GIVEN_an_http_failure_WHEN_read_THEN_the_reason_says_which_kind(status, headers, reason):
+    reader = reader_answering(lambda request: httpx.Response(status, headers=headers, content=b"<html></html>"))
+
+    assert await reason_for(reader) == reason
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_page_with_no_readable_text_WHEN_read_THEN_the_reason_is_unreadable():
+    assert await reason_for(reader_answering(lambda request: html_response(html=EMPTY_HTML))) == "unreadable"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_something_that_is_not_a_web_page_WHEN_read_THEN_the_reason_is_not_a_page():
+    reader = reader_answering(lambda request: httpx.Response(200, headers={"content-type": "image/png"}, content=b"x"))
+
+    assert await reason_for(reader) == "not_a_page"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_non_web_or_private_address_WHEN_read_THEN_the_reason_is_not_a_page():
+    assert await reason_for(HttpPageReader(), url="ftp://public.example.com/x") == "not_a_page"
+    assert await reason_for(HttpPageReader(), url="http://127.0.0.1/admin") == "not_a_page"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_host_that_does_not_resolve_WHEN_read_THEN_the_reason_is_not_found():
+    async def failing_resolve(host):
+        raise OSError("Name or service not known")
+
+    assert await reason_for(HttpPageReader(resolve=failing_resolve)) == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_site_that_does_not_answer_WHEN_read_THEN_the_reason_is_service_unavailable():
+    def respond(request):
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    assert await reason_for(reader_answering(respond)) == "service_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pdf_over_the_limit_WHEN_read_THEN_the_reason_is_too_large():
+    reader = reader_answering(
+        lambda request: httpx.Response(200, headers={"content-type": "application/pdf"}, content=b"%PDF" + b"x" * 2000),
+        document_reader=FakeDocumentReader(),
+        max_pdf_bytes=1000,
+    )
+
+    assert await reason_for(reader) == "too_large"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_scanned_pdf_WHEN_read_THEN_the_reason_is_unreadable():
+    reader = reader_answering(
+        lambda request: httpx.Response(200, headers={"content-type": "application/pdf"}, content=b"%PDF scan"),
+        document_reader=FakeDocumentReader(exception=ScannedPdfException("scanned image")),
+    )
+
+    assert await reason_for(reader) == "unreadable"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_endless_redirects_WHEN_read_THEN_the_reason_is_unreadable():
+    def respond(request):
+        n = int(request.url.path.strip("/") or 0)
+        return httpx.Response(302, headers={"location": f"http://public.example.com/{n + 1}"})
+
+    assert await reason_for(reader_answering(respond, max_redirects=2), url="http://public.example.com/0") == "unreadable"
