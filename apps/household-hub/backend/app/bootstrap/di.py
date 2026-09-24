@@ -333,7 +333,9 @@ def get_container(session: AsyncSession):
                     is_first_turn=is_first_turn,
                     timezone_name=timezone_name,
                 )
-                await bg_container[pres_deps.get_summarize_history_use_case].execute(session_id)
+                await bg_container[pres_deps.get_summarize_history_use_case].execute(
+                    session_id, timezone_name=timezone_name
+                )
         except Exception as exc:
             logger.error("Background reflection failed for session %s: %s", session_id, exc, exc_info=True)
 
@@ -398,7 +400,9 @@ def get_container(session: AsyncSession):
                     # After reflection, so the facts it keeps are taken from the words before they
                     # are folded into the summary.
                     try:
-                        await bg_container[pres_deps.get_summarize_history_use_case].execute(session_id)
+                        await bg_container[pres_deps.get_summarize_history_use_case].execute(
+                            session_id, timezone_name=timezone_name
+                        )
                     except Exception as sum_exc:
                         logger.error("Background history summary failed for session %s: %s", session_id, sum_exc, exc_info=True)
         except Exception as exc:

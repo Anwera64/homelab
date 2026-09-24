@@ -108,8 +108,8 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
             order.append("reflect")
 
     class Summary:
-        async def execute(self, session_id):
-            order.append(("summary", session_id))
+        async def execute(self, session_id, timezone_name=None):
+            order.append(("summary", session_id, timezone_name))
 
     runner = di.get_container(session=None)[deps.get_background_chat_stream_runner]
 
@@ -125,9 +125,10 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
     })
 
     queue: asyncio.Queue = asyncio.Queue()
-    await runner("s1", User(id="u1", full_name="Alex"), "Hello", False, queue)
+    await runner("s1", User(id="u1", full_name="Alex"), "Hello", False, queue, timezone_name="Asia/Tokyo")
 
-    assert order == ["reflect", ("summary", "s1")]
+    # #39: the summary stamps messages in the member's timezone, so it is handed the turn's.
+    assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
 
 
 @pytest.mark.asyncio
@@ -146,8 +147,8 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
             order.append("reflect")
 
     class Summary:
-        async def execute(self, session_id):
-            order.append(("summary", session_id))
+        async def execute(self, session_id, timezone_name=None):
+            order.append(("summary", session_id, timezone_name))
 
     runner = di.get_container(session=None)[deps.get_background_reflection_runner]
 
@@ -161,6 +162,6 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
         deps.get_summarize_history_use_case: Summary(),
     })
 
-    await runner("s1", "u1", "Alex", "a1", "Assistant", "Hi", "Hello", False, False, False)
+    await runner("s1", "u1", "Alex", "a1", "Assistant", "Hi", "Hello", False, False, False, timezone_name="Asia/Tokyo")
 
-    assert order == ["reflect", ("summary", "s1")]
+    assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
