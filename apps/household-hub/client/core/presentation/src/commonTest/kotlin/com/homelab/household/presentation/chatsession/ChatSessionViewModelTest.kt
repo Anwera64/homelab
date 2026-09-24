@@ -3,6 +3,7 @@ package com.homelab.household.presentation.chatsession
 import app.cash.turbine.test
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
@@ -679,7 +680,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_tool_that_finishes_leaves_a_record_and_one_that_fails_says_so() =
+    fun `GIVEN a tool that finishes and one that fails WHEN they run THEN each leaves its part and the failure says so`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -696,17 +697,42 @@ class ChatSessionViewModelTest {
             val state = viewModel.uiState.value
             assertNull(state.activeTool)
             assertEquals(
-                listOf(TurnRecord.ToolDone("calendar_read"), TurnRecord.ToolFailed("searxng_search")),
-                state.trail,
+                listOf(AnswerPart.ToolDone("calendar_read"), AnswerPart.ToolFailed("searxng_search")),
+                state.parts,
             )
         }
 
-    /**
-     * How long it thought, measured from the first thought to the first word and summed across a
-     * tool — one record, at the top of the trail, however many times it stopped to think.
-     */
+    /** Issue #33: the tool used to be drawn above the whole answer, and the two stretches ran together. */
     @Test
-    fun thinking_folds_into_one_timed_record_at_the_top_of_the_trail() =
+    fun `GIVEN text then a tool then more text WHEN it streams THEN the parts keep that order`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Delta("Let me "),
+                    ChatStreamEvent.Delta("check."),
+                    ChatStreamEvent.ToolExecuting("web_search"),
+                    ChatStreamEvent.ToolResult("web_search", success = true),
+                    ChatStreamEvent.Delta("It stays "),
+                    ChatStreamEvent.Delta("dry."),
+                )
+
+            viewModel.sendMessage("Will Saturday stay dry?")
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(
+                    AnswerPart.Text("Let me check."),
+                    AnswerPart.ToolDone("web_search"),
+                    AnswerPart.Text("It stays dry."),
+                ),
+                viewModel.uiState.value.parts,
+            )
+        }
+
+    /** Timed from the first thought of each stretch to whatever ends it: a tool, a word, the end. */
+    @Test
+    fun `GIVEN thinking before each stretch WHEN it streams THEN each stretch has its own thought where it happened`() =
         runTest(testDispatcher) {
             val clock = TestTimeSource()
             viewModel = viewModelWith(clock)
@@ -716,6 +742,7 @@ class ChatSessionViewModelTest {
                     emit(ChatStreamEvent.Reasoning("I need the calendar."))
                     clock += 3.seconds
                     emit(ChatStreamEvent.ToolExecuting("calendar_read"))
+                    clock += 20.seconds // the tool running is not thinking
                     emit(ChatStreamEvent.ToolResult("calendar_read", success = true))
                     emit(ChatStreamEvent.Reasoning("Two events."))
                     clock += 1.seconds
@@ -726,12 +753,20 @@ class ChatSessionViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals(listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")), state.trail)
+            assertEquals(
+                listOf(
+                    AnswerPart.Thought(3),
+                    AnswerPart.ToolDone("calendar_read"),
+                    AnswerPart.Thought(1),
+                    AnswerPart.Text("Two things."),
+                ),
+                state.parts,
+            )
             assertFalse(state.isThinking, "once the answer begins, the thinking steps aside")
         }
 
     @Test
-    fun the_trail_stays_with_its_answer_once_the_turn_is_done() =
+    fun `GIVEN a finished answer WHEN the hub sends no parts THEN the message keeps the parts it streamed`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -746,9 +781,67 @@ class ChatSessionViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals(listOf(TurnRecord.ToolDone("calendar_read")), state.trails["m-2"])
-            assertTrue(state.trail.isEmpty())
+            assertEquals(
+                listOf(AnswerPart.ToolDone("calendar_read"), AnswerPart.Text("A light day.")),
+                state.messages.single { it.id == "m-2" }.parts,
+            )
+            assertTrue(state.parts.isEmpty())
             assertNull(state.activeTool)
+        }
+
+    @Test
+    fun `GIVEN a finished answer WHEN the hub sends its parts THEN the message keeps the hub's`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            val saved =
+                listOf(AnswerPart.Thought(2), AnswerPart.ToolDone("calendar_read"), AnswerPart.Text("A light day."))
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.ToolExecuting("calendar_read"),
+                    ChatStreamEvent.ToolResult("calendar_read", success = true),
+                    ChatStreamEvent.Delta("A light day."),
+                    ChatStreamEvent.Done(messageId = "m-2", assistantContent = "A light day.", parts = saved),
+                )
+
+            viewModel.sendMessage("What is on tomorrow?")
+            advanceUntilIdle()
+
+            assertEquals(
+                saved,
+                viewModel.uiState.value.messages
+                    .single { it.id == "m-2" }
+                    .parts,
+            )
+        }
+
+    @Test
+    fun `GIVEN an answer resumed after a lock WHEN more text and a tool arrive THEN they carry on after the parts already shown`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.Delta("Let me "),
+                    ChatStreamEvent.Reconnecting,
+                    ChatStreamEvent.StillWorking,
+                )
+            every { resumeTurnUseCase("s-1", any()) } returns
+                flowOf(
+                    ChatStreamEvent.Delta("check."),
+                    ChatStreamEvent.ToolExecuting("web_search"),
+                    ChatStreamEvent.ToolResult("web_search", success = true),
+                    ChatStreamEvent.Delta("Dry."),
+                )
+            viewModel.sendMessage("Will Saturday stay dry?")
+            advanceUntilIdle()
+
+            viewModel.onForeground()
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(AnswerPart.Text("Let me check."), AnswerPart.ToolDone("web_search"), AnswerPart.Text("Dry.")),
+                viewModel.uiState.value.parts,
+            )
         }
 
     @Test
@@ -771,7 +864,7 @@ class ChatSessionViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isThinking)
-            assertTrue(state.trail.isEmpty())
+            assertTrue(state.parts.isEmpty())
             assertTrue(state.isSilent, "a turn that has heard nothing yet is silent")
         }
 

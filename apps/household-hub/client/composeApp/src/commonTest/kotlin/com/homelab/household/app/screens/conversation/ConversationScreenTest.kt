@@ -39,6 +39,7 @@ import com.homelab.household.app.resources.conversation_reconnecting
 import com.homelab.household.app.resources.conversation_reconnecting_detail
 import com.homelab.household.app.resources.conversation_retry
 import com.homelab.household.app.resources.conversation_sent
+import com.homelab.household.app.resources.conversation_steps
 import com.homelab.household.app.resources.conversation_still_working
 import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thinking
@@ -50,6 +51,7 @@ import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -369,21 +371,66 @@ class ConversationScreenTest {
             onNodeWithText("calendar_read", substring = true).assertDoesNotExist()
         }
 
+    /** Issue #33: the tool line used to sit above the whole answer. */
     @Test
-    fun the_trail_sits_above_an_answer_as_it_arrives() =
+    fun `GIVEN an answer being written with text then a tool then text WHEN drawn THEN the tool line sits between the two stretches`() =
         runComposeUiTest {
-            setContent(conversation(stateNamed("The answer arrives, with its trail")))
+            setContent(conversation(stateNamed("The answer arrives, a tool between its words")))
 
-            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+            val thought = onNodeWithText(getString(Res.string.conversation_thought, 4)).getUnclippedBoundsInRoot()
+            val before = onNodeWithText("Let me check your calendar.").getUnclippedBoundsInRoot()
+            val tool = onNodeWithText(getString(Res.string.tool_calendar_read_done)).getUnclippedBoundsInRoot()
+            val after = onNodeWithText("Tomorrow's fairly light", substring = true).getUnclippedBoundsInRoot()
+            assertTrue(thought.top < before.top, "the thinking came first")
+            assertTrue(before.bottom <= tool.top, "the tool ran after the first words")
+            assertTrue(tool.bottom <= after.top, "and before the rest")
         }
 
     @Test
-    fun a_finished_answer_keeps_its_trail() =
+    fun `GIVEN a finished answer with steps between its text WHEN drawn THEN each run of steps folds into one line where it happened`() =
         runComposeUiTest {
-            setContent(conversation(stateNamed("A finished answer and its trail")))
+            setContent(conversation(stateNamed("A finished answer, its steps folded")))
 
-            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertIsDisplayed()
+            val first = onNodeWithText(getPluralString(Res.plurals.conversation_steps, 1, 1)).getUnclippedBoundsInRoot()
+            val before = onNodeWithText("Let me check your calendar.").getUnclippedBoundsInRoot()
+            val second =
+                onNodeWithText(
+                    getPluralString(Res.plurals.conversation_steps, 2, 2),
+                ).getUnclippedBoundsInRoot()
+            val after = onNodeWithText("Tomorrow's fairly light. Nothing in the evening.").getUnclippedBoundsInRoot()
+            assertTrue(first.bottom <= before.top)
+            assertTrue(before.bottom <= second.top)
+            assertTrue(second.bottom <= after.top)
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertDoesNotExist()
+        }
+
+    @Test
+    fun `GIVEN a folded run of steps WHEN tapped THEN its steps show in place and tapping again hides them`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished answer, its steps folded")))
+            val fold = getPluralString(Res.plurals.conversation_steps, 2, 2)
+
+            onNodeWithText(fold).performClick()
+
+            val tool = onNodeWithText(getString(Res.string.tool_calendar_read_done)).getUnclippedBoundsInRoot()
+            val before = onNodeWithText("Let me check your calendar.").getUnclippedBoundsInRoot()
+            val after = onNodeWithText("Tomorrow's fairly light. Nothing in the evening.").getUnclippedBoundsInRoot()
+            assertTrue(before.bottom <= tool.top && tool.bottom <= after.top, "the steps open where they happened")
+            onNodeWithText(getString(Res.string.conversation_thought, 2)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertDoesNotExist()
+
+            onNodeWithText(fold).performClick()
+
+            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertDoesNotExist()
+        }
+
+    @Test
+    fun `GIVEN an answer saved before parts were kept WHEN drawn THEN its text shows as it always did`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished exchange")))
+
+            onNodeWithText("The panel review is tomorrow at 14:30.").assertIsDisplayed()
         }
 
     @Test

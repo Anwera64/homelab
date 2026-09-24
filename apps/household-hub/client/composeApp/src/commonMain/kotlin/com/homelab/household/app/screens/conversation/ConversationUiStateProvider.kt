@@ -1,6 +1,7 @@
 package com.homelab.household.app.screens.conversation
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
@@ -8,7 +9,6 @@ import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.AgentChoice
 import com.homelab.household.presentation.chatsession.AgentOwner
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
-import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
 
 /**
@@ -23,7 +23,8 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         content: String,
         role: MessageRole,
         status: MessageStatus = MessageStatus.SENT,
-    ) = ChatMessage(id = id, sessionId = "s-1", role = role, content = content, status = status)
+        parts: List<AnswerPart> = emptyList(),
+    ) = ChatMessage(id = id, sessionId = "s-1", role = role, content = content, status = status, parts = parts)
 
     private val agent =
         ChatSessionUiState(
@@ -117,30 +118,55 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     streamingMessage = "",
                     turnState = TurnState.Streaming,
                     activeTool = "calendar_read",
-                    trail = listOf(TurnRecord.Thought(3)),
+                    parts = listOf(AnswerPart.Thought(3)),
                 ),
-            "The answer arrives, with its trail" to
+            // Issue #33: each tool sits between the words either side of it, never above them all.
+            "The answer arrives, a tool between its words" to
                 agent.copy(
                     messages = listOf(question),
-                    streamingMessage = "Tomorrow's fairly light. The panel review at 14:30 is the only fixed",
+                    streamingMessage =
+                        "Let me check your calendar.Tomorrow's fairly light. The panel review at 14:30 is the only fixed",
                     turnState = TurnState.Streaming,
-                    trail = listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read")),
+                    parts =
+                        listOf(
+                            AnswerPart.Thought(4),
+                            AnswerPart.Text("Let me check your calendar."),
+                            AnswerPart.ToolDone("calendar_read"),
+                            AnswerPart.Text("Tomorrow's fairly light. The panel review at 14:30 is the only fixed"),
+                        ),
                 ),
-            "A finished answer and its trail" to
+            // Once it is done, each run of steps folds into one line where it happened.
+            "A finished answer, its steps folded" to
                 agent.copy(
                     messages =
                         listOf(
                             question,
-                            said("m-2", "Tomorrow's fairly light. Nothing in the evening.", MessageRole.ASSISTANT),
+                            said(
+                                "m-2",
+                                "Let me check your calendar.\n\nTomorrow's fairly light. Nothing in the evening.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Thought(4),
+                                        AnswerPart.Text("Let me check your calendar."),
+                                        AnswerPart.ToolDone("calendar_read"),
+                                        AnswerPart.Thought(2),
+                                        AnswerPart.Text("Tomorrow's fairly light. Nothing in the evening."),
+                                    ),
+                            ),
                         ),
-                    trails = mapOf("m-2" to listOf(TurnRecord.Thought(4), TurnRecord.ToolDone("calendar_read"))),
                 ),
             "A tool that couldn't run" to
                 agent.copy(
                     messages = listOf(question),
                     streamingMessage = "I couldn't reach your calendar just now, so I can't say for certain.",
                     turnState = TurnState.Streaming,
-                    trail = listOf(TurnRecord.Thought(2), TurnRecord.ToolFailed("calendar_read")),
+                    parts =
+                        listOf(
+                            AnswerPart.Thought(2),
+                            AnswerPart.ToolFailed("calendar_read"),
+                            AnswerPart.Text("I couldn't reach your calendar just now, so I can't say for certain."),
+                        ),
                 ),
             "Answering" to
                 agent.copy(

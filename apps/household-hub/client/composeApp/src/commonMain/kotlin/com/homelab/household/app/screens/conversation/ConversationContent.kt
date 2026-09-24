@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import com.homelab.household.app.components.AnswerText
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MessageBubble
@@ -35,6 +37,7 @@ import com.homelab.household.app.components.NotSentReceipt
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.SentReceipt
 import com.homelab.household.app.components.SlowLine
+import com.homelab.household.app.components.StepsFold
 import com.homelab.household.app.components.ThinkingDots
 import com.homelab.household.app.components.ToolRecordLine
 import com.homelab.household.app.components.ToolRunningChip
@@ -60,10 +63,10 @@ import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.app.theme.StillMotion
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
+import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
-import com.homelab.household.presentation.chatsession.TurnRecord
 import com.homelab.household.presentation.chatsession.TurnState
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
@@ -122,14 +125,14 @@ fun ConversationContent(
 
     // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this the
     // words land below the fold and the screen sits still while the agent talks.
-    // Thinking, a tool and the trail grow the answer too, before a single word of it arrives.
+    // Thinking, a tool and the steps grow the answer too, before a single word of it arrives.
     LaunchedEffect(
         itemCount,
         state.streamingMessage,
         state.turnState,
         state.isThinking,
         state.activeTool,
-        state.trail,
+        state.parts,
     ) {
         if (itemCount == 0) return@LaunchedEffect
 
@@ -286,8 +289,10 @@ fun ConversationContent(
                 // The receipt belongs to the newest question only: under every one it is noise.
                 val receipted = message.id == latestQuestionId && message.status == MessageStatus.SENT
 
-                Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                    TurnTrail(state.trails[message.id].orEmpty())
+                if (message.role == MessageRole.ASSISTANT) {
+                    // Finished, so its steps fold away and it reads as the answer.
+                    Answer(parts = message.parts, written = message.content, folded = true)
+                } else {
                     MessageBubble(
                         content = message.content,
                         fromMe = message.role == MessageRole.USER,
@@ -307,23 +312,17 @@ fun ConversationContent(
             // The answer being written, with whatever has become of it sitting where it stopped.
             if (state.streamingMessage != null || state.turnState == TurnState.Failed) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                        TurnTrail(state.trail)
-                        MessageBubble(
-                            content = state.streamingMessage.orEmpty(),
-                            fromMe = false,
-                            status = {
-                                val tool = state.activeTool
-                                when {
-                                    // In the answer's place, because that is where the eye is waiting.
-                                    tool != null -> ToolRunningChip(stringResource(toolLabel(tool).running))
+                    // Nothing folded while it is being written: each step shows as it happens.
+                    Answer(parts = state.parts, written = state.streamingMessage.orEmpty(), folded = false) {
+                        val tool = state.activeTool
+                        when {
+                            // In the answer's place, because that is where the eye is waiting.
+                            tool != null -> ToolRunningChip(stringResource(toolLabel(tool).running))
 
-                                    thinking -> Thinking(thinkingPhase, slowPhase)
+                            thinking -> Thinking(thinkingPhase, slowPhase)
 
-                                    else -> TurnStatus(state, onTryAgain)
-                                }
-                            },
-                        )
+                            else -> TurnStatus(state, onTryAgain)
+                        }
                     }
                 }
             }
@@ -347,34 +346,107 @@ private fun Thinking(
 }
 
 /**
- * What an answer did on the way to it, above the answer: one quiet line each (design notes §6.5).
- * Thinking comes first, summed; then each tool, in the order it ran.
+ * An answer, drawn in the order it happened: its words, and between them the steps it took on
+ * the way — each stretch of thinking and each tool, one quiet line each (design notes §6.5).
+ *
+ * The steps used to be drawn above the whole answer, so a tool used halfway through looked as if
+ * it came first and the words either side of it ran together (#33). A [folded] answer — a finished
+ * one — keeps each run of steps to a single "N steps" line where it happened.
+ *
+ * [written] is the answer as plain text, drawn as it always was when there are no parts to draw
+ * it from: an answer saved before the hub kept them, or one whose words have not started yet.
+ * [status] sits where the answer stopped.
  */
 @Composable
-private fun TurnTrail(records: List<TurnRecord>) {
-    if (records.isEmpty()) return
+private fun Answer(
+    parts: List<AnswerPart>,
+    written: String,
+    folded: Boolean,
+    status: (@Composable () -> Unit)? = null,
+) {
+    val runs = parts.runs(written)
+    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+        runs.forEachIndexed { index, run ->
+            // Keyed by place, so each fold remembers its own open or closed.
+            key(index) {
+                when (run) {
+                    is AnswerRun.Words -> {
+                        AnswerText(content = run.text)
+                    }
+
+                    is AnswerRun.Steps -> {
+                        if (folded) {
+                            StepsFold(count = run.steps.size) { Steps(run.steps) }
+                        } else {
+                            Steps(run.steps)
+                        }
+                    }
+                }
+            }
+        }
+        status?.invoke()
+    }
+}
+
+/** A stretch of an answer: its words, or the steps it took between them. */
+private sealed interface AnswerRun {
+    data class Words(
+        val text: String,
+    ) : AnswerRun
+
+    data class Steps(
+        val steps: List<AnswerPart>,
+    ) : AnswerRun
+}
+
+/**
+ * The parts grouped into stretches. With no words among them, [written] stands in for the words:
+ * a message saved before parts were kept, or a live answer whose parts are all steps so far.
+ */
+private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
+    val runs = mutableListOf<AnswerRun>()
+    var steps = mutableListOf<AnswerPart>()
+    for (part in this) {
+        if (part is AnswerPart.Text) {
+            if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
+            steps = mutableListOf()
+            if (part.content.isNotBlank()) runs += AnswerRun.Words(part.content.trim())
+        } else {
+            steps += part
+        }
+    }
+    if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
+    if (runs.none { it is AnswerRun.Words } && written.isNotBlank()) runs += AnswerRun.Words(written)
+    return runs
+}
+
+/** Each step on a line of its own, in the order it ran. */
+@Composable
+private fun Steps(steps: List<AnswerPart>) {
     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
-        records.forEach { record ->
-            when (record) {
-                is TurnRecord.Thought -> {
+        steps.forEach { step ->
+            when (step) {
+                is AnswerPart.Thought -> {
                     ToolRecordLine(
                         icon = HearthIcon.Streaming,
-                        text = stringResource(Res.string.conversation_thought, record.seconds),
+                        text = stringResource(Res.string.conversation_thought, step.seconds),
                     )
                 }
 
-                is TurnRecord.ToolDone -> {
-                    val label = toolLabel(record.tool)
+                is AnswerPart.ToolDone -> {
+                    val label = toolLabel(step.tool)
                     ToolRecordLine(icon = label.icon, text = stringResource(label.done))
                 }
 
-                is TurnRecord.ToolFailed -> {
+                is AnswerPart.ToolFailed -> {
                     ToolRecordLine(
                         icon = HearthIcon.Error,
-                        text = stringResource(toolLabel(record.tool).failed),
+                        text = stringResource(toolLabel(step.tool).failed),
                         tint = HearthTheme.colors.error,
                     )
                 }
+
+                is AnswerPart.Text -> {}
             }
         }
     }
