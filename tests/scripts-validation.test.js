@@ -33,6 +33,18 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       'startup_homelab.ps1 must invoke docker compose up -d'
     );
 
+    // The hub is built from source, so a restart must rebuild it to pick up code changes
+    assert.ok(
+      /docker\s+compose @profileArg.*up\s+-d\s+--build/i.test(startupContent),
+      'startup_homelab.ps1 must rebuild local images when bringing the stack up'
+    );
+
+    // The hub is AI-only like ollama and searxng, so an arr-only start must not flag it as failed
+    assert.ok(
+      startupContent.includes('$cName -eq "household-hub"'),
+      'startup_homelab.ps1 must skip household-hub in the health audit when AI is off'
+    );
+
     // Verifies update parameters, persistent timestamp gate, and image prune
     assert.ok(
       startupContent.includes('[switch]$SkipUpdate') && startupContent.includes('[switch]$ForceUpdate'),

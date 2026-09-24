@@ -1,0 +1,9 @@
+.venv/
+*.db*
+pre-reset-*/
+tests/
+scripts/
+**/__pycache__/
+.pytest_cache/
+.coverage
+.dev-server.*

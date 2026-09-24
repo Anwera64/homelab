@@ -57,52 +57,33 @@ The backend is structured into decoupled architectural layers strictly enforced 
 
 ---
 
-## 🚀 Running Locally
+## 🚀 Running the Hub
 
-### 1. Create Virtual Environment & Install Dependencies
-```powershell
-cd apps\household-hub\backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+The backend runs as a Docker Compose service, in the `ai` profile alongside Ollama and SearXNG. Run these from the repo root:
 
-### 2. Start Application Server
-```powershell
-# Using the dev control script:
-.\scripts\dev.ps1 start
+* **Start/rebuild:** `docker compose --profile ai up -d --build household-hub`
+* **Status:** `docker ps --filter name=household-hub` (the container has a healthcheck on `/api/v1/health`)
+* **Logs:** `docker logs -f household-hub`
+* **Stop:** `docker compose stop household-hub`
+* **Reset a PIN:** `docker exec household-hub hub reset-pin "Name"`
+* **Wipe the database:** `docker compose rm -sf household-hub; docker volume rm household_hub_data`, then start again — migrations recreate the schema on startup.
+* **Back up the database:** `docker cp household-hub:/data/household_hub.db .`
 
-# Or directly with uvicorn:
-uvicorn app.main:app --reload --host 0.0.0.0 --port 3050
-```
-
+The container publishes its port on loopback, so these still work straight from the host:
 * **Interactive API Documentation:** [http://localhost:3050/docs](http://localhost:3050/docs)
 * **OpenAPI Specification:** [http://localhost:3050/api/v1/openapi.json](http://localhost:3050/api/v1/openapi.json)
 * **Health Check:** [http://localhost:3050/api/v1/health](http://localhost:3050/api/v1/health)
-
-### 3. Developer Helper Scripts
-```powershell
-# Check server status
-.\scripts\dev.ps1 status
-
-# Stream server logs
-.\scripts\dev.ps1 logs
-
-# Stop the backend server
-.\scripts\dev.ps1 stop
-
-# Wipe SQLite database and restart backend from scratch
-.\wipe-db.ps1
-# Or via dev script:
-.\scripts\dev.ps1 wipe
-```
 
 ---
 
 ## 🧪 Running Automated Tests (TDD)
 
+Tests run on the host against a local virtual environment:
 ```powershell
 cd apps\household-hub\backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
@@ -125,21 +106,3 @@ The 291 automated tests (100% passing) cover:
 * `tests/data/`: Data source, connector, and repository mapping tests.
 * `tests/presentation/`: Presentation mapper, response DTO, session lock registry, and gossip router tests.
 
----
-
-## 🐳 Docker Deployment
-
-Build the container image:
-```powershell
-docker build -t household-hub-backend:latest -f Dockerfile .
-```
-
-Run with persistent storage volume:
-```powershell
-docker run -d \
-  --name household-hub-backend \
-  -p 3050:3050 \
-  -v household_hub_data:/data \
-  -e SECRET_KEY="your-production-secret-key" \
-  household-hub-backend:latest
-```

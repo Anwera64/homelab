@@ -277,4 +277,25 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       'docker-compose.yml must declare the ollama_models volume with a fixed name'
     );
   });
+
+  await t.test('Household Hub runs in compose with its data in a named volume', () => {
+    // On the host the backend could not resolve searxng:8080; inside compose every service name resolves.
+    const hubMatch = dockerComposeContent.match(/^  household-hub:\s*\n([\s\S]*?)(?=^  [a-z][\w-]*:\s*\n|^[a-z]+:\s*\n)/m);
+    assert.ok(hubMatch, 'docker-compose.yml must declare a household-hub service');
+    const hub = hubMatch[1];
+    assert.match(hub, /profiles:\s*\["ai"\]/, 'household-hub must be in the ai profile so an arr-only start leaves it off');
+    assert.match(hub, /context:\s*\.\/apps\/household-hub\/backend/, 'household-hub must build from the backend folder');
+    assert.ok(hub.includes('- household_hub_data:/data'), 'household-hub must keep its SQLite database in the household_hub_data volume');
+    assert.ok(hub.includes('- 127.0.0.1:3050:3050'), 'household-hub must publish 3050 on loopback only');
+    assert.match(hub, /depends_on:\s*\n\s+- ollama\s*\n\s+- searxng/, 'household-hub must start after ollama and searxng');
+    assert.ok(
+      /^volumes:\s*\n[\s\S]*?^  household_hub_data:\s*\n\s+name:\s*household_hub_data\s*$/m.test(dockerComposeContent),
+      'docker-compose.yml must declare the household_hub_data volume with a fixed name'
+    );
+  });
+
+  await t.test('Caddy proxies the hub to the container, not the host', () => {
+    assert.ok(caddyfileContent.includes('reverse_proxy household-hub:3050'), 'the hub route must target the household-hub container');
+    assert.ok(!caddyfileContent.includes('host.docker.internal:3050'), 'the hub route must not reach back to the Windows host');
+  });
 });
