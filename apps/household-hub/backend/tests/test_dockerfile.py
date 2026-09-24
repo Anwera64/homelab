@@ -24,6 +24,11 @@ def test_image_copies_the_alembic_migrations():
     assert "COPY alembic/ alembic/" in _dockerfile_lines()
 
 
+def test_hub_cli_is_written_on_one_line():
+    # Line breaks inside the quoted printf ended the RUN early and the Dockerfile failed to parse.
+    assert "RUN printf '#!/bin/sh\\nexec python -m app.cli \"$@\"\\n' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub" in _dockerfile_lines()
+
+
 def test_build_context_excludes_the_venv():
     assert ".venv/" in _dockerignore_patterns()
 

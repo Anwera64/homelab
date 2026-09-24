@@ -26,9 +26,7 @@ COPY alembic/ alembic/
 RUN mkdir -p /data
 
 # `hub reset-pin "Emma"` from inside the container: the last resort for a forgotten PIN.
-RUN printf '#!/bin/sh
-exec python -m app.cli "$@"
-' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub
+RUN printf '#!/bin/sh\nexec python -m app.cli "$@"\n' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub
 
 EXPOSE 3050
 
