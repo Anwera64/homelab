@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.domain.entities.user import User
 from app.domain.entities.session import ChatMessage, ConversationSession
@@ -96,6 +96,66 @@ class _AnswerParts:
         return written
 
 
+class _ContextBudget:
+    """
+    How much of the model's window a turn has used, so it always leaves room for the answer.
+
+    Research used to fill the window until the answer itself was cut off mid-sentence (#35). The
+    budget keeps [answer_reserve_tokens] free: a round only starts when there is room for it, and a
+    tool result that does not fit keeps whole items only - whole passages, whole events - and says
+    how many it left out. Text is never cut mid-way; when not even one item fits, the model is told
+    to answer with what it has.
+
+    Tokens are estimated from characters, pessimistically, since the hub has no tokenizer. With no
+    window set there is no limit.
+    """
+
+    CHARACTERS_PER_TOKEN = 3
+    # Less room than this and another round would only crowd the answer.
+    SMALLEST_ROUND_TOKENS = 256
+    NO_ROOM = "No room left for more results; answer with what you have."
+
+    def __init__(self, window_tokens: Optional[int], answer_reserve_tokens: int):
+        self.window_tokens = window_tokens
+        self.answer_reserve_tokens = answer_reserve_tokens
+
+    def room(self, messages: List[LLMMessage], tools: Optional[List[Dict[str, Any]]]) -> float:
+        if self.window_tokens is None:
+            return float("inf")
+        return self.window_tokens - self.answer_reserve_tokens - self._tokens(messages, tools)
+
+    def has_room_for_a_round(self, messages: List[LLMMessage], tools: Optional[List[Dict[str, Any]]]) -> bool:
+        return self.room(messages, tools) >= self.SMALLEST_ROUND_TOKENS
+
+    def fit(
+        self, result: Dict[str, Any], messages: List[LLMMessage], tools: Optional[List[Dict[str, Any]]]
+    ) -> Tuple[str, bool]:
+        """The result as the model will read it, and whether the turn has run out of room."""
+        room = self.room(messages, tools)
+        whole = json.dumps(result)
+        if self._estimate(whole) <= room:
+            return whole, False
+        items_key = next((key for key, value in result.items() if isinstance(value, list) and value), None)
+        if items_key is not None:
+            items = result[items_key]
+            for keep in range(len(items) - 1, 0, -1):
+                trimmed = json.dumps({**result, items_key: items[:keep], "left_out": len(items) - keep})
+                if self._estimate(trimmed) <= room:
+                    return trimmed, False
+        return json.dumps({"error": self.NO_ROOM}), True
+
+    def _tokens(self, messages: List[LLMMessage], tools: Optional[List[Dict[str, Any]]]) -> float:
+        characters = len(json.dumps(tools)) if tools else 0
+        for message in messages:
+            characters += len(message.content or "")
+            for call in message.tool_calls or []:
+                characters += len(call.name) + len(json.dumps(call.arguments))
+        return characters / self.CHARACTERS_PER_TOKEN
+
+    def _estimate(self, text: str) -> float:
+        return len(text) / self.CHARACTERS_PER_TOKEN
+
+
 class ProcessChatTurnUseCase:
     PRIVACY_TRIGGERS = [
         r"\bkeep this between us\b",
@@ -120,6 +180,8 @@ class ProcessChatTurnUseCase:
         max_iterations: int = 5,
         clock: Callable[[], float] = time.monotonic,
         source_index_factory: Optional[ISourceIndexFactory] = None,
+        context_window_tokens: Optional[int] = None,
+        answer_reserve_tokens: int = 4096,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -134,6 +196,9 @@ class ProcessChatTurnUseCase:
         self.clock = clock
         # One index per streamed turn: what a turn searched and read, for its tools to look up.
         self.source_index_factory = source_index_factory
+        # The model's window, and what a turn keeps free in it for the answer. No window, no limit.
+        self.context_window_tokens = context_window_tokens
+        self.answer_reserve_tokens = answer_reserve_tokens
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -484,6 +549,7 @@ class ProcessChatTurnUseCase:
         final_content_parts: List[str],
         answer: _AnswerParts,
         tool_calls: Optional[List[LLMToolCall]] = None,
+        finish_reasons: Optional[List[str]] = None,
     ):
         """
         One model stream, turned into what the phone is sent.
@@ -507,7 +573,21 @@ class ProcessChatTurnUseCase:
                 answer.stop_thinking()
                 if tool_calls is not None:
                     tool_calls.extend(chunk.tool_calls)
+            if chunk.finish_reason and finish_reasons is not None:
+                finish_reasons.append(chunk.finish_reason)
         answer.stop_thinking()
+
+    @staticmethod
+    def _answer_now(question: str) -> str:
+        """
+        The last thing the model reads before a forced answer. Quoting the question puts it at the
+        end of the prompt, where the model reads best, however much research came after it.
+        """
+        instruction = (
+            "Tool budget reached. Please synthesize the findings gathered so far and provide your "
+            "final response to the user."
+        )
+        return f"{instruction}\n\nThe question was: {question}" if question else instruction
 
     async def _stream_answer(
         self,
@@ -560,21 +640,25 @@ class ProcessChatTurnUseCase:
             if agent_tools and self.source_index_factory is not None
             else None
         )
+        budget = _ContextBudget(self.context_window_tokens, self.answer_reserve_tokens)
+        out_of_room = False
+        question = next((m.content for m in reversed(recent_messages) if m.role == "user"), "")
+        finish_reasons: List[str] = []
 
         # One model call per round, until a round calls no tool: that round is the answer (#35).
-        # The model may keep using tools until the last round of the budget, which is made to
-        # answer with none. A write waiting on the member ends the turn the same way, so the model
-        # says it is waiting rather than trying the write again.
+        # The model may keep using tools until the last round of the budget, or until the window
+        # has no room for another round; then it is made to answer with none. A write waiting on
+        # the member ends the turn the same way, so the model says it is waiting rather than
+        # trying the write again.
         for round_number in range(1, self.max_iterations + 1):
             if not agent_tools or awaiting_approval:
                 tools = None
-            elif round_number == self.max_iterations:
-                llm_messages.append(
-                    LLMMessage(
-                        role="system",
-                        content="Tool budget reached. Please synthesize the findings gathered so far and provide your final response to the user.",
-                    )
-                )
+            elif (
+                round_number == self.max_iterations
+                or out_of_room
+                or not budget.has_room_for_a_round(llm_messages, agent_tools)
+            ):
+                llm_messages.append(LLMMessage(role="system", content=self._answer_now(question)))
                 tools = None
             else:
                 tools = agent_tools
@@ -596,6 +680,7 @@ class ProcessChatTurnUseCase:
                 final_content_parts,
                 answer,
                 tool_calls,
+                finish_reasons,
             ):
                 yield event
 
@@ -650,18 +735,24 @@ class ProcessChatTurnUseCase:
                     tools_executed.append(exec_info)
                     answer.tool(tc.name, tool_result.success)
                     yield {"type": "tool_result", "data": exec_info}
+                    # The phone is sent the whole result; the model reads what fits.
+                    seen, no_room = budget.fit(
+                        tool_result.data if tool_result.success else {"error": tool_result.error},
+                        llm_messages,
+                        agent_tools,
+                    )
+                    out_of_room = out_of_room or no_room
                     llm_messages.append(
-                        LLMMessage(
-                            role="tool",
-                            tool_call_id=tc.id,
-                            name=tc.name,
-                            content=json.dumps(
-                                tool_result.data if tool_result.success else {"error": tool_result.error}
-                            ),
-                        )
+                        LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen)
                     )
 
         final_content = answer.content()
+        # The model stopped because the window was full, not because it was done. Saved as such, so
+        # it is never mistaken for a finished answer.
+        cut_off = bool(finish_reasons) and finish_reasons[-1] == "length"
+        if cut_off:
+            logger.warning("Answer in session %s was cut off by the context window", session.id)
+        extra_metadata = {"cut_off": True} if cut_off else {}
 
         async with self.uow:
             asst_msg = ChatMessage(
@@ -673,6 +764,7 @@ class ProcessChatTurnUseCase:
                     "parts": answer.parts,
                     "privacy_trigger_detected": privacy_trigger_detected,
                     "suggest_secret_mode": suggest_secret_mode,
+                    **extra_metadata,
                 },
             )
             created_asst_msg = await self.session_repo.add_message(asst_msg)
@@ -681,6 +773,7 @@ class ProcessChatTurnUseCase:
             await self.uow.commit()
 
         yield {
+            "cut_off": cut_off,
             "type": "done",
             "message_id": created_asst_msg.id,
             "assistant_content": final_content,

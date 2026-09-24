@@ -1122,3 +1122,124 @@ async def test_GIVEN_tools_in_two_rounds_WHEN_answered_THEN_every_call_shares_on
     first, second = (call["sources"] for call in tool_executor.executed_calls)
     assert first is not None and first is second
     assert len(factory.made) == 2
+
+
+class PassagesToolExecutor(FakeToolExecutor):
+    """Looks up three passages of 900 characters each: about 950 tokens by the hub's estimate."""
+
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
+        return ToolExecutionResult(
+            tool_name=tool_name,
+            success=True,
+            data={"passages": [{"id": f"p1.{i}", "text": str(i) * 900} for i in (1, 2, 3)]},
+        )
+
+
+def _windowed_use_case(session_repo, agent, llm_client, window, reserve):
+    use_case = _use_case(session_repo, agent, llm_client, PassagesToolExecutor())
+    use_case.context_window_tokens = window
+    use_case.answer_reserve_tokens = reserve
+    return use_case
+
+
+def _tool_message(call) -> dict:
+    import json
+    return json.loads([m for m in call["messages"] if m.role == "tool"][-1].content)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_result_bigger_than_the_room_left_WHEN_answered_THEN_whole_items_are_kept_and_the_answer_is_forced():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    call = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[call])], [LLMResponseChunk(delta_content="From two passages.")]]
+    )
+
+    events = [ev async for ev in _windowed_use_case(session_repo, agent, llm_client, window=1200, reserve=300)
+              .execute_stream(session_id="s1", current_user=user, content="What do the sources say?")]
+
+    seen = _tool_message(llm_client.stream_calls[1])
+    # Whole passages only: two fit, the third is left out and the model is told.
+    assert [p["text"] for p in seen["passages"]] == ["1" * 900, "2" * 900]
+    assert seen["left_out"] == 1
+    # Too little room for another round, so the second call is the answer.
+    assert llm_client.stream_calls[1]["tools"] is None
+    assert llm_client.stream_calls[1]["messages"][-1].content.startswith("Tool budget reached")
+    assert events[-1]["assistant_content"] == "From two passages."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_room_for_even_one_item_WHEN_a_tool_returns_THEN_the_model_is_told_to_answer_with_what_it_has():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    call = LLMToolCall(id="c1", name="calendar_read", arguments={})
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[call])], [LLMResponseChunk(delta_content="What I have.")]]
+    )
+
+    [ev async for ev in _windowed_use_case(session_repo, agent, llm_client, window=650, reserve=300)
+     .execute_stream(session_id="s1", current_user=user, content="What do the sources say?")]
+
+    assert _tool_message(llm_client.stream_calls[1]) == {
+        "error": "No room left for more results; answer with what you have."
+    }
+    assert llm_client.stream_calls[1]["tools"] is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_answer_is_forced_WHEN_the_model_is_asked_THEN_the_question_is_the_last_thing_it_reads():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Answer.")],
+        ]
+    )
+    use_case = _use_case(session_repo, agent, llm_client)
+    use_case.max_iterations = 2
+
+    [ev async for ev in use_case.execute_stream(session_id="s1", current_user=user, content="Rank them by gravity")]
+
+    last = llm_client.stream_calls[-1]["messages"][-1]
+    assert last.role == "system"
+    assert last.content.startswith("Tool budget reached")
+    assert "Rank them by gravity" in last.content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_the_window_cut_off_WHEN_saved_THEN_it_is_flagged_as_cut_off():
+    """It used to be saved as a finished answer ending mid-sentence, with nothing saying why."""
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Let me compile"), LLMResponseChunk(finish_reason="length")]]
+    )
+
+    events = [ev async for ev in _use_case(session_repo, agent, llm_client)
+              .execute_stream(session_id="s1", current_user=user, content="Rank them")]
+
+    assert events[-1]["cut_off"] is True
+    assert session_repo.messages[-1].metadata_json["cut_off"] is True
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answer_that_finished_WHEN_saved_THEN_it_is_not_flagged():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Done."), LLMResponseChunk(finish_reason="stop")]]
+    )
+
+    events = [ev async for ev in _use_case(session_repo, agent, llm_client)
+              .execute_stream(session_id="s1", current_user=user, content="Hi")]
+
+    assert events[-1]["cut_off"] is False
+    assert "cut_off" not in session_repo.messages[-1].metadata_json
