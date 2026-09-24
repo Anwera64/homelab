@@ -443,17 +443,13 @@ private fun Steps(steps: List<AnswerPart>) {
                     )
                 }
 
+                // What each tool found, or why it couldn't, and its own icon, red when it failed (#40).
                 is AnswerPart.ToolDone -> {
-                    val label = toolLabel(step.tool)
-                    ToolRecordLine(icon = label.icon, text = stringResource(label.done))
+                    ToolStepLine(step)
                 }
 
                 is AnswerPart.ToolFailed -> {
-                    ToolRecordLine(
-                        icon = HearthIcon.Error,
-                        text = stringResource(toolLabel(step.tool).failed),
-                        tint = HearthTheme.colors.error,
-                    )
+                    ToolStepLine(step)
                 }
 
                 is AnswerPart.Text -> {}

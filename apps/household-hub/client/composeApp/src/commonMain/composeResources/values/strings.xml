@@ -353,6 +353,25 @@
     <string name="tool_lookup_running">Looking through the sources…</string>
     <string name="tool_lookup_done">Looked through the sources</string>
     <string name="tool_lookup_failed">Couldn’t look through the sources</string>
+    <!-- A step says what it found and why it failed (#40). The query and titles are shown as the hub saved them. -->
+    <string name="tool_search_done_query">Searched the web for “%1$s” · %2$s</string>
+    <plurals name="tool_search_results">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
+    <string name="tool_read_page_done_named">Read %1$s · %2$s</string>
+    <string name="tool_read_page_failed_named">Couldn’t read %1$s</string>
+    <string name="tool_step_named">%1$s · %2$s</string>
+    <string name="tool_reason_search_unavailable">the hub’s search service isn’t answering</string>
+    <string name="tool_reason_site_unavailable">the site isn’t answering</string>
+    <string name="tool_reason_blocked">it blocks automated reading</string>
+    <string name="tool_reason_forbidden">the site turned it away</string>
+    <string name="tool_reason_too_large">it’s too large to read</string>
+    <string name="tool_reason_not_a_page">it isn’t a web page</string>
+    <string name="tool_reason_unreadable">there’s no text in it to read</string>
+    <string name="tool_reason_not_found">it couldn’t be found</string>
+    <string name="tool_results_show">Show results</string>
+    <string name="tool_results_hide">Hide results</string>
     <string name="tool_pdf_running">Reading the document…</string>
     <string name="tool_pdf_done">Read the document</string>
     <string name="tool_pdf_failed">Couldn’t read the document</string>

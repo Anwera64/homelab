@@ -6,6 +6,9 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ToolFailureReason
+import com.homelab.household.domain.model.ToolSource
+import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.presentation.chatsession.AgentChoice
 import com.homelab.household.presentation.chatsession.AgentOwner
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
@@ -135,6 +138,29 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             AnswerPart.Text("Tomorrow's fairly light. The panel review at 14:30 is the only fixed"),
                         ),
                 ),
+            // #40: each step says what it found, or why it couldn't.
+            "Researching: a search, a page read and one blocked" to
+                agent.copy(
+                    messages = listOf(question),
+                    streamingMessage = "The South China Morning Post blocks automated reading, so",
+                    turnState = TurnState.Streaming,
+                    parts =
+                        listOf(
+                            AnswerPart.ToolDone(
+                                "searxng_search",
+                                ToolSummary(query = "Hong Kong press freedom", count = 2, sources = listOf(rsf, scmp)),
+                            ),
+                            AnswerPart.ToolDone("read_page", ToolSummary(sources = listOf(rsf))),
+                            AnswerPart.ToolFailed(
+                                "read_page",
+                                ToolSummary(
+                                    reason = ToolFailureReason.Blocked,
+                                    sources = listOf(scmp.copy(title = "")),
+                                ),
+                            ),
+                            AnswerPart.Text("The South China Morning Post blocks automated reading, so"),
+                        ),
+                ),
             // Once it is done, each run of steps folds into one line where it happened.
             "A finished answer, its steps folded" to
                 agent.copy(
@@ -250,3 +276,6 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
 
     override fun getDisplayName(index: Int): String = named[index].first
 }
+
+private val rsf = ToolSource("Hong Kong: press freedom index", "https://rsf.org/en/country/hong-kong")
+private val scmp = ToolSource("Hong Kong news", "https://www.scmp.com/news/hong-kong")

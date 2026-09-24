@@ -49,6 +49,7 @@ import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
+import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getPluralString
@@ -384,6 +385,18 @@ class ConversationScreenTest {
             assertTrue(thought.top < before.top, "the thinking came first")
             assertTrue(before.bottom <= tool.top, "the tool ran after the first words")
             assertTrue(tool.bottom <= after.top, "and before the rest")
+        }
+
+    /** #40: a search says what it looked for, a read names its page, a blocked read says why. */
+    @Test
+    fun `GIVEN an answer being researched WHEN drawn THEN each step says what it found or why not`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Researching: a search, a page read and one blocked")))
+
+            onNodeWithText("Searched the web for “Hong Kong press freedom” · 2 results").assertIsDisplayed()
+            onNodeWithText("Read Hong Kong: press freedom index · rsf.org").assertIsDisplayed()
+            onNodeWithText("Couldn’t read scmp.com · it blocks automated reading").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_read_page_done)).assertDoesNotExist()
         }
 
     @Test
