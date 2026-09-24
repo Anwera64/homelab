@@ -8,8 +8,7 @@
     },
     {
       "name": "bge-m3-cpu",
-      "gguf_url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
-      "sha256": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c",
+      "ollama_pull": "bge-m3",
       "modelfile": "bge-m3-cpu.Modelfile"
     }
   ]

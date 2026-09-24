@@ -255,6 +255,23 @@ if ($failedContainers.Count -gt 0) {
                 }
 
                 Write-Host "  [+] Downloading model '$name' into the ollama_models volume (this can take a while)..." -ForegroundColor Yellow
+                if ($model.ollama_pull) {
+                    # From the Ollama library, which verifies what it downloads; the Modelfile builds on it.
+                    docker exec ollama ollama pull $($model.ollama_pull)
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "  [WARNING] Pull of '$($model.ollama_pull)' failed; it will be retried on the next start." -ForegroundColor Yellow
+                        continue
+                    }
+                    Copy-Item -Path (Join-Path $PSScriptRoot "config\ollama-models\$($model.modelfile)") -Destination (Join-Path $importsDir $model.modelfile) -Force
+                    docker exec ollama ollama create $name -f "/root/.ollama/imports/$($model.modelfile)"
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "  [SUCCESS] Model '$name' is ready!" -ForegroundColor Green
+                    } else {
+                        Write-Host "  [WARNING] Ollama could not register '$name'; it will be retried on the next start." -ForegroundColor Yellow
+                    }
+                    continue
+                }
+
                 $gguf = Join-Path $importsDir "$name.gguf"
                 curl.exe -fL --retry 5 -C - -o $gguf $model.gguf_url
                 if ($LASTEXITCODE -ne 0) {

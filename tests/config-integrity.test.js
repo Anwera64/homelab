@@ -241,15 +241,26 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.ok(Array.isArray(manifest.models) && manifest.models.length > 0, 'manifest must list at least one model');
 
+    // Two kinds of entry: a GGUF downloaded and checked against its SHA256 (for models the Ollama
+    // library doesn't carry), or a model pulled from the Ollama library, which verifies it itself.
     for (const model of manifest.models) {
-      for (const key of ['name', 'gguf_url', 'sha256', 'modelfile']) {
+      for (const key of ['name', 'modelfile']) {
         assert.ok(model[key], `manifest entry ${model.name || '?'} must have ${key}`);
       }
-      assert.match(model.sha256, /^[0-9a-f]{64}$/, `${model.name} sha256 must be 64 lowercase hex chars`);
-      assert.ok(model.gguf_url.startsWith('https://huggingface.co/'), `${model.name} must download from huggingface.co`);
       const modelfile = path.join(OLLAMA_MODELS_DIR, model.modelfile);
       assert.ok(fs.existsSync(modelfile), `${model.name} Modelfile ${model.modelfile} must be tracked in config/ollama-models`);
-      assert.match(fs.readFileSync(modelfile, 'utf8'), /^FROM \/root\/\.ollama\/imports\//m, `${model.name} Modelfile must build FROM the imports folder`);
+      const modelfileContent = fs.readFileSync(modelfile, 'utf8');
+      if (model.ollama_pull) {
+        assert.ok(!model.gguf_url, `${model.name} must name either ollama_pull or gguf_url, not both`);
+        assert.match(modelfileContent, new RegExp(`^FROM ${model.ollama_pull}$`, 'm'), `${model.name} Modelfile must build FROM the pulled ${model.ollama_pull}`);
+      } else {
+        for (const key of ['gguf_url', 'sha256']) {
+          assert.ok(model[key], `manifest entry ${model.name} must have ${key}`);
+        }
+        assert.match(model.sha256, /^[0-9a-f]{64}$/, `${model.name} sha256 must be 64 lowercase hex chars`);
+        assert.ok(model.gguf_url.startsWith('https://huggingface.co/'), `${model.name} must download from huggingface.co`);
+        assert.match(modelfileContent, /^FROM \/root\/\.ollama\/imports\//m, `${model.name} Modelfile must build FROM the imports folder`);
+      }
     }
 
     const rvn = manifest.models.find((m) => m.name === 'qwen3.8-rvn');
@@ -269,7 +280,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // The embedder runs on the CPU so the chat model keeps the whole GPU.
     const embedder = manifest.models.find((m) => m.name === 'bge-m3-cpu');
     assert.ok(embedder, 'manifest must provision bge-m3-cpu, the source index embedder');
-    assert.equal(embedder.sha256, 'daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c');
+    assert.equal(embedder.ollama_pull, 'bge-m3', 'bge-m3-cpu is built from the Ollama library bge-m3');
     const embedderModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, embedder.modelfile), 'utf8');
     assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
   });
