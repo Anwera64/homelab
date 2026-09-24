@@ -6,6 +6,7 @@ import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDat
 import com.homelab.household.data.dto.ChatMessageReadDto
 import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
+import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SessionConflictException
@@ -267,22 +268,54 @@ class SessionRepositoryTest {
             assertEquals(ChatStreamEvent.StillWorking, events.last())
         }
 
+    /**
+     * A locked phone cannot reach anything, and that is all an unreachable hub means while a turn is
+     * being waited for. It used to end the turn with a connection error the moment the screen went
+     * dark; now it is waited out like any other slow answer.
+     */
     @Test
-    fun `GIVEN the hub going offline while a busy conversation is polled WHEN a turn is sent THEN the lost connection is reported`() =
+    fun `GIVEN the hub unreachable while a busy conversation is polled WHEN a turn is sent THEN it keeps waiting instead of failing`() =
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
             every { remote.openChatStream(any(), any(), any()) } returns flow { throw SessionConflictException() }
-            everySuspend { remote.fetchSession("s-1") } throws ServerOfflineException("Connection refused")
+            var polls = 0
+            everySuspend { remote.fetchSession("s-1") } calls {
+                polls++
+                if (polls < 3) throw ServerOfflineException("Connection refused")
+                detailDto(
+                    "s-1",
+                    listOf(
+                        messageDto("m1", "s-1", "user", "Hello"),
+                        messageDto("m2", "s-1", "assistant", "Back again"),
+                    ),
+                )
+            }
 
             // WHEN
-            val thrown =
-                assertFailsWith<ServerOfflineException> {
-                    repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Hello").toList()
-                }
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Hello").toList()
 
             // THEN
-            assertTrue(thrown.message!!.contains("polling"))
+            assertEquals("Back again", (events.last() as ChatStreamEvent.Done).assistantContent)
+        }
+
+    @Test
+    fun `GIVEN the hub unreachable for longer than the wait WHEN a turn is sent THEN the turn is still working`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Three"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            every { remote.resumeTurnStream("s-1") } returns flow { throw ServerOfflineException("Locked") }
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 1000).streamChatTurn("s-1", "Hello").toList()
+
+            // THEN — never an exception: the phone was away, the answer did not fail.
+            assertEquals(ChatStreamEvent.StillWorking, events.last())
         }
 
     @Test
@@ -297,6 +330,152 @@ class SessionRepositoryTest {
 
             // THEN
             verifySuspend(VerifyMode.exactly(0)) { remote.fetchSession(any()) }
+        }
+
+    // ---- picking the stream up where it stopped -----------------------------
+
+    /**
+     * The phone locked mid-answer. The hub kept writing, and kept what it wrote; the phone asks for
+     * what came after the last word it has, and the answer carries on as if nothing happened.
+     */
+    @Test
+    fun `GIVEN a stream that dropped mid-answer WHEN the rest is resumed THEN the answer carries on without gaps or repeats`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    emit(ChatStreamEvent.Delta("Hel"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            every { remote.resumeTurnStream("s-1") } returns
+                flowOf(
+                    ChatStreamEvent.Delta("lo"),
+                    ChatStreamEvent.Done(messageId = "m2", assistantContent = "Hello", agentName = "Assistant"),
+                )
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Say hello").toList()
+
+            // THEN
+            assertEquals(
+                listOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.Delta("Hel"),
+                    ChatStreamEvent.Reconnecting,
+                    ChatStreamEvent.Delta("lo"),
+                    ChatStreamEvent.Done(messageId = "m2", assistantContent = "Hello", agentName = "Assistant"),
+                ),
+                events,
+            )
+            verifySuspend(VerifyMode.exactly(0)) { remote.fetchSession(any()) }
+        }
+
+    @Test
+    fun `GIVEN the hub unreachable for a while WHEN the rest is resumed THEN it keeps trying until the hub answers`() =
+        runTest {
+            // GIVEN — a locked phone: every attempt fails until the screen comes back on.
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("Hel"))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            var attempts = 0
+            every { remote.resumeTurnStream("s-1") } returns
+                flow {
+                    attempts++
+                    if (attempts < 3) throw ServerOfflineException("Locked")
+                    emit(ChatStreamEvent.Delta("lo"))
+                    emit(ChatStreamEvent.Done(messageId = "m2", assistantContent = "Hello", agentName = "Assistant"))
+                }
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Say hello").toList()
+
+            // THEN
+            assertEquals(3, attempts)
+            assertEquals(ChatStreamEvent.Delta("lo"), events[events.size - 2])
+            assertTrue(events.last() is ChatStreamEvent.Done)
+        }
+
+    @Test
+    fun `GIVEN a resumed stream that drops again WHEN it is resumed once more THEN each word still arrives once`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openChatStream(any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Delta("One "))
+                    throw ServerOfflineException("Stream dropped")
+                }
+            var attempts = 0
+            every { remote.resumeTurnStream("s-1") } returns
+                flow {
+                    attempts++
+                    if (attempts == 1) {
+                        emit(ChatStreamEvent.Delta("two "))
+                        throw ServerOfflineException("Dropped again")
+                    }
+                    emit(ChatStreamEvent.Delta("three"))
+                    emit(
+                        ChatStreamEvent.Done(
+                            messageId = "m2",
+                            assistantContent = "One two three",
+                            agentName = "Assistant",
+                        ),
+                    )
+                }
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).streamChatTurn("s-1", "Count").toList()
+
+            // THEN
+            val words = events.filterIsInstance<ChatStreamEvent.Delta>().joinToString("") { it.content }
+            assertEquals("One two three", words)
+        }
+
+    @Test
+    fun `GIVEN a turn left waiting WHEN the phone comes back and resumes it THEN the rest of the answer arrives`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns
+                flowOf(
+                    ChatStreamEvent.Delta("lo"),
+                    ChatStreamEvent.Done(messageId = "m2", assistantContent = "Hello", agentName = "Assistant"),
+                )
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).resumeTurn("s-1", afterAssistantMessageId = null).toList()
+
+            // THEN
+            assertEquals(ChatStreamEvent.Reconnecting, events.first())
+            assertEquals(ChatStreamEvent.Delta("lo"), events[1])
+            assertEquals("Hello", (events.last() as ChatStreamEvent.Done).assistantContent)
+        }
+
+    @Test
+    fun `GIVEN a turn the hub has let go WHEN the phone comes back and resumes it THEN the saved answer is read instead`() =
+        runTest {
+            // GIVEN
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(
+                        messageDto("m1", "s-1", "user", "Say hello"),
+                        messageDto("m2", "s-1", "assistant", "Hello"),
+                    ),
+                )
+
+            // WHEN
+            val events = repository(remote, pollDelayMs = 10).resumeTurn("s-1", afterAssistantMessageId = null).toList()
+
+            // THEN
+            assertEquals("Hello", (events.last() as ChatStreamEvent.Done).assistantContent)
         }
 
     // ---- recovering the right answer ---------------------------------------
@@ -314,6 +493,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow {
                     emit(ChatStreamEvent.Delta("Three things, in order"))
@@ -351,6 +531,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow {
                     emit(ChatStreamEvent.Delta("Well"))
@@ -404,6 +585,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow {
                     emit(ChatStreamEvent.Accepted)
@@ -430,6 +612,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow {
                     emit(ChatStreamEvent.Delta("Plan"))
@@ -454,6 +637,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow {
                     emit(ChatStreamEvent.Delta("Three things"))
@@ -516,6 +700,7 @@ class SessionRepositoryTest {
         runTest {
             // GIVEN
             val remote = mock<SessionRemoteDataSource>()
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
             every { remote.openChatStream(any(), any(), any()) } returns flowOf(ChatStreamEvent.Delta("Three thi"))
             everySuspend { remote.fetchSession("s-1") } returns
                 detailDto(

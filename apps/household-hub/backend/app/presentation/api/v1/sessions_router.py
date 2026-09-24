@@ -1,7 +1,7 @@
 import asyncio
 import json
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.domain.entities.user import User
@@ -30,6 +30,7 @@ from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 from app.domain.use_cases.agents.get_agent import GetAgentUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.presentation.api.session_lock import SessionLockRegistry
+from app.presentation.api.turn_log import TurnLog, TurnLogRegistry
 from app.presentation.api.deps import (
     get_current_user,
     get_list_user_sessions_use_case,
@@ -44,10 +45,27 @@ from app.presentation.api.deps import (
     get_session_lock_registry,
     get_background_reflection_runner,
     get_background_chat_stream_runner,
+    get_turn_log_registry,
 )
 
 
 router = APIRouter(prefix="/sessions", tags=["Conversation Sessions & Secret Mode"])
+
+
+async def _sse(log: TurnLog, after: int = 0):
+    """
+    A turn as Server-Sent Events, from the event after [after] to the end.
+
+    Each frame's id is `<turn>:<n>`: the number is what a phone that lost the stream asks to resume
+    after, and the turn is what stops it resuming into the wrong one. The log belongs to the worker,
+    not to this response, so a phone hanging up ends only the listening.
+    """
+    try:
+        async for seq, item in log.follow(after):
+            yield f"id: {log.turn_id}:{seq}\ndata: {json.dumps(item)}\n\n"
+        yield "data: [DONE]\n\n"
+    except asyncio.CancelledError:
+        pass
 
 
 @router.get("", response_model=List[SessionRead])
@@ -239,6 +257,7 @@ async def regenerate_answer(
     agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
+    turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -272,7 +291,7 @@ async def regenerate_answer(
         await lock_registry.release(session_id)
         raise
 
-    queue = asyncio.Queue()
+    log = turn_logs.start(session_id)
 
     async def worker():
         try:
@@ -281,7 +300,7 @@ async def regenerate_answer(
                 current_user=current_user,
                 content=question,
                 auto_approve_writes=False,
-                queue=queue,
+                queue=log,
                 agent_id=agent_id,
                 agent_name=agent_name,
                 is_first_turn=is_first_turn,
@@ -290,20 +309,9 @@ async def regenerate_answer(
         finally:
             await lock_registry.release(session_id)
 
-    asyncio.create_task(worker())
+    turn_logs.spawn(worker())
 
-    async def sse_generator():
-        try:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield f"data: {json.dumps(item)}\n\n"
-            yield "data: [DONE]\n\n"
-        except asyncio.CancelledError:
-            pass
-
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+    return StreamingResponse(_sse(log), media_type="text/event-stream")
 
 
 @router.post("/{session_id}/chat/stream")
@@ -314,13 +322,14 @@ async def chat_turn_stream(
     agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
+    turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
     current_user: User = Depends(get_current_user),
 ):
     """
     Streaming chat endpoint via Server-Sent Events (SSE).
-    Uses an asyncio.Queue decoupling bridge and independent AsyncSessionLocal worker:
-    in-flight generation runs to completion and saves to database even if the HTTP
-    client disconnects early, with immediate 409 Conflict rejection if locked.
+    The worker writes to a TurnLog on its own AsyncSessionLocal: in-flight generation runs to
+    completion and saves to database even if the HTTP client disconnects early, and a client that
+    did can pick the rest up from `GET .../chat/stream`. 409 Conflict immediately if locked.
     """
     if not await lock_registry.try_acquire(session_id):
         raise HTTPException(
@@ -338,7 +347,7 @@ async def chat_turn_stream(
         await lock_registry.release(session_id)
         raise
 
-    queue = asyncio.Queue()
+    log = turn_logs.start(session_id)
 
     async def worker():
         try:
@@ -347,7 +356,7 @@ async def chat_turn_stream(
                 current_user=current_user,
                 content=payload.content,
                 auto_approve_writes=payload.auto_approve_writes,
-                queue=queue,
+                queue=log,
                 agent_id=agent_id,
                 agent_name=agent_name,
                 is_first_turn=is_first_turn,
@@ -355,20 +364,43 @@ async def chat_turn_stream(
         finally:
             await lock_registry.release(session_id)
 
-    # Launch background worker
-    asyncio.create_task(worker())
+    turn_logs.spawn(worker())
 
-    async def sse_generator():
-        try:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield f"data: {json.dumps(item)}\n\n"
-            yield "data: [DONE]\n\n"
-        except asyncio.CancelledError:
-            pass
-
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+    return StreamingResponse(_sse(log), media_type="text/event-stream")
 
 
+@router.get("/{session_id}/chat/stream")
+async def resume_turn_stream(
+    session_id: str,
+    last_event_id: Optional[str] = Query(None),
+    last_event_id_header: Optional[str] = Header(None, alias="Last-Event-ID"),
+    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    The rest of a turn, for a phone whose stream dropped part way — a locked screen, a lost signal.
+
+    `last_event_id` (or the standard `Last-Event-ID` header) is the last `<turn>:<n>` the phone
+    received. Everything after it follows, live if the turn is still being written. 410 Gone means
+    the hub no longer holds that turn — long finished, or another has started — and the saved
+    message is where the answer is.
+
+    With no id at all — a phone that opened the conversation mid-turn, or was restarted — the turn
+    the hub holds is followed from its first event.
+    """
+    await get_session_uc.execute(session_id=session_id, current_user=current_user)
+
+    log = turn_logs.get(session_id)
+    resume_from = last_event_id or last_event_id_header
+    if resume_from is None and log is not None:
+        return StreamingResponse(_sse(log), media_type="text/event-stream")
+
+    turn_id, _, seq = (resume_from or "").partition(":")
+    if log is None or log.turn_id != turn_id or not seq.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="That turn is no longer being held; read the conversation for its answer.",
+        )
+
+    return StreamingResponse(_sse(log, after=int(seq)), media_type="text/event-stream")

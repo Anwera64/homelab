@@ -84,6 +84,7 @@ from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
 from app.domain.repositories.llm_client import ILLMClient
 from app.presentation.api.session_lock import SessionLockRegistry
+from app.presentation.api.turn_log import TurnLogRegistry
 
 
 reusable_oauth2 = OAuth2PasswordBearer(
@@ -276,6 +277,11 @@ _session_lock_registry = SessionLockRegistry()
 
 def get_session_lock_registry() -> SessionLockRegistry:
     return _session_lock_registry
+
+_turn_log_registry = TurnLogRegistry()
+
+def get_turn_log_registry() -> TurnLogRegistry:
+    return _turn_log_registry
 
 def get_publish_gossip_milestone_use_case() -> PublishGossipMilestoneUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")

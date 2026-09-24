@@ -9,6 +9,7 @@ import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SessionSecretToggleDto
 import com.homelab.household.data.dto.ToolApprovalRequestDto
 import com.homelab.household.data.network.NetworkExceptionHelper
+import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub
 import com.homelab.household.domain.exception.SessionConflictException
@@ -16,13 +17,15 @@ import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.ChatStreamEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpStatement
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -39,6 +42,9 @@ class KtorSessionRemoteDataSource(
     private val baseUrl: String,
     private val sseStreamReader: DefensiveSseStreamReader = DefensiveSseStreamReader(),
 ) : SessionRemoteDataSource {
+    /** The last event id each conversation's turn has reached, the way a browser keeps `Last-Event-ID`. */
+    private val lastEventIds = mutableMapOf<String, String>()
+
     override suspend fun listSessions(): List<SessionReadDto> =
         reachingHub {
             client.get("$baseUrl/api/v1/sessions").ensureJsonSuccess().body()
@@ -100,6 +106,33 @@ class KtorSessionRemoteDataSource(
                 .isSuccess()
         }
 
+    override fun openChatStream(
+        sessionId: String,
+        content: String,
+        autoApproveWrites: Boolean,
+    ): Flow<ChatStreamEvent> =
+        openTurnStream(sessionId, onStart = { lastEventIds.remove(sessionId) }) {
+            client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
+                contentType(ContentType.Application.Json)
+                setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
+            }
+        }
+
+    override fun openRegenerateStream(sessionId: String): Flow<ChatStreamEvent> =
+        openTurnStream(sessionId, onStart = { lastEventIds.remove(sessionId) }) {
+            client.preparePost("$baseUrl/api/v1/sessions/$sessionId/chat/regenerate") {}
+        }
+
+    override fun resumeTurnStream(sessionId: String): Flow<ChatStreamEvent> =
+        openTurnStream(sessionId) {
+            // No id remembered — the conversation was opened mid-turn, or the app restarted — asks
+            // for the turn the hub holds from its first event. Whether there is one is the hub's call.
+            val lastEventId = lastEventIds[sessionId]
+            client.prepareGet("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
+                if (lastEventId != null) parameter("last_event_id", lastEventId)
+            }
+        }
+
     /**
      * The only streamed call in the client, and the only place the dispatcher matters.
      *
@@ -113,34 +146,29 @@ class KtorSessionRemoteDataSource(
      * This is the whole reason the awkwardness is confined to one function: above here, the
      * repository composes ordinary flows and nothing crosses a dispatcher at all.
      */
-    override fun openChatStream(
-        sessionId: String,
-        content: String,
-        autoApproveWrites: Boolean,
-    ): Flow<ChatStreamEvent> =
-        openTurnStream("$baseUrl/api/v1/sessions/$sessionId/chat/stream") {
-            contentType(ContentType.Application.Json)
-            setBody(ChatTurnRequestDto(content = content, auto_approve_writes = autoApproveWrites))
-        }
-
-    override fun openRegenerateStream(sessionId: String): Flow<ChatStreamEvent> =
-        openTurnStream("$baseUrl/api/v1/sessions/$sessionId/chat/regenerate") {}
-
     private fun openTurnStream(
-        url: String,
-        configure: HttpRequestBuilder.() -> Unit,
+        sessionId: String,
+        onStart: () -> Unit = {},
+        prepareStatement: suspend () -> HttpStatement,
     ): Flow<ChatStreamEvent> =
         channelFlow {
             try {
-                val statement = client.preparePost(url, configure)
+                onStart()
+                val statement = prepareStatement()
                 statement.execute { response ->
                     when (response.status) {
                         HttpStatusCode.OK -> {
-                            sseStreamReader.readEvents(response.bodyAsChannel()).collect { send(it) }
+                            sseStreamReader
+                                .readEvents(response.bodyAsChannel(), onEventId = { lastEventIds[sessionId] = it })
+                                .collect { send(it) }
                         }
 
                         HttpStatusCode.Conflict -> {
                             throw SessionConflictException()
+                        }
+
+                        HttpStatusCode.Gone -> {
+                            throw TurnGoneException()
                         }
 
                         else -> {
@@ -151,7 +179,8 @@ class KtorSessionRemoteDataSource(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // Network failures become ServerOfflineException; the refusals above pass through.
+                // Network failures become ServerOfflineException; the refusals above — including
+                // TurnGoneException from a stream that never got as far as issuing a request — pass through.
                 NetworkExceptionHelper.rethrowAsDomain(e)
             }
         }.buffer(Channel.RENDEZVOUS)

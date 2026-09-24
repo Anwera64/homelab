@@ -6,6 +6,7 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
@@ -16,9 +17,11 @@ import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
+import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +40,7 @@ class ChatSessionViewModel(
     private val listAgentsUseCase: ListAgentsUseCase,
     private val createSessionUseCase: CreateSessionUseCase,
     private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
+    private val resumeTurnUseCase: ResumeTurnUseCase,
     private val approveToolProposalUseCase: ApproveToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
     /** Finds the Coordinator by its slug when the whole list cannot be had. */
@@ -61,6 +65,12 @@ class ChatSessionViewModel(
      * and writes stay on the main dispatcher, the same one `viewModelScope` and every caller use.
      */
     private var nextTempMessageNumber = 0L
+
+    /** The turn being followed, so coming back to the app can swap a slow wait for a fresh ask. */
+    private var followJob: Job? = null
+
+    /** The question the followed turn answers, so a resumed turn still marks it sent. */
+    private var followingUserMessageId: String? = null
 
     /**
      * Opens a conversation, or prepares one that does not exist yet.
@@ -178,6 +188,7 @@ class ChatSessionViewModel(
                         isSecretLocked = session.isSecretLocked,
                     )
                 }
+                pickUpUnansweredQuestion(session, messages)
             } catch (e: Throwable) {
                 _uiState.update {
                     it.copy(
@@ -261,6 +272,64 @@ class ChatSessionViewModel(
     }
 
     /**
+     * A conversation opened with its last question still unanswered — sent, then left before the
+     * answer came, or the app closed.
+     *
+     * Leaving the screen stopped the listening, not the hub: if it is still writing, the answer is
+     * followed from its first word, as if the screen had never been left. If it is not, and no
+     * answer came, the turn died, and the screen says so and offers another go instead of showing
+     * a question that looks like it is waiting on nothing.
+     */
+    private fun pickUpUnansweredQuestion(
+        session: ConversationSession,
+        messages: List<ChatMessage>,
+    ) {
+        if (messages.lastOrNull()?.role != MessageRole.USER) return
+
+        if (!session.turnRunning) {
+            _uiState.update { it.copy(turnState = TurnState.Failed) }
+            return
+        }
+
+        _uiState.update { it.startingTurn().copy(turnState = TurnState.Reconnecting) }
+        follow(
+            turn =
+                resumeTurnUseCase(
+                    sessionId = session.id,
+                    afterAssistantMessageId = _uiState.value.lastAssistantMessageId,
+                ),
+            sessionId = session.id,
+            userMessageId = null,
+            resuming = true,
+        )
+    }
+
+    /**
+     * The app is on screen again — unlocked, or back from another app.
+     *
+     * A turn left waiting (reconnecting, or past the wait and still working) was most likely
+     * waiting on nothing but a phone that could not reach the hub. Now it can, so it asks at once
+     * for the rest of the answer instead of sitting out the rest of a backoff; the words already
+     * on screen stay, and the answer carries on after them.
+     */
+    fun onForeground() {
+        val currentSession = _uiState.value.session ?: return
+        val turnState = _uiState.value.turnState
+        if (turnState != TurnState.Reconnecting && turnState != TurnState.StillWorking) return
+
+        follow(
+            turn =
+                resumeTurnUseCase(
+                    sessionId = currentSession.id,
+                    afterAssistantMessageId = _uiState.value.lastAssistantMessageId,
+                ),
+            sessionId = currentSession.id,
+            userMessageId = followingUserMessageId,
+            resuming = true,
+        )
+    }
+
+    /**
      * Asks for the answer again after the model failed to produce one.
      *
      * The question is already on the hub and stays where it is; only the answer is asked for
@@ -292,168 +361,196 @@ class ChatSessionViewModel(
      * and the state goes on the turn rather than on a question that was never at fault.
      *
      * [userMessageId] is null when regenerating, because there is no new question to blame.
+     *
+     * [resuming] picks up a turn already under way: the question is known to have arrived, and the
+     * words and trail on screen are where this one carries on from rather than starts over.
      */
     private fun follow(
         turn: Flow<ChatStreamEvent>,
         sessionId: String,
         userMessageId: String?,
+        resuming: Boolean = false,
     ) {
-        viewModelScope.launch {
-            var accumulated = ""
-            var delivered = false
+        followJob?.cancel()
+        followingUserMessageId = userMessageId
+        val carriedText = if (resuming) _uiState.value.streamingMessage.orEmpty() else ""
+        val carriedTrail = if (resuming) _uiState.value.trail else emptyList()
+        followJob =
+            viewModelScope.launch {
+                var accumulated = carriedText
+                var delivered = resuming
 
-            // Thinking is timed from the first thought of each stretch to whatever ends it — a
-            // tool, the first word, the end of the turn — and summed across the turn.
-            var thinkingSince: TimeMark? = null
-            var thought = Duration.ZERO
-            val tools = mutableListOf<TurnRecord>()
+                // Thinking is timed from the first thought of each stretch to whatever ends it — a
+                // tool, the first word, the end of the turn — and summed across the turn.
+                var thinkingSince: TimeMark? = null
+                var thought = Duration.ZERO
+                val tools = mutableListOf<TurnRecord>()
 
-            fun stopThinking() {
-                thinkingSince?.let { thought += it.elapsedNow() }
-                thinkingSince = null
-            }
-
-            fun trail(): List<TurnRecord> =
-                buildList {
-                    if (thought > Duration.ZERO) add(TurnRecord.Thought(thought.toShownSeconds()))
-                    addAll(tools)
+                fun stopThinking() {
+                    thinkingSince?.let { thought += it.elapsedNow() }
+                    thinkingSince = null
                 }
 
-            turn
-                .catch { e ->
-                    if (delivered) {
-                        // The question arrived; only the wait broke. Keep what was being read.
-                        _uiState.update { it.copy(turnState = TurnState.Failed) }
-                        return@catch
+                fun trail(): List<TurnRecord> =
+                    buildList {
+                        addAll(carriedTrail)
+                        if (thought > Duration.ZERO) add(TurnRecord.Thought(thought.toShownSeconds()))
+                        addAll(tools)
                     }
-                    val failedStatus =
-                        if (e is ServerOfflineException) {
-                            MessageStatus.FAILED_OFFLINE
-                        } else {
-                            MessageStatus.FAILED_ERROR
+
+                turn
+                    .catch { e ->
+                        if (delivered) {
+                            // The question arrived; only the wait broke. Keep what was being read.
+                            _uiState.update { it.copy(turnState = TurnState.Failed) }
+                            return@catch
                         }
-                    _uiState.update { state ->
-                        state.copy(
-                            streamingMessage = null,
-                            turnState = TurnState.Idle,
-                            errorMessage = e.message ?: "Streaming failed",
-                            messages =
-                                state.messages.map { msg ->
-                                    if (msg.id == userMessageId) msg.copy(status = failedStatus) else msg
-                                },
-                        )
-                    }
-                }.collect { event ->
-                    when (event) {
-                        // The hub has the question. The receipt says so now rather than when the
-                        // answer lands, which on a cold model can be a minute away.
-                        is ChatStreamEvent.Accepted -> {
-                            delivered = true
-                            _uiState.update { state ->
-                                state.copy(
-                                    messages =
-                                        state.messages.map { msg ->
-                                            if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
-                                        },
-                                )
+                        val failedStatus =
+                            if (e is ServerOfflineException) {
+                                MessageStatus.FAILED_OFFLINE
+                            } else {
+                                MessageStatus.FAILED_ERROR
                             }
+                        _uiState.update { state ->
+                            state.copy(
+                                streamingMessage = null,
+                                turnState = TurnState.Idle,
+                                errorMessage = e.message ?: "Streaming failed",
+                                messages =
+                                    state.messages.map { msg ->
+                                        if (msg.id == userMessageId) msg.copy(status = failedStatus) else msg
+                                    },
+                            )
                         }
-
-                        is ChatStreamEvent.Reasoning -> {
-                            if (thinkingSince == null) thinkingSince = timeSource.markNow()
-                            _uiState.update { it.copy(isThinking = true) }
-                        }
-
-                        is ChatStreamEvent.ToolExecuting -> {
-                            stopThinking()
-                            _uiState.update { it.copy(activeTool = event.tool, isThinking = false, trail = trail()) }
-                        }
-
-                        is ChatStreamEvent.ToolResult -> {
-                            tools +=
-                                when {
-                                    event.success -> TurnRecord.ToolDone(event.tool)
-                                    else -> TurnRecord.ToolFailed(event.tool)
+                    }.collect { event ->
+                        when (event) {
+                            // The hub has the question. The receipt says so now rather than when the
+                            // answer lands, which on a cold model can be a minute away.
+                            is ChatStreamEvent.Accepted -> {
+                                delivered = true
+                                _uiState.update { state ->
+                                    state.copy(
+                                        messages =
+                                            state.messages.map { msg ->
+                                                if (msg.id ==
+                                                    userMessageId
+                                                ) {
+                                                    msg.copy(status = MessageStatus.SENT)
+                                                } else {
+                                                    msg
+                                                }
+                                            },
+                                    )
                                 }
-                            _uiState.update { it.copy(activeTool = null, trail = trail()) }
-                        }
-
-                        is ChatStreamEvent.Delta -> {
-                            delivered = true
-                            if (accumulated.isEmpty()) stopThinking()
-                            accumulated += event.content
-                            _uiState.update {
-                                it.copy(
-                                    streamingMessage = accumulated,
-                                    turnState = TurnState.Streaming,
-                                    isThinking = false,
-                                    trail = trail(),
-                                )
                             }
-                        }
 
-                        is ChatStreamEvent.ToolApprovalProposal -> {
-                            _uiState.update { it.copy(pendingToolProposal = event) }
-                        }
-
-                        is ChatStreamEvent.Done -> {
-                            val assistantMsg =
-                                ChatMessage(
-                                    id = event.messageId,
-                                    sessionId = sessionId,
-                                    role = MessageRole.ASSISTANT,
-                                    content = event.assistantContent,
-                                    status = MessageStatus.SENT,
-                                )
-                            stopThinking()
-                            val finished = trail()
-                            _uiState.update { state ->
-                                state.copy(
-                                    streamingMessage = null,
-                                    turnState = TurnState.Idle,
-                                    messages =
-                                        state.messages.map { msg ->
-                                            if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg
-                                        } + assistantMsg,
-                                    isThinking = false,
-                                    activeTool = null,
-                                    trail = emptyList(),
-                                    trails =
-                                        if (finished.isEmpty()) {
-                                            state.trails
-                                        } else {
-                                            state.trails +
-                                                (event.messageId to finished)
-                                        },
-                                )
+                            is ChatStreamEvent.Reasoning -> {
+                                if (thinkingSince == null) thinkingSince = timeSource.markNow()
+                                _uiState.update { it.copy(isThinking = true) }
                             }
-                        }
 
-                        // The stream is gone but the hub has not finished; the words so far stay.
-                        is ChatStreamEvent.Reconnecting -> {
-                            _uiState.update { it.copy(turnState = TurnState.Reconnecting) }
-                        }
-
-                        is ChatStreamEvent.StillWorking -> {
-                            _uiState.update { it.copy(turnState = TurnState.StillWorking) }
-                        }
-
-                        is ChatStreamEvent.TurnFailed -> {
-                            stopThinking()
-                            _uiState.update {
-                                it.copy(
-                                    turnState = TurnState.Failed,
-                                    isThinking = false,
-                                    activeTool = null,
-                                    trail = trail(),
-                                )
+                            is ChatStreamEvent.ToolExecuting -> {
+                                stopThinking()
+                                _uiState.update {
+                                    it.copy(
+                                        activeTool = event.tool,
+                                        isThinking = false,
+                                        trail = trail(),
+                                    )
+                                }
                             }
-                        }
 
-                        else -> {}
+                            is ChatStreamEvent.ToolResult -> {
+                                tools +=
+                                    when {
+                                        event.success -> TurnRecord.ToolDone(event.tool)
+                                        else -> TurnRecord.ToolFailed(event.tool)
+                                    }
+                                _uiState.update { it.copy(activeTool = null, trail = trail()) }
+                            }
+
+                            is ChatStreamEvent.Delta -> {
+                                delivered = true
+                                if (accumulated.isEmpty()) stopThinking()
+                                accumulated += event.content
+                                _uiState.update {
+                                    it.copy(
+                                        streamingMessage = accumulated,
+                                        turnState = TurnState.Streaming,
+                                        isThinking = false,
+                                        trail = trail(),
+                                    )
+                                }
+                            }
+
+                            is ChatStreamEvent.ToolApprovalProposal -> {
+                                _uiState.update { it.copy(pendingToolProposal = event) }
+                            }
+
+                            is ChatStreamEvent.Done -> {
+                                val assistantMsg =
+                                    ChatMessage(
+                                        id = event.messageId,
+                                        sessionId = sessionId,
+                                        role = MessageRole.ASSISTANT,
+                                        content = event.assistantContent,
+                                        status = MessageStatus.SENT,
+                                    )
+                                stopThinking()
+                                val finished = trail()
+                                _uiState.update { state ->
+                                    state.copy(
+                                        streamingMessage = null,
+                                        turnState = TurnState.Idle,
+                                        messages =
+                                            state.messages.map { msg ->
+                                                if (msg.id ==
+                                                    userMessageId
+                                                ) {
+                                                    msg.copy(status = MessageStatus.SENT)
+                                                } else {
+                                                    msg
+                                                }
+                                            } + assistantMsg,
+                                        isThinking = false,
+                                        activeTool = null,
+                                        trail = emptyList(),
+                                        trails =
+                                            if (finished.isEmpty()) {
+                                                state.trails
+                                            } else {
+                                                state.trails +
+                                                    (event.messageId to finished)
+                                            },
+                                    )
+                                }
+                            }
+
+                            // The stream is gone but the hub has not finished; the words so far stay.
+                            is ChatStreamEvent.Reconnecting -> {
+                                _uiState.update { it.copy(turnState = TurnState.Reconnecting) }
+                            }
+
+                            is ChatStreamEvent.StillWorking -> {
+                                _uiState.update { it.copy(turnState = TurnState.StillWorking) }
+                            }
+
+                            is ChatStreamEvent.TurnFailed -> {
+                                stopThinking()
+                                _uiState.update {
+                                    it.copy(
+                                        turnState = TurnState.Failed,
+                                        isThinking = false,
+                                        activeTool = null,
+                                        trail = trail(),
+                                    )
+                                }
+                            }
+
+                            else -> {}
+                        }
                     }
-                }
-        }
+            }
     }
 
     fun approveTool(

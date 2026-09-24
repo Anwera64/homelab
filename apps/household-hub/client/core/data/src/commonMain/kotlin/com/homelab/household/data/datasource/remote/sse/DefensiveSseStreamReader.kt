@@ -24,12 +24,31 @@ class DefensiveSseStreamReader(
             "<|startoftext|>",
         )
 
-    fun readEvents(channel: ByteReadChannel): Flow<ChatStreamEvent> =
+    /**
+     * [onEventId] is called with each frame's `id:` line, once its event has been emitted and
+     * taken by the collector — this is how a data source learns where to resume a dropped stream
+     * from without risking an id for an event the collector never actually saw. An id never
+     * survives past its own frame: it is reset at every blank line, so a later frame that has no
+     * `id:` of its own reports nothing.
+     */
+    fun readEvents(
+        channel: ByteReadChannel,
+        onEventId: (String) -> Unit = {},
+    ): Flow<ChatStreamEvent> =
         flow {
+            var pendingId: String? = null
             while (!channel.isClosedForRead) {
                 val line = channel.readUTF8Line() ?: break
                 val trimmed = line.trim()
-                if (trimmed.isEmpty()) continue
+                if (trimmed.isEmpty()) {
+                    // Frame boundary: an id never carries over to a later frame that has none.
+                    pendingId = null
+                    continue
+                }
+                if (trimmed.startsWith("id:")) {
+                    pendingId = trimmed.substringAfter("id:").trim()
+                    continue
+                }
                 if (trimmed == "data: [DONE]" || trimmed == "[DONE]") {
                     break
                 }
@@ -55,6 +74,7 @@ class DefensiveSseStreamReader(
                             }
                         if (event != null) {
                             emit(event)
+                            pendingId?.let { onEventId(it) }
                         }
                     }
                 }

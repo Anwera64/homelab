@@ -1,6 +1,7 @@
 package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
+import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.exception.UpstreamGatewayException
@@ -12,6 +13,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
@@ -23,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -313,5 +316,196 @@ class KtorSessionRemoteDataSourceTest {
                     dataSource(engine).openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
                 }
             assertEquals(500, thrown.statusCode)
+        }
+
+    // ---- resuming a dropped stream -----------------------------------------
+
+    private val twoEventTurnSse =
+        """
+        id: t:1
+        data: {"type": "delta", "content": "Hello"}
+
+        id: t:2
+        data: {"type": "done", "message_id": "m1", "assistant_content": "Hello", "agent_name": "Assistant"}
+
+        data: [DONE]
+
+        """.trimIndent()
+
+    @Test
+    fun `GIVEN a turn that streamed two events WHEN it is resumed THEN the hub is asked for what came after the last one`() =
+        runTest {
+            // GIVEN
+            val resumeSse =
+                """
+                id: t:3
+                data: {"type": "delta", "content": " world"}
+
+                data: [DONE]
+
+                """.trimIndent()
+            var getPath: String? = null
+            var getLastEventId: String? = null
+            val engine =
+                MockEngine { request ->
+                    if (request.method == HttpMethod.Post) {
+                        respondSse(twoEventTurnSse)
+                    } else {
+                        getPath = request.url.encodedPath
+                        getLastEventId = request.url.parameters["last_event_id"]
+                        respondSse(resumeSse)
+                    }
+                }
+            val dataSource = dataSource(engine)
+            dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
+
+            // WHEN
+            val events = dataSource.resumeTurnStream("s-1").toList()
+
+            // THEN
+            assertEquals("/api/v1/sessions/s-1/chat/stream", getPath)
+            assertEquals("t:2", getLastEventId)
+            assertEquals(" world", (events[0] as ChatStreamEvent.Delta).content)
+        }
+
+    @Test
+    fun `GIVEN a resumed stream WHEN it is resumed again THEN it continues from the last resumed event`() =
+        runTest {
+            // GIVEN
+            val resumeSse =
+                """
+                id: t:3
+                data: {"type": "delta", "content": " world"}
+
+                data: [DONE]
+
+                """.trimIndent()
+            val getLastEventIds = mutableListOf<String?>()
+            val engine =
+                MockEngine { request ->
+                    if (request.method == HttpMethod.Post) {
+                        respondSse(twoEventTurnSse)
+                    } else {
+                        getLastEventIds.add(request.url.parameters["last_event_id"])
+                        respondSse(resumeSse)
+                    }
+                }
+            val dataSource = dataSource(engine)
+            dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
+            dataSource.resumeTurnStream("s-1").toList()
+
+            // WHEN
+            dataSource.resumeTurnStream("s-1").toList()
+
+            // THEN
+            assertEquals(listOf<String?>("t:2", "t:3"), getLastEventIds)
+        }
+
+    @Test
+    fun `GIVEN a conversation opened mid-turn WHEN it is resumed THEN the hub is asked for its turn from the start`() =
+        runTest {
+            // GIVEN — nothing streamed on this phone yet: the screen was reopened, or the app restarted.
+            var path: String? = null
+            var asked: String? = "unset"
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    asked = request.url.parameters["last_event_id"]
+                    respondSse(twoEventTurnSse)
+                }
+
+            // WHEN
+            val events = dataSource(engine).resumeTurnStream("s-1").toList()
+
+            // THEN
+            assertEquals("/api/v1/sessions/s-1/chat/stream", path)
+            assertNull(asked)
+            assertEquals(2, events.size)
+        }
+
+    @Test
+    fun `GIVEN a conversation with no turn held WHEN it is resumed with nothing remembered THEN it is gone`() =
+        runTest {
+            // GIVEN
+            val engine = MockEngine { respondJson("""{"detail": "gone"}""", HttpStatusCode.Gone) }
+
+            // WHEN / THEN
+            assertFailsWith<TurnGoneException> {
+                dataSource(engine).resumeTurnStream("s-1").toList()
+            }
+        }
+
+    @Test
+    fun `GIVEN the hub has let the turn go WHEN it is resumed THEN it is gone`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine { request ->
+                    if (request.method == HttpMethod.Post) {
+                        respondSse(twoEventTurnSse)
+                    } else {
+                        respondJson("""{"detail": "gone"}""", HttpStatusCode.Gone)
+                    }
+                }
+            val dataSource = dataSource(engine)
+            dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
+
+            // WHEN / THEN
+            assertFailsWith<TurnGoneException> {
+                dataSource.resumeTurnStream("s-1").toList()
+            }
+        }
+
+    @Test
+    fun `GIVEN the hub cannot be reached WHEN a turn is resumed THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine { request ->
+                    if (request.method == HttpMethod.Post) {
+                        respondSse(twoEventTurnSse)
+                    } else {
+                        throw IOException("Connection refused")
+                    }
+                }
+            val dataSource = dataSource(engine)
+            dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
+
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> {
+                dataSource.resumeTurnStream("s-1").toList()
+            }
+        }
+
+    @Test
+    fun `GIVEN a new turn in the conversation WHEN it is resumed before any event arrives THEN it does not resume the previous turn`() =
+        runTest {
+            // GIVEN
+            val noIdSse =
+                """
+                data: [DONE]
+
+                """.trimIndent()
+            var postCount = 0
+            var asked: String? = "unset"
+            val engine =
+                MockEngine { request ->
+                    if (request.method == HttpMethod.Post) {
+                        postCount += 1
+                        if (postCount == 1) respondSse(twoEventTurnSse) else respondSse(noIdSse)
+                    } else {
+                        asked = request.url.parameters["last_event_id"]
+                        respondSse(noIdSse)
+                    }
+                }
+            val dataSource = dataSource(engine)
+            dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
+            dataSource.openChatStream("s-1", "Hello again", autoApproveWrites = false).toList()
+
+            // WHEN
+            dataSource.resumeTurnStream("s-1").toList()
+
+            // THEN — the new turn is asked for from its start, never after the old turn's last event.
+            assertNull(asked)
         }
 }
