@@ -317,6 +317,14 @@
     <!-- Conversation -->
     <string name="conversation_back">Back to chats</string>
     <string name="conversation_greeting">Evening, %1$s</string>
+    <string name="conversation_change_agent">Change agent</string>
+    <string name="agent_picker_title">Who do you want to talk to?</string>
+    <string name="agent_picker_caption">A chat stays with the agent you start it with.</string>
+    <string name="agent_picker_failed_title">The other agents didn’t load</string>
+    <string name="agent_picker_failed_line">The hub answered but didn’t send the list. You can keep going with %1$s, or ask again.</string>
+    <string name="agent_owner_built_in">built in</string>
+    <string name="agent_owner_yours">yours</string>
+    <string name="agent_owner_member">%1$s’s</string>
     <string name="conversation_composer_idle">Message the %1$s…</string>
     <string name="conversation_composer_waiting">Waiting for this answer to finish…</string>
     <string name="conversation_composer_leave">You can leave — the answer will wait for you</string>
@@ -342,6 +350,12 @@
     <string name="tool_generic_running">Working on it…</string>
     <string name="tool_generic_done">Used a tool</string>
     <string name="tool_generic_failed">A tool didn’t work</string>
+    <string name="tool_permission_calendar_read">Read calendar</string>
+    <string name="tool_permission_calendar_write">Add to calendar</string>
+    <string name="tool_permission_search">Search the web</string>
+    <string name="tool_permission_pdf">Read PDFs</string>
+    <string name="tool_permission_note">Write notes</string>
+    <string name="tool_permission_generic">Use a tool</string>
     <string name="conversation_thinking">Thinking…</string>
     <string name="conversation_reconnecting">Reconnecting…</string>
     <string name="conversation_reconnecting_detail">the rest is still being written on the hub</string>

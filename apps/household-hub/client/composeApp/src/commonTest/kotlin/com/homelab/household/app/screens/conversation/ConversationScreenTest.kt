@@ -6,11 +6,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -24,6 +27,9 @@ import com.homelab.household.app.components.RETRY_GLYPH_TAG
 import com.homelab.household.app.components.SENT_GLYPH_TAG
 import com.homelab.household.app.components.THINKING_DOTS_TAG
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.agent_picker_failed_title
+import com.homelab.household.app.resources.agent_picker_title
+import com.homelab.household.app.resources.conversation_change_agent
 import com.homelab.household.app.resources.conversation_composer_leave
 import com.homelab.household.app.resources.conversation_composer_waiting
 import com.homelab.household.app.resources.conversation_failed_line
@@ -72,6 +78,8 @@ class ConversationScreenTest {
         onComposerTextChange: (String) -> Unit = {},
         onRetry: (String) -> Unit = {},
         onTryAgain: () -> Unit = {},
+        onSelectAgent: (String) -> Unit = {},
+        onRetryAgents: () -> Unit = {},
     ): @Composable () -> Unit =
         {
             StillTheme {
@@ -81,6 +89,8 @@ class ConversationScreenTest {
                     onSend = onSend,
                     onRetry = onRetry,
                     onTryAgain = onTryAgain,
+                    onSelectAgent = onSelectAgent,
+                    onRetryAgents = onRetryAgents,
                     onBack = {},
                     memberName = "Emma",
                 )
@@ -486,4 +496,56 @@ class ConversationScreenTest {
         assertEquals(top.left, under.left, "label and detail share a left edge")
         assertTrue(under.top >= top.bottom, "the detail is on its own row, under the label")
     }
+
+    // ---- choosing the agent of a new chat ----------------------------------
+
+    @Test
+    fun `GIVEN a new chat WHEN the avatar is tapped THEN the sheet offers every agent`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("New chat")))
+
+            onNodeWithContentDescription(getString(Res.string.conversation_change_agent)).performClick()
+
+            onNodeWithText(getString(Res.string.agent_picker_title)).assertIsDisplayed()
+            onNodeWithText("Academic Researcher").assertIsDisplayed()
+            onNodeWithText("Hardware Scout").assertIsDisplayed()
+            onNodeWithText("Liam’s").assertIsDisplayed()
+            // Every card says what its agent may do, in words: all three here can search the web.
+            onAllNodesWithText("Search the web", useUnmergedTree = true).assertCountEquals(3)
+        }
+
+    @Test
+    fun `GIVEN a chat that has started WHEN it is shown THEN there is no way to change its agent`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished exchange")))
+
+            onAllNodes(hasContentDescription(getString(Res.string.conversation_change_agent))).assertCountEquals(0)
+        }
+
+    @Test
+    fun `GIVEN the sheet is open WHEN another agent is picked THEN it is chosen and the sheet closes`() =
+        runComposeUiTest {
+            var picked: String? = null
+            setContent(conversation(stateNamed("New chat"), onSelectAgent = { picked = it }))
+
+            onNodeWithContentDescription(getString(Res.string.conversation_change_agent)).performClick()
+            onNodeWithText("Academic Researcher").performClick()
+            waitForIdle()
+
+            assertEquals("agent-research", picked)
+            onNodeWithText(getString(Res.string.agent_picker_title)).assertDoesNotExist()
+        }
+
+    @Test
+    fun `GIVEN the agents did not load WHEN the sheet opens THEN it says so and can ask again`() =
+        runComposeUiTest {
+            var retried = false
+            setContent(conversation(stateNamed("New chat, agents didn't load"), onRetryAgents = { retried = true }))
+
+            onNodeWithContentDescription(getString(Res.string.conversation_change_agent)).performClick()
+
+            onNodeWithText(getString(Res.string.agent_picker_failed_title)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.conversation_try_again)).performClick()
+            assertTrue(retried)
+        }
 }

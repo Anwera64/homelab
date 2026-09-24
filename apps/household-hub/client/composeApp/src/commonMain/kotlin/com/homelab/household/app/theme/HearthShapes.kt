@@ -27,6 +27,9 @@ object HearthShapes {
     /** Chips, pills and badges. */
     val pill = RoundedCornerShape(percent = 50)
 
+    /** A bottom sheet: the bento radius on the edge that rises, square where it meets the screen. */
+    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+
     /** A key on the PIN pad. */
     val key = RoundedCornerShape(20.dp)
 

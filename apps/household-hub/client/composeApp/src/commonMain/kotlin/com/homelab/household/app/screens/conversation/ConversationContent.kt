@@ -17,7 +17,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -90,6 +92,8 @@ fun ConversationContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     memberName: String = "",
+    onSelectAgent: (String) -> Unit = {},
+    onRetryAgents: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -233,7 +237,25 @@ fun ConversationContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md, Alignment.CenterVertically),
             ) {
-                Text(text = state.agentAvatar, style = type.glyphXl)
+                var picking by rememberSaveable { mutableStateOf(false) }
+                AgentAvatarButton(
+                    avatar = state.agentAvatar,
+                    onChangeAgent = if (state.canChangeAgent) ({ picking = true }) else null,
+                )
+                if (picking && state.canChangeAgent) {
+                    AgentPickerSheet(
+                        agents = state.agents,
+                        selectedAgentId = state.selectedAgentId,
+                        failed = state.agentsFailed,
+                        currentAgentName = state.agentName,
+                        onSelect = { agentId ->
+                            onSelectAgent(agentId)
+                            picking = false
+                        },
+                        onRetry = onRetryAgents,
+                        onDismiss = { picking = false },
+                    )
+                }
                 Text(
                     text = stringResource(Res.string.conversation_greeting, memberName),
                     style = type.hero,

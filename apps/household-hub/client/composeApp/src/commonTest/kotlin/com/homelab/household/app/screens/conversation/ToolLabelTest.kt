@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 
@@ -38,5 +39,31 @@ class ToolLabelTest {
                     assertFalse(shown.contains('_'), "\"$shown\" reads like an identifier")
                 }
             }
+        }
+
+    @Test
+    fun `GIVEN every tool the hub has WHEN its permission is shown THEN it has words of its own`() =
+        runComposeUiTest {
+            hubTools.forEach { tool ->
+                assertNotEquals(
+                    toolPermissionLabel("a_tool_nobody_named"),
+                    toolPermissionLabel(tool),
+                    "$tool falls back to the generic permission words",
+                )
+            }
+        }
+
+    @Test
+    fun `GIVEN the web search tool WHEN its permission is shown THEN it reads Search the web`() =
+        runComposeUiTest {
+            assertEquals("Search the web", getString(toolPermissionLabel("searxng_search")))
+        }
+
+    @Test
+    fun `GIVEN a tool nobody named WHEN its permission is shown THEN the raw name never appears`() =
+        runComposeUiTest {
+            val shown = getString(toolPermissionLabel("a_tool_nobody_named"))
+            assertFalse(shown.contains("a_tool_nobody_named"), "\"$shown\" names the raw tool")
+            assertFalse(shown.contains('_'), "\"$shown\" reads like an identifier")
         }
 }

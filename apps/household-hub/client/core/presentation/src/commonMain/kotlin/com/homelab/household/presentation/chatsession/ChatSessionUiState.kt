@@ -87,6 +87,18 @@ data class ChatSessionUiState(
     val agentName: String = "",
     val agentAvatar: String = "",
     val agentTagline: String = "",
+    /**
+     * Who a new chat could talk to instead, as `GET /agents` gives them: built-ins first, nothing
+     * trashed or suspended. Only the picker reads it, and only before the first message.
+     */
+    val agents: List<AgentChoice> = emptyList(),
+    /** The agent the first message will create the chat with. */
+    val selectedAgentId: String? = null,
+    /**
+     * The list could not be fetched. The chosen agent still answers — the picker says so in
+     * words and offers to ask again, rather than blocking the chat.
+     */
+    val agentsFailed: Boolean = false,
     val pendingToolProposal: ChatStreamEvent.ToolApprovalProposal? = null,
     val errorMessage: String? = null,
     val isSecretLocked: Boolean = false,
@@ -122,6 +134,13 @@ data class ChatSessionUiState(
     /** A conversation nobody has spoken in yet: the hero greeting rather than a transcript. */
     val isNew: Boolean
         get() = messages.isEmpty() && streamingMessage == null
+
+    /**
+     * Whether the agent can still be changed: a chat is bound to one agent for its life, so only
+     * until the first message creates it on the hub.
+     */
+    val canChangeAgent: Boolean
+        get() = isNew && session == null
 
     /** The newest answer already on screen, which a recovery must not mistake for a new one. */
     val lastAssistantMessageId: String?
