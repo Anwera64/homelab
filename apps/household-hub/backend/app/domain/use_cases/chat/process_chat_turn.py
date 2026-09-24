@@ -216,6 +216,7 @@ class ProcessChatTurnUseCase:
         current_user: User,
         content: str,
         auto_approve_writes: bool = False,
+        timezone_name: Optional[str] = None,
     ) -> ChatTurnResult:
         session = await self.session_repo.get_by_id(session_id)
         if not session:
@@ -271,6 +272,7 @@ class ProcessChatTurnUseCase:
             recent_messages=recent_messages,
             is_secret_session=session.is_secret,
             is_turn_secret=is_turn_secret,
+            timezone_name=timezone_name,
             history_summary=session.history_summary,
         )
 
@@ -440,7 +442,9 @@ class ProcessChatTurnUseCase:
 
         return session, agent
 
-    async def regenerate_stream(self, session_id: str, current_user: User):
+    async def regenerate_stream(
+        self, session_id: str, current_user: User, timezone_name: Optional[str] = None
+    ):
         """
         Answer the last question again, without asking it again.
 
@@ -476,6 +480,7 @@ class ProcessChatTurnUseCase:
             recent_messages=recent_messages,
             privacy_trigger_detected=privacy_trigger_detected,
             auto_approve_writes=False,
+            timezone_name=timezone_name,
         ):
             yield event
 
@@ -485,6 +490,7 @@ class ProcessChatTurnUseCase:
         current_user: User,
         content: str,
         auto_approve_writes: bool = False,
+        timezone_name: Optional[str] = None,
     ):
         session, agent = await self._open_turn(session_id, current_user)
 
@@ -516,6 +522,7 @@ class ProcessChatTurnUseCase:
             recent_messages=recent_messages,
             privacy_trigger_detected=privacy_trigger_detected,
             auto_approve_writes=auto_approve_writes,
+            timezone_name=timezone_name,
         ):
             yield event
 
@@ -629,6 +636,7 @@ class ProcessChatTurnUseCase:
         recent_messages,
         privacy_trigger_detected: bool,
         auto_approve_writes: bool,
+        timezone_name: Optional[str] = None,
     ):
         """Generate and persist the answer. Everything a turn does once the question is settled."""
         model = await self.model_resolver.for_agent(agent)
@@ -641,6 +649,7 @@ class ProcessChatTurnUseCase:
             recent_messages=recent_messages,
             is_secret_session=session.is_secret,
             is_turn_secret=is_turn_secret,
+            timezone_name=timezone_name,
             history_summary=session.history_summary,
         )
 

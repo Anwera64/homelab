@@ -23,7 +23,9 @@ import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataS
 import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
+import com.homelab.household.data.network.deviceTimeZoneId
 import com.homelab.household.data.network.installBearerAuth
+import com.homelab.household.data.network.sendDeviceTimeZone
 import com.homelab.household.data.network.signOutOnUnauthorized
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
@@ -80,6 +82,7 @@ val dataModule =
                         }
                 }
                 installBearerAuth(storage)
+                sendDeviceTimeZone(::deviceTimeZoneId)
                 val events: AuthEventsLocalDataSource = get()
                 signOutOnUnauthorized(storage) { events.raiseSignedOut() }
             }
