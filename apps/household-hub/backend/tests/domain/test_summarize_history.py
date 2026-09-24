@@ -156,3 +156,57 @@ async def test_GIVEN_an_empty_summary_WHEN_summarizing_THEN_nothing_is_saved():
 
     assert await _use_case(repo, FakeLLMClient(reply="   ")).execute("s1") is False
     assert repo.saved == []
+
+
+def _dated_messages(count: int, characters: int) -> List[ChatMessage]:
+    """Messages sent an hour apart from 14:00 UTC on Monday 21 September 2026."""
+    from datetime import datetime, timedelta, timezone
+
+    start = datetime(2026, 9, 21, 14, 0, tzinfo=timezone.utc)
+    messages = _messages(count, characters)
+    for i, message in enumerate(messages):
+        message.created_at = start + timedelta(hours=i)
+    return messages
+
+
+async def _summarize_dated(timezone_name=None):
+    messages = _dated_messages(10, 600)
+    repo = FakeSessionRepository(ConversationSession(id="s1"), messages)
+    llm = FakeLLMClient()
+    await _use_case(repo, llm).execute("s1", timezone_name=timezone_name)
+    return messages, llm.calls[0]["messages"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_phones_timezone_WHEN_summarizing_THEN_each_message_carries_when_it_was_sent():
+    """
+    #39: folded messages can be days old, so "tomorrow" has to be read against the day it was
+    written. Each line is stamped with its own send time, in the member's timezone.
+    """
+    messages, prompt = await _summarize_dated("America/Mexico_City")
+    transcript = prompt[-1].content
+
+    assert transcript.startswith("New messages (times in America/Mexico_City):\n")
+    assert f"[Mon 21 Sep 2026, 08:00] user: {messages[0].content}" in transcript
+    assert f"[Mon 21 Sep 2026, 09:00] assistant: {messages[1].content}" in transcript
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_timezone_WHEN_summarizing_THEN_the_stamps_are_in_utc_and_say_so():
+    messages, prompt = await _summarize_dated()
+    transcript = prompt[-1].content
+
+    assert transcript.startswith("New messages (times in UTC):\n")
+    assert f"[Mon 21 Sep 2026, 14:00] user: {messages[0].content}" in transcript
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_summary_is_written_WHEN_asked_THEN_dates_are_absolute_and_it_never_says_today():
+    """The summary is read on later days, so a 'today' kept in it would go stale - and contradict
+    the real date the chat prompt carries."""
+    _, prompt = await _summarize_dated("America/Mexico_City")
+    instructions = prompt[0].content
+
+    assert "calendar date" in instructions
+    assert "Never write 'today', 'tomorrow' or 'yesterday'" in instructions
+    assert not any("Today is" in m.content for m in prompt)

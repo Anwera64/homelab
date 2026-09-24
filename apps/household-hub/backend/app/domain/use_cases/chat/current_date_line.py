@@ -22,13 +22,18 @@ def _zone(timezone_name: Optional[str]) -> Optional[tzinfo]:
         return None
 
 
+def timezone_label(timezone_name: Optional[str]) -> str:
+    """The zone times are shown in: the phone's, or UTC when it can't be used."""
+    return timezone_name if _zone(timezone_name) else "UTC"
+
+
 def _local(when: datetime, timezone_name: Optional[str]) -> Tuple[datetime, str]:
     """[when] in the phone's zone, and the name to show for it: UTC when the zone can't be used."""
     zone = _zone(timezone_name)
     # SQLite gives times back without their zone; they were all written in UTC.
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
-    return when.astimezone(zone or timezone.utc), timezone_name if zone else "UTC"
+    return when.astimezone(zone or timezone.utc), timezone_label(timezone_name)
 
 
 def current_date_line(now: datetime, timezone_name: Optional[str]) -> str:
