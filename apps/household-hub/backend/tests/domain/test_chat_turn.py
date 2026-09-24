@@ -97,7 +97,13 @@ def _house_resolver():
 
 
 class FakeContextAssembler:
-    async def execute(self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False):
+    def __init__(self):
+        self.timezones_asked_for = []
+
+    async def execute(
+        self, user, agent, recent_messages, is_secret_session=False, is_turn_secret=False, timezone_name=None
+    ):
+        self.timezones_asked_for.append(timezone_name)
         return [
             LLMMessage(role="system", content="System instructions"),
             *[LLMMessage(role=m.role, content=m.content) for m in recent_messages],
@@ -952,3 +958,49 @@ async def test_GIVEN_an_answer_with_no_tools_WHEN_answered_THEN_it_is_one_text_p
 
     assert events[-1]["parts"] == [{"type": "text", "content": "A light day. "}]
     assert session_repo.messages[-1].content == "A light day. "
+
+
+def _timezone_use_case(assembler):
+    """A conversation with one unanswered question, so any of the three turns can run."""
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=[])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    session_repo.messages.append(ChatMessage(id="m1", session_id="s1", role="user", content="What's new?"))
+    llm_client = FakeLLMClient(
+        responses=[LLMResponse(content="Not much.")],
+        stream_chunks_list=[[LLMResponseChunk(delta_content="Not much.")]],
+    )
+    return ProcessChatTurnUseCase(
+        session_repo=session_repo,
+        agent_repo=FakeAgentRepository(agents=[agent]),
+        llm_client=llm_client,
+        context_assembler=assembler,
+        tool_executor=FakeToolExecutor(),
+        tool_lister=FakeToolLister(),
+        model_resolver=_house_resolver(),
+        uow=FakeUnitOfWork(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_phones_timezone_WHEN_a_turn_is_answered_THEN_the_context_is_dated_in_it():
+    """#39: every way of answering - plain, streamed, regenerated - dates the prompt in the phone's zone."""
+    user = User(id="u1", full_name="Alex")
+
+    plain = FakeContextAssembler()
+    await _timezone_use_case(plain).execute(
+        session_id="s1", current_user=user, content="Hi", timezone_name="Europe/Madrid"
+    )
+
+    streamed = FakeContextAssembler()
+    [ev async for ev in _timezone_use_case(streamed).execute_stream(
+        session_id="s1", current_user=user, content="Hi", timezone_name="Europe/Madrid"
+    )]
+
+    regenerated = FakeContextAssembler()
+    [ev async for ev in _timezone_use_case(regenerated).regenerate_stream(
+        session_id="s1", current_user=user, timezone_name="Europe/Madrid"
+    )]
+
+    assert plain.timezones_asked_for == ["Europe/Madrid"]
+    assert streamed.timezones_asked_for == ["Europe/Madrid"]
+    assert regenerated.timezones_asked_for == ["Europe/Madrid"]
