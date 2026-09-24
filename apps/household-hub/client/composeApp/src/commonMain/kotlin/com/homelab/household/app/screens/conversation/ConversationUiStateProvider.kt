@@ -182,6 +182,43 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                 ),
+            // #40: the fold says what its steps did, and that one of them failed.
+            "A researched answer, its steps folded" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            question,
+                            said(
+                                "m-2",
+                                "The South China Morning Post blocks automated reading, so I leaned on the other two.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(
+                                            "searxng_search",
+                                            ToolSummary(
+                                                query = "Hong Kong press freedom",
+                                                count = 1,
+                                                sources = listOf(rsf),
+                                            ),
+                                        ),
+                                        AnswerPart.ToolDone("read_page", ToolSummary(sources = listOf(rsf))),
+                                        AnswerPart.ToolFailed(
+                                            "read_page",
+                                            ToolSummary(
+                                                reason = ToolFailureReason.Blocked,
+                                                sources = listOf(scmp.copy(title = "")),
+                                            ),
+                                        ),
+                                        AnswerPart.ToolDone("read_page", ToolSummary(sources = listOf(hkja))),
+                                        AnswerPart.ToolDone("lookup_sources"),
+                                        AnswerPart.Text(
+                                            "The South China Morning Post blocks automated reading, so I leaned on the other two.",
+                                        ),
+                                    ),
+                            ),
+                        ),
+                ),
             // The tool is done and the next words are not here yet: still working, and it says so.
             "Between a tool and the next words" to
                 agent.copy(
@@ -279,3 +316,4 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
 
 private val rsf = ToolSource("Hong Kong: press freedom index", "https://rsf.org/en/country/hong-kong")
 private val scmp = ToolSource("Hong Kong news", "https://www.scmp.com/news/hong-kong")
+private val hkja = ToolSource("Annual report: a shrinking space", "https://www.hkja.org.hk/")

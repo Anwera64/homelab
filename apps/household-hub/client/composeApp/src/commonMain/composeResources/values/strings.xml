@@ -336,8 +336,29 @@
         <item quantity="one">%1$d step</item>
         <item quantity="other">%1$d steps</item>
     </plurals>
-    <string name="conversation_steps_show">Show steps</string>
-    <string name="conversation_steps_hide">Hide steps</string>
+    <!-- Said to a screen reader: the fold's label says what the steps did, this says how many (#40). -->
+    <plurals name="conversation_steps_show">
+        <item quantity="one">Show %1$d step</item>
+        <item quantity="other">Show %1$d steps</item>
+    </plurals>
+    <plurals name="conversation_steps_hide">
+        <item quantity="one">Hide %1$d step</item>
+        <item quantity="other">Hide %1$d steps</item>
+    </plurals>
+    <!-- A closed fold says what its steps did (#40). Phrases are joined, and the first is capitalised. -->
+    <string name="steps_phrase_searched">searched the web</string>
+    <string name="steps_phrase_searched_twice">searched the web twice</string>
+    <string name="steps_phrase_searched_times">searched the web %1$d times</string>
+    <plurals name="steps_phrase_read">
+        <item quantity="one">read a page</item>
+        <item quantity="other">read %1$d pages</item>
+    </plurals>
+    <string name="steps_phrase_checked_calendar">checked your calendar</string>
+    <string name="steps_phrase_added">added %1$s</string>
+    <string name="steps_phrase_added_plain">added to your calendar</string>
+    <string name="steps_label_and">%1$s, %2$s</string>
+    <string name="steps_label_more">%1$s and %2$d more</string>
+    <string name="steps_label_failed">%1$d failed</string>
     <string name="tool_calendar_read_running">Checking your calendar…</string>
     <string name="tool_calendar_read_done">Checked your calendar</string>
     <string name="tool_calendar_read_failed">Couldn’t check your calendar</string>

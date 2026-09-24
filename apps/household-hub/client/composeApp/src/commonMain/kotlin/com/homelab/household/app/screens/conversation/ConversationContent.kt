@@ -380,8 +380,12 @@ private fun Answer(
                     }
 
                     is AnswerRun.Steps -> {
-                        if (folded) {
-                            StepsFold(count = run.steps.size) { Steps(run.steps) }
+                        // A single step isn't folded: it is shown as it is (#40).
+                        val label = if (folded) stepsLabel(run.steps) else null
+                        if (label != null) {
+                            StepsFold(label = stepsLabelText(label, run.steps.size), count = run.steps.size) {
+                                Steps(run.steps)
+                            }
                         } else {
                             Steps(run.steps)
                         }
