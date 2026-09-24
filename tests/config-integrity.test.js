@@ -285,6 +285,20 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
   });
 
+  await t.test('Every tool the hub offers has words of its own in the app', () => {
+    // A tool added on the hub without a label shows as the generic "Used a tool" (read_page and
+    // lookup_sources did, in #36). The hub's list and the app's label map must name the same tools.
+    const hubTools = fs.readFileSync(
+      path.join(ROOT_DIR, 'apps/household-hub/backend/app/domain/use_cases/integrations/list_available_tools.py'), 'utf8');
+    const appLabels = fs.readFileSync(
+      path.join(ROOT_DIR, 'apps/household-hub/client/composeApp/src/commonMain/kotlin/com/homelab/household/app/screens/conversation/ToolLabel.kt'), 'utf8');
+    const offered = [...hubTools.matchAll(/name="([a-z_]+)"/g)].map((m) => m[1]);
+    const labelled = new Set([...appLabels.matchAll(/^\s*"([a-z_]+)" to$/gm)].map((m) => m[1]));
+    assert.ok(offered.length >= 7, 'the hub tool list should be readable');
+    const missing = offered.filter((tool) => !labelled.has(tool));
+    assert.deepEqual(missing, [], `these hub tools have no label in ToolLabel.kt: ${missing.join(', ')}`);
+  });
+
   await t.test('Ollama models live in a named volume, not on the Windows share', () => {
     const ollamaMatch = dockerComposeContent.match(/container_name:\s*ollama[\s\S]*?volumes:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:\s*\n)/);
     assert.ok(ollamaMatch, 'docker-compose.yml must declare volumes for the ollama service');

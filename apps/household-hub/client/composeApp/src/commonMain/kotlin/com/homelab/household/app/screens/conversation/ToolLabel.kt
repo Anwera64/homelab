@@ -11,6 +11,9 @@ import com.homelab.household.app.resources.tool_calendar_write_running
 import com.homelab.household.app.resources.tool_generic_done
 import com.homelab.household.app.resources.tool_generic_failed
 import com.homelab.household.app.resources.tool_generic_running
+import com.homelab.household.app.resources.tool_lookup_done
+import com.homelab.household.app.resources.tool_lookup_failed
+import com.homelab.household.app.resources.tool_lookup_running
 import com.homelab.household.app.resources.tool_note_done
 import com.homelab.household.app.resources.tool_note_failed
 import com.homelab.household.app.resources.tool_note_running
@@ -23,6 +26,9 @@ import com.homelab.household.app.resources.tool_permission_generic
 import com.homelab.household.app.resources.tool_permission_note
 import com.homelab.household.app.resources.tool_permission_pdf
 import com.homelab.household.app.resources.tool_permission_search
+import com.homelab.household.app.resources.tool_read_page_done
+import com.homelab.household.app.resources.tool_read_page_failed
+import com.homelab.household.app.resources.tool_read_page_running
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.app.resources.tool_search_running
@@ -85,6 +91,23 @@ private val labels =
                 running = Res.string.tool_search_running,
                 done = Res.string.tool_search_done,
                 failed = Res.string.tool_search_failed,
+                icon = HearthIcon.Search,
+                permission = Res.string.tool_permission_search,
+            ),
+        // Reading pages and looking through them come with searching, so their permission is its.
+        "read_page" to
+            ToolLabel(
+                running = Res.string.tool_read_page_running,
+                done = Res.string.tool_read_page_done,
+                failed = Res.string.tool_read_page_failed,
+                icon = HearthIcon.Document,
+                permission = Res.string.tool_permission_search,
+            ),
+        "lookup_sources" to
+            ToolLabel(
+                running = Res.string.tool_lookup_running,
+                done = Res.string.tool_lookup_done,
+                failed = Res.string.tool_lookup_failed,
                 icon = HearthIcon.Search,
                 permission = Res.string.tool_permission_search,
             ),
