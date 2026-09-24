@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.ui.unit.dp
 import com.homelab.household.app.components.AnswerText
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
@@ -393,8 +392,8 @@ private fun Answer(
         if (status != null) {
             // Held clear of the steps above it, so waiting reads as the turn still going rather
             // than as one more step. Nothing above it, nothing to hold clear of.
-            val clearance = if (runs.isEmpty()) 0.dp else HearthTheme.spacing.sm
-            Box(modifier = Modifier.padding(top = clearance)) { status() }
+            val clearance = if (runs.isEmpty()) Modifier else Modifier.padding(top = HearthTheme.spacing.sm)
+            Box(modifier = clearance) { status() }
         }
     }
 }
