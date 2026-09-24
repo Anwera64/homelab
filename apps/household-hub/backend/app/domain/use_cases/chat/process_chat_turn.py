@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.domain.entities.user import User
 from app.domain.entities.session import ChatMessage, ConversationSession
 from app.domain.entities.llm_message import LLMMessage, LLMToolCall
+from app.domain.entities.tool_definition import ToolExecutionResult
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.llm_client import ILLMClient
@@ -23,6 +24,7 @@ from app.domain.exceptions import (
     EntityNotFoundException,
     ZeroLeakViolationException,
     InvalidOperationException,
+    ToolPermissionDeniedException,
 )
 
 
@@ -350,13 +352,8 @@ class ProcessChatTurnUseCase:
                     )
                 else:
                     # Execute tool
-                    tool_result = await self.tool_executor.execute(
-                        tool_name=tc.name,
-                        arguments=tc.arguments,
-                        user_id=current_user.id,
-                        agent_tool_permissions=agent.tool_permissions,
-                        is_secret_mode=is_turn_secret,
-                        role="assistant",
+                    tool_result = await self._run_tool(
+                        tc, agent, current_user.id, is_turn_secret, sources=None, offered=agent_tools
                     )
                     exec_info = {
                         "tool": tc.name,
@@ -574,6 +571,39 @@ class ProcessChatTurnUseCase:
                 finish_reasons.append(chunk.finish_reason)
         answer.stop_thinking()
 
+    async def _run_tool(
+        self,
+        tc: LLMToolCall,
+        agent,
+        user_id: str,
+        is_turn_secret: bool,
+        sources: Optional[TurnSources],
+        offered: List[Dict[str, Any]],
+    ) -> ToolExecutionResult:
+        """
+        Runs one tool call. A name the agent can't use - misspelled, or garbled with tool-call markup,
+        as a model has sent - comes back as a failed result naming the tools it does have. It used
+        to raise past the loop and end the whole turn, and the model never learnt why.
+        """
+        try:
+            return await self.tool_executor.execute(
+                tool_name=tc.name,
+                arguments=tc.arguments,
+                user_id=user_id,
+                agent_tool_permissions=agent.tool_permissions,
+                is_secret_mode=is_turn_secret,
+                role="assistant",
+                sources=sources,
+            )
+        except ToolPermissionDeniedException:
+            shown = " ".join(tc.name.split())[:60]
+            names = ", ".join(tool["function"]["name"] for tool in offered)
+            return ToolExecutionResult(
+                tool_name=tc.name,
+                success=False,
+                error=f"There is no tool '{shown}'. Your tools are: {names}.",
+            )
+
     @staticmethod
     def _answer_now(question: str) -> str:
         """
@@ -714,14 +744,8 @@ class ProcessChatTurnUseCase:
                     )
                 else:
                     yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
-                    tool_result = await self.tool_executor.execute(
-                        tool_name=tc.name,
-                        arguments=tc.arguments,
-                        user_id=current_user.id,
-                        agent_tool_permissions=agent.tool_permissions,
-                        is_secret_mode=is_turn_secret,
-                        role="assistant",
-                        sources=sources,
+                    tool_result = await self._run_tool(
+                        tc, agent, current_user.id, is_turn_secret, sources=sources, offered=agent_tools
                     )
                     exec_info = {
                         "tool": tc.name,

@@ -1278,3 +1278,89 @@ async def test_GIVEN_a_chat_with_a_summary_WHEN_streamed_THEN_the_model_gets_the
     assert assembler.summaries == ["Alex planned a trip to Lima."]
     sent = [m.content for m in llm_client.stream_calls[0]["messages"][1:]]
     assert sent == ["message 3", "message 4", "And the hotel?"]
+
+
+class StrictToolExecutor(FakeToolExecutor):
+    """Refuses a tool the agent wasn't given, the way ExecuteToolUseCase does: by raising."""
+
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+        from app.domain.exceptions import ToolPermissionDeniedException
+
+        if tool_name not in agent_tool_permissions:
+            raise ToolPermissionDeniedException(f"Agent does not have permission to execute tool '{tool_name}'.")
+        return await super().execute(tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode, role, sources)
+
+
+async def _turn_with_a_bad_tool_name(bad_name: str):
+    import json
+
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c1", name=bad_name, arguments={"query": "x"})])],
+            [LLMResponseChunk(tool_calls=[LLMToolCall(id="c2", name="calendar_read", arguments={})])],
+            [LLMResponseChunk(delta_content="Here it is.")],
+        ]
+    )
+    executor = StrictToolExecutor()
+    events = [
+        ev
+        async for ev in _use_case(session_repo, agent, llm_client, executor).execute_stream(
+            session_id="s1", current_user=user, content="Look it up"
+        )
+    ]
+    first_tool_message = [m for m in llm_client.stream_calls[1]["messages"] if m.role == "tool"][0]
+    return events, json.loads(first_tool_message.content), executor
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_misspelled_tool_WHEN_the_model_calls_it_THEN_it_is_told_its_tools_and_the_turn_goes_on():
+    """
+    The model once called 'searng_search'. The executor refused it by raising, nothing caught
+    that, and the whole turn died as "couldn't finish your answer" - twice, since regenerating
+    rolled the same dice. Now the model is told which tools it has and tries again.
+    """
+    events, told, executor = await _turn_with_a_bad_tool_name("searng_search")
+
+    assert told == {"error": "There is no tool 'searng_search'. Your tools are: calendar_read."}
+    assert [call["tool"] for call in executor.executed_calls] == ["calendar_read"]
+    assert not [ev for ev in events if ev["type"] == "turn_failed"]
+    done = events[-1]
+    assert done["assistant_content"] == "Here it is."
+    assert [(p["type"], p.get("tool"), p.get("success")) for p in done["parts"] if p["type"] == "tool"] == [
+        ("tool", "searng_search", False),
+        ("tool", "calendar_read", True),
+    ]
+    assert done["tools_executed"][0]["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_tool_name_with_markup_in_it_WHEN_called_THEN_it_is_shown_on_one_short_line():
+    events, told, _ = await _turn_with_a_bad_tool_name("searxng_\n</parameter" + "x" * 100)
+
+    assert "\n" not in told["error"]
+    shown = told["error"].split("'")[1]
+    assert shown.startswith("searxng_ </parameter") and len(shown) <= 60
+    assert events[-1]["assistant_content"] == "Here it is."
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_misspelled_tool_WHEN_answered_without_streaming_THEN_the_turn_still_answers():
+    user = User(id="u1", full_name="Alex")
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["calendar_read"])
+    session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
+    llm_client = FakeLLMClient(
+        responses=[
+            LLMResponse(content="", tool_calls=[LLMToolCall(id="c1", name="searng_search", arguments={})]),
+            LLMResponse(content="Answered."),
+        ]
+    )
+
+    result = await _use_case(session_repo, agent, llm_client, StrictToolExecutor()).execute(
+        session_id="s1", current_user=user, content="Look it up"
+    )
+
+    assert result.message.content == "Answered."
+    assert result.tools_executed[0]["success"] is False
