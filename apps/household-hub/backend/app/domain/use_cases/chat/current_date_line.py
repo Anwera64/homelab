@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, tzinfo
-from typing import Optional
+from typing import Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Spelled out rather than taken from strftime, whose names follow the host's locale.
@@ -22,6 +22,15 @@ def _zone(timezone_name: Optional[str]) -> Optional[tzinfo]:
         return None
 
 
+def _local(when: datetime, timezone_name: Optional[str]) -> Tuple[datetime, str]:
+    """[when] in the phone's zone, and the name to show for it: UTC when the zone can't be used."""
+    zone = _zone(timezone_name)
+    # SQLite gives times back without their zone; they were all written in UTC.
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when.astimezone(zone or timezone.utc), timezone_name if zone else "UTC"
+
+
 def current_date_line(now: datetime, timezone_name: Optional[str]) -> str:
     """
     Today's date and time as the phone's owner would read it, for the top of a prompt.
@@ -30,10 +39,21 @@ def current_date_line(now: datetime, timezone_name: Optional[str]) -> str:
     sent; one the hub can't resolve becomes UTC, and the line says so rather than passing UTC off
     as local time. Minutes, never seconds: the prompt stays the same for a whole minute.
     """
-    zone = _zone(timezone_name)
-    label = timezone_name if zone else "UTC"
-    local = now.astimezone(zone or timezone.utc)
+    local, label = _local(now, timezone_name)
     return (
         f"Today is {_WEEKDAYS[local.weekday()]}, {local.day} {_MONTHS[local.month - 1]} {local.year}, "
         f"{local:%H:%M} ({label})."
+    )
+
+
+def sent_at_stamp(when: datetime, timezone_name: Optional[str]) -> str:
+    """
+    When a message was sent, short, for a transcript: "Mon 21 Sep 2026, 08:14".
+
+    Lets a model reading old messages work out which day "tomorrow" meant to whoever wrote it.
+    """
+    local, _ = _local(when, timezone_name)
+    return (
+        f"{_WEEKDAYS[local.weekday()][:3]} {local.day} {_MONTHS[local.month - 1][:3]} {local.year}, "
+        f"{local:%H:%M}"
     )
