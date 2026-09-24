@@ -398,8 +398,27 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+
+  household-hub:
+    profiles: ["ai"]
+    build:
+      context: ./apps/household-hub/backend
+    container_name: household-hub
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      # SQLite in WAL mode needs real file locks, which the Windows share does not give it.
+      - household_hub_data:/data
+    ports:
+      - 127.0.0.1:3050:3050   # host-only: /docs and /health from the PC; phones come in through Caddy
+    depends_on:
+      - ollama
+      - searxng
+    restart: unless-stopped
 volumes:
   tailscale_sock:
   ollama_models:
     name: ollama_models
+  household_hub_data:
+    name: household_hub_data
 

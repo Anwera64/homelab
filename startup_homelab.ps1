@@ -186,7 +186,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[3/3] Starting remaining Homelab services..." -ForegroundColor Cyan
-docker compose @profileArg -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d
+docker compose @profileArg -f "$PSScriptRoot\docker-compose.yml" --env-file "$PSScriptRoot\.env" up -d --build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[ERROR] Docker compose encountered an error during service startup." -ForegroundColor Red
     Write-Host "  -> Check logs with: docker compose logs" -ForegroundColor Yellow
@@ -206,7 +206,7 @@ if ($containerIds) {
         $exitCode = docker inspect $cId --format "{{.State.ExitCode}}"
         $health = docker inspect $cId --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
 
-        if (-not $aiEnabled -and ($cName -eq "ollama" -or $cName -eq "searxng")) {
+        if (-not $aiEnabled -and ($cName -eq "ollama" -or $cName -eq "searxng" -or $cName -eq "household-hub")) {
             continue
         }
 

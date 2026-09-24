@@ -15,7 +15,7 @@ from app.domain.exceptions import LLMInferenceException
 class OllamaLLMConnector(ILLMClient):
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:11434",
+        base_url: str = "http://ollama:11434",
         timeout_seconds: float = 60.0,
         client: Optional[httpx.AsyncClient] = None,
     ):

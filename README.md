@@ -97,6 +97,7 @@ graph TD
 | **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
 | **FlareSolverr** | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
 | **SearXNG Aggregator** | Internal Container (`http://searxng:8080`) | N/A | Private search backend (JSON API, Wolfram Alpha enabled) |
+| **Household Hub** | `https://hub.spicy-llama.duckdns.org` | `http://127.0.0.1:3050` (host only) | Family assistant backend, reaches Ollama and SearXNG over the compose network (AI profile) |
 
 ---
 

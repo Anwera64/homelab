@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     MAX_PDF_PAGES: int = 150
 
     # AI & LLM Inference Settings
-    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    OLLAMA_BASE_URL: str = "http://ollama:11434"
     # Long enough to cover a cold load of the model into memory: 31 s for qwen3.8-rvn from the Docker volume, measured.
     OLLAMA_TIMEOUT_SECONDS: float = 120.0
     DEFAULT_LLM_MODEL: str = "qwen3.8-rvn"

@@ -18,13 +18,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY app/ app/
 
+# Startup migrates the database, so the migrations ship with the app
+COPY alembic.ini .
+COPY alembic/ alembic/
+
 # Create data directory for SQLite persistence
 RUN mkdir -p /data
 
 # `hub reset-pin "Emma"` from inside the container: the last resort for a forgotten PIN.
-RUN printf '#!/bin/sh
-exec python -m app.cli "$@"
-' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub
+RUN printf '#!/bin/sh\nexec python -m app.cli "$@"\n' > /usr/local/bin/hub && chmod +x /usr/local/bin/hub
 
 EXPOSE 3050
 
