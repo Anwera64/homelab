@@ -16,9 +16,11 @@ class FakeLLMClient:
         self.response_json_str = response_json_str
 
         self.models_asked = []
+        self.messages_sent = []
 
     async def chat_completion(self, messages, model, temperature=0.7, top_p=0.9, tools=None):
         self.models_asked.append(model)
+        self.messages_sent.append(messages)
         return LLMResponse(content=self.response_json_str)
 
 
@@ -345,3 +347,49 @@ async def test_reflect_turn_milestone_sanitization_and_deduplication():
     # Total milestones in repo should be 2 (existing + newly created)
     assert len(gossip_repo.milestones) == 2
 
+
+
+FIXED_NOW = datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
+
+
+async def _reflect_and_capture_system_prompt(timezone_name=None) -> str:
+    llm = FakeLLMClient(response_json_str=json.dumps({"memories": [], "milestones": []}))
+    use_case = ReflectTurnUseCase(
+        llm_client=llm,
+        memory_repo=FakeMemoryRepository(),
+        gossip_repo=FakeGossipRepository(),
+        session_repo=FakeSessionRepository(session=ConversationSession(id="s1", user_id="u1", agent_id="a1")),
+        uow=FakeUnitOfWork(),
+        model_resolver=_house_resolver(),
+        clock=lambda: FIXED_NOW,
+    )
+    await use_case.execute(
+        session_id="s1",
+        user_id="u1",
+        username="alex",
+        agent_id="a1",
+        agent_name="Researcher",
+        user_message="My thesis jury is on Friday.",
+        assistant_message="Good luck!",
+        timezone_name=timezone_name,
+    )
+    return "\n\n".join(m.content for m in llm.messages_sent[0] if m.role == "system")
+
+
+@pytest.mark.asyncio
+async def test_reflection_is_told_the_date_so_friday_and_expiry_land_on_real_days():
+    """
+    #39: without today's date the model guessed the year for `expires_at`, and a milestone could
+    come out already expired - so no other agent ever heard of it.
+    """
+    system = await _reflect_and_capture_system_prompt(timezone_name="America/Mexico_City")
+
+    assert "Today is Thursday, 24 September 2026, 14:05 (America/Mexico_City)." in system
+    assert "absolute" in system and "expires_at" in system.split("Today is", 1)[1]
+
+
+@pytest.mark.asyncio
+async def test_reflection_without_a_timezone_is_dated_in_utc():
+    system = await _reflect_and_capture_system_prompt()
+
+    assert "Today is Thursday, 24 September 2026, 20:05 (UTC)." in system
