@@ -9,8 +9,11 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -21,7 +24,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import com.homelab.household.app.components.NOT_SENT_GLYPH_TAG
 import com.homelab.household.app.components.RETRY_GLYPH_TAG
@@ -232,6 +237,59 @@ class ConversationScreenTest {
             onNode(hasSetTextAction()).performImeAction()
 
             assertEquals(listOf("And Saturday?"), sent)
+        }
+
+    /**
+     * iOS has no back button to hide the keyboard, and the composer's return key sends. Tapping the
+     * conversation, away from the composer, is how Messages lets it go, so it must clear focus.
+     */
+    @Test
+    fun `GIVEN the composer focused WHEN the transcript is tapped THEN the keyboard goes away`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A finished exchange")))
+
+            onNode(hasSetTextAction()).performClick()
+            onNode(hasSetTextAction()).assertIsFocused()
+            onNodeWithText("The panel review is tomorrow at 14:30.").performTouchInput { click() }
+
+            onNode(hasSetTextAction()).assertIsNotFocused()
+        }
+
+    @Test
+    fun `GIVEN the composer focused in a new chat WHEN the greeting is tapped THEN the keyboard goes away`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("New chat")))
+
+            onNode(hasSetTextAction()).performClick()
+            onNode(hasSetTextAction()).assertIsFocused()
+            onNodeWithText("Evening, Emma").performTouchInput { click() }
+
+            onNode(hasSetTextAction()).assertIsNotFocused()
+        }
+
+    /** Dragging the transcript to read back is the other way Messages hides the keyboard. */
+    @Test
+    fun `GIVEN the composer focused WHEN the transcript is dragged THEN the keyboard goes away`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A long answer arriving")))
+
+            onNode(hasSetTextAction()).performClick()
+            onNode(hasSetTextAction()).assertIsFocused()
+            onNodeWithTag(CONVERSATION_TRANSCRIPT_TAG).performTouchInput { swipeDown() }
+
+            onNode(hasSetTextAction()).assertIsNotFocused()
+        }
+
+    /** The screen following an answer as it arrives is not you scrolling: typing carries on. */
+    @Test
+    fun `GIVEN the composer focused WHEN an answer arriving scrolls the transcript THEN the keyboard stays`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A long answer arriving")))
+
+            onNode(hasSetTextAction()).performClick()
+            waitForIdle()
+
+            onNode(hasSetTextAction()).assertIsFocused()
         }
 
     @Test
