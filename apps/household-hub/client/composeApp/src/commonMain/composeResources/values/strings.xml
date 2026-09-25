@@ -384,6 +384,7 @@
     <string name="tool_read_page_failed_named">Couldn’t read %1$s</string>
     <string name="tool_step_named">%1$s · %2$s</string>
     <string name="tool_reason_search_unavailable">the hub’s search service isn’t answering</string>
+    <string name="tool_reason_throttled">the search engines are limiting requests; try again in a few minutes</string>
     <string name="tool_reason_site_unavailable">the site isn’t answering</string>
     <string name="tool_reason_blocked">it blocks automated reading</string>
     <string name="tool_reason_forbidden">the site turned it away</string>

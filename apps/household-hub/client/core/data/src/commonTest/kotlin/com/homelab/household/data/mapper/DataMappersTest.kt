@@ -204,6 +204,25 @@ class DataMappersTest {
     }
 
     @Test
+    fun `GIVEN a throttled search saved with its reason WHEN mapped THEN the part says so`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "searxng_search", "success": false,
+                    "summary": {"query": "q", "reason": "throttled"}}]""",
+            )
+
+        assertEquals(
+            listOf(
+                AnswerPart.ToolFailed(
+                    "searxng_search",
+                    ToolSummary(query = "q", reason = ToolFailureReason.Throttled),
+                ),
+            ),
+            parts,
+        )
+    }
+
+    @Test
     fun `GIVEN a reason this phone does not know WHEN mapped THEN it is unknown`() {
         val parts =
             partsOf(
