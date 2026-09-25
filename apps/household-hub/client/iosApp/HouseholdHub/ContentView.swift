@@ -16,12 +16,13 @@ struct ContentView: View {
 
     var body: some View {
         ComposeView()
-            // Compose runs its own keyboard handling: it reads the keyboard inset itself and
-            // resizes its content, which is what `android:windowSoftInputMode="adjustResize"`
-            // buys on the other platform. Letting SwiftUI *also* inset the hosting view for the
-            // keyboard would apply that shift twice and push the composer off-screen, so SwiftUI
-            // is told to keep out of the keyboard's way — and only the keyboard's; the status bar
-            // and home indicator insets still come through, and Compose lays out against them.
-            .ignoresSafeArea(.keyboard)
+            // The Compose UI is edge to edge and pads every safe area itself — the status bar,
+            // the home indicator and the keyboard, all through `WindowInsets.safeDrawing` (the
+            // keyboard part is what `android:windowSoftInputMode="adjustResize"` buys on the other
+            // platform). So SwiftUI hands it the whole window and stays out of all of them. Keeping
+            // any region here would apply that inset twice: ignoring only the keyboard once left a
+            // white strip of SwiftUI background above and below the app, plus Compose's own
+            // padding on top of it (#45). `EdgeToEdgeHostingTests` pins this.
+            .ignoresSafeArea()
     }
 }
