@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
@@ -49,6 +50,7 @@ import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
+import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getPluralString
@@ -386,43 +388,68 @@ class ConversationScreenTest {
             assertTrue(tool.bottom <= after.top, "and before the rest")
         }
 
+    /** #40: a search says what it looked for, a read names its page, a blocked read says why. */
     @Test
-    fun `GIVEN a finished answer with steps between its text WHEN drawn THEN each run of steps folds into one line where it happened`() =
+    fun `GIVEN an answer being researched WHEN drawn THEN each step says what it found or why not`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Researching: a search, a page read and one blocked")))
+
+            onNodeWithText("Searched the web for “Hong Kong press freedom” · 2 results").assertIsDisplayed()
+            onNodeWithText("Read Hong Kong: press freedom index · rsf.org").assertIsDisplayed()
+            onNodeWithText("Couldn’t read scmp.com · it blocks automated reading").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_read_page_done)).assertDoesNotExist()
+        }
+
+    /** #40: a run of steps is labelled with what it did; a single step is not folded at all. */
+    @Test
+    fun `GIVEN a finished answer with steps between its text WHEN drawn THEN each run shows where it happened and says what it did`() =
         runComposeUiTest {
             setContent(conversation(stateNamed("A finished answer, its steps folded")))
+            val checked = getString(Res.string.tool_calendar_read_done)
 
-            val first = onNodeWithText(getPluralString(Res.plurals.conversation_steps, 1, 1)).getUnclippedBoundsInRoot()
+            val first = onNodeWithText(getString(Res.string.conversation_thought, 4)).getUnclippedBoundsInRoot()
             val before = onNodeWithText("Let me check your calendar.").getUnclippedBoundsInRoot()
-            val second =
-                onNodeWithText(
-                    getPluralString(Res.plurals.conversation_steps, 2, 2),
-                ).getUnclippedBoundsInRoot()
+            val second = onNodeWithText(checked).getUnclippedBoundsInRoot()
             val after = onNodeWithText("Tomorrow's fairly light. Nothing in the evening.").getUnclippedBoundsInRoot()
-            assertTrue(first.bottom <= before.top)
+            assertTrue(first.bottom <= before.top, "a single step shows as it is")
             assertTrue(before.bottom <= second.top)
             assertTrue(second.bottom <= after.top)
-            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertDoesNotExist()
-            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.conversation_thought, 2)).assertDoesNotExist()
         }
 
     @Test
     fun `GIVEN a folded run of steps WHEN tapped THEN its steps show in place and tapping again hides them`() =
         runComposeUiTest {
             setContent(conversation(stateNamed("A finished answer, its steps folded")))
-            val fold = getPluralString(Res.plurals.conversation_steps, 2, 2)
+            val checked = getString(Res.string.tool_calendar_read_done)
 
-            onNodeWithText(fold).performClick()
+            onNodeWithText(checked).performClick()
 
-            val tool = onNodeWithText(getString(Res.string.tool_calendar_read_done)).getUnclippedBoundsInRoot()
+            onAllNodesWithText(checked).assertCountEquals(2)
+            val thought = onNodeWithText(getString(Res.string.conversation_thought, 2)).getUnclippedBoundsInRoot()
             val before = onNodeWithText("Let me check your calendar.").getUnclippedBoundsInRoot()
             val after = onNodeWithText("Tomorrow's fairly light. Nothing in the evening.").getUnclippedBoundsInRoot()
-            assertTrue(before.bottom <= tool.top && tool.bottom <= after.top, "the steps open where they happened")
-            onNodeWithText(getString(Res.string.conversation_thought, 2)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.conversation_thought, 4)).assertDoesNotExist()
+            assertTrue(
+                before.bottom <= thought.top && thought.bottom <= after.top,
+                "the steps open where they happened",
+            )
 
-            onNodeWithText(fold).performClick()
+            onAllNodesWithText(checked)[0].performClick()
 
-            onNodeWithText(getString(Res.string.tool_calendar_read_done)).assertDoesNotExist()
+            onAllNodesWithText(checked).assertCountEquals(1)
+            onNodeWithText(getString(Res.string.conversation_thought, 2)).assertDoesNotExist()
+        }
+
+    @Test
+    fun `GIVEN a finished research answer WHEN drawn THEN its fold says what the steps did and what failed`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A researched answer, its steps folded")))
+
+            val fold = onNodeWithText("Searched the web, read 2 pages · 1 failed")
+            fold.assertIsDisplayed()
+            // How many steps it holds is still told to a screen reader.
+            assertEquals("Show 5 steps", fold.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+            onNodeWithText("Read Hong Kong: press freedom index · rsf.org").assertDoesNotExist()
         }
 
     @Test

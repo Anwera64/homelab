@@ -15,3 +15,5 @@ class ToolExecutionResult:
     success: bool
     data: Optional[Any] = None
     error: Optional[str] = None
+    # Why it failed, as a code the phone can put into words; `error` is written for the model.
+    reason: Optional[str] = None

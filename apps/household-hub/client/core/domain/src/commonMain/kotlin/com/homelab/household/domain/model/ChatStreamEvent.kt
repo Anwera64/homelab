@@ -34,6 +34,8 @@ sealed interface ChatStreamEvent {
         val success: Boolean,
         val data: Any? = null,
         val error: String? = null,
+        /** What the step shows on the phone, the same as the saved part will carry (#40). */
+        val summary: ToolSummary? = null,
     ) : ChatStreamEvent
 
     data class ToolApprovalProposal(

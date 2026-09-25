@@ -336,8 +336,29 @@
         <item quantity="one">%1$d step</item>
         <item quantity="other">%1$d steps</item>
     </plurals>
-    <string name="conversation_steps_show">Show steps</string>
-    <string name="conversation_steps_hide">Hide steps</string>
+    <!-- Said to a screen reader: the fold's label says what the steps did, this says how many (#40). -->
+    <plurals name="conversation_steps_show">
+        <item quantity="one">Show %1$d step</item>
+        <item quantity="other">Show %1$d steps</item>
+    </plurals>
+    <plurals name="conversation_steps_hide">
+        <item quantity="one">Hide %1$d step</item>
+        <item quantity="other">Hide %1$d steps</item>
+    </plurals>
+    <!-- A closed fold says what its steps did (#40). Phrases are joined, and the first is capitalised. -->
+    <string name="steps_phrase_searched">searched the web</string>
+    <string name="steps_phrase_searched_twice">searched the web twice</string>
+    <string name="steps_phrase_searched_times">searched the web %1$d times</string>
+    <plurals name="steps_phrase_read">
+        <item quantity="one">read a page</item>
+        <item quantity="other">read %1$d pages</item>
+    </plurals>
+    <string name="steps_phrase_checked_calendar">checked your calendar</string>
+    <string name="steps_phrase_added">added %1$s</string>
+    <string name="steps_phrase_added_plain">added to your calendar</string>
+    <string name="steps_label_and">%1$s, %2$s</string>
+    <string name="steps_label_more">%1$s and %2$d more</string>
+    <string name="steps_label_failed">%1$d failed</string>
     <string name="tool_calendar_read_running">Checking your calendar…</string>
     <string name="tool_calendar_read_done">Checked your calendar</string>
     <string name="tool_calendar_read_failed">Couldn’t check your calendar</string>
@@ -353,6 +374,25 @@
     <string name="tool_lookup_running">Looking through the sources…</string>
     <string name="tool_lookup_done">Looked through the sources</string>
     <string name="tool_lookup_failed">Couldn’t look through the sources</string>
+    <!-- A step says what it found and why it failed (#40). The query and titles are shown as the hub saved them. -->
+    <string name="tool_search_done_query">Searched the web for “%1$s” · %2$s</string>
+    <plurals name="tool_search_results">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
+    <string name="tool_read_page_done_named">Read %1$s · %2$s</string>
+    <string name="tool_read_page_failed_named">Couldn’t read %1$s</string>
+    <string name="tool_step_named">%1$s · %2$s</string>
+    <string name="tool_reason_search_unavailable">the hub’s search service isn’t answering</string>
+    <string name="tool_reason_site_unavailable">the site isn’t answering</string>
+    <string name="tool_reason_blocked">it blocks automated reading</string>
+    <string name="tool_reason_forbidden">the site turned it away</string>
+    <string name="tool_reason_too_large">it’s too large to read</string>
+    <string name="tool_reason_not_a_page">it isn’t a web page</string>
+    <string name="tool_reason_unreadable">there’s no text in it to read</string>
+    <string name="tool_reason_not_found">it couldn’t be found</string>
+    <string name="tool_results_show">Show results</string>
+    <string name="tool_results_hide">Hide results</string>
     <string name="tool_pdf_running">Reading the document…</string>
     <string name="tool_pdf_done">Read the document</string>
     <string name="tool_pdf_failed">Couldn’t read the document</string>

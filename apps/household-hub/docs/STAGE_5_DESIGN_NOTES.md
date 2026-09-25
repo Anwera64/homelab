@@ -165,7 +165,7 @@ A screen reads the scale off the theme, beside the palette — `HearthTheme.spac
 | PDFs | Attached to a chat. The file is never kept, the extracted text is. No page limit | Agreed when the document feature was designed |
 | Notes | Read, share (.md), delete. No editing in the app | You ask the agent to change a note |
 | Memories | Remove only, no editing | Kept simple; `UpdateMemoryUseCase` stays unused |
-| Web search | Sources come from the tool's own stored result, shown by opening the record | Doesn't depend on the model remembering to cite |
+| Web search | Each step shows its own sources, from a summary saved with the tool part: a search opens to its results, a page read names its page. A closed fold says what its steps did (#40) | Doesn't depend on the model remembering to cite, and survives reopening the chat |
 | Agent in a chat | The header pill names the agent, with no chevron. Changing agent means starting a new chat | A session is bound to one agent and there is no endpoint to switch |
 | Platforms | Android and iOS phones, portrait. Tablet in a later stage | Both of you need it on your own phone |
 | Dropped | Suggestion chips, voice input, the 150-page PDF limit | Nothing backs them, or they measured the wrong thing |
@@ -202,7 +202,8 @@ Items marked **⛔** break a designed flow until they're done.
 - [ ] ⛔ `last_message_preview` on `SessionRead`, truncated server-side.
 - [ ] ⛔ **Classify stream failures by when they happen** in `ChatSessionViewModel`: before the first delta = not delivered; after = delivered. Keep the partial answer; put the status on the assistant turn. Today a dropped stream discards the half-answer and marks your question failed.
 - [ ] ⛔ The 60-second polling limit ends the active wait, not the turn — it must not surface as an error.
-- [ ] ⛔ **Handle `ToolExecuting` and `ToolResult`.** The ViewModel drops them (`else -> {}`), so every read tool, record and search source list is invisible.
+- [x] ⛔ **Handle `ToolExecuting` and `ToolResult`.** Done in #33/#34: every tool part is drawn where it ran.
+- [x] **Tool steps say what they found, or why not (#40).** Each tool part carries a `summary`; see §6.7.
 - [ ] ⛔ **`tool_call_id` on `ToolApprovalProposal`.** `approveTool` needs it and the event doesn't carry it, so approval can't work as wired.
 - [ ] Milestone ids on `ChatStreamEvent.Done`, for the transient publish notice and its Undo (`DELETE /gossip/{id}`).
 - [ ] Title search on the phone, over the loaded list, excluding secret chats.
@@ -441,7 +442,7 @@ A tool that fails says what broke and offers the one fix — here, Reconnect cal
 
 #### Two things to fix in code first
 
-1. ChatSessionViewModel handles Delta, ToolApprovalProposal and Done, then else -> {}. ToolExecuting and ToolResult are silently dropped, so every read tool is invisible today.
+1. ~~ChatSessionViewModel drops ToolExecuting and ToolResult (else -> {}).~~ Done in #33/#34: every tool part is drawn in order, running and done.
 
 2. approveTool(toolCallId, …) needs a call id, but the ToolApprovalProposal event carries only tool, arguments and message. The client has nothing to pass, so approval cannot work as wired. The event contract needs a tool_call_id before any of this is built.
 
@@ -477,19 +478,29 @@ Undo, the settings screen and the checkbox all move the same per-person, per-act
 
 ### 6.7 Web search
 
-*Screens:* Web search · sources, opened, Web search · service down
+*Screens:* Web search · sources, opened, Web search · service down, Research · a page it couldn't read, and the Explanatory steps row
 
-#### Where the answer came from
+#### Where the answer came from (#40)
 
-A search leaves the usual record line — here tapped open to show what came back: page title and site, each a link. That list is the tool’s own result (title, url, snippet per hit), stored as the tool message, so it doesn’t depend on the model remembering to cite. The answer can still name sources in prose; the spec rules out citation chips.
+Each step shows its own sources, so nothing is listed twice when an answer searches four times:
 
-When SearXNG is down the record turns red and says why, and the agent says it can’t look things up rather than guessing silently.
+- A search says what it searched for and how much came back — *Searched the web for “dinner Gràcia Thursday” · 5 results ⌄* — and opens in place to its results: each title a link, its site underneath. No card.
+- A page read names its page — *Read Menu and opening hours · lapubilla.cat* — the title a link. The Read lines are the sources the answer rests on.
+- A failed step keeps its tool's own icon, in red, and says why when that is known: *Couldn't read scmp.com · it blocks automated reading*, *Couldn't search the web · the hub's search service isn't answering*.
+
+None of it depends on the model citing: it comes from the tools' own results. The answer can still name sources in prose; the spec rules out citation chips. Never an id or a tool name.
+
+#### A closed fold says what its steps did
+
+A finished answer folds each run of two or more steps behind a label built from them: one phrase per kind in the order it first ran, repeats counted (*Searched the web twice, read 3 pages*), a write named by its outcome (*added Dinner together*), at most two kinds then *and N more*, and *· N failed* last, in red. When nothing worked, the label is the failure itself. Thinking and looking through the sources are neither named nor counted, and a single step isn't folded at all. A screen reader still hears how many steps a fold holds.
 
 #### Backend and client
 
-Search failures don’t fail the turn: SearchServiceException is caught in execute_tool and returned to the model as a failed tool result, which is why the agent can explain. The client, though, discards ToolExecuting and ToolResult events (else -> {}), so neither the running state, the record, nor the sources list can render until those are handled.
+Every tool part the hub saves carries a `summary` beside `{type, tool, success}` (`summarize_tool`, `app/domain/use_cases/chat/tool_summary.py`): a search's query, count, and each result's title and URL; a page read's title and URL; a written event's title; and a failure's reason. The same summary rides on the live `tool_result` event, so the line is the same while it is written and when the chat is reopened; secret chats save it under the same rules as the rest of the answer. It never carries snippets, ids or error text, and only `http(s)` links get through.
 
-The sources list reads from the stored role="tool" message, so it also works when reopening an old chat.
+A failure's reason is a code — `service_unavailable`, `blocked`, `forbidden`, `too_large`, `not_a_page`, `unreadable`, `not_found`, `unknown` — set where the cause is known (the page reader, the SearXNG connector) and put into words on the phone. The exception's message is written for the model and never reaches the screen.
+
+Search failures still don't fail the turn: `execute_tool` returns them to the model as a failed result, which is why the agent can explain. On the phone, `toolStep` decides each step's icon, words and results from its summary, `ToolStepLine` draws it, and `stepsLabel` builds a fold's label.
 
 ### 6.8 PDFs
 

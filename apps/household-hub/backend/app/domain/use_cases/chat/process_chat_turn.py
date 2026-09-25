@@ -17,6 +17,7 @@ from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContex
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+from app.domain.use_cases.chat.tool_summary import summarize_tool
 from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
@@ -68,9 +69,13 @@ class _AnswerParts:
         else:
             self.parts.append({"type": "text", "content": content})
 
-    def tool(self, name: str, success: bool) -> None:
+    def tool(self, name: str, success: bool, summary: Optional[Dict[str, Any]] = None) -> None:
+        """A tool used, with what it shows on the phone when it has anything to show (#40)."""
         self.stop_thinking()
-        self.parts.append({"type": "tool", "tool": name, "success": success})
+        part: Dict[str, Any] = {"type": "tool", "tool": name, "success": success}
+        if summary is not None:
+            part["summary"] = summary
+        self.parts.append(part)
 
     def stop_thinking(self) -> None:
         """Ends a stretch of thinking: whole seconds, rounded half up, and never zero."""
@@ -756,15 +761,17 @@ class ProcessChatTurnUseCase:
                     tool_result = await self._run_tool(
                         tc, agent, current_user.id, is_turn_secret, sources=sources, offered=agent_tools
                     )
+                    summary = summarize_tool(tc.name, tc.arguments, tool_result)
                     exec_info = {
                         "tool": tc.name,
                         "success": tool_result.success,
                         "arguments": tc.arguments,
                         "data": tool_result.data,
                         "error": tool_result.error,
+                        "summary": summary,
                     }
                     tools_executed.append(exec_info)
-                    answer.tool(tc.name, tool_result.success)
+                    answer.tool(tc.name, tool_result.success, summary)
                     yield {"type": "tool_result", "data": exec_info}
                     # The phone is sent the whole result; the model reads what fits.
                     seen, no_room = budget.fit(

@@ -380,8 +380,12 @@ private fun Answer(
                     }
 
                     is AnswerRun.Steps -> {
-                        if (folded) {
-                            StepsFold(count = run.steps.size) { Steps(run.steps) }
+                        // A single step isn't folded: it is shown as it is (#40).
+                        val label = if (folded) stepsLabel(run.steps) else null
+                        if (label != null) {
+                            StepsFold(label = stepsLabelText(label, run.steps.size), count = run.steps.size) {
+                                Steps(run.steps)
+                            }
                         } else {
                             Steps(run.steps)
                         }
@@ -443,17 +447,13 @@ private fun Steps(steps: List<AnswerPart>) {
                     )
                 }
 
+                // What each tool found, or why it couldn't, and its own icon, red when it failed (#40).
                 is AnswerPart.ToolDone -> {
-                    val label = toolLabel(step.tool)
-                    ToolRecordLine(icon = label.icon, text = stringResource(label.done))
+                    ToolStepLine(step)
                 }
 
                 is AnswerPart.ToolFailed -> {
-                    ToolRecordLine(
-                        icon = HearthIcon.Error,
-                        text = stringResource(toolLabel(step.tool).failed),
-                        tint = HearthTheme.colors.error,
-                    )
+                    ToolStepLine(step)
                 }
 
                 is AnswerPart.Text -> {}

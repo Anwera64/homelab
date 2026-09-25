@@ -620,3 +620,37 @@ async def test_GIVEN_an_answer_saved_with_its_parts_WHEN_the_conversation_is_rea
     detail = (await client.get(f"/api/v1/sessions/{session_id}", headers=headers)).json()
 
     assert detail["messages"][-1]["metadata_json"]["parts"] == parts
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_tool_parts_with_summaries_WHEN_the_conversation_is_read_THEN_the_sources_and_reasons_come_back(
+    client: httpx.AsyncClient,
+):
+    """The sources list and why a step failed are drawn from the saved parts when a chat is reopened (#40)."""
+    _, member_token, agent_id = await setup_environment(client)
+    headers = {"Authorization": f"Bearer {member_token}"}
+    session_id = (await client.post("/api/v1/sessions", json={"agent_id": agent_id}, headers=headers)).json()["id"]
+    parts = [
+        {
+            "type": "tool",
+            "tool": "searxng_search",
+            "success": True,
+            "summary": {"query": "hk press", "count": 1, "sources": [{"title": "Index", "url": "https://rsf.org/hk"}]},
+        },
+        {
+            "type": "tool",
+            "tool": "read_page",
+            "success": False,
+            "summary": {"reason": "blocked", "sources": [{"title": "", "url": "https://www.scmp.com/news"}]},
+        },
+        {"type": "text", "content": "One source was blocked."},
+    ]
+    await client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"role": "assistant", "content": "One source was blocked.", "metadata_json": {"parts": parts}},
+        headers=headers,
+    )
+
+    detail = (await client.get(f"/api/v1/sessions/{session_id}", headers=headers)).json()
+
+    assert detail["messages"][-1]["metadata_json"]["parts"] == parts

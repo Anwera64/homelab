@@ -33,8 +33,9 @@ object AnswerPartDataMapper {
             "tool" -> {
                 val tool = part["tool"]?.jsonPrimitive?.contentOrNull
                 val success = part["success"]?.jsonPrimitive?.booleanOrNull
+                val summary = ToolSummaryDataMapper.fromJson(part["summary"])
                 if (tool != null && success != null) {
-                    if (success) AnswerPart.ToolDone(tool) else AnswerPart.ToolFailed(tool)
+                    if (success) AnswerPart.ToolDone(tool, summary) else AnswerPart.ToolFailed(tool, summary)
                 } else {
                     null
                 }

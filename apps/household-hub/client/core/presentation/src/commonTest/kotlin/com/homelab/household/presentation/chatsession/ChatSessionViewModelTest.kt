@@ -9,6 +9,9 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ToolFailureReason
+import com.homelab.household.domain.model.ToolSource
+import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
@@ -699,6 +702,32 @@ class ChatSessionViewModelTest {
             assertEquals(
                 listOf(AnswerPart.ToolDone("calendar_read"), AnswerPart.ToolFailed("searxng_search")),
                 state.parts,
+            )
+        }
+
+    /** The live line shows the query, the results and why a step failed, as the reopened chat will (#40). */
+    @Test
+    fun `GIVEN tool results with summaries WHEN they arrive THEN each part carries its summary`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            val menu = ToolSource("Menu", "https://lapubilla.cat/")
+            val found = ToolSummary(query = "dinner", count = 1, sources = listOf(menu))
+            val scmp = ToolSource("", "https://scmp.com/")
+            val blocked = ToolSummary(reason = ToolFailureReason.Blocked, sources = listOf(scmp))
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.ToolExecuting("searxng_search"),
+                    ChatStreamEvent.ToolResult("searxng_search", success = true, summary = found),
+                    ChatStreamEvent.ToolExecuting("read_page"),
+                    ChatStreamEvent.ToolResult("read_page", success = false, summary = blocked),
+                )
+
+            viewModel.sendMessage("Dinner near Gràcia?")
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(AnswerPart.ToolDone("searxng_search", found), AnswerPart.ToolFailed("read_page", blocked)),
+                viewModel.uiState.value.parts,
             )
         }
 

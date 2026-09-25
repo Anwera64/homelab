@@ -2,6 +2,8 @@ package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ToolSource
+import com.homelab.household.domain.model.ToolSummary
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -274,6 +276,31 @@ class DefensiveSseStreamReaderTest {
             assertEquals("calendar_read", result.tool)
             assertEquals(false, result.success)
             assertEquals("Unauthorized", result.error)
+        }
+
+    /** A tool's summary is what the phone draws on its line: a search's query and results (#40). */
+    @Test
+    fun `GIVEN a tool result with a summary WHEN read THEN the event carries it`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_result", "data": {"tool": "searxng_search", "success": true, "summary": {"query": "dinner", "count": 1, "sources": [{"title": "Menu", "url": "https://lapubilla.cat/"}]}}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            val result = events.single() as ChatStreamEvent.ToolResult
+            assertEquals(
+                ToolSummary(
+                    query = "dinner",
+                    count = 1,
+                    sources = listOf(ToolSource("Menu", "https://lapubilla.cat/")),
+                ),
+                result.summary,
+            )
         }
 
     /** `id:` lines let a data source remember where to resume a dropped stream from. */

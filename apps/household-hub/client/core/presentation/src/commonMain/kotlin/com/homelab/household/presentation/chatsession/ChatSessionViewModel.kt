@@ -10,6 +10,7 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
@@ -445,7 +446,7 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.ToolResult -> {
-                                answer.tool(event.tool, event.success)
+                                answer.tool(event.tool, event.success, event.summary)
                                 _uiState.update { it.copy(activeTool = null, parts = answer.parts()) }
                             }
 
@@ -614,9 +615,10 @@ private class AnswerPartsBuilder(
     fun tool(
         name: String,
         succeeded: Boolean,
+        summary: ToolSummary? = null,
     ) {
         stopThinking()
-        parts += if (succeeded) AnswerPart.ToolDone(name) else AnswerPart.ToolFailed(name)
+        parts += if (succeeded) AnswerPart.ToolDone(name, summary) else AnswerPart.ToolFailed(name, summary)
     }
 }
 

@@ -13,6 +13,9 @@ import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
+import com.homelab.household.domain.model.ToolFailureReason
+import com.homelab.household.domain.model.ToolSource
+import com.homelab.household.domain.model.ToolSummary
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -139,6 +142,113 @@ class DataMappersTest {
             )
 
         assertEquals(listOf(AnswerPart.Text("Hi")), ChatMessageDataMapper.toDomain(dto).parts)
+    }
+
+    private fun partsOf(partsJson: String) =
+        ChatMessageDataMapper
+            .toDomain(
+                Json { ignoreUnknownKeys = true }.decodeFromString<ChatMessageReadDto>(
+                    """{"id": "m-1", "session_id": "s-1", "role": "assistant", "content": "x", "metadata_json": {"parts": $partsJson}}""",
+                ),
+            ).parts
+
+    @Test
+    fun `GIVEN a search saved with its summary WHEN mapped THEN the part carries its query and results`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "searxng_search", "success": true,
+                    "summary": {"query": "dinner Gràcia", "count": 2, "sources": [
+                        {"title": "The best restaurants in Gràcia", "url": "https://www.timeout.com/gracia"},
+                        {"title": "Menu and opening hours", "url": "https://lapubilla.cat/"}]}}]""",
+            )
+
+        assertEquals(
+            listOf(
+                AnswerPart.ToolDone(
+                    "searxng_search",
+                    ToolSummary(
+                        query = "dinner Gràcia",
+                        count = 2,
+                        sources =
+                            listOf(
+                                ToolSource("The best restaurants in Gràcia", "https://www.timeout.com/gracia"),
+                                ToolSource("Menu and opening hours", "https://lapubilla.cat/"),
+                            ),
+                    ),
+                ),
+            ),
+            parts,
+        )
+    }
+
+    @Test
+    fun `GIVEN a failed read saved with its reason WHEN mapped THEN the part says why and which page`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "read_page", "success": false,
+                    "summary": {"reason": "blocked", "sources": [{"title": "", "url": "https://www.scmp.com/news"}]}}]""",
+            )
+
+        assertEquals(
+            listOf(
+                AnswerPart.ToolFailed(
+                    "read_page",
+                    ToolSummary(
+                        reason = ToolFailureReason.Blocked,
+                        sources = listOf(ToolSource("", "https://www.scmp.com/news")),
+                    ),
+                ),
+            ),
+            parts,
+        )
+    }
+
+    @Test
+    fun `GIVEN a reason this phone does not know WHEN mapped THEN it is unknown`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "read_page", "success": false, "summary": {"reason": "moon_phase"}}]""",
+            )
+
+        assertEquals(listOf(AnswerPart.ToolFailed("read_page", ToolSummary(reason = ToolFailureReason.Unknown))), parts)
+    }
+
+    @Test
+    fun `GIVEN an added event saved with its title WHEN mapped THEN the part names it`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": true, "summary": {"title": "Dinner together"}}]""",
+            )
+
+        assertEquals(listOf(AnswerPart.ToolDone("calendar_write", ToolSummary(title = "Dinner together"))), parts)
+    }
+
+    @Test
+    fun `GIVEN a malformed summary WHEN mapped THEN the part is kept without one`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "searxng_search", "success": true, "summary": "nonsense"},
+                    {"type": "tool", "tool": "read_page", "success": true, "summary": {"sources": "nope", "count": "many"}}]""",
+            )
+
+        assertEquals(
+            listOf(AnswerPart.ToolDone("searxng_search"), AnswerPart.ToolDone("read_page", ToolSummary())),
+            parts,
+        )
+    }
+
+    @Test
+    fun `GIVEN a source that is not a web link WHEN mapped THEN it never becomes something to tap`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "searxng_search", "success": true, "summary": {"query": "q", "count": 3, "sources": [
+                    {"title": "Fine", "url": "https://example.org/"},
+                    {"title": "Script", "url": "javascript:alert(1)"},
+                    {"title": "No link"}]}}]""",
+            )
+
+        val summary = (parts.single() as AnswerPart.ToolDone).summary
+        assertEquals(listOf(ToolSource("Fine", "https://example.org/")), summary?.sources)
     }
 
     @Test
