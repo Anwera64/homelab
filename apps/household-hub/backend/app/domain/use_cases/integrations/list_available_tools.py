@@ -88,6 +88,16 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "description": "The search keywords or query",
                         },
+                        "category": {
+                            "type": "string",
+                            "enum": ["general", "science"],
+                            "description": (
+                                "'science' searches arXiv, Wikipedia, Wikidata and Wolfram Alpha: for papers, "
+                                "data and definitions. 'general' searches the whole web: for news, reports "
+                                "from NGOs and governments, and current events (default: general)"
+                            ),
+                            "default": "general",
+                        },
                         "fresh": {
                             "type": "boolean",
                             "description": "Bypass 15-minute memory cache and force a live upstream query",

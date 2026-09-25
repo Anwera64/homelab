@@ -40,7 +40,7 @@ The backend is structured into decoupled architectural layers strictly enforced 
   * **Inactive Agent Suspension:** Deactivating an agent (`is_active=False`) suspends it from accepting new sessions or chat messages while preserving full read access to past conversation history.
 * **Pluggable Integrations Engine (Stage 2):**
   * **Unified CalDAV Calendar Connector:** Compatible with Apple iCloud, Google Calendar, and self-hosted CalDAV instances. Passwords encrypted with AES-256 (Fernet) at rest. Enforces SSRF blocks and cloud metadata protections.
-  * **SearXNG Private Search Client:** Fast HTTP connection pooling (`httpx.AsyncClient`) with bounded LRU caching (max 500 entries) and 15-minute TTL. Role-based profiles (general vs. academic sources).
+  * **SearXNG Private Search Client:** Fast HTTP connection pooling (`httpx.AsyncClient`) with bounded LRU caching (max 500 entries) and 15-minute TTL. The model picks a `category` per search: `general` (the whole web) or `science` (arXiv, Wikipedia, Wikidata, Wolfram Alpha only).
   * **PyMuPDF Document Reader & Extractor:** Non-blocking PDF parsing with chunked streaming upload validation (64KB chunks), sectioning, citation extraction, and scanned 0-text rejection (`422 Unprocessable Entity`).
   * **Relational Document Store:** SQLite persistence with auto-incrementing version tracking and raw `.md` download endpoint.
 * **AI Inference, Tool Execution & Attributed Gossip Bus (Stage 3):**
