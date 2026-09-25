@@ -366,21 +366,39 @@ async def test_calendar_event_lifecycle():
 
 # Tests for SearXNG Use Case
 @pytest.mark.asyncio
-async def test_execute_search_assistant_vs_researcher_profiles():
+async def test_GIVEN_no_category_WHEN_searching_THEN_it_is_a_general_search_on_the_default_engines():
     connector = MockSearchConnector()
     use_case = ExecuteSearchUseCase(connector)
 
-    # Assistant profile -> general search
-    res_assistant = await use_case.execute(query="best dinner recipes", role="assistant", fresh=False)
-    assert connector.last_category == "general"
-    assert connector.last_fresh is False
-    assert len(res_assistant.results) == 1
+    res = await use_case.execute(query="best dinner recipes", fresh=False)
 
-    # Researcher profile -> academic/science search
-    res_researcher = await use_case.execute(query="parametric roofs", role="researcher", fresh=True)
+    assert connector.last_category == "general"
+    assert connector.last_engines is None
+    assert connector.last_fresh is False
+    assert len(res.results) == 1
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_science_category_WHEN_searching_THEN_only_the_academic_engines_are_asked():
+    connector = MockSearchConnector()
+    use_case = ExecuteSearchUseCase(connector)
+
+    await use_case.execute(query="parametric roofs", category="science", fresh=True)
+
     assert connector.last_category == "science"
     assert connector.last_engines == ["arxiv", "wikipedia", "wikidata", "wolframalpha"]
     assert connector.last_fresh is True
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_unknown_category_WHEN_searching_THEN_it_falls_back_to_a_general_search():
+    connector = MockSearchConnector()
+    use_case = ExecuteSearchUseCase(connector)
+
+    await use_case.execute(query="parametric roofs", category="scholarly")
+
+    assert connector.last_category == "general"
+    assert connector.last_engines is None
 
 
 # Tests for PDF Use Case
@@ -464,6 +482,59 @@ async def test_list_available_tools_openai_schemas():
         assert "properties" in t.parameters_schema
 
 
+def test_GIVEN_the_tool_catalog_WHEN_searxng_search_is_offered_THEN_the_model_can_choose_general_or_science():
+    search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
+
+    category = search.parameters_schema["properties"]["category"]
+
+    assert category["enum"] == ["general", "science"]
+    assert category["default"] == "general"
+    assert "category" not in search.parameters_schema["required"]
+
+
+def _search_tool(connector: MockSearchConnector) -> ExecuteToolUseCase:
+    return ExecuteToolUseCase(
+        calendar_repo=MockCalendarCredentialRepository(),
+        calendar_connector=MockCalendarConnector(),
+        search_connector=connector,
+        document_repo=MockDocumentRepository(),
+        document_reader=MockDocumentReader(),
+        cipher=MockSecretCipher(),
+        uow=MockUnitOfWork(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_model_asks_for_science_WHEN_searxng_search_runs_THEN_the_academic_engines_are_searched():
+    connector = MockSearchConnector()
+
+    result = await _search_tool(connector).execute(
+        tool_name="searxng_search",
+        arguments={"query": "parametric roofs", "category": "science"},
+        user_id="u1",
+        agent_tool_permissions=["searxng_search"],
+    )
+
+    assert result.success is True
+    assert connector.last_category == "science"
+    assert connector.last_engines == ["arxiv", "wikipedia", "wikidata", "wolframalpha"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_category_WHEN_searxng_search_runs_THEN_it_is_a_general_search():
+    connector = MockSearchConnector()
+
+    await _search_tool(connector).execute(
+        tool_name="searxng_search",
+        arguments={"query": "human rights report 2025"},
+        user_id="u1",
+        agent_tool_permissions=["searxng_search"],
+    )
+
+    assert connector.last_category == "general"
+    assert connector.last_engines is None
+
+
 @pytest.mark.asyncio
 async def test_execute_tool_permissions_and_secret_mode():
     cal_repo = MockCalendarCredentialRepository()
@@ -493,7 +564,6 @@ async def test_execute_tool_permissions_and_secret_mode():
             user_id="u1",
             agent_tool_permissions=["searxng_search"],  # Missing calendar_write
             is_secret_mode=False,
-            role="assistant",
         )
 
     # 2. Secret Mode Lock check (Soft degradation)
@@ -503,7 +573,6 @@ async def test_execute_tool_permissions_and_secret_mode():
         user_id="u1",
         agent_tool_permissions=["calendar_write"],
         is_secret_mode=True,  # Secret Mode!
-        role="assistant",
     )
     assert secret_res.success is False
     assert "Secret Mode" in secret_res.error
@@ -515,7 +584,6 @@ async def test_execute_tool_permissions_and_secret_mode():
         user_id="u1",
         agent_tool_permissions=["searxng_search"],
         is_secret_mode=False,
-        role="assistant",
     )
     assert search_res.success is True
     assert search_res.data["query"] == "Barcelona weather"
@@ -527,7 +595,6 @@ async def test_execute_tool_permissions_and_secret_mode():
         user_id="u1",
         agent_tool_permissions=["calendar_read"],
         is_secret_mode=False,
-        role="assistant",
     )
     assert cal_res.success is False
     assert "No calendar configured" in cal_res.error

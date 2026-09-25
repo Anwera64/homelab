@@ -38,6 +38,19 @@ async def test_built_in_agents_seeded(client: httpx.AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_GIVEN_the_seeded_researcher_WHEN_read_THEN_its_prompt_says_when_to_search_science(client: httpx.AsyncClient):
+    """Which engines suit depends on the question, so the Researcher is told, not switched (#38)."""
+    admin_token, _ = await setup_users(client)
+
+    res = await client.get("/api/v1/agents/researcher", headers={"Authorization": f"Bearer {admin_token}"})
+
+    prompt = res.json()["system_prompt"]
+    assert "category" in prompt
+    assert "science" in prompt
+    assert "general" in prompt
+
+
+@pytest.mark.asyncio
 async def test_cannot_delete_built_in_model(client: httpx.AsyncClient):
     """Built-in models must reject deletion with 400 Bad Request."""
     admin_token, _ = await setup_users(client)

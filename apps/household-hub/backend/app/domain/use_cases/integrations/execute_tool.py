@@ -22,7 +22,7 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
-from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
+from app.domain.use_cases.integrations.execute_search import GENERAL, ExecuteSearchUseCase
 from app.domain.use_cases.integrations.manage_documents import SaveDocumentUseCase
 from app.domain.use_cases.integrations.turn_sources import TurnSources
 
@@ -87,7 +87,6 @@ class ExecuteToolUseCase:
         user_id: str,
         agent_tool_permissions: List[str],
         is_secret_mode: bool = False,
-        role: str = "assistant",
         sources: Optional[TurnSources] = None,
     ) -> ToolExecutionResult:
         # 1. Verify agent tool permission
@@ -110,7 +109,8 @@ class ExecuteToolUseCase:
                 query = arguments.get("query", "")
                 fresh = bool(arguments.get("fresh", False))
                 limit = int(arguments.get("limit", DEFAULT_SEARCH_RESULTS))
-                res = await self.search_uc.execute(query=query, role=role, fresh=fresh, limit=limit)
+                category = str(arguments.get("category", GENERAL))
+                res = await self.search_uc.execute(query=query, category=category, fresh=fresh, limit=limit)
                 if sources is None:
                     results = [
                         {"title": r.title, "url": r.url, "snippet": r.snippet[:INLINE_SNIPPET_CHARACTERS]}

@@ -74,7 +74,6 @@ async def execute_tool(
         user_id=current_user.id,
         agent_tool_permissions=agent.tool_permissions,
         is_secret_mode=is_secret_mode,
-        role="researcher" if agent.slug == "researcher" else "assistant",
     )
     return IntegrationPresentationMapper.to_tool_execution_response(result)
 
@@ -203,7 +202,6 @@ async def execute_search(
     """Executes a search query with 15-minute caching and live freshness toggle."""
     res = await search_uc.execute(
         query=payload.query,
-        role="assistant",
         fresh=bool(payload.fresh),
         limit=payload.limit or 10,
     )

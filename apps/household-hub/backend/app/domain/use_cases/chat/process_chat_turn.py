@@ -604,7 +604,6 @@ class ProcessChatTurnUseCase:
                 user_id=user_id,
                 agent_tool_permissions=agent.tool_permissions,
                 is_secret_mode=is_turn_secret,
-                role="assistant",
                 sources=sources,
             )
         except ToolPermissionDeniedException:

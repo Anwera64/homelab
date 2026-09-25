@@ -19,6 +19,9 @@ from app.domain.exceptions import (
     LLMInferenceException,
 )
 from app.domain.entities.llm_model import LLMModel
+from app.domain.entities.search_result import SearchResult
+from app.domain.use_cases.integrations.execute_search import REPUTABLE_ACADEMIC_ENGINES
+from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
@@ -129,7 +132,7 @@ class FakeToolExecutor:
     def __init__(self):
         self.executed_calls = []
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
         return ToolExecutionResult(tool_name=tool_name, success=True, data={"result": "ok"})
 
@@ -830,7 +833,7 @@ class SteppedClock:
 
 
 class FailingToolExecutor(FakeToolExecutor):
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         return ToolExecutionResult(tool_name=tool_name, success=False, error="unreachable")
 
@@ -1149,7 +1152,7 @@ async def test_GIVEN_tools_in_two_rounds_WHEN_answered_THEN_every_call_shares_on
 class PassagesToolExecutor(FakeToolExecutor):
     """Looks up three passages of 900 characters each: about 950 tokens by the hub's estimate."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
         return ToolExecutionResult(
             tool_name=tool_name,
@@ -1295,12 +1298,12 @@ async def test_GIVEN_a_chat_with_a_summary_WHEN_streamed_THEN_the_model_gets_the
 class StrictToolExecutor(FakeToolExecutor):
     """Refuses a tool the agent wasn't given, the way ExecuteToolUseCase does: by raising."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
         from app.domain.exceptions import ToolPermissionDeniedException
 
         if tool_name not in agent_tool_permissions:
             raise ToolPermissionDeniedException(f"Agent does not have permission to execute tool '{tool_name}'.")
-        return await super().execute(tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode, role, sources)
+        return await super().execute(tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode, sources)
 
 
 async def _turn_with_a_bad_tool_name(bad_name: str):
@@ -1383,7 +1386,7 @@ async def test_GIVEN_a_misspelled_tool_WHEN_answered_without_streaming_THEN_the_
 class ResearchToolExecutor(FakeToolExecutor):
     """A search, a page that reads and one that is blocked, as the real tools answer them."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, role="assistant", sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         if tool_name == "searxng_search":
             return ToolExecutionResult(
@@ -1550,3 +1553,60 @@ async def test_GIVEN_the_phones_timezone_WHEN_a_turn_is_answered_THEN_the_contex
     assert plain.timezones_asked_for == ["Europe/Madrid"]
     assert streamed.timezones_asked_for == ["Europe/Madrid"]
     assert regenerated.timezones_asked_for == ["Europe/Madrid"]
+
+
+class RecordingSearchConnector:
+    def __init__(self):
+        self.searches = []
+
+    async def search(self, query, category="general", engines=None, fresh=False, limit=10, timeout=8.0):
+        self.searches.append({"category": category, "engines": engines})
+        return SearchResult(query=query, category=category, total_results=0, is_cached=False, results=[])
+
+
+def _searching_use_case(connector):
+    agent = AgentPersonality(id="a1", name="Researcher", tool_permissions=["searxng_search"])
+    session = ConversationSession(id="s1", user_id="u1", agent_id="a1")
+    tools = ExecuteToolUseCase(
+        calendar_repo=None,
+        calendar_connector=None,
+        search_connector=connector,
+        document_repo=None,
+        document_reader=None,
+        cipher=None,
+        uow=None,
+    )
+    science = LLMToolCall(id="c1", name="searxng_search", arguments={"query": "grain boundaries", "category": "science"})
+    llm_client = FakeLLMClient(
+        responses=[LLMResponse(content="", tool_calls=[science]), LLMResponse(content="Found it.")],
+        stream_chunks_list=[
+            [LLMResponseChunk(tool_calls=[science], finish_reason="tool_calls")],
+            [LLMResponseChunk(delta_content="Found it.")],
+        ],
+    )
+    use_case = _use_case(FakeSessionRepository(sessions=[session]), agent, llm_client, tools)
+    use_case.tool_lister = ResearchToolLister()
+    return use_case
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_model_asks_for_a_science_search_WHEN_answered_THEN_the_academic_engines_are_searched():
+    connector = RecordingSearchConnector()
+
+    await _searching_use_case(connector).execute(
+        session_id="s1", current_user=User(id="u1", full_name="Alex"), content="What are grain boundaries?"
+    )
+
+    assert connector.searches == [{"category": "science", "engines": REPUTABLE_ACADEMIC_ENGINES}]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_model_asks_for_a_science_search_WHEN_streamed_THEN_the_academic_engines_are_searched():
+    connector = RecordingSearchConnector()
+
+    async for _ in _searching_use_case(connector).execute_stream(
+        session_id="s1", current_user=User(id="u1", full_name="Alex"), content="What are grain boundaries?"
+    ):
+        pass
+
+    assert connector.searches == [{"category": "science", "engines": REPUTABLE_ACADEMIC_ENGINES}]
