@@ -306,3 +306,138 @@ async def test_searxng_failures_say_the_service_is_unavailable(respond):
         await connector.search("dinner")
 
     assert raised.value.reason == "service_unavailable"
+
+
+def _searxng_answering(payload: dict, calls: list):
+    """A SearXNG that always gives the same JSON and counts how often it was asked."""
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.params.get("q"))
+        return httpx.Response(200, json=payload)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(respond))
+
+
+THROTTLED = {
+    "results": [],
+    "unresponsive_engines": [["brave", "too many requests"], ["duckduckgo", "CAPTCHA"]],
+}
+
+
+@pytest.mark.asyncio
+async def test_searxng_with_every_engine_refusing_is_a_failure_that_says_why():
+    """No results because the engines refused is not 'nothing matched': the model must be told (#42)."""
+    connector = SearXNGSearchConnector(client=_searxng_answering(THROTTLED, []))
+
+    with pytest.raises(SearchServiceException) as raised:
+        await connector.search("Odebrecht Peru Lava Jato convictions")
+
+    assert raised.value.reason == "throttled"
+    assert "brave: too many requests" in raised.value.message
+    assert "duckduckgo: CAPTCHA" in raised.value.message
+
+
+@pytest.mark.asyncio
+async def test_searxng_results_despite_some_refusing_engines_are_results():
+    payload = {
+        "results": [{"title": "Lava Jato", "url": "https://example.org/lj", "content": "The case"}],
+        "unresponsive_engines": [["brave", "too many requests"]],
+    }
+    connector = SearXNGSearchConnector(client=_searxng_answering(payload, []))
+
+    res = await connector.search("lava jato")
+
+    assert [r.url for r in res.results] == ["https://example.org/lj"]
+
+
+@pytest.mark.asyncio
+async def test_searxng_with_nothing_matching_is_still_an_empty_search():
+    connector = SearXNGSearchConnector(client=_searxng_answering({"results": [], "unresponsive_engines": []}, []))
+
+    res = await connector.search("xyzzy plugh")
+
+    assert res.results == []
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+@pytest.mark.asyncio
+async def test_searxng_while_throttled_fails_fast_without_asking_the_engines_again():
+    """Retrying while the engines are blocking us only deepens the block (#42)."""
+    calls: list = []
+    clock = FakeClock()
+    connector = SearXNGSearchConnector(
+        client=_searxng_answering(THROTTLED, calls), throttle_cooldown_seconds=300, clock=clock
+    )
+    with pytest.raises(SearchServiceException):
+        await connector.search("peru")
+
+    clock.now += 299
+    with pytest.raises(SearchServiceException) as raised:
+        await connector.search("another query", fresh=True)
+
+    assert raised.value.reason == "throttled"
+    assert "brave: too many requests" in raised.value.message
+    assert calls == ["peru"]
+
+
+@pytest.mark.asyncio
+async def test_searxng_asks_the_engines_again_once_the_cooldown_is_over():
+    calls: list = []
+    clock = FakeClock()
+    connector = SearXNGSearchConnector(
+        client=_searxng_answering(THROTTLED, calls), throttle_cooldown_seconds=300, clock=clock
+    )
+    with pytest.raises(SearchServiceException):
+        await connector.search("peru")
+
+    clock.now += 300
+    with pytest.raises(SearchServiceException):
+        await connector.search("peru")
+
+    assert calls == ["peru", "peru"]
+
+
+@pytest.mark.asyncio
+async def test_searxng_while_throttled_still_answers_from_the_cache():
+    calls: list = []
+    answers = iter([
+        {"results": [{"title": "Peru", "url": "https://example.org/pe", "content": ""}]},
+        THROTTLED,
+    ])
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.params.get("q"))
+        return httpx.Response(200, json=next(answers))
+
+    connector = SearXNGSearchConnector(
+        client=httpx.AsyncClient(transport=httpx.MockTransport(respond)), clock=FakeClock()
+    )
+    await connector.search("peru")
+    with pytest.raises(SearchServiceException):
+        await connector.search("chile")
+
+    res = await connector.search("peru")
+
+    assert res.is_cached
+    assert calls == ["peru", "chile"]
+
+
+@pytest.mark.asyncio
+async def test_searxng_throttled_general_engines_do_not_stop_a_search_of_other_engines():
+    """Brave and DuckDuckGo turning us away says nothing about arXiv."""
+    calls: list = []
+    connector = SearXNGSearchConnector(client=_searxng_answering(THROTTLED, calls), clock=FakeClock())
+    with pytest.raises(SearchServiceException):
+        await connector.search("peru")
+
+    with pytest.raises(SearchServiceException):
+        await connector.search("peru", category="science", engines=["arxiv"])
+
+    assert calls == ["peru", "peru"]

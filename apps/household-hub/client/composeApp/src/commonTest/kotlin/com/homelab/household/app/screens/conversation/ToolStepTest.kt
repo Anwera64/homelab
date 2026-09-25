@@ -8,6 +8,7 @@ import com.homelab.household.app.resources.tool_calendar_write_failed
 import com.homelab.household.app.resources.tool_reason_blocked
 import com.homelab.household.app.resources.tool_reason_search_unavailable
 import com.homelab.household.app.resources.tool_reason_site_unavailable
+import com.homelab.household.app.resources.tool_reason_throttled
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.domain.model.AnswerPart
@@ -105,6 +106,23 @@ class ToolStepTest {
 
         assertEquals(
             StepWords.Failed(Res.string.tool_search_failed, Res.string.tool_reason_search_unavailable),
+            step.words,
+        )
+        assertEquals(HearthIcon.Search, step.icon)
+    }
+
+    @Test
+    fun `GIVEN the search engines throttling WHEN described THEN it says so in the search's own words`() {
+        val step =
+            toolStep(
+                AnswerPart.ToolFailed(
+                    "searxng_search",
+                    ToolSummary(query = "q", reason = ToolFailureReason.Throttled),
+                ),
+            )
+
+        assertEquals(
+            StepWords.Failed(Res.string.tool_search_failed, Res.string.tool_reason_throttled),
             step.words,
         )
         assertEquals(HearthIcon.Search, step.icon)

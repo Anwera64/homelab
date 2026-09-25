@@ -108,9 +108,10 @@ class ExecuteToolUseCase:
         try:
             if tool_name == "searxng_search":
                 query = arguments.get("query", "")
-                fresh = bool(arguments.get("fresh", False))
                 limit = int(arguments.get("limit", DEFAULT_SEARCH_RESULTS))
-                res = await self.search_uc.execute(query=query, role=role, fresh=fresh, limit=limit)
+                # Never fresh: a model retrying a search that came back empty would only ask the
+                # engines again, and when they are throttling us that deepens the block (#42).
+                res = await self.search_uc.execute(query=query, role=role, fresh=False, limit=limit)
                 if sources is None:
                     results = [
                         {"title": r.title, "url": r.url, "snippet": r.snippet[:INLINE_SNIPPET_CHARACTERS]}

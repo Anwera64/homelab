@@ -1,9 +1,9 @@
 from collections import OrderedDict
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 import httpx
 from app.domain.entities.search_result import SearchResult, SearchResultItem
-from app.domain.exceptions import SearchServiceException
+from app.domain.exceptions import SearchServiceException, ToolFailureReason
 from app.domain.repositories.search_connector import ISearchConnector
 
 
@@ -14,6 +14,8 @@ class SearXNGSearchConnector(ISearchConnector):
         cache_ttl_seconds: int = 900,
         max_cache_entries: int = 500,
         client: Optional[httpx.AsyncClient] = None,
+        throttle_cooldown_seconds: int = 300,
+        clock: Callable[[], float] = time.monotonic,
     ):
         self.base_url = base_url.rstrip("/")
         self.cache_ttl_seconds = cache_ttl_seconds
@@ -21,6 +23,11 @@ class SearXNGSearchConnector(ISearchConnector):
         self._external_client = client
         self._internal_client: Optional[httpx.AsyncClient] = None
         self._cache: OrderedDict[Tuple[str, str, Optional[Tuple[str, ...]]], Tuple[float, SearchResult]] = OrderedDict()
+        # When the engines turn us away, asking again only deepens the block: until the cooldown is
+        # over every search of the same engines fails with the same reason, without reaching them (#42).
+        self.throttle_cooldown_seconds = throttle_cooldown_seconds
+        self._clock = clock
+        self._throttled: Dict[Tuple[str, Optional[Tuple[str, ...]]], Tuple[float, str]] = {}
 
     @property
     def _client(self) -> Optional[httpx.AsyncClient]:
@@ -77,6 +84,11 @@ class SearXNGSearchConnector(ISearchConnector):
             else:
                 del self._cache[cache_key]
 
+        engines_key = cache_key[1:]
+        throttled_until, throttled_message = self._throttled.get(engines_key, (0.0, ""))
+        if self._clock() < throttled_until:
+            raise SearchServiceException(throttled_message, reason=ToolFailureReason.THROTTLED)
+
         # 2. Query SearXNG JSON API
         params: Dict[str, str] = {
             "q": query,
@@ -96,6 +108,14 @@ class SearXNGSearchConnector(ISearchConnector):
                 )
 
             data = response.json()
+            refusing = _refusing_engines(data)
+            if refusing and not data.get("results"):
+                message = (
+                    f"The search engines are limiting requests ({refusing}). Searching again now "
+                    "won't help; try again in a few minutes."
+                )
+                self._throttled[engines_key] = (self._clock() + self.throttle_cooldown_seconds, message)
+                raise SearchServiceException(message, reason=ToolFailureReason.THROTTLED)
             raw_results = data.get("results", [])[:limit]
             results: List[SearchResultItem] = []
             for r in raw_results:
@@ -140,3 +160,14 @@ class SearXNGSearchConnector(ISearchConnector):
             return resp.status_code == 200
         except Exception:
             return False
+
+
+def _refusing_engines(data: dict) -> str:
+    """SearXNG's `unresponsive_engines`, `[[engine, why], ...]`, as `brave: too many requests, ...`."""
+    refusing = []
+    for entry in data.get("unresponsive_engines") or []:
+        if isinstance(entry, (list, tuple)) and entry:
+            refusing.append(": ".join(str(part) for part in entry[:2]))
+        else:
+            refusing.append(str(entry))
+    return ", ".join(refusing)

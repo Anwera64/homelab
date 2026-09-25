@@ -186,6 +186,7 @@ _searxng_connector = SearXNGSearchConnector(
     base_url=settings.SEARXNG_BASE_URL,
     cache_ttl_seconds=settings.SEARCH_CACHE_TTL_SECONDS,
     max_cache_entries=settings.SEARXNG_CACHE_MAX_ENTRIES,
+    throttle_cooldown_seconds=settings.SEARCH_THROTTLE_COOLDOWN_SECONDS,
 )
 _document_reader = PyMuPDFDocumentReader()
 _caldav_connector = CalDavCalendarConnector()

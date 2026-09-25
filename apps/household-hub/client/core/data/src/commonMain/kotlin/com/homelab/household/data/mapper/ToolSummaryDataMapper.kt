@@ -39,6 +39,7 @@ object ToolSummaryDataMapper {
     private fun reasonFromCode(code: String): ToolFailureReason =
         when (code) {
             "service_unavailable" -> ToolFailureReason.ServiceUnavailable
+            "throttled" -> ToolFailureReason.Throttled
             "blocked" -> ToolFailureReason.Blocked
             "forbidden" -> ToolFailureReason.Forbidden
             "too_large" -> ToolFailureReason.TooLarge
