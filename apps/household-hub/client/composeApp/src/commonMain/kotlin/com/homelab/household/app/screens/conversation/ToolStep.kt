@@ -8,6 +8,7 @@ import com.homelab.household.app.resources.tool_reason_not_a_page
 import com.homelab.household.app.resources.tool_reason_not_found
 import com.homelab.household.app.resources.tool_reason_search_unavailable
 import com.homelab.household.app.resources.tool_reason_site_unavailable
+import com.homelab.household.app.resources.tool_reason_throttled
 import com.homelab.household.app.resources.tool_reason_too_large
 import com.homelab.household.app.resources.tool_reason_unreadable
 import com.homelab.household.domain.model.AnswerPart
@@ -123,6 +124,10 @@ private fun reasonWords(
     when (reason) {
         ToolFailureReason.ServiceUnavailable -> {
             if (tool == SEARCH) Res.string.tool_reason_search_unavailable else Res.string.tool_reason_site_unavailable
+        }
+
+        ToolFailureReason.Throttled -> {
+            Res.string.tool_reason_throttled
         }
 
         ToolFailureReason.Blocked -> {

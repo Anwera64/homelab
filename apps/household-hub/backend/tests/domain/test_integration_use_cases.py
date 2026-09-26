@@ -464,6 +464,36 @@ async def test_list_available_tools_openai_schemas():
         assert "properties" in t.parameters_schema
 
 
+def test_the_model_is_not_offered_a_way_around_the_search_cache():
+    """A model retrying with `fresh` hit throttled engines again and again (#42)."""
+    search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
+
+    assert "fresh" not in search.parameters_schema["properties"]
+
+
+@pytest.mark.asyncio
+async def test_a_model_asking_for_a_fresh_search_still_gets_the_cache():
+    search_connector = MockSearchConnector()
+    execute_uc = ExecuteToolUseCase(
+        calendar_repo=MockCalendarCredentialRepository(),
+        calendar_connector=MockCalendarConnector(),
+        search_connector=search_connector,
+        document_repo=MockDocumentRepository(),
+        document_reader=MockDocumentReader(),
+        cipher=MockSecretCipher(),
+        uow=MockUnitOfWork(),
+    )
+
+    await execute_uc.execute(
+        tool_name="searxng_search",
+        arguments={"query": "peru", "fresh": True},
+        user_id="u1",
+        agent_tool_permissions=["searxng_search"],
+    )
+
+    assert search_connector.last_fresh is False
+
+
 @pytest.mark.asyncio
 async def test_execute_tool_permissions_and_secret_mode():
     cal_repo = MockCalendarCredentialRepository()
