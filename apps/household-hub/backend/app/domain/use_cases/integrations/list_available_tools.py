@@ -98,11 +98,6 @@ class ListAvailableToolsUseCase:
                             ),
                             "default": "general",
                         },
-                        "fresh": {
-                            "type": "boolean",
-                            "description": "Bypass 15-minute memory cache and force a live upstream query",
-                            "default": False,
-                        },
                         "limit": {
                             "type": "integer",
                             "description": "Number of search results to return (default: 5)",

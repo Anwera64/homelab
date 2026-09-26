@@ -492,6 +492,13 @@ def test_GIVEN_the_tool_catalog_WHEN_searxng_search_is_offered_THEN_the_model_ca
     assert "category" not in search.parameters_schema["required"]
 
 
+def test_the_model_is_not_offered_a_way_around_the_search_cache():
+    """A model retrying with `fresh` hit throttled engines again and again (#42)."""
+    search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
+
+    assert "fresh" not in search.parameters_schema["properties"]
+
+
 def _search_tool(connector: MockSearchConnector) -> ExecuteToolUseCase:
     return ExecuteToolUseCase(
         calendar_repo=MockCalendarCredentialRepository(),
@@ -533,6 +540,20 @@ async def test_GIVEN_no_category_WHEN_searxng_search_runs_THEN_it_is_a_general_s
 
     assert connector.last_category == "general"
     assert connector.last_engines is None
+
+
+@pytest.mark.asyncio
+async def test_a_model_asking_for_a_fresh_search_still_gets_the_cache():
+    connector = MockSearchConnector()
+
+    await _search_tool(connector).execute(
+        tool_name="searxng_search",
+        arguments={"query": "peru", "fresh": True},
+        user_id="u1",
+        agent_tool_permissions=["searxng_search"],
+    )
+
+    assert connector.last_fresh is False
 
 
 @pytest.mark.asyncio

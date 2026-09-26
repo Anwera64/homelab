@@ -105,6 +105,7 @@ class ToolFailureReason:
     """
 
     SERVICE_UNAVAILABLE = "service_unavailable"
+    THROTTLED = "throttled"
     BLOCKED = "blocked"
     FORBIDDEN = "forbidden"
     TOO_LARGE = "too_large"

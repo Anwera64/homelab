@@ -24,6 +24,7 @@ data class ToolSource(
 /** Why a step failed, as the hub names it. A reason this phone does not know yet is [Unknown]. */
 enum class ToolFailureReason {
     ServiceUnavailable,
+    Throttled,
     Blocked,
     Forbidden,
     TooLarge,

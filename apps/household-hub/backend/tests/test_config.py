@@ -165,3 +165,7 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
     await runner("s1", "u1", "Alex", "a1", "Assistant", "Hi", "Hello", False, False, False, timezone_name="Asia/Tokyo")
 
     assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
+
+
+def test_settings_pause_searching_for_five_minutes_when_the_engines_throttle_us(settings_without_overrides: Settings):
+    assert settings_without_overrides.SEARCH_THROTTLE_COOLDOWN_SECONDS == 300
