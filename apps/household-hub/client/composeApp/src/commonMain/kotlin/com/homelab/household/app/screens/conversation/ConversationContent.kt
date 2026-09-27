@@ -351,11 +351,17 @@ fun ConversationContent(
                         val tool = state.activeTool
                         when {
                             // In the answer's place, because that is where the eye is waiting.
-                            tool != null -> ToolRunningChip(stringResource(toolLabel(tool).running))
+                            tool != null -> {
+                                ToolRunningChip(stringResource(toolLabel(tool, state.activeToolAction).running))
+                            }
 
-                            thinking -> Thinking(thinkingPhase, slowPhase)
+                            thinking -> {
+                                Thinking(thinkingPhase, slowPhase)
+                            }
 
-                            else -> TurnStatus(state, onTryAgain)
+                            else -> {
+                                TurnStatus(state, onTryAgain)
+                            }
                         }
                     }
                 }

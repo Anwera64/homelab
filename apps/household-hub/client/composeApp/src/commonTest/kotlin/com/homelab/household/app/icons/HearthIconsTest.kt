@@ -58,6 +58,8 @@ class HearthIconsTest {
             "sent",
             // The calendar row's options, drawn on the Calendar & offline canvas
             "more",
+            // Removing an event, drawn on the Tools page's approval board
+            "calendarRemove",
         )
 
     private val solidShapeCounts =

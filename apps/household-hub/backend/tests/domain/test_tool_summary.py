@@ -89,7 +89,45 @@ def test_an_added_event_is_named_by_its_title():
 
     summary = summarize_tool("calendar_write", {"action": "create", "title": "Dinner together"}, result)
 
-    assert summary == {"title": "Dinner together"}
+    assert summary == {"action": "create", "title": "Dinner together"}
+
+
+def test_a_write_says_which_action_it_was_so_a_removal_never_reads_as_added():
+    result = ToolExecutionResult(tool_name="calendar_write", success=True, data={"action": "deleted"})
+
+    summary = summarize_tool("calendar_write", {"action": "delete", "event_id": "e1", "title": "Print shop"}, result)
+
+    assert summary == {"action": "delete", "title": "Print shop"}
+
+
+def test_a_write_with_no_action_is_the_tools_default_create():
+    result = ToolExecutionResult(tool_name="calendar_write", success=True, data={"event": {"id": "e1"}})
+
+    assert summarize_tool("calendar_write", {"title": "Dinner"}, result) == {"action": "create", "title": "Dinner"}
+
+
+def test_a_note_write_says_which_action_it_was():
+    result = ToolExecutionResult(tool_name="document_writer", success=True, data={"document_id": "d1"})
+
+    for action in ("create", "append", "replace"):
+        summary = summarize_tool("document_writer", {"action": action, "title": "Shopping", "content": "x"}, result)
+        assert summary == {"action": action}
+
+
+def test_a_failed_write_still_says_which_action_it_was():
+    result = ToolExecutionResult(tool_name="calendar_write", success=False, error="CalDAV said no", reason=None)
+
+    summary = summarize_tool("calendar_write", {"action": "update", "event_id": "e1"}, result)
+
+    assert summary == {"action": "update", "reason": "unknown"}
+
+
+def test_an_action_the_tool_does_not_have_is_left_out_rather_than_guessed():
+    result = ToolExecutionResult(tool_name="calendar_write", success=True, data={})
+
+    summary = summarize_tool("calendar_write", {"action": "obliterate", "title": "Dinner"}, result)
+
+    assert summary == {"title": "Dinner"}
 
 
 def test_tools_with_nothing_to_show_have_no_summary():

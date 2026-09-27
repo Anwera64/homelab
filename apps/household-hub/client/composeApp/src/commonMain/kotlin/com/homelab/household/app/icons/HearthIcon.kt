@@ -91,6 +91,16 @@ enum class HearthIcon(
             "M17.6 14.6v6M14.6 17.6h6",
         ),
     ),
+
+    // The approval board's calendar with a minus: a removal, never drawn as an add.
+    CalendarRemove(
+        "calendarRemove",
+        strokes(
+            "M19.4 11.6V8.6a2.8 2.8 0 0 0-2.8-2.8H5.8A2.8 2.8 0 0 0 3 8.6v9.2a2.8 2.8 0 0 0 2.8 2.8h6",
+            "M8.2 3.4v4.4M15 3.4v4.4M3 11.4h16.4",
+            "M14.8 17.6h6",
+        ),
+    ),
     Search("search", strokes(circle(10.8, 10.8, 6.4), "M15.6 15.6l4.8 4.8")),
     Document(
         "document",

@@ -9,6 +9,7 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -680,6 +681,38 @@ class ChatSessionViewModelTest {
             advanceUntilIdle()
 
             assertEquals("calendar_read", viewModel.uiState.value.activeTool)
+        }
+
+    @Test
+    fun `GIVEN a write running WHEN shown THEN its action is shown with it and goes when it is done`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(ChatStreamEvent.ToolExecuting("calendar_write", action = ToolAction.Delete))
+
+            viewModel.sendMessage("Cancel the print shop thing")
+            advanceUntilIdle()
+
+            assertEquals("calendar_write", viewModel.uiState.value.activeTool)
+            assertEquals(ToolAction.Delete, viewModel.uiState.value.activeToolAction)
+        }
+
+    @Test
+    fun `GIVEN a write that finished WHEN the next tool runs THEN no action is left over from it`() =
+        runTest(testDispatcher) {
+            loadedSession()
+            every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.ToolExecuting("calendar_write", action = ToolAction.Delete),
+                    ChatStreamEvent.ToolResult("calendar_write", success = true),
+                    ChatStreamEvent.ToolExecuting("calendar_read"),
+                )
+
+            viewModel.sendMessage("Cancel it and tell me what's left")
+            advanceUntilIdle()
+
+            assertEquals("calendar_read", viewModel.uiState.value.activeTool)
+            assertNull(viewModel.uiState.value.activeToolAction)
         }
 
     @Test

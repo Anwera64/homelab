@@ -64,10 +64,10 @@ private fun ToolStepLine(
 ) {
     val colors = HearthTheme.colors
     val iconTint = if (step.failed) colors.error else colors.textMuted
-    val text = stepText(step)
+    val (text, kept) = stepText(step)
 
     if (step.results.isEmpty()) {
-        ToolRecordLine(icon = step.icon, text = text, modifier = modifier, iconTint = iconTint)
+        ToolRecordLine(icon = step.icon, text = text, modifier = modifier, iconTint = iconTint, kept = kept)
         return
     }
 
@@ -113,36 +113,53 @@ private fun Results(results: List<ToolSource>) {
     }
 }
 
+/** A step's words, and the end of its line that is never shortened, when it has one. */
+private data class StepText(
+    val text: AnnotatedString,
+    val kept: String? = null,
+)
+
 @Composable
-private fun stepText(step: ToolStep): AnnotatedString =
+private fun stepText(step: ToolStep): StepText =
     when (val words = step.words) {
         is StepWords.Plain -> {
-            AnnotatedString(stringResource(words.words))
+            StepText(AnnotatedString(stringResource(words.words)))
         }
 
         is StepWords.Searched -> {
             val results = pluralStringResource(Res.plurals.tool_search_results, words.count, words.count)
-            AnnotatedString(stringResource(Res.string.tool_search_done_query, words.query, results))
+            StepText(AnnotatedString(stringResource(Res.string.tool_search_done_query, words.query, results)))
         }
 
         is StepWords.Read -> {
+            // One line, however long the title: the title gives way and the site is kept whole.
             val line = stringResource(Res.string.tool_read_page_done_named, words.title, words.host)
-            linkedWithin(line, words.title, words.url)
+            val start = line.indexOf(words.title)
+            if (start < 0) {
+                StepText(linkedWithin(line, words.title, words.url))
+            } else {
+                val end = start + words.title.length
+                StepText(linkedWithin(line.substring(0, end), words.title, words.url), kept = line.substring(end))
+            }
         }
 
         is StepWords.Named -> {
-            AnnotatedString(stringResource(Res.string.tool_step_named, stringResource(words.words), words.name))
+            StepText(
+                AnnotatedString(stringResource(Res.string.tool_step_named, stringResource(words.words), words.name)),
+            )
         }
 
         is StepWords.CouldNotRead -> {
-            failure(
-                stringResource(Res.string.tool_read_page_failed_named, words.host),
-                words.reason?.let { stringResource(it) },
+            StepText(
+                failure(
+                    stringResource(Res.string.tool_read_page_failed_named, words.host),
+                    words.reason?.let { stringResource(it) },
+                ),
             )
         }
 
         is StepWords.Failed -> {
-            failure(stringResource(words.words), words.reason?.let { stringResource(it) })
+            StepText(failure(stringResource(words.words), words.reason?.let { stringResource(it) }))
         }
     }
 

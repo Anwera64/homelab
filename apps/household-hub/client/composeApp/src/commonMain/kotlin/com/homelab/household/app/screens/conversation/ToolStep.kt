@@ -63,7 +63,7 @@ sealed interface StepWords {
         val reason: StringResource?,
     ) : StepWords
 
-    /** "Added to your calendar · Dinner together". */
+    /** "Added to your calendar · Dinner together", or "Removed from your calendar · Print shop". */
     data class Named(
         val words: StringResource,
         val name: String,
@@ -79,7 +79,7 @@ private fun toolStep(
     succeeded: Boolean,
     summary: ToolSummary?,
 ): ToolStep {
-    val label = toolLabel(tool)
+    val label = toolLabel(tool, summary?.action)
     val page = summary?.sources?.firstOrNull()
     if (!succeeded) {
         val reason = summary?.reason?.let { reasonWords(tool, it) }
