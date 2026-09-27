@@ -141,4 +141,28 @@ class StepsLabelTest {
             stepsLabel(listOf(appended, search))?.phrases,
         )
     }
+
+    @Test
+    fun `GIVEN a write done and one declined WHEN labelled THEN the declined one is its own named phrase and not a failure`() {
+        val added =
+            AnswerPart.ToolDone(
+                "calendar_write",
+                ToolSummary(title = "Dinner together", action = ToolAction.Create),
+            )
+        val declined =
+            AnswerPart.Declined(
+                "calendar_write",
+                ToolSummary(title = "Buy flowers", action = ToolAction.Create),
+            )
+
+        assertEquals(
+            StepsLabel(
+                listOf(
+                    StepPhrase.Wrote(ToolAction.Create, "Dinner together"),
+                    StepPhrase.Declined("calendar_write", ToolAction.Create, "Buy flowers"),
+                ),
+            ),
+            stepsLabel(listOf(added, declined)),
+        )
+    }
 }

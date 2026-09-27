@@ -181,7 +181,8 @@ class ChatSessionViewModelTest {
             arguments = mapOf("title" to "Dinner together", "start_time" to "2026-10-03T20:30:00"),
         )
     private val flowers = dinner.copy(toolCallId = "c2", arguments = mapOf("title" to "Buy flowers"))
-    private val question = ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Dinner Saturday?")
+    private val question =
+        ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Dinner Saturday?")
 
     private fun pausedAnswer(vararg cards: AnswerPart.Proposal) =
         ChatMessage(
@@ -203,7 +204,8 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a turn that asks before a write WHEN it pauses THEN the answer stays with its card and the turn waits`() =
         runTest(testDispatcher) {
-            everySuspend { getSessionUseCase("s-1") } returns Pair(ConversationSession(id = "s-1", userId = "u-1"), emptyList())
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(ConversationSession(id = "s-1", userId = "u-1"), emptyList())
             viewModel.loadSession("s-1")
             advanceUntilIdle()
             every { streamChatTurnUseCase("s-1", "Dinner Saturday?", false, any()) } returns
@@ -239,7 +241,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun `GIVEN a waiting card WHEN Send is tapped THEN nothing is sent, the text stays and the hold line shows`() =
+    fun `GIVEN a waiting card WHEN Send is tapped THEN nothing is sent and the text stays and the hold line shows`() =
         runTest(testDispatcher) {
             openPaused(dinner)
             viewModel.composerTextChanged("Also lunch?")
@@ -262,16 +264,30 @@ class ChatSessionViewModelTest {
             val done =
                 listOf(
                     AnswerPart.Text("I can add it now."),
-                    AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner together")),
+                    AnswerPart.ToolDone(
+                        "calendar_write",
+                        ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                    ),
                     AnswerPart.Text("Done."),
                 )
             every { decideToolProposalUseCase("s-1", "c1", true, null) } returns
                 flowOf(
                     ChatStreamEvent.Accepted,
                     ChatStreamEvent.ToolExecuting("calendar_write", action = ToolAction.Create),
-                    ChatStreamEvent.ToolResult("calendar_write", success = true, summary = done[1].let { (it as AnswerPart.ToolDone).summary }),
+                    ChatStreamEvent.ToolResult(
+                        "calendar_write",
+                        success = true,
+                        summary =
+                            done[1].let {
+                                (it as AnswerPart.ToolDone).summary
+                            },
+                    ),
                     ChatStreamEvent.Delta("Done."),
-                    ChatStreamEvent.Done(messageId = "m-2", assistantContent = "I can add it now.\n\nDone.", parts = done),
+                    ChatStreamEvent.Done(
+                        messageId = "m-2",
+                        assistantContent = "I can add it now.\n\nDone.",
+                        parts = done,
+                    ),
                 )
 
             viewModel.decide("c1", approved = true)
@@ -292,7 +308,12 @@ class ChatSessionViewModelTest {
             every { decideToolProposalUseCase("s-1", "c1", false, null) } returns
                 flow {
                     emit(ChatStreamEvent.Accepted)
-                    emit(ChatStreamEvent.ToolDeclined("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner together")))
+                    emit(
+                        ChatStreamEvent.ToolDeclined(
+                            "calendar_write",
+                            ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                        ),
+                    )
                     awaitCancellation()
                 }
 
@@ -305,7 +326,10 @@ class ChatSessionViewModelTest {
             assertEquals(
                 listOf(
                     AnswerPart.Text("I can add it now."),
-                    AnswerPart.Declined("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner together")),
+                    AnswerPart.Declined(
+                        "calendar_write",
+                        ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                    ),
                 ),
                 state.parts,
             )
@@ -319,7 +343,11 @@ class ChatSessionViewModelTest {
             every { decideToolProposalUseCase("s-1", "c1", true, null) } returns
                 flowOf(
                     ChatStreamEvent.Accepted,
-                    ChatStreamEvent.AwaitingApproval(messageId = "m-2", assistantContent = afterFirst.content, parts = afterFirst.parts),
+                    ChatStreamEvent.AwaitingApproval(
+                        messageId = "m-2",
+                        assistantContent = afterFirst.content,
+                        parts = afterFirst.parts,
+                    ),
                 )
 
             viewModel.decide("c1", approved = true)
@@ -332,15 +360,20 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun `GIVEN the hub holding a card this phone has not seen WHEN a message is sent THEN it is held, not failed`() =
+    fun `GIVEN the hub holding a card this phone has not seen WHEN a message is sent THEN it is held and not failed`() =
         runTest(testDispatcher) {
-            everySuspend { getSessionUseCase("s-1") } returns Pair(ConversationSession(id = "s-1", userId = "u-1"), listOf(question))
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(ConversationSession(id = "s-1", userId = "u-1"), listOf(question))
             viewModel.loadSession("s-1")
             advanceUntilIdle()
-            every { streamChatTurnUseCase("s-1", "Also lunch?", false, any()) } returns flow { throw ApprovalPendingException() }
+            every { streamChatTurnUseCase("s-1", "Also lunch?", false, any()) } returns
+                flow { throw ApprovalPendingException() }
             // Read again, the chat shows the card another phone left waiting.
             everySuspend { getSessionUseCase("s-1") } returns
-                Pair(ConversationSession(id = "s-1", userId = "u-1", awaitingApproval = true), listOf(question, pausedAnswer(dinner)))
+                Pair(
+                    ConversationSession(id = "s-1", userId = "u-1", awaitingApproval = true),
+                    listOf(question, pausedAnswer(dinner)),
+                )
 
             viewModel.sendMessage("Also lunch?")
             advanceUntilIdle()

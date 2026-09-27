@@ -157,20 +157,26 @@ class SessionRepositoryImpl(
                     when (event) {
                         // The hub saying it has the question is what decides this, not the first
                         // word: a model loading and then thinking can go a minute without one.
-                        is ChatStreamEvent.Accepted, is ChatStreamEvent.Delta -> delivered = true
+                        is ChatStreamEvent.Accepted, is ChatStreamEvent.Delta -> {
+                            delivered = true
+                        }
 
                         // The hub refused the turn before the question was written down, and
                         // said why. Thrown from the collector, which — as above — goes straight
                         // past the recovery to the caller, and that is the point: there is no
                         // answer on its way to wait for, so the words belong under the composer
                         // and the question belongs marked as never sent.
-                        is ChatStreamEvent.StreamError -> throw DomainException(event.message)
+                        is ChatStreamEvent.StreamError -> {
+                            throw DomainException(event.message)
+                        }
 
                         is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed, is ChatStreamEvent.AwaitingApproval -> {
                             ended = true
                         }
 
-                        else -> Unit
+                        else -> {
+                            Unit
+                        }
                     }
                     emit(event)
                 }
@@ -276,11 +282,17 @@ class SessionRepositoryImpl(
             }.collect { event ->
                 heard = true
                 when (event) {
-                    is ChatStreamEvent.StreamError -> throw DomainException(event.message)
+                    is ChatStreamEvent.StreamError -> {
+                        throw DomainException(event.message)
+                    }
+
                     is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed, is ChatStreamEvent.AwaitingApproval -> {
                         outcome = Resumed.ENDED
                     }
-                    else -> Unit
+
+                    else -> {
+                        Unit
+                    }
                 }
                 emit(event)
             }

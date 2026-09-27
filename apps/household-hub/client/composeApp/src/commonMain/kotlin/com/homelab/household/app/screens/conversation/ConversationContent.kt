@@ -62,6 +62,7 @@ import com.homelab.household.app.resources.conversation_still_working
 import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
+import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.LocalHearthMotion
 import com.homelab.household.app.theme.PreviewDayNight
@@ -103,6 +104,7 @@ fun ConversationContent(
     memberName: String = "",
     onSelectAgent: (String) -> Unit = {},
     onRetryAgents: () -> Unit = {},
+    onDecide: (toolCallId: String, approved: Boolean) -> Unit = { _, _ -> },
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -214,7 +216,9 @@ fun ConversationContent(
             Column {
                 // Under the composer, where the problem is — and the message it refused is still
                 // sitting in the field above, so it can simply be sent again.
-                val failure = state.errorMessage
+                // A card is waiting: the message stays in the field, and this says what to do first.
+                val failure =
+                    if (state.holdingForCard) stringResource(Res.string.tool_card_hold) else state.errorMessage
                 if (failure != null) {
                     Text(
                         text = failure,
@@ -325,7 +329,7 @@ fun ConversationContent(
 
                 if (message.role == MessageRole.ASSISTANT) {
                     // Finished, so its steps fold away and it reads as the answer.
-                    Answer(parts = message.parts, written = message.content, folded = true)
+                    Answer(parts = message.parts, written = message.content, folded = true, onDecide = onDecide)
                 } else {
                     MessageBubble(
                         content = message.content,
@@ -347,7 +351,12 @@ fun ConversationContent(
             if (state.streamingMessage != null || state.turnState == TurnState.Failed) {
                 item {
                     // Nothing folded while it is being written: each step shows as it happens.
-                    Answer(parts = state.parts, written = state.streamingMessage.orEmpty(), folded = false) {
+                    Answer(
+                        parts = state.parts,
+                        written = state.streamingMessage.orEmpty(),
+                        folded = false,
+                        onDecide = onDecide,
+                    ) {
                         val tool = state.activeTool
                         when {
                             // In the answer's place, because that is where the eye is waiting.
@@ -402,6 +411,7 @@ private fun Answer(
     parts: List<AnswerPart>,
     written: String,
     folded: Boolean,
+    onDecide: (toolCallId: String, approved: Boolean) -> Unit,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)
@@ -412,6 +422,11 @@ private fun Answer(
                 when (run) {
                     is AnswerRun.Words -> {
                         AnswerText(content = run.text)
+                    }
+
+                    // Never folded away: it is the one thing in an answer waiting on you.
+                    is AnswerRun.Card -> {
+                        ToolApprovalCard(card = run.card, onDecide = onDecide)
                     }
 
                     is AnswerRun.Steps -> {
@@ -446,6 +461,10 @@ private sealed interface AnswerRun {
     data class Steps(
         val steps: List<AnswerPart>,
     ) : AnswerRun
+
+    data class Card(
+        val card: AnswerPart.Proposal,
+    ) : AnswerRun
 }
 
 /**
@@ -456,12 +475,22 @@ private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
     val runs = mutableListOf<AnswerRun>()
     var steps = mutableListOf<AnswerPart>()
     for (part in this) {
-        if (part is AnswerPart.Text) {
-            if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
-            steps = mutableListOf()
-            if (part.content.isNotBlank()) runs += AnswerRun.Words(part.content.trim())
-        } else {
-            steps += part
+        when (part) {
+            is AnswerPart.Text -> {
+                if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
+                steps = mutableListOf()
+                if (part.content.isNotBlank()) runs += AnswerRun.Words(part.content.trim())
+            }
+
+            is AnswerPart.Proposal -> {
+                if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
+                steps = mutableListOf()
+                runs += AnswerRun.Card(part)
+            }
+
+            else -> {
+                steps += part
+            }
         }
     }
     if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
@@ -491,7 +520,12 @@ private fun Steps(steps: List<AnswerPart>) {
                     ToolStepLine(step)
                 }
 
-                is AnswerPart.Text -> {}
+                // Not red: nothing failed, the member said no.
+                is AnswerPart.Declined -> {
+                    ToolStepLine(step)
+                }
+
+                is AnswerPart.Text, is AnswerPart.Proposal -> {}
             }
         }
     }
@@ -539,7 +573,7 @@ private fun TurnStatus(
             }
         }
 
-        TurnState.Idle, TurnState.Streaming -> {
+        TurnState.Idle, TurnState.Streaming, TurnState.AwaitingApproval -> {
             Unit
         }
     }

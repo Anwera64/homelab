@@ -8,12 +8,11 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.longOrNull
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Turns the hub's `parts` array into [AnswerPart]s.
@@ -54,7 +53,10 @@ object AnswerPartDataMapper {
                     AnswerPart.Proposal(
                         toolCallId = toolCallId,
                         tool = tool,
-                        action = (part["action"] as? JsonPrimitive)?.contentOrNull?.let(ToolSummaryDataMapper::actionFromCode),
+                        action =
+                            (part["action"] as? JsonPrimitive)?.contentOrNull?.let(
+                                ToolSummaryDataMapper::actionFromCode,
+                            ),
                         arguments = argumentsFromJson(part["arguments"]),
                         status = statusFromCode((part["status"] as? JsonPrimitive)?.contentOrNull),
                     )

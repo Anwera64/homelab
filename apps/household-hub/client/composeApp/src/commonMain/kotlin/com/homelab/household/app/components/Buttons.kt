@@ -82,6 +82,10 @@ private val buttonPadding: PaddingValues
     @ReadOnlyComposable
     get() = PaddingValues(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.lg)
 
+/**
+ * [lifted] is off for a button inside a card: the card already lifts it, and a shadow on a shadow
+ * reads as a smudge (canvas: tools-slice-todo).
+ */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -90,6 +94,7 @@ fun PrimaryButton(
     icon: HearthIcon? = null,
     busy: Boolean = false,
     busyDescription: String? = null,
+    lifted: Boolean = true,
 ) {
     val colors = HearthTheme.colors
     WithBusyBar(modifier = modifier, busy = busy, busyBar = BusyBar.filled(colors)) {
@@ -99,7 +104,7 @@ fun PrimaryButton(
                 Modifier
                     .heightIn(min = buttonMinHeight)
                     .shadow(
-                        elevation = HearthTheme.size.raised,
+                        elevation = if (lifted) HearthTheme.size.raised else HearthTheme.spacing.none,
                         shape = HearthShapes.button,
                         ambientColor = colors.primary.copy(alpha = 0.30f),
                         spotColor = colors.primary.copy(alpha = 0.30f),

@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -18,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -26,7 +24,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 
 /**
@@ -44,12 +41,7 @@ fun ToolRunningChip(
     Row(
         modifier =
             modifier
-                .shadow(
-                    elevation = HearthTheme.size.raised,
-                    shape = HearthShapes.item,
-                    ambientColor = colors.textPrimary.copy(alpha = 0.06f),
-                    spotColor = colors.textPrimary.copy(alpha = 0.06f),
-                ).background(colors.surface, HearthShapes.item)
+                .actionCardSurface()
                 .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md)
                 .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),

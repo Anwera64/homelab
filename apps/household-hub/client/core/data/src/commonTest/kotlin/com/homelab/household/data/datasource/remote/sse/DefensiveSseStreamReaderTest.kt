@@ -405,7 +405,7 @@ class DefensiveSseStreamReaderTest {
     // ---- approval cards (slice 4, PR 3) -----------------------------------
 
     @Test
-    fun `GIVEN a write that needs asking WHEN its proposal is read THEN the card has its call id, action and details`() =
+    fun `GIVEN a write that needs asking WHEN its proposal is read THEN the card has its call id and action and details`() =
         runTest {
             val ssePayload =
                 """
@@ -470,6 +470,9 @@ class DefensiveSseStreamReaderTest {
 
             val named = ToolSummary(action = ToolAction.Create, title = "Buy flowers")
             assertEquals(ChatStreamEvent.ToolDeclined("calendar_write", named), events[0])
-            assertEquals(AnswerPart.Declined("calendar_write", named), (events[1] as ChatStreamEvent.Done).parts.first())
+            assertEquals(
+                AnswerPart.Declined("calendar_write", named),
+                (events[1] as ChatStreamEvent.Done).parts.first(),
+            )
         }
 }

@@ -58,6 +58,14 @@ fun ToolStepLine(
 }
 
 @Composable
+fun ToolStepLine(
+    part: AnswerPart.Declined,
+    modifier: Modifier = Modifier,
+) {
+    ToolStepLine(toolStep(part), modifier)
+}
+
+@Composable
 private fun ToolStepLine(
     step: ToolStep,
     modifier: Modifier = Modifier,

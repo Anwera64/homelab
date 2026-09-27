@@ -130,7 +130,10 @@ class DefensiveSseStreamReader(
                 ChatStreamEvent.ToolApprovalProposal(
                     toolCallId = toolCallId,
                     tool = element["tool"]?.jsonPrimitive?.content ?: "",
-                    action = (element["action"] as? JsonPrimitive)?.contentOrNull?.let(ToolSummaryDataMapper::actionFromCode),
+                    action =
+                        (element["action"] as? JsonPrimitive)?.contentOrNull?.let(
+                            ToolSummaryDataMapper::actionFromCode,
+                        ),
                     arguments = AnswerPartDataMapper.argumentsFromJson(element["arguments"]),
                 )
             }
