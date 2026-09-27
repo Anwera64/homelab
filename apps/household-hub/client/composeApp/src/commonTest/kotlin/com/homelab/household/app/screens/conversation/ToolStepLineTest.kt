@@ -1,12 +1,19 @@
 package com.homelab.household.app.screens.conversation
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.testing.StillTheme
@@ -17,6 +24,8 @@ import com.homelab.household.domain.model.ToolSummary
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** A step's line, drawn from what it says about itself (#40). */
 @OptIn(ExperimentalTestApi::class)
@@ -76,9 +85,53 @@ class ToolStepLineTest {
                 }
             }
 
-            val line = "Read Menu and opening hours · lapubilla.cat"
-            onNodeWithText(line).assertIsDisplayed()
-            assertEquals(listOf(menu.url), linksIn(line))
+            val read = "Read Menu and opening hours"
+            onNodeWithText(read).assertIsDisplayed()
+            onNodeWithText(" · lapubilla.cat", useUnmergedTree = true).assertIsDisplayed()
+            assertEquals(listOf(menu.url), linksIn(read))
+        }
+
+    @Test
+    fun `GIVEN a page with a long title WHEN drawn THEN the line stays on one line and shortens the title, never the site`() =
+        runComposeUiTest {
+            val long =
+                ToolSource(
+                    "Hong Kong: press freedom in decline four years after the national security law came into force",
+                    "https://rsf.org/en/country/hong-kong",
+                )
+            setContent {
+                StillTheme {
+                    ToolStepLine(
+                        AnswerPart.ToolDone("read_page", ToolSummary(sources = listOf(long))),
+                        modifier = Modifier.width(320.dp),
+                    )
+                }
+            }
+
+            val title = layoutOf("Read ${long.title}")
+            assertEquals(1, title.lineCount)
+            assertTrue(title.isLineEllipsized(0), "the title is shortened")
+
+            val site = layoutOf(" · rsf.org")
+            assertEquals(1, site.lineCount)
+            assertFalse(site.hasVisualOverflow, "the site is shown whole")
+            assertFalse(site.isLineEllipsized(0), "the site is never shortened")
+        }
+
+    @Test
+    fun `GIVEN a page with a short title WHEN drawn THEN nothing on its line is shortened`() =
+        runComposeUiTest {
+            setContent {
+                StillTheme {
+                    ToolStepLine(
+                        AnswerPart.ToolDone("read_page", ToolSummary(sources = listOf(menu))),
+                        modifier = Modifier.width(320.dp),
+                    )
+                }
+            }
+
+            assertFalse(layoutOf("Read Menu and opening hours").isLineEllipsized(0))
+            assertFalse(layoutOf(" · lapubilla.cat").isLineEllipsized(0))
         }
 
     @Test
@@ -112,7 +165,15 @@ class ToolStepLineTest {
             onNodeWithText("·", substring = true).assertDoesNotExist()
         }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.linksIn(text: String): List<String> {
+    private fun ComposeUiTest.layoutOf(text: String): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        onNodeWithText(text, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
+            it(layouts)
+        }
+        return layouts.single()
+    }
+
+    private fun ComposeUiTest.linksIn(text: String): List<String> {
         val shown = onNodeWithText(text).fetchSemanticsNode().config[SemanticsProperties.Text].first()
         return shown.getLinkAnnotations(0, shown.length).map { (it.item as LinkAnnotation.Url).url }
     }

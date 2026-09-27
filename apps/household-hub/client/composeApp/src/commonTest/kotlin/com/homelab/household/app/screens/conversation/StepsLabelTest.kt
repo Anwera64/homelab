@@ -1,6 +1,7 @@
 package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSummary
 import kotlin.test.Test
@@ -57,11 +58,42 @@ class StepsLabelTest {
 
     @Test
     fun `GIVEN an added event WHEN labelled THEN the outcome is named`() {
-        val added = AnswerPart.ToolDone("calendar_write", ToolSummary(title = "Dinner together"))
+        val added = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner together"))
 
         assertEquals(
-            listOf(StepPhrase.CheckedCalendar, StepPhrase.Added("Dinner together")),
+            listOf(StepPhrase.CheckedCalendar, StepPhrase.Wrote(ToolAction.Create, "Dinner together")),
             stepsLabel(listOf(checked, added))?.phrases,
+        )
+    }
+
+    @Test
+    fun `GIVEN a removed event WHEN labelled THEN it is named as removed, never added`() {
+        val removed = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Print shop"))
+
+        assertEquals(
+            listOf(StepPhrase.CheckedCalendar, StepPhrase.Wrote(ToolAction.Delete, "Print shop")),
+            stepsLabel(listOf(checked, removed))?.phrases,
+        )
+    }
+
+    @Test
+    fun `GIVEN an add and a removal WHEN labelled THEN each is its own phrase`() {
+        val added = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner"))
+        val removed = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Lunch"))
+
+        assertEquals(
+            listOf(StepPhrase.Wrote(ToolAction.Delete, "Lunch"), StepPhrase.Wrote(ToolAction.Create, "Dinner")),
+            stepsLabel(listOf(removed, added))?.phrases,
+        )
+    }
+
+    @Test
+    fun `GIVEN a failed removal alone WHEN labelled THEN the label is that removal failing`() {
+        val failed = AnswerPart.ToolFailed("calendar_write", ToolSummary(action = ToolAction.Delete))
+
+        assertEquals(
+            StepsLabel(listOf(StepPhrase.Failed("calendar_write", ToolAction.Delete))),
+            stepsLabel(listOf(thought, failed)),
         )
     }
 
@@ -89,6 +121,16 @@ class StepsLabelTest {
         assertEquals(
             listOf(StepPhrase.Did("document_writer"), StepPhrase.Searched(1)),
             stepsLabel(listOf(AnswerPart.ToolDone("document_writer"), search))?.phrases,
+        )
+    }
+
+    @Test
+    fun `GIVEN a note write WHEN labelled THEN it is named by what it did to the note`() {
+        val appended = AnswerPart.ToolDone("document_writer", ToolSummary(action = ToolAction.Append))
+
+        assertEquals(
+            listOf(StepPhrase.Did("document_writer", ToolAction.Append), StepPhrase.Searched(1)),
+            stepsLabel(listOf(appended, search))?.phrases,
         )
     }
 }
