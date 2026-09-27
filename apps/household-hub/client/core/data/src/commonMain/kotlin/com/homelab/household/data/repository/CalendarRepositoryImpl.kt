@@ -33,4 +33,6 @@ class CalendarRepositoryImpl(
         )
 
     override suspend fun removeCalendar() = remote.deleteCalendar()
+
+    override suspend fun startGoogleSignIn(): String = remote.startGoogleSignIn()
 }

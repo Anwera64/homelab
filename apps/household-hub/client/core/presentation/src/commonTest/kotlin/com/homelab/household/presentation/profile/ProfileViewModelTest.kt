@@ -295,6 +295,32 @@ class ProfileViewModelTest {
             hubAnswers.complete(Unit)
         }
 
+    @Test
+    fun `GIVEN Google stopped accepting the sign-in WHEN the calendar is loaded THEN the row asks to sign in again`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+            everySuspend { getCalendar() } returns
+                icloud.copy(provider = CalendarProvider.GOOGLE, account = "emma@gmail.com", needsReconnect = true)
+            val viewModel = viewModel()
+
+            // WHEN
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            // THEN
+            assertEquals(
+                CalendarRow.Connected(
+                    provider = CalendarProvider.GOOGLE,
+                    account = "emma@gmail.com",
+                    minutesAgo = 4,
+                    needsSignInAgain = true,
+                ),
+                viewModel.uiState.value.calendar,
+            )
+        }
+
     private suspend fun TestScope.connectedToIcloud(): ProfileViewModel {
         everySuspend { getCurrentUser() } returns emma
         everySuspend { listHouseholdMembers() } returns listOf(emma, liam)

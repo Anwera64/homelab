@@ -47,6 +47,7 @@ import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
 import com.homelab.household.domain.usecase.RevokeMilestoneUseCase
+import com.homelab.household.domain.usecase.StartGoogleCalendarSignInUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.usecase.UnlockSecretSessionUseCase
@@ -100,6 +101,7 @@ import com.homelab.household.domain.usecase.impl.ResumeTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMilestoneUseCaseImpl
+import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
@@ -178,4 +180,5 @@ val domainModule =
         factory<GetCalendarUseCase> { GetCalendarUseCaseImpl(get()) }
         factory<ConnectCalendarUseCase> { ConnectCalendarUseCaseImpl(get()) }
         factory<RemoveCalendarUseCase> { RemoveCalendarUseCaseImpl(get()) }
+        factory<StartGoogleCalendarSignInUseCase> { StartGoogleCalendarSignInUseCaseImpl(get()) }
     }

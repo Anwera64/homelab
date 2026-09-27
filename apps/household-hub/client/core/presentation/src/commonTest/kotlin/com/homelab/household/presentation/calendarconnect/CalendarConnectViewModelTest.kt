@@ -120,18 +120,4 @@ class CalendarConnectViewModelTest {
             assertEquals(true, state.serverMissing)
             verifySuspend(VerifyMode.not) { connectCalendar(any(), any(), any(), any(), any()) }
         }
-
-    @Test
-    fun google_builds_its_address_from_the_account_as_it_is_typed() =
-        runTest(testDispatcher) {
-            val viewModel = CalendarConnectViewModel(CalendarProvider.GOOGLE, connectCalendar)
-
-            viewModel.onAccountChange("emma.larsson@gmail.com")
-
-            assertEquals(
-                "https://apidata.googleusercontent.com/caldav/v2/emma.larsson@gmail.com/events",
-                viewModel.uiState.value.presetServer,
-            )
-            assertEquals(false, viewModel.uiState.value.serverMissing)
-        }
 }

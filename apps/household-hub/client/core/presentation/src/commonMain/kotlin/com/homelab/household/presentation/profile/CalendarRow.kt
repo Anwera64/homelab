@@ -13,6 +13,8 @@ sealed interface CalendarRow {
         val provider: CalendarProvider,
         val account: String,
         val minutesAgo: Long?,
+        /** Google stopped accepting the sign-in; the row offers to sign in again. */
+        val needsSignInAgain: Boolean = false,
     ) : CalendarRow
 
     /** The hub couldn't say. The profile's own failure line already says why. */

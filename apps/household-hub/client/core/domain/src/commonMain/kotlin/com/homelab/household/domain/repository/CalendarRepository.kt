@@ -21,4 +21,11 @@ interface CalendarRepository {
     ): CalendarConnection
 
     suspend fun removeCalendar()
+
+    /**
+     * Google's sign-in page for this member. The hub keeps the whole sign-in and sends the browser
+     * back to the app when it ends. Throws `GoogleSignInUnavailableException` when the hub has no
+     * Google sign-in set up.
+     */
+    suspend fun startGoogleSignIn(): String
 }

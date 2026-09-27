@@ -12,4 +12,6 @@ data class CalendarCredentialReadDto(
     val username: String,
     @SerialName("calendar_name") val calendarName: String = "Default",
     @SerialName("updated_at") val updatedAt: String? = null,
+    /** Google stopped accepting the sign-in. Hubs from before Google sign-in don't send it. */
+    @SerialName("needs_reconnect") val needsReconnect: Boolean = false,
 )

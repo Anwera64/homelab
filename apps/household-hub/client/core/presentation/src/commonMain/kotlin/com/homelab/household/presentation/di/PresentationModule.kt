@@ -6,6 +6,7 @@ import com.homelab.household.presentation.chats.ChatsViewModel
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.dashboard.DashboardViewModel
 import com.homelab.household.presentation.firstrun.FirstRunViewModel
+import com.homelab.household.presentation.googlesignin.GoogleCalendarSignInViewModel
 import com.homelab.household.presentation.invitecode.InviteCodeViewModel
 import com.homelab.household.presentation.invitecreate.InviteCreateViewModel
 import com.homelab.household.presentation.join.JoinViewModel
@@ -42,6 +43,7 @@ val presentationModule =
         factory { params -> NewPinViewModel(code = params.get(), redeemPinReset = get()) }
         factory { ChangePinViewModel(get()) }
         factory { params -> CalendarConnectViewModel(provider = params.get(), connectCalendar = get()) }
+        factory { GoogleCalendarSignInViewModel(startSignIn = get()) }
         factory { params -> RemoveMemberViewModel(member = params.get(), removeMember = get()) }
         factory { LeaveHouseholdViewModel(get()) }
         factory { params ->
