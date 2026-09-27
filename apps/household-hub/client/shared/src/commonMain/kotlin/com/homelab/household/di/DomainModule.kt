@@ -1,7 +1,6 @@
 package com.homelab.household.di
 
 import com.homelab.household.domain.usecase.ApprovePinResetUseCase
-import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.ArchiveSessionUseCase
 import com.homelab.household.domain.usecase.AuditMemoriesUseCase
 import com.homelab.household.domain.usecase.ChangePinUseCase
@@ -11,6 +10,7 @@ import com.homelab.household.domain.usecase.ConnectCalendarUseCase
 import com.homelab.household.domain.usecase.CreateAgentUseCase
 import com.homelab.household.domain.usecase.CreateInviteUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
+import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import com.homelab.household.domain.usecase.DeleteAgentUseCase
 import com.homelab.household.domain.usecase.DeleteSessionUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
@@ -54,7 +54,6 @@ import com.homelab.household.domain.usecase.UpdateAgentUseCase
 import com.homelab.household.domain.usecase.UpdateMemoryUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
 import com.homelab.household.domain.usecase.impl.ApprovePinResetUseCaseImpl
-import com.homelab.household.domain.usecase.impl.ApproveToolProposalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ChangePinUseCaseImpl
@@ -64,6 +63,7 @@ import com.homelab.household.domain.usecase.impl.ConnectCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateInviteUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.DecideToolProposalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
@@ -117,7 +117,7 @@ val domainModule =
         factory<ArchiveSessionUseCase> { ArchiveSessionUseCaseImpl(get()) }
         factory<ToggleSecretModeUseCase> { ToggleSecretModeUseCaseImpl(get()) }
         factory<DeleteSessionUseCase> { DeleteSessionUseCaseImpl(get()) }
-        factory<ApproveToolProposalUseCase> { ApproveToolProposalUseCaseImpl(get()) }
+        factory<DecideToolProposalUseCase> { DecideToolProposalUseCaseImpl(get()) }
         factory<ObserveMessagesUseCase> { ObserveMessagesUseCaseImpl(get()) }
         factory<RetryMessageUseCase> { RetryMessageUseCaseImpl(get()) }
         factory<StreamChatTurnUseCase> { StreamChatTurnUseCaseImpl(get()) }

@@ -59,12 +59,21 @@ class SessionRepositoryImpl(
 
     override suspend fun deleteSession(sessionId: String) = remote.deleteSession(sessionId)
 
-    override suspend fun approveToolProposal(
+    /**
+     * The paused answer carries on as the same message, so no earlier answer can be mistaken for
+     * it: recovery waits for the hub to stop writing and reads whatever the conversation ends on.
+     */
+    override fun decideToolProposal(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
         modifiedArguments: Map<String, Any?>?,
-    ): Boolean = remote.approveToolProposal(sessionId, toolCallId, approved)
+    ): Flow<ChatStreamEvent> =
+        recoverable(
+            remote.openDecisionStream(sessionId, toolCallId, approved, modifiedArguments),
+            sessionId,
+            afterAssistantMessageId = null,
+        )
 
     override suspend fun lockAllSecretSessions(): Int {
         val secret = remote.listSessions().filter { it.is_secret }.map { it.id }
@@ -157,7 +166,9 @@ class SessionRepositoryImpl(
                         // and the question belongs marked as never sent.
                         is ChatStreamEvent.StreamError -> throw DomainException(event.message)
 
-                        is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed -> ended = true
+                        is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed, is ChatStreamEvent.AwaitingApproval -> {
+                            ended = true
+                        }
 
                         else -> Unit
                     }
@@ -266,7 +277,9 @@ class SessionRepositoryImpl(
                 heard = true
                 when (event) {
                     is ChatStreamEvent.StreamError -> throw DomainException(event.message)
-                    is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed -> outcome = Resumed.ENDED
+                    is ChatStreamEvent.Done, is ChatStreamEvent.TurnFailed, is ChatStreamEvent.AwaitingApproval -> {
+                        outcome = Resumed.ENDED
+                    }
                     else -> Unit
                 }
                 emit(event)
@@ -284,13 +297,30 @@ class SessionRepositoryImpl(
             detail.messages
                 .lastOrNull { it.role.equals("assistant", ignoreCase = true) }
                 ?.takeIf { it.id != afterAssistantMessageId }
+                ?.let(ChatMessageDataMapper::toDomain)
         return when {
-            reply != null -> {
+            // Paused on a card: that is where this turn ends for now.
+            reply != null && detail.awaiting_approval -> {
+                ChatStreamEvent.AwaitingApproval(
+                    messageId = reply.id,
+                    assistantContent = reply.content,
+                    parts = reply.parts,
+                )
+            }
+
+            // Only once the hub has stopped writing: an answer carried on after a card is saved
+            // before it is finished, so while the turn runs it is not the answer yet.
+            reply != null && !detail.turn_running -> {
                 ChatStreamEvent.Done(
                     messageId = reply.id,
                     assistantContent = reply.content,
                     agentName = "Assistant",
+                    parts = reply.parts,
                 )
+            }
+
+            reply != null -> {
+                null
             }
 
             !detail.turn_running -> {

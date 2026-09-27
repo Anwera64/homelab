@@ -2,6 +2,7 @@ package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.network.TurnGoneException
+import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.exception.UpstreamGatewayException
@@ -211,25 +212,63 @@ class KtorSessionRemoteDataSourceTest {
     // ---- tool approvals ----------------------------------------------------
 
     @Test
-    fun `GIVEN an agent waiting on a tool WHEN the tool is approved THEN the approval is posted and accepted`() =
+    fun `GIVEN a card waiting WHEN it is answered THEN the decision is posted and the rest of the turn streams back`() =
         runTest {
             // GIVEN
+            val sse =
+                """
+                data: {"type": "accepted"}
+
+                data: {"type": "done", "message_id": "m1", "assistant_content": "Done."}
+
+                data: [DONE]
+
+                """.trimIndent()
             var path: String? = null
             var sent: String? = null
             val engine =
                 MockEngine { request ->
                     path = request.url.encodedPath
                     sent = (request.body as TextContent).text
-                    respondJson("""{"status": "approved", "tool_call_id": "tc-1", "result": {"success": true}}""")
+                    respondSse(sse)
                 }
 
             // WHEN
-            val accepted = dataSource(engine).approveToolProposal("s-1", "tc-1", approved = true)
+            val events =
+                dataSource(engine)
+                    .openDecisionStream(
+                        "s-1",
+                        "tc-1",
+                        approved = true,
+                        modifiedArguments = mapOf("start_time" to "2026-10-03T21:00:00", "is_all_day" to false),
+                    ).toList()
 
             // THEN
-            assertEquals("/api/v1/sessions/s-1/tools/approve", path)
-            assertSameJson("""{"tool_call_id": "tc-1", "approved": true}""", sent)
-            assertTrue(accepted)
+            assertEquals("/api/v1/sessions/s-1/tools/tc-1/decision", path)
+            assertSameJson(
+                """{"approved": true, "modified_arguments": {"start_time": "2026-10-03T21:00:00", "is_all_day": false}}""",
+                sent,
+            )
+            assertEquals(ChatStreamEvent.Accepted, events.first())
+            assertTrue(events.last() is ChatStreamEvent.Done)
+        }
+
+    @Test
+    fun `GIVEN a card waiting WHEN another message is sent THEN it is held rather than taken for a busy hub`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine {
+                    respondJson(
+                        """{"detail": "Answer the card above before sending another message.", "code": "approval_pending"}""",
+                        HttpStatusCode.Conflict,
+                    )
+                }
+
+            // WHEN / THEN
+            assertFailsWith<ApprovalPendingException> {
+                dataSource(engine).openChatStream("s-1", "Also lunch?", autoApproveWrites = false).toList()
+            }
         }
 
     // ---- the streamed turn -------------------------------------------------

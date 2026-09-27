@@ -22,4 +22,6 @@ data class ConversationSession(
     val agentAvatar: String? = null,
     /** Whether the hub is generating an answer for this conversation right now. */
     val turnRunning: Boolean = false,
+    /** Whether the newest answer is paused on a card the member has still to answer. */
+    val awaitingApproval: Boolean = false,
 )

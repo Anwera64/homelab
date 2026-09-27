@@ -7,11 +7,13 @@ import com.homelab.household.data.dto.SessionCreateDto
 import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SessionSecretToggleDto
-import com.homelab.household.data.dto.ToolApprovalRequestDto
+import com.homelab.household.data.dto.ToolDecisionRequestDto
+import com.homelab.household.data.mapper.AnswerPartDataMapper
 import com.homelab.household.data.network.NetworkExceptionHelper
 import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub
+import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import com.homelab.household.domain.model.ChatStreamEvent
@@ -27,10 +29,10 @@ import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpStatement
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -92,18 +94,22 @@ class KtorSessionRemoteDataSource(
             client.delete("$baseUrl/api/v1/sessions/$sessionId").ensureJsonSuccess()
         }
 
-    override suspend fun approveToolProposal(
+    override fun openDecisionStream(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-    ): Boolean =
-        reachingHub {
-            client
-                .post("$baseUrl/api/v1/sessions/$sessionId/tools/approve") {
-                    contentType(ContentType.Application.Json)
-                    setBody(ToolApprovalRequestDto(tool_call_id = toolCallId, approved = approved))
-                }.status
-                .isSuccess()
+        modifiedArguments: Map<String, Any?>?,
+    ): Flow<ChatStreamEvent> =
+        openTurnStream(sessionId, onStart = { lastEventIds.remove(sessionId) }) {
+            client.preparePost("$baseUrl/api/v1/sessions/$sessionId/tools/$toolCallId/decision") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    ToolDecisionRequestDto(
+                        approved = approved,
+                        modified_arguments = modifiedArguments?.let(AnswerPartDataMapper::argumentsToJson),
+                    ),
+                )
+            }
         }
 
     override fun openChatStream(
@@ -163,7 +169,10 @@ class KtorSessionRemoteDataSource(
                                 .collect { send(it) }
                         }
 
+                        // Two refusals share the status: a turn already running, which is worth
+                        // waiting for, and a card waiting, which is not - the member has to answer it.
                         HttpStatusCode.Conflict -> {
+                            if (response.bodyAsText().contains(APPROVAL_PENDING)) throw ApprovalPendingException()
                             throw SessionConflictException()
                         }
 
@@ -184,4 +193,9 @@ class KtorSessionRemoteDataSource(
                 NetworkExceptionHelper.rethrowAsDomain(e)
             }
         }.buffer(Channel.RENDEZVOUS)
+
+    private companion object {
+        /** The hub's code for a message refused because a card is waiting. */
+        const val APPROVAL_PENDING = "approval_pending"
+    }
 }

@@ -2,9 +2,9 @@ package com.homelab.household.presentation.chatsession
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
-import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
+import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 
 /**
@@ -29,6 +29,12 @@ sealed interface TurnState {
 
     /** The question arrived, the answer did not. The one case worth offering to do again. */
     data object Failed : TurnState
+
+    /**
+     * The answer is paused on its approval cards (slice 4): saved, and waiting on the member. The
+     * turn carries on, as the same answer, once every card has been answered.
+     */
+    data object AwaitingApproval : TurnState
 }
 
 data class ChatSessionUiState(
@@ -77,7 +83,11 @@ data class ChatSessionUiState(
      * words and offers to ask again, rather than blocking the chat.
      */
     val agentsFailed: Boolean = false,
-    val pendingToolProposal: ChatStreamEvent.ToolApprovalProposal? = null,
+    /**
+     * Send was tapped while a card waits. Nothing was sent and nothing declined: the text stays in
+     * the composer, and a line under it asks for the card to be answered first.
+     */
+    val holdingForCard: Boolean = false,
     val errorMessage: String? = null,
     val isSecretLocked: Boolean = false,
 ) {
@@ -92,7 +102,23 @@ data class ChatSessionUiState(
         get() =
             when (turnState) {
                 TurnState.Streaming, TurnState.Reconnecting, TurnState.StillWorking -> false
-                TurnState.Idle, TurnState.Failed -> true
+
+                // Send still answers while a card waits, by holding the message and saying why.
+                TurnState.Idle, TurnState.Failed, TurnState.AwaitingApproval -> true
+            }
+
+    /** The cards the newest answer is waiting on, in the order the agent asked. */
+    val pendingProposals: List<AnswerPart.Proposal>
+        get() =
+            if (turnState != TurnState.AwaitingApproval) {
+                emptyList()
+            } else {
+                messages
+                    .lastOrNull { it.role == MessageRole.ASSISTANT }
+                    ?.parts
+                    .orEmpty()
+                    .filterIsInstance<AnswerPart.Proposal>()
+                    .filter { it.status == ProposalStatus.Pending }
             }
 
     /**

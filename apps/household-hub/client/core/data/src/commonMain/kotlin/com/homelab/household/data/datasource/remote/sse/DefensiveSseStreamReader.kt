@@ -9,6 +9,7 @@ import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -123,10 +124,31 @@ class DefensiveSseStreamReader(
                 ChatStreamEvent.ToolResult(tool = tool, success = success, error = error, summary = summary)
             }
 
-            "tool_approval_proposal", "tool_proposal" -> {
-                val tool = element["tool"]?.jsonPrimitive?.content ?: ""
-                val message = element["message"]?.jsonPrimitive?.content ?: ""
-                ChatStreamEvent.ToolApprovalProposal(tool = tool, message = message)
+            "tool_approval_proposal" -> {
+                // A card with no call id could never be answered, so it is not a card at all.
+                val toolCallId = (element["tool_call_id"] as? JsonPrimitive)?.contentOrNull ?: return null
+                ChatStreamEvent.ToolApprovalProposal(
+                    toolCallId = toolCallId,
+                    tool = element["tool"]?.jsonPrimitive?.content ?: "",
+                    action = (element["action"] as? JsonPrimitive)?.contentOrNull?.let(ToolSummaryDataMapper::actionFromCode),
+                    arguments = AnswerPartDataMapper.argumentsFromJson(element["arguments"]),
+                )
+            }
+
+            "tool_declined" -> {
+                ChatStreamEvent.ToolDeclined(
+                    tool = element["tool"]?.jsonPrimitive?.content ?: "",
+                    summary = ToolSummaryDataMapper.fromJson(element["summary"]),
+                )
+            }
+
+            "awaiting_approval" -> {
+                ChatStreamEvent.AwaitingApproval(
+                    messageId = element["message_id"]?.jsonPrimitive?.content ?: "",
+                    assistantContent = sanitizeContent(element["assistant_content"]?.jsonPrimitive?.content ?: ""),
+                    parts = sanitizedParts(element["parts"]),
+                    agentName = element["agent_name"]?.jsonPrimitive?.content ?: "",
+                )
             }
 
             // The two ways the hub says a turn went wrong. Dropping these as unknown types is
@@ -146,10 +168,7 @@ class DefensiveSseStreamReader(
                 val suggestSecret = element["suggest_secret_mode"]?.jsonPrimitive?.booleanOrNull ?: false
                 val isTurnSecret = element["is_turn_secret"]?.jsonPrimitive?.booleanOrNull ?: false
                 val agentName = element["agent_name"]?.jsonPrimitive?.content ?: ""
-                val parts =
-                    AnswerPartDataMapper.fromJson(element["parts"]).map { part ->
-                        if (part is AnswerPart.Text) part.copy(content = sanitizeContent(part.content)) else part
-                    }
+                val parts = sanitizedParts(element["parts"])
                 ChatStreamEvent.Done(
                     messageId = messageId,
                     assistantContent = assistantContent,
@@ -165,6 +184,11 @@ class DefensiveSseStreamReader(
             }
         }
     }
+
+    private fun sanitizedParts(element: JsonElement?): List<AnswerPart> =
+        AnswerPartDataMapper.fromJson(element).map { part ->
+            if (part is AnswerPart.Text) part.copy(content = sanitizeContent(part.content)) else part
+        }
 
     private fun sanitizeContent(content: String): String {
         var sanitized = content

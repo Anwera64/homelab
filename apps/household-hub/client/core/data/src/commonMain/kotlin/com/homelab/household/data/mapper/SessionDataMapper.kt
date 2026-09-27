@@ -33,5 +33,6 @@ object SessionDataMapper {
             createdAt = dto.created_at,
             updatedAt = dto.updated_at,
             turnRunning = dto.turn_running,
+            awaitingApproval = dto.awaiting_approval,
         )
 }
