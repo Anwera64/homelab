@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.domain.entities.user import User
 from app.presentation.api import deps as pres_deps
+from app.bootstrap.after_turn import AfterTurnWork
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,7 @@ _jwt_token_service = JwtTokenService(
 _dummy_pin_hash = _password_hasher.hash("dummy-constant-time-pin-hash")
 _pin_locks = MemberPinLocks()
 _code_guess_lock = CodeGuessLock()
+_after_turn_work = AfterTurnWork()
 
 _user_mapper = UserDataMapper()
 _space_mapper = SpaceDataMapper()
@@ -304,6 +306,47 @@ def get_container(session: AsyncSession):
         confidence_threshold=settings.MEMORY_REFLECTION_CONFIDENCE_THRESHOLD,
     )
 
+    async def _reflect_and_summarize(
+        session_id: str,
+        user_id: str,
+        username: str,
+        agent_id: str,
+        agent_name: str,
+        user_message: str,
+        assistant_message: str,
+        is_secret_session: bool,
+        is_turn_secret: bool,
+        is_first_turn: bool,
+        timezone_name: Optional[str] = None,
+    ):
+        # On a database session of its own: it runs after the turn's has been closed.
+        async with AsyncSessionLocal() as bg_sess:
+            bg_container = get_container(bg_sess)
+            try:
+                await bg_container[pres_deps.get_reflect_turn_use_case].execute(
+                    session_id=session_id,
+                    user_id=user_id,
+                    username=username,
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    user_message=user_message,
+                    assistant_message=assistant_message,
+                    is_secret_session=is_secret_session,
+                    is_turn_secret=is_turn_secret,
+                    is_first_turn=is_first_turn,
+                    timezone_name=timezone_name,
+                )
+            except Exception as ref_exc:
+                logger.error("Background reflection failed for session %s: %s", session_id, ref_exc, exc_info=True)
+            # After reflection, so the facts it keeps are taken from the words before they are
+            # folded into the summary.
+            try:
+                await bg_container[pres_deps.get_summarize_history_use_case].execute(
+                    session_id, timezone_name=timezone_name
+                )
+            except Exception as sum_exc:
+                logger.error("Background history summary failed for session %s: %s", session_id, sum_exc, exc_info=True)
+
     async def _run_background_reflection(
         session_id: str,
         user_id: str,
@@ -317,28 +360,14 @@ def get_container(session: AsyncSession):
         is_first_turn: bool,
         timezone_name: Optional[str] = None,
     ):
-        try:
-            async with AsyncSessionLocal() as bg_sess:
-                bg_container = get_container(bg_sess)
-                bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
-                await bg_reflect_uc.execute(
-                    session_id=session_id,
-                    user_id=user_id,
-                    username=username,
-                    agent_id=agent_id,
-                    agent_name=agent_name,
-                    user_message=user_message,
-                    assistant_message=assistant_message,
-                    is_secret_session=is_secret_session,
-                    is_turn_secret=is_turn_secret,
-                    is_first_turn=is_first_turn,
-                    timezone_name=timezone_name,
-                )
-                await bg_container[pres_deps.get_summarize_history_use_case].execute(
-                    session_id, timezone_name=timezone_name
-                )
-        except Exception as exc:
-            logger.error("Background reflection failed for session %s: %s", session_id, exc, exc_info=True)
+        """The plain `POST chat` path's reflection, queued behind the chat's earlier ones."""
+        _after_turn_work.spawn(
+            session_id,
+            lambda: _reflect_and_summarize(
+                session_id, user_id, username, agent_id, agent_name, user_message, assistant_message,
+                is_secret_session, is_turn_secret, is_first_turn, timezone_name,
+            ),
+        )
 
     async def _run_background_chat_stream(
         session_id: str,
@@ -381,31 +410,21 @@ def get_container(session: AsyncSession):
                     await queue.put(event)
 
                 if final_event:
-                    bg_reflect_uc = bg_container[pres_deps.get_reflect_turn_use_case]
-                    try:
-                        await bg_reflect_uc.execute(
-                            session_id=session_id,
-                            user_id=current_user.id,
-                            username=current_user.full_name,
-                            agent_id=agent_id or final_event.get("agent_id", ""),
-                            agent_name=agent_name or final_event.get("agent_name", ""),
-                            user_message=content,
-                            assistant_message=final_event.get("assistant_content", ""),
-                            is_secret_session=final_event.get("is_secret", False),
-                            is_turn_secret=final_event.get("is_turn_secret", False),
-                            is_first_turn=is_first_turn,
-                            timezone_name=timezone_name,
-                        )
-                    except Exception as ref_exc:
-                        logger.error("Background reflection in stream failed for session %s: %s", session_id, ref_exc, exc_info=True)
-                    # After reflection, so the facts it keeps are taken from the words before they
-                    # are folded into the summary.
-                    try:
-                        await bg_container[pres_deps.get_summarize_history_use_case].execute(
-                            session_id, timezone_name=timezone_name
-                        )
-                    except Exception as sum_exc:
-                        logger.error("Background history summary failed for session %s: %s", session_id, sum_exc, exc_info=True)
+                    # Handed on rather than awaited: the chat's lock is let go when this returns,
+                    # so the member can write again while reflection and the summary run (#53).
+                    after_turn = dict(
+                        user_id=current_user.id,
+                        username=current_user.full_name,
+                        agent_id=agent_id or final_event.get("agent_id", ""),
+                        agent_name=agent_name or final_event.get("agent_name", ""),
+                        user_message=content,
+                        assistant_message=final_event.get("assistant_content", ""),
+                        is_secret_session=final_event.get("is_secret", False),
+                        is_turn_secret=final_event.get("is_turn_secret", False),
+                        is_first_turn=is_first_turn,
+                        timezone_name=timezone_name,
+                    )
+                    _after_turn_work.spawn(session_id, lambda: _reflect_and_summarize(session_id, **after_turn))
         except Exception as exc:
             logger.error("Background chat stream failed for session %s: %s", session_id, exc, exc_info=True)
             await queue.put({"type": "error", "error": str(exc)})

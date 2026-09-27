@@ -71,6 +71,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # The pooled connection's asyncio lock belongs to this test's event loop; a later test that
+    # used it from its own loop, with two requests at once, would fail on it.
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -91,6 +94,13 @@ async def client(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> A
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
+
+    # Reflection and the summary outlive the turn that started them (#53); let them finish before
+    # the database they write to is dropped.
+    for _ in range(500):
+        if di_module._after_turn_work.running == 0:
+            break
+        await asyncio.sleep(0.01)
 
     app.dependency_overrides.pop(get_db, None)
     app.dependency_overrides.pop(get_db_session, None)
