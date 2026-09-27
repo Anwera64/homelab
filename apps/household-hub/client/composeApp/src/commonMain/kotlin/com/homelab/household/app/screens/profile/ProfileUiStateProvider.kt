@@ -1,7 +1,9 @@
 package com.homelab.household.app.screens.profile
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.User
+import com.homelab.household.presentation.profile.CalendarRow
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
 
@@ -19,7 +21,25 @@ class ProfileUiStateProvider : PreviewParameterProvider<ProfileUiState> {
 
     private val named =
         listOf(
-            "The only admin" to ProfileUiState(member = emma, isSoleAdmin = true, status = ProfileStatus.Ready),
+            "The only admin" to
+                ProfileUiState(
+                    member = emma,
+                    isSoleAdmin = true,
+                    calendar = CalendarRow.None,
+                    status = ProfileStatus.Ready,
+                ),
+            "With a calendar" to
+                ProfileUiState(
+                    member = emma,
+                    isSoleAdmin = true,
+                    calendar =
+                        CalendarRow.Connected(
+                            provider = CalendarProvider.APPLE,
+                            account = "emma@icloud.com",
+                            minutesAgo = 4,
+                        ),
+                    status = ProfileStatus.Ready,
+                ),
             "An admin who can leave" to
                 ProfileUiState(
                     member = emma,

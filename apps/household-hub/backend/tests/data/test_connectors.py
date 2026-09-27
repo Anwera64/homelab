@@ -441,3 +441,66 @@ async def test_searxng_throttled_general_engines_do_not_stop_a_search_of_other_e
         await connector.search("peru", category="science", engines=["arxiv"])
 
     assert calls == ["peru", "peru"]
+
+
+def _icloud_credential() -> CalendarCredential:
+    return CalendarCredential(
+        id="cred-1",
+        user_id="user-1",
+        provider="apple_icloud",
+        url="https://caldav.icloud.com",
+        username="emma@icloud.com",
+        encrypted_secret="enc",
+        calendar_name="Default",
+    )
+
+
+@pytest.mark.asyncio
+async def test_caldav_connection_test_passes_when_the_account_answers():
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.return_value.calendars.return_value = [MagicMock()]
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        assert await connector.test_connection(_icloud_credential(), "abcd-efgh-ijkl-mnop") is True
+
+
+@pytest.mark.asyncio
+async def test_caldav_connection_test_says_rejected_when_the_server_refuses_the_password():
+    from caldav.lib.error import AuthorizationError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.side_effect = AuthorizationError(url="https://caldav.icloud.com", reason="Unauthorized")
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarAuthException):
+            await connector.test_connection(_icloud_credential(), "my-apple-id-password")
+
+
+@pytest.mark.asyncio
+async def test_caldav_connection_test_says_unreachable_when_the_server_cannot_be_reached():
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException, CalendarUnreachableException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.side_effect = ConnectionError("Name or service not known")
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarUnreachableException) as raised:
+            await connector.test_connection(_icloud_credential(), "abcd-efgh-ijkl-mnop")
+    assert not isinstance(raised.value, CalendarAuthException)
+
+
+@pytest.mark.asyncio
+async def test_caldav_connection_test_says_unreachable_when_the_server_never_answers():
+    import time
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarUnreachableException
+
+    connector = CalDavCalendarConnector()
+    with patch.object(connector, "_sync_test_connection", side_effect=lambda *_: time.sleep(0.5)):
+        with pytest.raises(CalendarUnreachableException):
+            await connector.test_connection(_icloud_credential(), "abcd-efgh-ijkl-mnop", timeout=0.05)

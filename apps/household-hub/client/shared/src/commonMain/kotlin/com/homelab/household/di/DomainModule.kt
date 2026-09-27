@@ -7,6 +7,7 @@ import com.homelab.household.domain.usecase.AuditMemoriesUseCase
 import com.homelab.household.domain.usecase.ChangePinUseCase
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.CheckServerHealthUseCase
+import com.homelab.household.domain.usecase.ConnectCalendarUseCase
 import com.homelab.household.domain.usecase.CreateAgentUseCase
 import com.homelab.household.domain.usecase.CreateInviteUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
@@ -14,6 +15,7 @@ import com.homelab.household.domain.usecase.DeleteAgentUseCase
 import com.homelab.household.domain.usecase.DeleteSessionUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
+import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
@@ -37,6 +39,7 @@ import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
 import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
 import com.homelab.household.domain.usecase.RedeemPinResetUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
+import com.homelab.household.domain.usecase.RemoveCalendarUseCase
 import com.homelab.household.domain.usecase.RemoveMemberUseCase
 import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
@@ -57,6 +60,7 @@ import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ChangePinUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckAuthStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
+import com.homelab.household.domain.usecase.impl.ConnectCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateInviteUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CreateSessionUseCaseImpl
@@ -64,6 +68,7 @@ import com.homelab.household.domain.usecase.impl.DeleteAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
@@ -87,6 +92,7 @@ import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RedeemPinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RegenerateAnswerUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RemoveCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemberUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
@@ -167,4 +173,9 @@ val domainModule =
         factory<UpdateAgentUseCase> { UpdateAgentUseCaseImpl(get()) }
         factory<DeleteAgentUseCase> { DeleteAgentUseCaseImpl(get()) }
         factory<RestoreAgentUseCase> { RestoreAgentUseCaseImpl(get()) }
+
+        // Calendar connection use cases
+        factory<GetCalendarUseCase> { GetCalendarUseCaseImpl(get()) }
+        factory<ConnectCalendarUseCase> { ConnectCalendarUseCaseImpl(get()) }
+        factory<RemoveCalendarUseCase> { RemoveCalendarUseCaseImpl(get()) }
     }

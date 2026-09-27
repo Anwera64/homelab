@@ -163,6 +163,10 @@ enum class HearthIcon(
     // Conversation - drawn on the Chat Turn States canvas rather than the sheet. A question the hub
     // has; kept apart from `synced`, whose check in a circle already means the hub is in step.
     Sent("sent", strokes("M5 12.5l4.5 4.5L19 7.5")),
+
+    // Profile - drawn on the Calendar & offline canvas rather than the sheet. Wider set and larger
+    // dots than `streaming`, which means something else: an answer still arriving.
+    More("more", solids(circle(5.6, 12.0, 1.6), circle(12.0, 12.0, 1.6), circle(18.4, 12.0, 1.6))),
     ;
 
     private val restingVector: ImageVector by lazy { build(strokeWidth = 1.5f) }

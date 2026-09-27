@@ -14,7 +14,8 @@ import io.ktor.http.headersOf
 
 /**
  * The hub as the members screens need it: who lives here, invites, PIN resets, changing a PIN,
- * removing someone and leaving. Every body it was sent is kept, so a test can check what was asked.
+ * removing someone and leaving, and the profile's calendar. Every body it was sent is kept, so a
+ * test can check what was asked.
  */
 class FakeMembersHub {
     private val sent = mutableListOf<String>()
@@ -29,6 +30,11 @@ class FakeMembersHub {
             """{"id":"liam","full_name":"Liam","avatar_color":"#C05638","is_admin":false,"is_active":true,
             "created_at":"2026-09-16T00:00:00Z"}""",
         )
+    private var calendar: String? = null
+
+    /** How many times the phone asked the hub to forget the calendar. */
+    var calendarsRemoved = 0
+        private set
     private var write: suspend MockRequestHandleScope.() -> HttpResponseData = { json("""{"message":"done"}""") }
     private var offline = false
 
@@ -52,11 +58,30 @@ class FakeMembersHub {
                     json(household.joinToString(prefix = "[", postfix = "]"))
                 }
 
+                path == "/api/v1/integrations/calendars/me" -> {
+                    calendar?.let { json(it) }
+                        ?: json("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound)
+                }
+
+                path == "/api/v1/integrations/calendars" && request.method == HttpMethod.Delete -> {
+                    calendarsRemoved++
+                    calendar = null
+                    respond("", HttpStatusCode.NoContent)
+                }
+
                 else -> {
                     write()
                 }
             }
         }
+
+    /** Emma's iCloud calendar, which the hub last reached at [checkedAt] (UTC, written without a zone). */
+    fun hasACalendar(checkedAt: String = "2026-09-26T20:04:00") {
+        calendar =
+            """{"id":"cal-1","user_id":"emma","provider":"apple_icloud","url":"https://caldav.icloud.com",
+            "username":"emma@icloud.com","calendar_name":"Default","is_active":true,
+            "created_at":"$checkedAt","updated_at":"$checkedAt"}"""
+    }
 
     fun livesAlone() {
         household = listOf(household.first())

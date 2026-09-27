@@ -1,16 +1,27 @@
 package com.homelab.household.app.screens.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -26,20 +37,35 @@ import com.homelab.household.app.components.SkeletonBlock
 import com.homelab.household.app.components.SkeletonCircle
 import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.icons.HearthIcon
+import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.resources.profile_admin
 import com.homelab.household.app.resources.profile_back
+import com.homelab.household.app.resources.profile_calendar
+import com.homelab.household.app.resources.profile_calendar_checked_days
+import com.homelab.household.app.resources.profile_calendar_checked_hours
+import com.homelab.household.app.resources.profile_calendar_checked_minutes
+import com.homelab.household.app.resources.profile_calendar_checked_now
+import com.homelab.household.app.resources.profile_calendar_connect
+import com.homelab.household.app.resources.profile_calendar_connect_caption
+import com.homelab.household.app.resources.profile_calendar_note
+import com.homelab.household.app.resources.profile_calendar_options
 import com.homelab.household.app.resources.profile_change_pin
 import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
+import com.homelab.household.app.screens.calendarprovider.CalendarProviderMark
+import com.homelab.household.app.screens.calendarprovider.providerName
+import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
+import com.homelab.household.presentation.profile.CalendarRow
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** The colour a member wears when the hub hasn't said which. */
@@ -59,11 +85,36 @@ fun ProfileContent(
     onChangePin: () -> Unit,
     onLeave: () -> Unit,
     onSignOut: () -> Unit,
+    onCalendar: () -> Unit,
     modifier: Modifier = Modifier,
+    onDisconnectCalendar: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val member = state.member
+    var sheet by rememberSaveable { mutableStateOf<CalendarSheetStep?>(null) }
+    val calendar = state.calendar
+
+    if (calendar is CalendarRow.Connected) {
+        sheet?.let { step ->
+            CalendarOptionsSheet(
+                row = calendar,
+                step = step,
+                disconnect = state.calendarDisconnect,
+                onChange = {
+                    sheet = null
+                    onCalendar()
+                },
+                onAskToDisconnect = { sheet = CalendarSheetStep.ConfirmDisconnect },
+                onDisconnect = onDisconnectCalendar,
+                onDismiss = { sheet = null },
+            )
+        }
+    }
+    // Disconnected (or not known any more): there is nothing left for the sheet to act on.
+    LaunchedEffect(calendar) {
+        if (calendar !is CalendarRow.Connected) sheet = null
+    }
 
     HearthScaffold(
         modifier = modifier,
@@ -96,6 +147,12 @@ fun ProfileContent(
                     }
                 }
             }
+
+            CalendarSection(
+                row = calendar,
+                onCalendar = onCalendar,
+                onCalendarOptions = { sheet = CalendarSheetStep.Options },
+            )
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
@@ -158,6 +215,147 @@ private fun ArrivingHeader() {
     }
 }
 
+/**
+ * One calendar per member. Connected, it names the provider and the account and when the hub last
+ * reached it; its options change it (replacing it rather than adding a second) or disconnect it.
+ */
+@Composable
+private fun CalendarSection(
+    row: CalendarRow,
+    onCalendar: () -> Unit,
+    onCalendarOptions: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+        Text(
+            stringResource(Res.string.profile_calendar).uppercase(),
+            modifier = Modifier.padding(start = HearthTheme.spacing.xs),
+            style = type.overline,
+            color = colors.textMuted,
+        )
+        when (row) {
+            is CalendarRow.Connected -> {
+                ConnectedCalendar(row = row, onOptions = onCalendarOptions)
+                Text(
+                    stringResource(Res.string.profile_calendar_note),
+                    modifier = Modifier.padding(start = HearthTheme.spacing.xs),
+                    style = type.caption,
+                    color = colors.textMuted,
+                )
+            }
+
+            CalendarRow.Loading -> {
+                // The card at a row's height and nothing in it, so the page does not jump when the
+                // answer lands. The header already carries this screen's one skeleton.
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = HearthTheme.size.touchTarget))
+                }
+            }
+
+            CalendarRow.None, CalendarRow.Unknown -> {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    SettingsRow(
+                        label = stringResource(Res.string.profile_calendar_connect),
+                        icon = HearthIcon.CalendarAdd,
+                        // Unknown makes no claim either way: connecting one replaces whatever is there.
+                        caption =
+                            if (row == CalendarRow.None) {
+                                stringResource(Res.string.profile_calendar_connect_caption)
+                            } else {
+                                null
+                            },
+                        onClick = onCalendar,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectedCalendar(
+    row: CalendarRow.Connected,
+    onOptions: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+
+    // The whole card opens the options, as it opened Change before; the button is the visible cue
+    // and the name a screen reader hears.
+    Surface(
+        onClick = onOptions,
+        modifier = modifier.fillMaxWidth(),
+        shape = HearthShapes.bento,
+        color = colors.surface,
+        contentColor = colors.textPrimary,
+    ) {
+        Row(
+            modifier = Modifier.padding(HearthTheme.spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
+                contentAlignment = Alignment.Center,
+            ) {
+                CalendarProviderMark(provider = row.provider)
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+            ) {
+                Text(providerName(row.provider), style = type.bodyStrong, color = colors.textPrimary)
+                Text(row.account, style = type.monoSm, color = colors.textMuted, maxLines = 1)
+                row.minutesAgo?.let { minutes ->
+                    Text(checkedAgo(minutes), style = type.caption, color = colors.textMuted)
+                }
+            }
+            IconButton(
+                onClick = onOptions,
+                modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
+            ) {
+                HearthIconImage(
+                    icon = HearthIcon.More,
+                    contentDescription = stringResource(Res.string.profile_calendar_options),
+                    size = HearthTheme.size.iconMd,
+                    tint = colors.textMuted,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun checkedAgo(minutes: Long): String {
+    val count = minutes.toInt()
+    return when {
+        minutes < 1 -> {
+            stringResource(Res.string.profile_calendar_checked_now)
+        }
+
+        minutes < MINUTES_PER_HOUR -> {
+            pluralStringResource(Res.plurals.profile_calendar_checked_minutes, count, count)
+        }
+
+        minutes < MINUTES_PER_DAY -> {
+            val hours = (minutes / MINUTES_PER_HOUR).toInt()
+            pluralStringResource(Res.plurals.profile_calendar_checked_hours, hours, hours)
+        }
+
+        else -> {
+            val days = (minutes / MINUTES_PER_DAY).toInt()
+            pluralStringResource(Res.plurals.profile_calendar_checked_days, days, days)
+        }
+    }
+}
+
+private const val MINUTES_PER_HOUR = 60L
+private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
+
 /** How much of the row the name and the admin chip fill before either has arrived. */
 private const val NAME_WIDTH = 0.6f
 private const val CHIP_WIDTH = 0.3f
@@ -183,6 +381,7 @@ private fun ProfileContentPreview(
             onChangePin = {},
             onLeave = {},
             onSignOut = {},
+            onCalendar = {},
         )
     }
 }

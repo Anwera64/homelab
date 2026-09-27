@@ -1,15 +1,27 @@
 package com.homelab.household.app.screens.profile
 
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.calendar_apple
+import com.homelab.household.app.resources.calendar_disconnect_keep
+import com.homelab.household.app.resources.calendar_disconnect_submit
+import com.homelab.household.app.resources.calendar_disconnect_title
+import com.homelab.household.app.resources.calendar_disconnect_unreachable
+import com.homelab.household.app.resources.calendar_sheet_change
+import com.homelab.household.app.resources.calendar_sheet_disconnect
+import com.homelab.household.app.resources.profile_calendar_connect
+import com.homelab.household.app.resources.profile_calendar_options
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
@@ -45,6 +57,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignOut = {},
+                        onCalendar = {},
                     )
                 }
             }
@@ -65,7 +78,14 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = {})
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                        onCalendar = {},
+                    )
                 }
             }
 
@@ -88,6 +108,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignedOut = {},
+                        onCalendar = {},
                     )
                 }
             }
@@ -113,6 +134,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignedOut = { signedOut++ },
+                        onCalendar = {},
                     )
                 }
             }
@@ -128,7 +150,7 @@ class ProfileScreenTest {
     @Test
     fun every_previewed_state_draws() {
         val states = ProfileUiStateProvider().values.toList()
-        assertEquals(5, states.size)
+        assertEquals(6, states.size)
 
         states.forEach { state ->
             runComposeUiTest {
@@ -141,12 +163,182 @@ class ProfileScreenTest {
                             onChangePin = {},
                             onLeave = {},
                             onSignOut = {},
+                            onCalendar = {},
                         )
                     }
                 }
 
                 onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
             }
+        }
+    }
+
+    @Test
+    fun `GIVEN a connected calendar WHEN its options are opened THEN it can be changed or disconnected`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+
+        runScreenTest {
+            showProfile(hub)
+            waitUntilExactlyOneExists(hasText("emma@icloud.com"), timeoutMillis = wait)
+
+            // WHEN
+            onNodeWithContentDescription(getString(Res.string.profile_calendar_options)).performClick()
+
+            // THEN
+            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_sheet_change)), timeoutMillis = wait)
+            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun `GIVEN the calendar options WHEN Change calendar is chosen THEN the picker opens`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+        var picker = 0
+
+        runScreenTest {
+            showProfile(hub, onCalendar = { picker++ })
+            openCalendarOptions()
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_sheet_change)).performClick()
+
+            // THEN
+            waitUntil(timeoutMillis = wait) { picker == 1 }
+        }
+    }
+
+    @Test
+    fun `GIVEN the calendar options WHEN Disconnect calendar is chosen THEN it asks first`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+
+        runScreenTest {
+            showProfile(hub)
+            openCalendarOptions()
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
+
+            // THEN
+            val title = getString(Res.string.calendar_disconnect_title, getString(Res.string.calendar_apple))
+            waitUntilExactlyOneExists(hasText(title), timeoutMillis = wait)
+            assertEquals(0, hub.calendarsRemoved)
+        }
+    }
+
+    @Test
+    fun `GIVEN it asks to disconnect WHEN the disconnect is confirmed THEN the hub forgets it and Profile offers to connect one`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+
+        runScreenTest {
+            showProfile(hub)
+            openCalendarOptions()
+            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
+            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_submit)), timeoutMillis = wait)
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_disconnect_submit)).performClick()
+
+            // THEN
+            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_calendar_connect)), timeoutMillis = wait)
+            assertEquals(1, hub.calendarsRemoved)
+        }
+    }
+
+    @Test
+    fun `GIVEN it asks to disconnect WHEN Keep it connected is chosen THEN nothing is disconnected`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+
+        runScreenTest {
+            showProfile(hub)
+            openCalendarOptions()
+            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
+            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_keep)), timeoutMillis = wait)
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_disconnect_keep)).performClick()
+
+            // THEN
+            waitUntilDoesNotExist(hasText(getString(Res.string.calendar_disconnect_keep)), timeoutMillis = wait)
+            onNodeWithText("emma@icloud.com").assertIsDisplayed()
+            assertEquals(0, hub.calendarsRemoved)
+        }
+    }
+
+    @Test
+    fun `GIVEN the hub stops answering WHEN the disconnect is confirmed THEN it says so and the calendar stays`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasACalendar() }
+
+        runScreenTest {
+            showProfile(hub)
+            openCalendarOptions()
+            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
+            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_submit)), timeoutMillis = wait)
+            hub.isOffline()
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_disconnect_submit)).performClick()
+
+            // THEN
+            waitUntilExactlyOneExists(
+                hasText(getString(Res.string.calendar_disconnect_unreachable)),
+                timeoutMillis = wait,
+            )
+            assertEquals(0, hub.calendarsRemoved)
+        }
+    }
+
+    private fun ComposeUiTest.showProfile(
+        hub: FakeMembersHub,
+        onCalendar: () -> Unit = {},
+    ) {
+        setContent {
+            TestApp(hub.engine, sessionStorage = signedIn()) {
+                ProfileScreen(
+                    onBack = {},
+                    onMembers = {},
+                    onChangePin = {},
+                    onLeave = {},
+                    onSignedOut = {},
+                    onCalendar = onCalendar,
+                )
+            }
+        }
+    }
+
+    private suspend fun ComposeUiTest.openCalendarOptions() {
+        waitUntilExactlyOneExists(hasText("emma@icloud.com"), timeoutMillis = wait)
+        onNodeWithContentDescription(getString(Res.string.profile_calendar_options)).performClick()
+        waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_sheet_disconnect)), timeoutMillis = wait)
+    }
+
+    @Test
+    fun no_calendar_offers_to_connect_one() {
+        val hub = FakeMembersHub()
+        var calendar = 0
+
+        runScreenTest {
+            setContent {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                        onCalendar = { calendar++ },
+                    )
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_calendar_connect)), timeoutMillis = wait)
+            onNodeWithText(getString(Res.string.profile_calendar_connect)).performClick()
+            waitUntil(timeoutMillis = wait) { calendar == 1 }
         }
     }
 }

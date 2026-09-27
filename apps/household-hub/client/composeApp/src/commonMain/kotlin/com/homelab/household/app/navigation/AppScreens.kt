@@ -1,6 +1,8 @@
 package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
+import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
+import com.homelab.household.app.screens.calendarprovider.CalendarProviderScreen
 import com.homelab.household.app.screens.changepin.ChangePinScreen
 import com.homelab.household.app.screens.chats.ChatsScreen
 import com.homelab.household.app.screens.conversation.ConversationScreen
@@ -20,6 +22,7 @@ import com.homelab.household.app.screens.profilepicker.ProfilePickerScreen
 import com.homelab.household.app.screens.removemember.RemoveMemberScreen
 import com.homelab.household.app.screens.resetpin.NewPinScreen
 import com.homelab.household.app.screens.resetpin.ResetCodeScreen
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 
@@ -114,6 +117,7 @@ interface AppScreens {
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
+        onCalendar: () -> Unit,
     )
 
     @Composable fun Members(
@@ -144,6 +148,17 @@ interface AppScreens {
     @Composable fun ChangePin(
         onBack: () -> Unit,
         onChange: () -> Unit,
+    )
+
+    @Composable fun CalendarPicker(
+        onBack: () -> Unit,
+        onPick: (CalendarProvider) -> Unit,
+    )
+
+    @Composable fun CalendarConnect(
+        provider: CalendarProvider,
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
     )
 }
 
@@ -275,6 +290,7 @@ object RealAppScreens : AppScreens {
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
+        onCalendar: () -> Unit,
     ) {
         ProfileScreen(
             onBack = onBack,
@@ -282,6 +298,7 @@ object RealAppScreens : AppScreens {
             onChangePin = onChangePin,
             onLeave = onLeave,
             onSignedOut = onSignedOut,
+            onCalendar = onCalendar,
         )
     }
 
@@ -331,5 +348,22 @@ object RealAppScreens : AppScreens {
         onChange: () -> Unit,
     ) {
         ChangePinScreen(onBack = onBack, onChange = onChange)
+    }
+
+    @Composable
+    override fun CalendarPicker(
+        onBack: () -> Unit,
+        onPick: (CalendarProvider) -> Unit,
+    ) {
+        CalendarProviderScreen(onBack = onBack, onPick = onPick)
+    }
+
+    @Composable
+    override fun CalendarConnect(
+        provider: CalendarProvider,
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
+    ) {
+        CalendarConnectScreen(provider = provider, onBack = onBack, onConnect = onConnect)
     }
 }

@@ -14,6 +14,8 @@ from app.domain.exceptions import (
     SoleAdminDeletionException,
     OwnPinResetException,
     SecretDecryptionException,
+    CalendarAuthException,
+    CalendarUnreachableException,
 )
 
 
@@ -57,6 +59,14 @@ def build_app() -> FastAPI:
     @app.get("/secret-decryption")
     async def _secret_decryption():
         raise SecretDecryptionException("Stored secret could not be decrypted.")
+
+    @app.get("/calendar-rejected")
+    async def _calendar_rejected():
+        raise CalendarAuthException("CalDAV server refused the credentials.")
+
+    @app.get("/calendar-unreachable")
+    async def _calendar_unreachable():
+        raise CalendarUnreachableException("CalDAV server could not be reached.")
 
     return app
 
@@ -154,3 +164,21 @@ async def test_an_undecryptable_calendar_secret_is_409(handler_client: httpx.Asy
     body = resp.json()
     assert body["detail"] == "Stored credentials could not be decrypted. Please reconfigure your calendar."
     assert body["code"] == "calendar_unreadable"
+
+
+@pytest.mark.asyncio
+async def test_a_calendar_that_refuses_the_password_says_rejected(handler_client: httpx.AsyncClient):
+    resp = await handler_client.get("/calendar-rejected")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["detail"]
+    assert body["code"] == "calendar_rejected"
+
+
+@pytest.mark.asyncio
+async def test_a_calendar_that_cannot_be_reached_says_unreachable(handler_client: httpx.AsyncClient):
+    resp = await handler_client.get("/calendar-unreachable")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["detail"]
+    assert body["code"] == "calendar_unreachable"

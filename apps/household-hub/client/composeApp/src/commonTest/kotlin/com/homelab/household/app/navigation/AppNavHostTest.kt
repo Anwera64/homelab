@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.navigation3.runtime.NavKey
 import com.homelab.household.app.testing.StillTheme
+import com.homelab.household.domain.model.CalendarProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -263,6 +264,35 @@ class AppNavHostTest {
 
             onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
             assertEquals(listOf(Destination.Profile), backStack.toList())
+        }
+
+    @Test
+    fun a_connected_calendar_returns_to_the_profile_past_the_picker() =
+        runComposeUiTest {
+            backStack[0] = Destination.Profile
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+
+            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
+            onNodeWithText(StubScreens.PICK_APPLE).performClick()
+            onNodeWithText(StubScreens.calendarConnectOf(CalendarProvider.APPLE)).assertIsDisplayed()
+            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+
+            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile), backStack.toList())
+        }
+
+    @Test
+    fun back_from_a_calendar_s_details_returns_to_the_picker() =
+        runComposeUiTest {
+            backStack[0] = Destination.Profile
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+
+            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
+            onNodeWithText(StubScreens.PICK_APPLE).performClick()
+            onNodeWithText(StubScreens.BACK).performClick()
+
+            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile, Destination.CalendarPicker), backStack.toList())
         }
 
     // ---- the four tabs and the raised + ------------------------------------

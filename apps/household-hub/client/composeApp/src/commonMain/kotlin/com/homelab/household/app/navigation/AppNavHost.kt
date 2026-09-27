@@ -170,6 +170,7 @@ fun AppNavHost(
                             onChangePin = { backStack.add(Destination.ChangePin) },
                             onLeave = { backStack.add(Destination.LeaveHousehold) },
                             onSignedOut = { backStack.startOver(Destination.SignIn) },
+                            onCalendar = { backStack.add(Destination.CalendarPicker) },
                         )
                     }
                 }
@@ -216,6 +217,29 @@ fun AppNavHost(
                         screens.ChangePin(
                             onBack = { backStack.removeLastOrNull() },
                             onChange = { backStack.removeLastOrNull() },
+                        )
+                    }
+                }
+                entry<Destination.CalendarPicker> {
+                    WithEntryViewModels {
+                        screens.CalendarPicker(
+                            onBack = { backStack.removeLastOrNull() },
+                            onPick = { provider -> backStack.add(Destination.CalendarConnect(provider)) },
+                        )
+                    }
+                }
+                entry<Destination.CalendarConnect> { destination ->
+                    WithEntryViewModels {
+                        screens.CalendarConnect(
+                            provider = destination.provider,
+                            onBack = { backStack.removeLastOrNull() },
+                            // Connected: back to the profile, past the picker, with the new row in it.
+                            onConnect = {
+                                backStack.removeAll {
+                                    it == Destination.CalendarPicker ||
+                                        it is Destination.CalendarConnect
+                                }
+                            },
                         )
                     }
                 }

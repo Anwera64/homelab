@@ -10,6 +10,7 @@ from app.domain.entities.tool_definition import ToolDefinition, ToolExecutionRes
 from app.domain.exceptions import (
     CalendarAuthException,
     CalendarIntegrationException,
+    CalendarUnreachableException,
     DocumentParsingException,
     DocumentNotFoundException,
     InvalidOperationException,
@@ -85,11 +86,14 @@ class MockCalendarCredentialRepository:
 
 
 class MockCalendarConnector:
-    def __init__(self, should_auth_fail: bool = False):
+    def __init__(self, should_auth_fail: bool = False, connection_error: Optional[Exception] = None):
         self.should_auth_fail = should_auth_fail
+        self.connection_error = connection_error
         self.events: List[CalendarEvent] = []
 
     async def test_connection(self, credential: CalendarCredential, secret: str) -> bool:
+        if self.connection_error is not None:
+            raise self.connection_error
         return not self.should_auth_fail
 
     async def fetch_events(
@@ -309,6 +313,29 @@ async def test_configure_calendar_auth_failure_raises():
             password="bad",
         )
     assert (await repo.get_by_user_id("u1")) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [CalendarAuthException("rejected"), CalendarUnreachableException("unreachable")],
+)
+async def test_configure_calendar_keeps_the_connectors_reason_and_saves_nothing(failure):
+    repo = MockCalendarCredentialRepository()
+    connector = MockCalendarConnector(connection_error=failure)
+    uow = MockUnitOfWork()
+
+    use_case = ConfigureCalendarUseCase(repo, connector, MockSecretCipher(), uow)
+    with pytest.raises(type(failure)):
+        await use_case.execute(
+            user_id="u1",
+            provider="apple_icloud",
+            url="https://caldav.icloud.com",
+            username="emma@icloud.com",
+            password="abcd-efgh-ijkl-mnop",
+        )
+    assert (await repo.get_by_user_id("u1")) is None
+    assert uow.committed is False
 
 
 @pytest.mark.asyncio

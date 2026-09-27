@@ -2,12 +2,17 @@ import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional
 import caldav
+from caldav.lib.error import AuthorizationError
 from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
 from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.entities.integration_credential import CalendarCredential
-from app.domain.exceptions import CalendarAuthException, CalendarIntegrationException
+from app.domain.exceptions import (
+    CalendarAuthException,
+    CalendarIntegrationException,
+    CalendarUnreachableException,
+)
 from app.domain.repositories.calendar_connector import ICalendarConnector
 
 
@@ -26,13 +31,18 @@ class CalDavCalendarConnector(ICalendarConnector):
         )
 
     def _sync_test_connection(self, credential: CalendarCredential, secret: str) -> bool:
-        client = self._sync_get_client(credential, secret)
+        """
+        True when the account answers. A refused password and a server that can't be reached are
+        different fixes for the member, so they raise different exceptions rather than one False.
+        """
         try:
-            principal = client.principal()
-            calendars = principal.calendars()
-            return len(calendars) >= 0
-        except Exception:
-            return False
+            client = self._sync_get_client(credential, secret)
+            client.principal().calendars()
+            return True
+        except AuthorizationError as e:
+            raise CalendarAuthException(f"CalDAV server at {credential.url} refused the credentials: {e}")
+        except Exception as e:
+            raise CalendarUnreachableException(f"CalDAV server at {credential.url} could not be reached: {e}")
 
     def _sync_get_target_calendar(self, client: caldav.DAVClient, calendar_name: str):
         principal = client.principal()
@@ -271,8 +281,14 @@ class CalDavCalendarConnector(ICalendarConnector):
         except Exception as e:
             raise CalendarIntegrationException(f"Failed to delete CalDAV event '{event_id}': {str(e)}")
 
-    async def test_connection(self, credential: CalendarCredential, secret: str) -> bool:
-        return await asyncio.to_thread(self._sync_test_connection, credential, secret)
+    async def test_connection(self, credential: CalendarCredential, secret: str, timeout: float = 15.0) -> bool:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._sync_test_connection, credential, secret),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise CalendarUnreachableException(f"CalDAV server at {credential.url} did not answer within {timeout:.0f}s.")
 
     async def fetch_events(
         self,
