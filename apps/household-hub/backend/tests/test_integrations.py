@@ -4,6 +4,7 @@ import httpx
 from unittest.mock import patch, AsyncMock, MagicMock
 from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.entities.search_result import SearchResult, SearchResultItem
+from app.domain.exceptions import CalendarAuthException, CalendarUnreachableException
 from tests.auth_helpers import ADMIN_PIN, add_signed_in_member, register_admin, sign_in
 
 
@@ -473,3 +474,36 @@ async def test_calendar_events_corrupted_secret_returns_409(client: httpx.AsyncC
     assert resp.json()["code"] == "calendar_unreadable"
 
 
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure, code",
+    [
+        (CalendarAuthException("CalDAV server refused the credentials."), "calendar_rejected"),
+        (CalendarUnreachableException("CalDAV server could not be reached."), "calendar_unreachable"),
+    ],
+)
+async def test_connecting_a_calendar_says_why_it_failed_and_keeps_nothing(client: httpx.AsyncClient, failure, code):
+    token = await create_authenticated_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch(
+        "app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector.test_connection",
+        side_effect=failure,
+    ):
+        resp = await client.post(
+            "/api/v1/integrations/calendars",
+            headers=headers,
+            json={
+                "provider": "apple_icloud",
+                "url": "https://caldav.icloud.com",
+                "username": "emma@icloud.com",
+                "password": "my-apple-id-password",
+            },
+        )
+    assert resp.status_code == 400
+    assert resp.json()["code"] == code
+
+    me = await client.get("/api/v1/integrations/calendars/me", headers=headers)
+    assert me.status_code == 404

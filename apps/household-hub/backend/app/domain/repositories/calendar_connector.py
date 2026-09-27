@@ -6,6 +6,10 @@ from app.domain.entities.integration_credential import CalendarCredential
 
 class ICalendarConnector(Protocol):
     async def test_connection(self, credential: CalendarCredential, secret: str) -> bool:
+        """
+        True when the account answers. Raises CalendarAuthException when the server refuses the
+        credentials, and CalendarUnreachableException when it can't be reached.
+        """
         ...
 
     async def fetch_events(

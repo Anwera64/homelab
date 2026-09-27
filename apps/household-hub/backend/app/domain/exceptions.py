@@ -94,7 +94,12 @@ class CalendarIntegrationException(DomainException):
 
 
 class CalendarAuthException(CalendarIntegrationException):
-    """Raised when CalDAV authentication fails."""
+    """The calendar server answered and refused the credentials (401/403): almost always the password."""
+    pass
+
+
+class CalendarUnreachableException(CalendarIntegrationException):
+    """The calendar server could not be reached, or did not answer like a CalDAV server."""
     pass
 
 

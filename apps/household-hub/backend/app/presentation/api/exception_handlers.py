@@ -20,6 +20,7 @@ from app.domain.exceptions import (
     InvalidOperationException,
     CalendarIntegrationException,
     CalendarAuthException,
+    CalendarUnreachableException,
     SearchServiceException,
     DocumentParsingException,
     ToolNotFoundException,
@@ -144,11 +145,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={"detail": str(exc)},
         )
 
+    # Both are 400 with a code, not a 5xx: the phone reads 502-504 as the hub itself being down.
     @app.exception_handler(CalendarAuthException)
     async def calendar_auth_handler(request: Request, exc: CalendarAuthException):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
+            content={"detail": str(exc), "code": "calendar_rejected"},
+        )
+
+    @app.exception_handler(CalendarUnreachableException)
+    async def calendar_unreachable_handler(request: Request, exc: CalendarUnreachableException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc), "code": "calendar_unreachable"},
         )
 
     @app.exception_handler(CalendarIntegrationException)
