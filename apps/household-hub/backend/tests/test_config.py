@@ -127,6 +127,12 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
     queue: asyncio.Queue = asyncio.Queue()
     await runner("s1", User(id="u1", full_name="Alex"), "Hello", False, queue, timezone_name="Asia/Tokyo")
 
+    # Reflection and the summary are queued, not awaited (#53); let them run.
+    for _ in range(100):
+        if di._after_turn_work.running == 0:
+            break
+        await asyncio.sleep(0.01)
+
     # #39: the summary stamps messages in the member's timezone, so it is handed the turn's.
     assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
 
@@ -135,6 +141,7 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
 async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_is_summarized_after_it(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    import asyncio
     from contextlib import asynccontextmanager
 
     from app.bootstrap import di
@@ -163,6 +170,12 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
     })
 
     await runner("s1", "u1", "Alex", "a1", "Assistant", "Hi", "Hello", False, False, False, timezone_name="Asia/Tokyo")
+
+    # Reflection and the summary are queued, not awaited (#53); let them run.
+    for _ in range(100):
+        if di._after_turn_work.running == 0:
+            break
+        await asyncio.sleep(0.01)
 
     assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
 

@@ -227,20 +227,19 @@ async def chat_turn(
             timezone_name=x_timezone,
         )
 
-        asyncio.create_task(
-            reflection_runner(
-                session_id=session_id,
-                user_id=current_user.id,
-                username=current_user.full_name,
-                agent_id=agent_id,
-                agent_name=agent_name,
-                user_message=payload.content,
-                assistant_message=result.message.content,
-                is_secret_session=result.is_secret,
-                is_turn_secret=result.is_turn_secret,
-                is_first_turn=is_first_turn,
-                timezone_name=x_timezone,
-            )
+        # Only queues reflection; it runs after the lock is let go.
+        await reflection_runner(
+            session_id=session_id,
+            user_id=current_user.id,
+            username=current_user.full_name,
+            agent_id=agent_id,
+            agent_name=agent_name,
+            user_message=payload.content,
+            assistant_message=result.message.content,
+            is_secret_session=result.is_secret,
+            is_turn_secret=result.is_turn_secret,
+            is_first_turn=is_first_turn,
+            timezone_name=x_timezone,
         )
 
         return ChatTurnResponse(
