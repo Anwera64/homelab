@@ -18,6 +18,7 @@ from app.domain.repositories.secret_cipher import ISecretCipher
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.page_reader import IPageReader
 
+from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
@@ -59,6 +60,7 @@ class ExecuteToolUseCase:
         uow: IUnitOfWork,
         allow_calendar_delete: bool = True,
         page_reader: Optional[IPageReader] = None,
+        calendar_secrets: Optional[CalendarSecretResolver] = None,
     ):
         self.calendar_repo = calendar_repo
         self.calendar_connector = calendar_connector
@@ -71,11 +73,13 @@ class ExecuteToolUseCase:
         self.page_reader = page_reader
 
         # Initialize sub-use-cases
-        self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, cipher)
-        self.create_calendar_event_uc = CreateCalendarEventUseCase(calendar_repo, calendar_connector, cipher)
-        self.update_calendar_event_uc = UpdateCalendarEventUseCase(calendar_repo, calendar_connector, cipher)
+        # Without a Google client, password calendars still work; a Google one is refused once its token runs out.
+        secrets = calendar_secrets or CalendarSecretResolver(calendar_repo, cipher, uow)
+        self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, secrets)
+        self.create_calendar_event_uc = CreateCalendarEventUseCase(calendar_repo, calendar_connector, secrets)
+        self.update_calendar_event_uc = UpdateCalendarEventUseCase(calendar_repo, calendar_connector, secrets)
         self.delete_calendar_event_uc = DeleteCalendarEventUseCase(
-            calendar_repo, calendar_connector, cipher, allow_agent_delete=allow_calendar_delete
+            calendar_repo, calendar_connector, secrets, allow_agent_delete=allow_calendar_delete
         )
         self.search_uc = ExecuteSearchUseCase(search_connector)
         self.save_doc_uc = SaveDocumentUseCase(document_repo, uow)

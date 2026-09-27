@@ -4,7 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CalendarCredentialCreate(BaseModel):
-    provider: Literal["caldav", "google_caldav", "apple_icloud"]
+    # Google refuses passwords; its calendars are connected through /calendars/google/start.
+    provider: Literal["caldav", "apple_icloud"]
     url: str = Field(..., min_length=8, max_length=512)
     username: str = Field(..., min_length=1, max_length=255)
     password: str = Field(..., min_length=1, max_length=256)
@@ -30,10 +31,17 @@ class CalendarCredentialRead(BaseModel):
     username: str
     calendar_name: str
     is_active: bool
+    auth_kind: str
+    # Google stopped honouring the sign-in: the member has to sign in with Google again.
+    needs_reconnect: bool
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GoogleSignInStartResponse(BaseModel):
+    authorization_url: str
 
 
 class CalendarEventCreate(BaseModel):

@@ -1,7 +1,7 @@
 from app.domain.exceptions import CalendarIntegrationException, ToolPermissionDeniedException
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
-from app.domain.repositories.secret_cipher import ISecretCipher
+from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 
 
 class DeleteCalendarEventUseCase:
@@ -9,12 +9,12 @@ class DeleteCalendarEventUseCase:
         self,
         credential_repo: ICalendarCredentialRepository,
         connector: ICalendarConnector,
-        cipher: ISecretCipher,
+        secrets: CalendarSecretResolver,
         allow_agent_delete: bool = True,
     ):
         self.credential_repo = credential_repo
         self.connector = connector
-        self.cipher = cipher
+        self.secrets = secrets
         self.allow_agent_delete = allow_agent_delete
 
     async def execute(self, user_id: str, event_id: str, timeout: float = 10.0) -> bool:
@@ -27,7 +27,7 @@ class DeleteCalendarEventUseCase:
         if not credential or not credential.is_active:
             raise CalendarIntegrationException("No calendar configured for user.")
 
-        secret = self.cipher.decrypt(credential.encrypted_secret)
+        secret = await self.secrets.resolve(credential)
         return await self.connector.delete_event(
             credential=credential,
             secret=secret,

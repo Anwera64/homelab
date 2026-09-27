@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     SEARCH_THROTTLE_COOLDOWN_SECONDS: int = 300
     CALENDAR_TIMEOUT_SECONDS: float = 10.0
     CALENDAR_ALLOW_AGENT_DELETE: bool = True
+    # Google Calendar only takes a Google sign-in (OAuth). Empty client ID: Google can't be connected.
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    # Where phones reach the hub; Google sends the browser back here after a sign-in.
+    HUB_PUBLIC_URL: str = "https://hub.spicy-llama.duckdns.org"
     PDF_PARSER_TIMEOUT_SECONDS: float = 30.0
     MAX_PDF_SIZE_BYTES: int = 25 * 1024 * 1024
     MAX_PDF_PAGES: int = 150
@@ -73,6 +78,10 @@ class Settings(BaseSettings):
                     "Production deployment must specify a secure SECRET_KEY of at least 32 characters."
                 )
         return self
+
+    @property
+    def google_oauth_redirect_uri(self) -> str:
+        return f"{self.HUB_PUBLIC_URL.rstrip('/')}{self.API_V1_STR}/integrations/calendars/google/callback"
 
     @property
     def database_url(self) -> str:

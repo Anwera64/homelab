@@ -63,6 +63,10 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.google_calendar_sign_in import (
+    CompleteGoogleCalendarSignInUseCase,
+    StartGoogleCalendarSignInUseCase,
+)
 from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
 from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
 from app.domain.use_cases.integrations.manage_documents import (
@@ -248,6 +252,12 @@ def get_update_calendar_event_use_case() -> UpdateCalendarEventUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_delete_calendar_event_use_case() -> DeleteCalendarEventUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_start_google_calendar_sign_in_use_case() -> StartGoogleCalendarSignInUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_complete_google_calendar_sign_in_use_case() -> CompleteGoogleCalendarSignInUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_execute_search_use_case() -> ExecuteSearchUseCase:

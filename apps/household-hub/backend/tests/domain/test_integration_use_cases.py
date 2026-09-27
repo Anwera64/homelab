@@ -37,6 +37,7 @@ from app.domain.use_cases.integrations.manage_documents import (
 )
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
+from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 
 
 # Mock Implementations for Protocols
@@ -344,6 +345,7 @@ async def test_calendar_event_lifecycle():
     connector = MockCalendarConnector()
     cipher = MockSecretCipher()
     uow = MockUnitOfWork()
+    secrets = CalendarSecretResolver(repo, cipher, uow)
 
     # Pre-configure calendar
     cred = CalendarCredential(
@@ -358,7 +360,7 @@ async def test_calendar_event_lifecycle():
 
     # Create event
     now = datetime.now(timezone.utc)
-    create_uc = CreateCalendarEventUseCase(repo, connector, cipher)
+    create_uc = CreateCalendarEventUseCase(repo, connector, secrets)
     event = await create_uc.execute(
         user_id="u1",
         title="Sync Meeting",
@@ -371,22 +373,22 @@ async def test_calendar_event_lifecycle():
     assert event.title == "Sync Meeting"
 
     # Fetch events
-    get_events_uc = GetCalendarEventsUseCase(repo, connector, cipher)
+    get_events_uc = GetCalendarEventsUseCase(repo, connector, secrets)
     events = await get_events_uc.execute(user_id="u1", start_time=now, end_time=now)
     assert len(events) == 1
 
     # Update event
-    update_uc = UpdateCalendarEventUseCase(repo, connector, cipher)
+    update_uc = UpdateCalendarEventUseCase(repo, connector, secrets)
     updated = await update_uc.execute(user_id="u1", event_id=event.id, title="Updated Sync Meeting")
     assert updated.title == "Updated Sync Meeting"
 
     # Delete event with safety switch allowed
-    delete_uc = DeleteCalendarEventUseCase(repo, connector, cipher, allow_agent_delete=True)
+    delete_uc = DeleteCalendarEventUseCase(repo, connector, secrets, allow_agent_delete=True)
     deleted = await delete_uc.execute(user_id="u1", event_id=event.id)
     assert deleted is True
 
     # Delete event with safety switch blocked
-    delete_blocked_uc = DeleteCalendarEventUseCase(repo, connector, cipher, allow_agent_delete=False)
+    delete_blocked_uc = DeleteCalendarEventUseCase(repo, connector, secrets, allow_agent_delete=False)
     with pytest.raises(ToolPermissionDeniedException):
         await delete_blocked_uc.execute(user_id="u1", event_id="evt-2")
 

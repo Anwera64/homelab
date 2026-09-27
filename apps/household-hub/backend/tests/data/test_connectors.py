@@ -504,3 +504,118 @@ async def test_caldav_connection_test_says_unreachable_when_the_server_never_ans
     with patch.object(connector, "_sync_test_connection", side_effect=lambda *_: time.sleep(0.5)):
         with pytest.raises(CalendarUnreachableException):
             await connector.test_connection(_icloud_credential(), "abcd-efgh-ijkl-mnop", timeout=0.05)
+
+
+GOOGLE_CALENDAR_URL = "https://apidata.googleusercontent.com/caldav/v2/emma@gmail.com/events"
+
+
+def _google_credential() -> CalendarCredential:
+    return CalendarCredential(
+        id="cred-2",
+        user_id="user-1",
+        provider="google_caldav",
+        url=GOOGLE_CALENDAR_URL,
+        username="emma@gmail.com",
+        encrypted_secret="enc",
+        auth_kind="oauth",
+    )
+
+
+def test_a_google_calendar_is_reached_with_its_access_token_as_a_bearer():
+    """GIVEN a calendar signed in with Google WHEN the hub builds its CalDAV client THEN the access token goes as a bearer token."""
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    with patch("app.data.connectors.caldav_calendar_connector.caldav.DAVClient") as dav_client:
+        CalDavCalendarConnector()._sync_get_client(_google_credential(), "access-1")
+
+    dav_client.assert_called_once_with(url=GOOGLE_CALENDAR_URL, password="access-1", auth_type="bearer")
+
+
+def test_a_password_calendar_is_still_reached_with_its_account_and_password():
+    """GIVEN a calendar connected with a password WHEN the hub builds its CalDAV client THEN the account and password are sent."""
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    with patch("app.data.connectors.caldav_calendar_connector.caldav.DAVClient") as dav_client:
+        CalDavCalendarConnector()._sync_get_client(_icloud_credential(), "abcd-efgh-ijkl-mnop")
+
+    dav_client.assert_called_once_with(url="https://caldav.icloud.com", username="emma@icloud.com", password="abcd-efgh-ijkl-mnop")
+
+
+@pytest.mark.asyncio
+async def test_a_google_calendar_is_opened_at_its_own_address_not_discovered():
+    """GIVEN a Google calendar WHEN events are read THEN the calendar at the stored address is used, without principal discovery."""
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.calendar.return_value.date_search.return_value = []
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        await connector.fetch_events(_google_credential(), "access-1", datetime.now(timezone.utc), datetime.now(timezone.utc))
+
+    client.calendar.assert_called_once_with(url=GOOGLE_CALENDAR_URL)
+    client.principal.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_google_calendar_connection_test_asks_the_calendar_itself():
+    """GIVEN a Google calendar WHEN the connection is tested THEN the calendar at its address answers, without principal discovery."""
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        assert await connector.test_connection(_google_credential(), "access-1") is True
+
+    client.calendar.return_value.get_display_name.assert_called_once()
+    client.principal.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_google_calendar_refusing_the_token_is_rejected():
+    """GIVEN Google refuses the access token WHEN the connection is tested THEN it reads as rejected."""
+    from caldav.lib.error import AuthorizationError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.calendar.return_value.get_display_name.side_effect = AuthorizationError(url=GOOGLE_CALENDAR_URL, reason="Unauthorized")
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarAuthException):
+            await connector.test_connection(_google_credential(), "access-1")
+
+
+@pytest.mark.asyncio
+async def test_an_edited_event_is_saved_as_valid_icalendar():
+    """GIVEN an event WHEN its title and times are edited THEN every date the hub writes is in iCalendar form, which Google insists on."""
+    import re
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    event = MagicMock()
+    event.data = (
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+        "BEGIN:VEVENT\r\nUID:event-123\r\nDTSTAMP:20260901T000000Z\r\n"
+        "DTSTART:20260908T100000Z\r\nDTEND:20260908T110000Z\r\nSUMMARY:Dentist\r\n"
+        "END:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+    calendar = MagicMock()
+    calendar.event_by_uid.return_value = event
+
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        await connector.update_event(
+            credential=_google_credential(),
+            secret="access-1",
+            event_id="event-123",
+            title="Dentist (moved)",
+            start_time=datetime(2026, 9, 9, 15, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 9, 9, 16, 0, tzinfo=timezone.utc),
+        )
+
+    saved = event.data
+    assert "SUMMARY:Dentist (moved)" in saved
+    assert "DTSTART:20260909T150000Z" in saved
+    assert "DTEND:20260909T160000Z" in saved
+    assert re.search(r"^DTSTAMP:\d{8}T\d{6}Z\r?$", saved, re.MULTILINE), saved
+    assert re.search(r"^SEQUENCE:1\r?$", saved, re.MULTILINE), saved
+    assert saved.count("DTSTART") == 1 and saved.count("DTSTAMP") == 1

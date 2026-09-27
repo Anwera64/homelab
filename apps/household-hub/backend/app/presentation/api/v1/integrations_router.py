@@ -1,14 +1,23 @@
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Query
+from fastapi.responses import RedirectResponse
 
 from app.core.config import settings
 from app.domain.entities.user import User
+from app.domain.exceptions import (
+    CalendarAuthException,
+    CalendarSignInDeniedException,
+    CalendarSignInExpiredException,
+    CalendarUnreachableException,
+)
 from app.presentation.api import deps as pres_deps
 from app.presentation.mappers.integration_presentation_mapper import IntegrationPresentationMapper
 from app.presentation.schemas.integration_schemas import (
     CalendarCredentialCreate,
     CalendarCredentialRead,
+    GoogleSignInStartResponse,
     CalendarEventCreate,
     CalendarEventUpdate,
     CalendarEventRead,
@@ -23,6 +32,7 @@ from app.presentation.schemas.integration_schemas import (
 )
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
+logger = logging.getLogger(__name__)
 
 
 # =========================================================================
@@ -119,6 +129,54 @@ async def delete_calendar(
     """Removes the authenticated user's calendar configuration."""
     await del_uc.execute(current_user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# Where the browser goes when a Google sign-in ends; the app registers this scheme on both platforms.
+SIGN_IN_CONNECTED = "hyggehub://calendar/connected"
+SIGN_IN_FAILED = "hyggehub://calendar/failed?reason={reason}"
+
+
+@router.post("/calendars/google/start", response_model=GoogleSignInStartResponse)
+async def start_google_calendar_sign_in(
+    current_user: User = Depends(pres_deps.get_current_user),
+    start_uc=Depends(pres_deps.get_start_google_calendar_sign_in_use_case),
+):
+    """Google's consent page for the member to open in a browser. The hub keeps the whole sign-in."""
+    return GoogleSignInStartResponse(authorization_url=start_uc.execute(current_user.id))
+
+
+@router.get("/calendars/google/callback", include_in_schema=False)
+async def complete_google_calendar_sign_in(
+    state: str = Query(""),
+    code: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    complete_uc=Depends(pres_deps.get_complete_google_calendar_sign_in_use_case),
+):
+    """
+    Google sends the member's browser here. It carries no member token, only the state, so every
+    outcome is a redirect back into the app rather than a JSON error.
+    """
+    try:
+        await complete_uc.execute(state=state, code=code, error=error)
+        target = SIGN_IN_CONNECTED
+    except Exception as e:
+        reason = _sign_in_failure_reason(e)
+        # Nobody sees the browser's error page, so the log is the only place the cause survives.
+        logger.warning("Google calendar sign-in failed (%s): %s", reason, e, exc_info=reason == "failed")
+        target = SIGN_IN_FAILED.format(reason=reason)
+    return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+
+
+def _sign_in_failure_reason(error: Exception) -> str:
+    if isinstance(error, CalendarSignInExpiredException):
+        return "expired"
+    if isinstance(error, CalendarSignInDeniedException):
+        return "denied"
+    if isinstance(error, CalendarAuthException):
+        return "rejected"
+    if isinstance(error, CalendarUnreachableException):
+        return "unreachable"
+    return "failed"
 
 
 @router.get("/calendars/events", response_model=List[CalendarEventRead])

@@ -7,13 +7,22 @@ from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
 from app.domain.entities.calendar_event import CalendarEvent
-from app.domain.entities.integration_credential import CalendarCredential
+from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
     CalendarIntegrationException,
     CalendarUnreachableException,
 )
 from app.domain.repositories.calendar_connector import ICalendarConnector
+
+
+def _replace(component, name: str, value) -> None:
+    """
+    Sets a property through icalendar's `add`, which writes it in iCalendar form. Assigning a raw
+    datetime writes Python's str() of it, which Google refuses with a 400.
+    """
+    component.pop(name, None)
+    component.add(name, value)
 
 
 class CalDavCalendarConnector(ICalendarConnector):
@@ -24,6 +33,8 @@ class CalDavCalendarConnector(ICalendarConnector):
     """
 
     def _sync_get_client(self, credential: CalendarCredential, secret: str) -> caldav.DAVClient:
+        if credential.auth_kind == OAUTH:
+            return caldav.DAVClient(url=credential.url, password=secret, auth_type="bearer")
         return caldav.DAVClient(
             url=credential.url,
             username=credential.username,
@@ -37,14 +48,22 @@ class CalDavCalendarConnector(ICalendarConnector):
         """
         try:
             client = self._sync_get_client(credential, secret)
-            client.principal().calendars()
+            if credential.auth_kind == OAUTH:
+                client.calendar(url=credential.url).get_display_name()
+            else:
+                client.principal().calendars()
             return True
         except AuthorizationError as e:
             raise CalendarAuthException(f"CalDAV server at {credential.url} refused the credentials: {e}")
         except Exception as e:
             raise CalendarUnreachableException(f"CalDAV server at {credential.url} could not be reached: {e}")
 
-    def _sync_get_target_calendar(self, client: caldav.DAVClient, calendar_name: str):
+    def _sync_get_target_calendar(self, client: caldav.DAVClient, credential: CalendarCredential):
+        # A Google sign-in's address is the calendar itself; Google's CalDAV has no discovery to lean on.
+        if credential.auth_kind == OAUTH:
+            return client.calendar(url=credential.url)
+
+        calendar_name = credential.calendar_name
         principal = client.principal()
         calendars = principal.calendars()
         if not calendars:
@@ -68,7 +87,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> List[CalendarEvent]:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             raw_events = target_cal.date_search(start=start_time, end=end_time, expand=True)
 
             events: List[CalendarEvent] = []
@@ -135,7 +154,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             cal = ICalendar()
             cal.add("prodid", "-//Household Hub//CalDAV Connector//EN")
             cal.add("version", "2.0")
@@ -182,7 +201,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             try:
                 event = target_cal.event_by_uid(event_id)
             except Exception as e:
@@ -201,22 +220,22 @@ class CalDavCalendarConnector(ICalendarConnector):
 
             for component in cal_obj.walk("VEVENT"):
                 if title is not None:
-                    component["summary"] = title
+                    _replace(component, "summary", title)
                 elif "summary" in component and not updated_title:
                     updated_title = str(component["summary"])
 
                 if description is not None:
-                    component["description"] = description
+                    _replace(component, "description", description)
                 elif "description" in component and not updated_desc:
                     updated_desc = str(component["description"])
 
                 if location is not None:
-                    component["location"] = location
+                    _replace(component, "location", location)
                 elif "location" in component and not updated_loc:
                     updated_loc = str(component["location"])
 
                 if start_time is not None:
-                    component["dtstart"] = start_time
+                    _replace(component, "dtstart", start_time)
                 elif "dtstart" in component and not updated_start:
                     dtstart_val = component.get("dtstart").dt
                     if not isinstance(dtstart_val, datetime):
@@ -227,7 +246,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                         updated_start = dtstart_val
 
                 if end_time is not None:
-                    component["dtend"] = end_time
+                    _replace(component, "dtend", end_time)
                 elif "dtend" in component and not updated_end:
                     dtend_val = component.get("dtend").dt
                     if not isinstance(dtend_val, datetime):
@@ -244,8 +263,8 @@ class CalDavCalendarConnector(ICalendarConnector):
 
                 # Bump sequence number and update DTSTAMP
                 seq = int(component.get("sequence", 0))
-                component["sequence"] = seq + 1
-                component["dtstamp"] = datetime.now(timezone.utc)
+                _replace(component, "sequence", seq + 1)
+                _replace(component, "dtstamp", datetime.now(timezone.utc))
 
             raw_ical = cal_obj.to_ical()
             event.data = raw_ical.decode("utf-8") if isinstance(raw_ical, (bytes, bytearray)) else str(raw_ical)
@@ -274,7 +293,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> bool:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             event = target_cal.event_by_uid(event_id)
             event.delete()
             return True

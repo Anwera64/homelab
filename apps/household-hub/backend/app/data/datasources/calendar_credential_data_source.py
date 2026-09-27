@@ -22,6 +22,10 @@ class SqliteCalendarCredentialDataSource:
             existing.encrypted_secret = model.encrypted_secret
             existing.calendar_name = model.calendar_name
             existing.is_active = model.is_active
+            existing.auth_kind = model.auth_kind
+            existing.encrypted_refresh_token = model.encrypted_refresh_token
+            existing.token_expires_at = model.token_expires_at
+            existing.needs_reconnect = model.needs_reconnect
             existing.updated_at = model.updated_at
             return existing
         else:
