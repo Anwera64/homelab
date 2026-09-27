@@ -2,7 +2,10 @@ package com.homelab.household.presentation.profile
 
 import app.cash.turbine.test
 import com.homelab.household.domain.exception.ServerOfflineException
+import com.homelab.household.domain.model.CalendarConnection
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.User
+import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
@@ -23,14 +26,33 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /** Your own account, and the one thing it cannot do: leave while you are the only admin. */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class ProfileViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private val getCurrentUser = mock<GetCurrentUserUseCase>()
     private val listHouseholdMembers = mock<ListHouseholdMembersUseCase>()
     private val logout = mock<LogoutUseCase>()
+    private val getCalendar = mock<GetCalendarUseCase>()
+
+    /** Four minutes after the hub last checked the calendar below. */
+    private val clock =
+        object : Clock {
+            override fun now(): Instant = Instant.parse("2026-09-26T20:08:00Z")
+        }
+
+    private val icloud =
+        CalendarConnection(
+            provider = CalendarProvider.APPLE,
+            account = "emma@icloud.com",
+            server = "https://caldav.icloud.com",
+            calendarName = "Default",
+            connectedAt = "2026-09-26T20:04:00",
+        )
 
     private val emma = User(id = "emma", fullName = "Emma", isAdmin = true, isActive = true)
     private val liam = User(id = "liam", fullName = "Liam", isAdmin = false, isActive = true)
@@ -42,7 +64,7 @@ class ProfileViewModelTest {
     @AfterTest
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = ProfileViewModel(getCurrentUser, listHouseholdMembers, logout)
+    private fun viewModel() = ProfileViewModel(getCurrentUser, listHouseholdMembers, logout, getCalendar, clock)
 
     @Test
     fun the_only_admin_is_told_they_cannot_leave() =
@@ -145,5 +167,71 @@ class ProfileViewModelTest {
                 assertEquals(ProfileEvent.SignedOut, awaitItem())
             }
             verifySuspend(VerifyMode.exactly(1)) { logout() }
+        }
+
+    @Test
+    fun a_connected_calendar_shows_its_account_and_how_long_since_it_was_checked() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+            everySuspend { getCalendar() } returns icloud
+            val viewModel = viewModel()
+
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            assertEquals(
+                CalendarRow.Connected(provider = CalendarProvider.APPLE, account = "emma@icloud.com", minutesAgo = 4),
+                viewModel.uiState.value.calendar,
+            )
+        }
+
+    @Test
+    fun no_calendar_offers_to_connect_one() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+            everySuspend { getCalendar() } returns null
+            val viewModel = viewModel()
+
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            assertEquals(CalendarRow.None, viewModel.uiState.value.calendar)
+        }
+
+    /** Coming back from connecting one is what asks again, so the new calendar shows at once. */
+    @Test
+    fun asking_again_picks_up_a_calendar_connected_since() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+            everySuspend { getCalendar() } returns null
+            val viewModel = viewModel()
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            everySuspend { getCalendar() } returns icloud.copy(connectedAt = "2026-09-26T20:08:00Z")
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            assertEquals(
+                CalendarRow.Connected(provider = CalendarProvider.APPLE, account = "emma@icloud.com", minutesAgo = 0),
+                viewModel.uiState.value.calendar,
+            )
+        }
+
+    @Test
+    fun a_calendar_the_hub_could_not_say_makes_no_claim() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+            everySuspend { getCalendar() } throws ServerOfflineException()
+            val viewModel = viewModel()
+
+            viewModel.loadCalendar()
+            advanceUntilIdle()
+
+            assertEquals(CalendarRow.Unknown, viewModel.uiState.value.calendar)
         }
 }

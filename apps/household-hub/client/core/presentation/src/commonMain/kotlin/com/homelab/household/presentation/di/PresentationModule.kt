@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.di
 
+import com.homelab.household.presentation.calendarconnect.CalendarConnectViewModel
 import com.homelab.household.presentation.changepin.ChangePinViewModel
 import com.homelab.household.presentation.chats.ChatsViewModel
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
@@ -32,7 +33,7 @@ val presentationModule =
         factory { FirstRunViewModel(get()) }
         factory { ProfilePickerViewModel(get()) }
         factory { InviteCodeViewModel(get()) }
-        factory { ProfileViewModel(get(), get(), get()) }
+        factory { ProfileViewModel(get(), get(), get(), get()) }
         factory { MembersViewModel(get(), get()) }
         factory { InviteCreateViewModel(get()) }
         factory { params -> PinApproveViewModel(member = params.get(), approvePinReset = get()) }
@@ -40,6 +41,7 @@ val presentationModule =
         factory { ResetCodeViewModel() }
         factory { params -> NewPinViewModel(code = params.get(), redeemPinReset = get()) }
         factory { ChangePinViewModel(get()) }
+        factory { params -> CalendarConnectViewModel(provider = params.get(), connectCalendar = get()) }
         factory { params -> RemoveMemberViewModel(member = params.get(), removeMember = get()) }
         factory { LeaveHouseholdViewModel(get()) }
         factory { params ->
