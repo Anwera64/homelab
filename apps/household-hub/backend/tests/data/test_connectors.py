@@ -583,3 +583,39 @@ async def test_a_google_calendar_refusing_the_token_is_rejected():
     with patch.object(connector, "_sync_get_client", return_value=client):
         with pytest.raises(CalendarAuthException):
             await connector.test_connection(_google_credential(), "access-1")
+
+
+@pytest.mark.asyncio
+async def test_an_edited_event_is_saved_as_valid_icalendar():
+    """GIVEN an event WHEN its title and times are edited THEN every date the hub writes is in iCalendar form, which Google insists on."""
+    import re
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    event = MagicMock()
+    event.data = (
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+        "BEGIN:VEVENT\r\nUID:event-123\r\nDTSTAMP:20260901T000000Z\r\n"
+        "DTSTART:20260908T100000Z\r\nDTEND:20260908T110000Z\r\nSUMMARY:Dentist\r\n"
+        "END:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+    calendar = MagicMock()
+    calendar.event_by_uid.return_value = event
+
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        await connector.update_event(
+            credential=_google_credential(),
+            secret="access-1",
+            event_id="event-123",
+            title="Dentist (moved)",
+            start_time=datetime(2026, 9, 9, 15, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 9, 9, 16, 0, tzinfo=timezone.utc),
+        )
+
+    saved = event.data
+    assert "SUMMARY:Dentist (moved)" in saved
+    assert "DTSTART:20260909T150000Z" in saved
+    assert "DTEND:20260909T160000Z" in saved
+    assert re.search(r"^DTSTAMP:\d{8}T\d{6}Z\r?$", saved, re.MULTILINE), saved
+    assert re.search(r"^SEQUENCE:1\r?$", saved, re.MULTILINE), saved
+    assert saved.count("DTSTART") == 1 and saved.count("DTSTAMP") == 1

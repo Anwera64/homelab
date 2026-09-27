@@ -16,6 +16,15 @@ from app.domain.exceptions import (
 from app.domain.repositories.calendar_connector import ICalendarConnector
 
 
+def _replace(component, name: str, value) -> None:
+    """
+    Sets a property through icalendar's `add`, which writes it in iCalendar form. Assigning a raw
+    datetime writes Python's str() of it, which Google refuses with a 400.
+    """
+    component.pop(name, None)
+    component.add(name, value)
+
+
 class CalDavCalendarConnector(ICalendarConnector):
     """
     CalDAV connector supporting Apple iCloud, Google Calendar, and self-hosted
@@ -211,22 +220,22 @@ class CalDavCalendarConnector(ICalendarConnector):
 
             for component in cal_obj.walk("VEVENT"):
                 if title is not None:
-                    component["summary"] = title
+                    _replace(component, "summary", title)
                 elif "summary" in component and not updated_title:
                     updated_title = str(component["summary"])
 
                 if description is not None:
-                    component["description"] = description
+                    _replace(component, "description", description)
                 elif "description" in component and not updated_desc:
                     updated_desc = str(component["description"])
 
                 if location is not None:
-                    component["location"] = location
+                    _replace(component, "location", location)
                 elif "location" in component and not updated_loc:
                     updated_loc = str(component["location"])
 
                 if start_time is not None:
-                    component["dtstart"] = start_time
+                    _replace(component, "dtstart", start_time)
                 elif "dtstart" in component and not updated_start:
                     dtstart_val = component.get("dtstart").dt
                     if not isinstance(dtstart_val, datetime):
@@ -237,7 +246,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                         updated_start = dtstart_val
 
                 if end_time is not None:
-                    component["dtend"] = end_time
+                    _replace(component, "dtend", end_time)
                 elif "dtend" in component and not updated_end:
                     dtend_val = component.get("dtend").dt
                     if not isinstance(dtend_val, datetime):
@@ -254,8 +263,8 @@ class CalDavCalendarConnector(ICalendarConnector):
 
                 # Bump sequence number and update DTSTAMP
                 seq = int(component.get("sequence", 0))
-                component["sequence"] = seq + 1
-                component["dtstamp"] = datetime.now(timezone.utc)
+                _replace(component, "sequence", seq + 1)
+                _replace(component, "dtstamp", datetime.now(timezone.utc))
 
             raw_ical = cal_obj.to_ical()
             event.data = raw_ical.decode("utf-8") if isinstance(raw_ical, (bytes, bytearray)) else str(raw_ical)
