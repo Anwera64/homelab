@@ -255,3 +255,68 @@ def test_GIVEN_a_researcher_someone_retuned_WHEN_migrated_THEN_its_temperature_i
 
     assert result["upgraded"] == {"researcher": 0.45}
     assert result["downgraded"] == {"researcher": 0.45}
+
+
+_BEFORE_RESEARCHER_KNOWS_SCIENCE_SEARCH = "7c3e91a0b5d2"
+_RESEARCHER_PROMPT_BEFORE_SCIENCE_SEARCH = (
+    "You are the Household Academic & Document Researcher. You specialize in deep academic analysis, "
+    "synthesizing complex documents, reading architectural papers, and extracting exact citations. "
+    "You maintain an objective, thorough, and rigorous research tone."
+)
+
+
+def _prompts_at(database_url: str, rows) -> dict:
+    """Migrates to just before the prompt change, inserts agents, upgrades to head and back down."""
+    from sqlalchemy import text
+
+    config = _alembic_config(database_url)
+    command.upgrade(config, _BEFORE_RESEARCHER_KNOWS_SCIENCE_SEARCH)
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as conn:
+            for slug, prompt, is_builtin in rows:
+                conn.execute(
+                    text(
+                        "INSERT INTO agent_personalities (id, slug, name, description, avatar, system_prompt, "
+                        "temperature, top_p, tool_permissions, is_builtin, is_active, created_at, updated_at) "
+                        "VALUES (:slug, :slug, :slug, '', '🤖', :prompt, 0.6, 0.85, '[]', :b, 1, "
+                        "'2026-01-01', '2026-01-01')"
+                    ),
+                    {"slug": slug, "prompt": prompt, "b": is_builtin},
+                )
+        command.upgrade(config, "head")
+        with engine.connect() as conn:
+            upgraded = dict(conn.execute(text("SELECT slug, system_prompt FROM agent_personalities")).all())
+        command.downgrade(config, _BEFORE_RESEARCHER_KNOWS_SCIENCE_SEARCH)
+        with engine.connect() as conn:
+            downgraded = dict(conn.execute(text("SELECT slug, system_prompt FROM agent_personalities")).all())
+        return {"upgraded": upgraded, "downgraded": downgraded}
+    finally:
+        engine.dispose()
+
+
+def test_GIVEN_the_untouched_builtin_researcher_WHEN_migrated_THEN_it_gets_the_seeded_prompt_and_back_on_downgrade():
+    """An existing hub's Researcher learns when to search science, the same words a new hub seeds (#38)."""
+    from app.domain.use_cases.agents.seed_builtin_agents import BUILTIN_AGENTS
+
+    seeded = next(a for a in BUILTIN_AGENTS if a["slug"] == "researcher")["system_prompt"]
+    old = _RESEARCHER_PROMPT_BEFORE_SCIENCE_SEARCH
+    with tempfile.TemporaryDirectory() as workspace:
+        result = _prompts_at(
+            f"sqlite:///{Path(workspace) / 'science.db'}",
+            [("researcher", old, True), ("custom", old, False)],
+        )
+
+    assert result["upgraded"] == {"researcher": seeded, "custom": old}
+    assert result["downgraded"] == {"researcher": old, "custom": old}
+
+
+def test_GIVEN_a_researcher_prompt_someone_rewrote_WHEN_migrated_THEN_it_is_left_alone():
+    with tempfile.TemporaryDirectory() as workspace:
+        result = _prompts_at(
+            f"sqlite:///{Path(workspace) / 'rewritten.db'}",
+            [("researcher", "You only read Spanish sources.", True)],
+        )
+
+    assert result["upgraded"] == {"researcher": "You only read Spanish sources."}
+    assert result["downgraded"] == {"researcher": "You only read Spanish sources."}
