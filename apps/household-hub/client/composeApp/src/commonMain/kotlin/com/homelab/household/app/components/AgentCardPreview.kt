@@ -13,7 +13,7 @@ private fun AgentCardPreview() {
             avatar = "🏡",
             tagline = "Schedules, meals, keeping the week straight.",
             owner = AgentOwnerChip.BuiltIn("built in"),
-            permissions = listOf("Read calendar", "Search the web"),
+            permissions = listOf("Read your calendar", "Search the web"),
             selected = true,
             onClick = {},
         )

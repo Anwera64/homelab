@@ -9,6 +9,13 @@ TITLE_CHARACTERS = 120
 # Only these open on the phone. Search results are the web's own data, so anything else is dropped.
 WEB_SCHEMES = ("https://", "http://")
 
+# What each write tool can do, so the phone can say what it did: a removal never reads as "Added".
+# Both tools default to create when the model leaves the action out (list_available_tools).
+WRITE_ACTIONS = {
+    "calendar_write": ("create", "update", "delete"),
+    "document_writer": ("create", "append", "replace"),
+}
+
 
 def summarize_tool(tool: str, arguments: Dict[str, Any], result: ToolExecutionResult) -> Optional[Dict[str, Any]]:
     """
@@ -22,7 +29,7 @@ def summarize_tool(tool: str, arguments: Dict[str, Any], result: ToolExecutionRe
     data = result.data if isinstance(result.data, dict) else {}
 
     if not result.success:
-        summary: Dict[str, Any] = {}
+        summary: Dict[str, Any] = _action(tool, arguments)
         if tool == "searxng_search":
             summary["query"] = str(arguments.get("query", ""))
         summary["reason"] = result.reason or "unknown"
@@ -39,11 +46,23 @@ def summarize_tool(tool: str, arguments: Dict[str, Any], result: ToolExecutionRe
     if tool == "read_page":
         return {"sources": _sources([data])}
 
-    if tool == "calendar_write":
+    if tool in WRITE_ACTIONS:
+        summary = _action(tool, arguments)
         title = arguments.get("title")
-        return {"title": _clip(str(title))} if title else None
+        if title and tool == "calendar_write":
+            summary["title"] = _clip(str(title))
+        return summary or None
 
     return None
+
+
+def _action(tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """A write tool's action as the tool names it; one it doesn't have is left out, never guessed."""
+    actions = WRITE_ACTIONS.get(tool)
+    if actions is None:
+        return {}
+    action = arguments.get("action") or "create"
+    return {"action": action} if action in actions else {}
 
 
 def _sources(items: List[Any]) -> List[Dict[str, str]]:

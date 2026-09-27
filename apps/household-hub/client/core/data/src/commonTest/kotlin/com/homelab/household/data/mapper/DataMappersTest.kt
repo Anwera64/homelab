@@ -13,6 +13,7 @@ import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -220,6 +221,55 @@ class DataMappersTest {
             ),
             parts,
         )
+    }
+
+    @Test
+    fun `GIVEN a removal saved with its action WHEN mapped THEN the part says it was a removal`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": true,
+                    "summary": {"action": "delete", "title": "Print shop cutoff"}}]""",
+            )
+
+        assertEquals(
+            listOf(
+                AnswerPart.ToolDone(
+                    "calendar_write",
+                    ToolSummary(action = ToolAction.Delete, title = "Print shop cutoff"),
+                ),
+            ),
+            parts,
+        )
+    }
+
+    @Test
+    fun `GIVEN each write action the hub names WHEN mapped THEN each is its own action`() {
+        val actions =
+            mapOf(
+                "create" to ToolAction.Create,
+                "update" to ToolAction.Update,
+                "delete" to ToolAction.Delete,
+                "append" to ToolAction.Append,
+                "replace" to ToolAction.Replace,
+            )
+
+        actions.forEach { (code, action) ->
+            val parts =
+                partsOf(
+                    """[{"type": "tool", "tool": "document_writer", "success": true, "summary": {"action": "$code"}}]""",
+                )
+            assertEquals(listOf(AnswerPart.ToolDone("document_writer", ToolSummary(action = action))), parts, code)
+        }
+    }
+
+    @Test
+    fun `GIVEN an action this phone does not know WHEN mapped THEN it is left out rather than guessed`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": true, "summary": {"action": "obliterate"}}]""",
+            )
+
+        assertEquals(listOf(AnswerPart.ToolDone("calendar_write", ToolSummary())), parts)
     }
 
     @Test

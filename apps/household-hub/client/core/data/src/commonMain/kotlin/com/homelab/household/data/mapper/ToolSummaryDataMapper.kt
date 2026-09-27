@@ -1,5 +1,6 @@
 package com.homelab.household.data.mapper
 
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -26,8 +27,20 @@ object ToolSummaryDataMapper {
             sources = (summary["sources"] as? JsonArray).orEmpty().mapNotNull(::sourceFromJson),
             reason = summary.string("reason")?.let(::reasonFromCode),
             title = summary.string("title"),
+            action = summary.string("action")?.let(::actionFromCode),
         )
     }
+
+    /** A write's action as the hub names it; one this phone does not know is left out, never guessed. */
+    fun actionFromCode(code: String): ToolAction? =
+        when (code) {
+            "create" -> ToolAction.Create
+            "update" -> ToolAction.Update
+            "delete" -> ToolAction.Delete
+            "append" -> ToolAction.Append
+            "replace" -> ToolAction.Replace
+            else -> null
+        }
 
     private fun sourceFromJson(element: JsonElement): ToolSource? {
         val source = element as? JsonObject ?: return null

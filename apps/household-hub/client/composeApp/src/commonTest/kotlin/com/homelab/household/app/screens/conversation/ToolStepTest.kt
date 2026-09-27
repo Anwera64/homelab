@@ -2,9 +2,13 @@ package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.tool_calendar_add_done
 import com.homelab.household.app.resources.tool_calendar_read_done
+import com.homelab.household.app.resources.tool_calendar_remove_done
+import com.homelab.household.app.resources.tool_calendar_remove_failed
 import com.homelab.household.app.resources.tool_calendar_write_done
 import com.homelab.household.app.resources.tool_calendar_write_failed
+import com.homelab.household.app.resources.tool_note_replace_done
 import com.homelab.household.app.resources.tool_reason_blocked
 import com.homelab.household.app.resources.tool_reason_search_unavailable
 import com.homelab.household.app.resources.tool_reason_site_unavailable
@@ -12,6 +16,7 @@ import com.homelab.household.app.resources.tool_reason_throttled
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -147,15 +152,50 @@ class ToolStepTest {
 
         assertEquals(StepWords.Failed(Res.string.tool_calendar_write_failed, reason = null), unknown.words)
         assertEquals(StepWords.Failed(Res.string.tool_calendar_write_failed, reason = null), unsaid.words)
-        assertEquals(HearthIcon.CalendarAdd, unknown.icon)
+        assertEquals(HearthIcon.Schedule, unknown.icon)
         assertTrue(unknown.failed)
     }
 
     @Test
-    fun `GIVEN an added event WHEN described THEN it is named`() {
+    fun `GIVEN an event write saved before its action was WHEN described THEN it is named without saying how`() {
         val step = toolStep(AnswerPart.ToolDone("calendar_write", ToolSummary(title = "Dinner together")))
 
         assertEquals(StepWords.Named(Res.string.tool_calendar_write_done, "Dinner together"), step.words)
+    }
+
+    @Test
+    fun `GIVEN a removed event WHEN described THEN it says it was removed with the removal's own icon`() {
+        val step =
+            toolStep(
+                AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Print shop")),
+            )
+
+        assertEquals(StepWords.Named(Res.string.tool_calendar_remove_done, "Print shop"), step.words)
+        assertEquals(HearthIcon.CalendarRemove, step.icon)
+    }
+
+    @Test
+    fun `GIVEN a removal that failed WHEN described THEN it says the removal failed`() {
+        val step = toolStep(AnswerPart.ToolFailed("calendar_write", ToolSummary(action = ToolAction.Delete)))
+
+        assertEquals(StepWords.Failed(Res.string.tool_calendar_remove_failed, reason = null), step.words)
+        assertTrue(step.failed)
+    }
+
+    @Test
+    fun `GIVEN an added event saved with its action WHEN described THEN it says it was added`() {
+        val step =
+            toolStep(AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner")))
+
+        assertEquals(StepWords.Named(Res.string.tool_calendar_add_done, "Dinner"), step.words)
+        assertEquals(HearthIcon.CalendarAdd, step.icon)
+    }
+
+    @Test
+    fun `GIVEN a note replaced WHEN described THEN it says it was replaced`() {
+        val step = toolStep(AnswerPart.ToolDone("document_writer", ToolSummary(action = ToolAction.Replace)))
+
+        assertEquals(StepWords.Plain(Res.string.tool_note_replace_done), step.words)
     }
 
     @Test

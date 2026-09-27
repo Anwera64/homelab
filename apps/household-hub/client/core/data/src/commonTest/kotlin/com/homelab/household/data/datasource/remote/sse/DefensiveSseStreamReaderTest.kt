@@ -2,6 +2,7 @@ package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
 import io.ktor.utils.io.ByteReadChannel
@@ -301,6 +302,42 @@ class DefensiveSseStreamReaderTest {
                 ),
                 result.summary,
             )
+        }
+
+    /** A running write says which action it is, so a removal is never shown as "Adding…". */
+    @Test
+    fun `GIVEN a running write WHEN read THEN the event carries its action`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_executing", "tool": "calendar_write", "arguments": {"action": "delete", "event_id": "e1"}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(
+                ChatStreamEvent.ToolExecuting(tool = "calendar_write", action = ToolAction.Delete),
+                events.single(),
+            )
+        }
+
+    @Test
+    fun `GIVEN a running read WHEN read THEN it has no action`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_executing", "tool": "searxng_search", "arguments": {"query": "dinner"}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(ChatStreamEvent.ToolExecuting(tool = "searxng_search"), events.single())
         }
 
     /** `id:` lines let a data source remember where to resume a dropped stream from. */

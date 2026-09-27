@@ -27,6 +27,8 @@ sealed interface ChatStreamEvent {
     data class ToolExecuting(
         val tool: String,
         val arguments: Map<String, Any?> = emptyMap(),
+        /** What a running write is doing, so the phone never says "Adding…" for a removal. */
+        val action: ToolAction? = null,
     ) : ChatStreamEvent
 
     data class ToolResult(

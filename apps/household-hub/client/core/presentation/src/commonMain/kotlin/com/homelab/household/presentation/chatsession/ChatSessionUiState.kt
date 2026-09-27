@@ -5,6 +5,7 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
+import com.homelab.household.domain.model.ToolAction
 
 /**
  * How the answer being written is going.
@@ -52,6 +53,8 @@ data class ChatSessionUiState(
     val isThinking: Boolean = false,
     /** The tool running right now, by its backend name. */
     val activeTool: String? = null,
+    /** What the running tool is doing, when it is a write: a removal is never shown as an add. */
+    val activeToolAction: ToolAction? = null,
     /** The answer being written, in the order it happened: its text, its thinking and its tools. */
     val parts: List<AnswerPart> = emptyList(),
     /**

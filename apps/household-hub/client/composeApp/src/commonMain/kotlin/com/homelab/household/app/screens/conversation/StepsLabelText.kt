@@ -11,13 +11,17 @@ import com.homelab.household.app.resources.steps_label_and
 import com.homelab.household.app.resources.steps_label_failed
 import com.homelab.household.app.resources.steps_label_more
 import com.homelab.household.app.resources.steps_phrase_added
-import com.homelab.household.app.resources.steps_phrase_added_plain
+import com.homelab.household.app.resources.steps_phrase_changed
 import com.homelab.household.app.resources.steps_phrase_checked_calendar
 import com.homelab.household.app.resources.steps_phrase_read
+import com.homelab.household.app.resources.steps_phrase_removed
 import com.homelab.household.app.resources.steps_phrase_searched
 import com.homelab.household.app.resources.steps_phrase_searched_times
 import com.homelab.household.app.resources.steps_phrase_searched_twice
+import com.homelab.household.app.resources.steps_phrase_updated
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.domain.model.ToolAction
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -34,7 +38,7 @@ fun stepsLabelText(
     val only = label.phrases.singleOrNull()
     if (only is StepPhrase.Failed) {
         return buildAnnotatedString {
-            withStyle(SpanStyle(color = error)) { append(stringResource(toolLabel(only.tool).failed)) }
+            withStyle(SpanStyle(color = error)) { append(stringResource(toolLabel(only.tool, only.action).failed)) }
         }
     }
     if (label.phrases.isEmpty()) {
@@ -76,19 +80,30 @@ private fun phrase(phrase: StepPhrase): String =
             stringResource(Res.string.steps_phrase_checked_calendar)
         }
 
-        is StepPhrase.Added -> {
-            phrase.title?.let { stringResource(Res.string.steps_phrase_added, it) }
-                ?: stringResource(Res.string.steps_phrase_added_plain)
+        is StepPhrase.Wrote -> {
+            phrase.title?.let { stringResource(wroteNamed(phrase.action), it) }
+                ?: stringResource(toolLabel(CALENDAR_WRITE, phrase.action).done).replaceFirstChar { it.lowercase() }
         }
 
         is StepPhrase.Did -> {
-            stringResource(toolLabel(phrase.tool).done).replaceFirstChar { it.lowercase() }
+            stringResource(toolLabel(phrase.tool, phrase.action).done).replaceFirstChar { it.lowercase() }
         }
 
         is StepPhrase.Failed -> {
-            stringResource(toolLabel(phrase.tool).failed).replaceFirstChar { it.lowercase() }
+            stringResource(toolLabel(phrase.tool, phrase.action).failed).replaceFirstChar { it.lowercase() }
         }
     }
+
+/** "added %s", "removed %s": what was done to the event, named. Unknown, it was only updated. */
+private fun wroteNamed(action: ToolAction?): StringResource =
+    when (action) {
+        ToolAction.Create -> Res.string.steps_phrase_added
+        ToolAction.Update -> Res.string.steps_phrase_changed
+        ToolAction.Delete -> Res.string.steps_phrase_removed
+        else -> Res.string.steps_phrase_updated
+    }
+
+private const val CALENDAR_WRITE = "calendar_write"
 
 // The same separator the step lines use between what happened and more about it.
 private const val SEPARATOR = " · "
