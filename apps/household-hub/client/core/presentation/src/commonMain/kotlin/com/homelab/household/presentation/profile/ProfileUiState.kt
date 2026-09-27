@@ -7,5 +7,6 @@ data class ProfileUiState(
     val member: User? = null,
     val isSoleAdmin: Boolean = false,
     val calendar: CalendarRow = CalendarRow.Loading,
+    val calendarDisconnect: CalendarDisconnect = CalendarDisconnect.Idle,
     val status: ProfileStatus = ProfileStatus.Loading,
 )

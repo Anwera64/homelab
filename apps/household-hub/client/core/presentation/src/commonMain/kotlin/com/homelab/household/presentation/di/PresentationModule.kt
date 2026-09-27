@@ -33,7 +33,7 @@ val presentationModule =
         factory { FirstRunViewModel(get()) }
         factory { ProfilePickerViewModel(get()) }
         factory { InviteCodeViewModel(get()) }
-        factory { ProfileViewModel(get(), get(), get(), get()) }
+        factory { ProfileViewModel(get(), get(), get(), get(), get()) }
         factory { MembersViewModel(get(), get()) }
         factory { InviteCreateViewModel(get()) }
         factory { params -> PinApproveViewModel(member = params.get(), approvePinReset = get()) }

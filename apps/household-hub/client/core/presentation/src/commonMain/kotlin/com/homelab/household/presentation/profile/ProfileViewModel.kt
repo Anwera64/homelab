@@ -8,6 +8,7 @@ import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
+import com.homelab.household.domain.usecase.RemoveCalendarUseCase
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,7 @@ class ProfileViewModel(
     private val listHouseholdMembers: ListHouseholdMembersUseCase,
     private val logout: LogoutUseCase,
     private val getCalendar: GetCalendarUseCase,
+    private val removeCalendar: RemoveCalendarUseCase,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -81,6 +83,31 @@ class ProfileViewModel(
                     onFailure = { CalendarRow.Unknown },
                 )
             _uiState.update { it.copy(calendar = row) }
+        }
+    }
+
+    /**
+     * The row only changes once the hub has said yes. A failure leaves the calendar connected, since
+     * that's still true, and says why.
+     */
+    fun onDisconnectCalendar() {
+        _uiState.update { it.copy(calendarDisconnect = CalendarDisconnect.Disconnecting) }
+        viewModelScope.launch {
+            runCatchingSafe { removeCalendar() }.fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(calendar = CalendarRow.None, calendarDisconnect = CalendarDisconnect.Idle)
+                    }
+                },
+                onFailure = { error ->
+                    val failure =
+                        when (error) {
+                            is ServerOfflineException -> CalendarDisconnect.Unreachable
+                            else -> CalendarDisconnect.Failed
+                        }
+                    _uiState.update { it.copy(calendarDisconnect = failure) }
+                },
+            )
         }
     }
 

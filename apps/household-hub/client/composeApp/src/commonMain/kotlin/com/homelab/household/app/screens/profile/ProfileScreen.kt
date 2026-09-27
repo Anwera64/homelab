@@ -42,5 +42,6 @@ fun ProfileScreen(
         onSignOut = viewModel::onSignOut,
         onCalendar = onCalendar,
         modifier = modifier,
+        onDisconnectCalendar = viewModel::onDisconnectCalendar,
     )
 }

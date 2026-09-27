@@ -9,17 +9,22 @@ import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
+import com.homelab.household.domain.usecase.RemoveCalendarUseCase
+import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.everySuspend
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlin.test.AfterTest
@@ -38,6 +43,7 @@ class ProfileViewModelTest {
     private val listHouseholdMembers = mock<ListHouseholdMembersUseCase>()
     private val logout = mock<LogoutUseCase>()
     private val getCalendar = mock<GetCalendarUseCase>()
+    private val removeCalendar = mock<RemoveCalendarUseCase>()
 
     /** Four minutes after the hub last checked the calendar below. */
     private val clock =
@@ -64,7 +70,8 @@ class ProfileViewModelTest {
     @AfterTest
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = ProfileViewModel(getCurrentUser, listHouseholdMembers, logout, getCalendar, clock)
+    private fun viewModel() =
+        ProfileViewModel(getCurrentUser, listHouseholdMembers, logout, getCalendar, removeCalendar, clock)
 
     @Test
     fun the_only_admin_is_told_they_cannot_leave() =
@@ -234,4 +241,67 @@ class ProfileViewModelTest {
 
             assertEquals(CalendarRow.Unknown, viewModel.uiState.value.calendar)
         }
+
+    @Test
+    fun `GIVEN a connected calendar WHEN it is disconnected THEN the hub removes it and the row offers to connect one`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val viewModel = connectedToIcloud()
+            everySuspend { removeCalendar() } returns Unit
+
+            // WHEN
+            viewModel.onDisconnectCalendar()
+            advanceUntilIdle()
+
+            // THEN
+            verifySuspend(VerifyMode.exactly(1)) { removeCalendar() }
+            assertEquals(CalendarRow.None, viewModel.uiState.value.calendar)
+            assertEquals(CalendarDisconnect.Idle, viewModel.uiState.value.calendarDisconnect)
+        }
+
+    @Test
+    fun `GIVEN the hub can't be reached WHEN the calendar is disconnected THEN it stays connected and says so`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val viewModel = connectedToIcloud()
+            everySuspend { removeCalendar() } throws ServerOfflineException()
+
+            // WHEN
+            viewModel.onDisconnectCalendar()
+            advanceUntilIdle()
+
+            // THEN
+            assertEquals(
+                CalendarRow.Connected(provider = CalendarProvider.APPLE, account = "emma@icloud.com", minutesAgo = 4),
+                viewModel.uiState.value.calendar,
+            )
+            assertEquals(CalendarDisconnect.Unreachable, viewModel.uiState.value.calendarDisconnect)
+        }
+
+    @Test
+    fun `GIVEN the hub is still answering WHEN the calendar is being disconnected THEN it shows it's busy`() =
+        runTest(testDispatcher) {
+            // GIVEN
+            val viewModel = connectedToIcloud()
+            val hubAnswers = CompletableDeferred<Unit>()
+            everySuspend { removeCalendar() } calls { hubAnswers.await() }
+
+            // WHEN
+            viewModel.onDisconnectCalendar()
+            runCurrent()
+
+            // THEN
+            assertEquals(CalendarDisconnect.Disconnecting, viewModel.uiState.value.calendarDisconnect)
+            hubAnswers.complete(Unit)
+        }
+
+    private suspend fun TestScope.connectedToIcloud(): ProfileViewModel {
+        everySuspend { getCurrentUser() } returns emma
+        everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
+        everySuspend { getCalendar() } returns icloud
+        return viewModel().also {
+            it.loadCalendar()
+            advanceUntilIdle()
+        }
+    }
 }

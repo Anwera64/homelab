@@ -31,6 +31,10 @@ class FakeMembersHub {
             "created_at":"2026-09-16T00:00:00Z"}""",
         )
     private var calendar: String? = null
+
+    /** How many times the phone asked the hub to forget the calendar. */
+    var calendarsRemoved = 0
+        private set
     private var write: suspend MockRequestHandleScope.() -> HttpResponseData = { json("""{"message":"done"}""") }
     private var offline = false
 
@@ -57,6 +61,12 @@ class FakeMembersHub {
                 path == "/api/v1/integrations/calendars/me" -> {
                     calendar?.let { json(it) }
                         ?: json("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound)
+                }
+
+                path == "/api/v1/integrations/calendars" && request.method == HttpMethod.Delete -> {
+                    calendarsRemoved++
+                    calendar = null
+                    respond("", HttpStatusCode.NoContent)
                 }
 
                 else -> {

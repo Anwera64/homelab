@@ -56,11 +56,14 @@ class HearthIconsTest {
             "delete",
             // The receipt under a question the hub has, drawn on the Chat Turn States canvas
             "sent",
+            // The calendar row's options, drawn on the Calendar & offline canvas
+            "more",
         )
 
     private val solidShapeCounts =
         mapOf(
             "streaming" to 3,
+            "more" to 3,
             "hubOnline" to 1,
             "hubOffline" to 1,
             "warning" to 1,

@@ -13,9 +13,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -31,13 +37,13 @@ import com.homelab.household.app.components.SkeletonBlock
 import com.homelab.household.app.components.SkeletonCircle
 import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.icons.HearthIcon
+import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.resources.profile_admin
 import com.homelab.household.app.resources.profile_back
 import com.homelab.household.app.resources.profile_calendar
-import com.homelab.household.app.resources.profile_calendar_change
 import com.homelab.household.app.resources.profile_calendar_checked_days
 import com.homelab.household.app.resources.profile_calendar_checked_hours
 import com.homelab.household.app.resources.profile_calendar_checked_minutes
@@ -45,6 +51,7 @@ import com.homelab.household.app.resources.profile_calendar_checked_now
 import com.homelab.household.app.resources.profile_calendar_connect
 import com.homelab.household.app.resources.profile_calendar_connect_caption
 import com.homelab.household.app.resources.profile_calendar_note
+import com.homelab.household.app.resources.profile_calendar_options
 import com.homelab.household.app.resources.profile_change_pin
 import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
@@ -80,10 +87,34 @@ fun ProfileContent(
     onSignOut: () -> Unit,
     onCalendar: () -> Unit,
     modifier: Modifier = Modifier,
+    onDisconnectCalendar: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val member = state.member
+    var sheet by rememberSaveable { mutableStateOf<CalendarSheetStep?>(null) }
+    val calendar = state.calendar
+
+    if (calendar is CalendarRow.Connected) {
+        sheet?.let { step ->
+            CalendarOptionsSheet(
+                row = calendar,
+                step = step,
+                disconnect = state.calendarDisconnect,
+                onChange = {
+                    sheet = null
+                    onCalendar()
+                },
+                onAskToDisconnect = { sheet = CalendarSheetStep.ConfirmDisconnect },
+                onDisconnect = onDisconnectCalendar,
+                onDismiss = { sheet = null },
+            )
+        }
+    }
+    // Disconnected (or not known any more): there is nothing left for the sheet to act on.
+    LaunchedEffect(calendar) {
+        if (calendar !is CalendarRow.Connected) sheet = null
+    }
 
     HearthScaffold(
         modifier = modifier,
@@ -117,7 +148,11 @@ fun ProfileContent(
                 }
             }
 
-            CalendarSection(row = state.calendar, onCalendar = onCalendar)
+            CalendarSection(
+                row = calendar,
+                onCalendar = onCalendar,
+                onCalendarOptions = { sheet = CalendarSheetStep.Options },
+            )
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
@@ -181,13 +216,14 @@ private fun ArrivingHeader() {
 }
 
 /**
- * One calendar per member. Connected, it names the provider and the account, when the hub last
- * reached it, and offers Change, which replaces it rather than adding a second.
+ * One calendar per member. Connected, it names the provider and the account and when the hub last
+ * reached it; its options change it (replacing it rather than adding a second) or disconnect it.
  */
 @Composable
 private fun CalendarSection(
     row: CalendarRow,
     onCalendar: () -> Unit,
+    onCalendarOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
@@ -202,7 +238,7 @@ private fun CalendarSection(
         )
         when (row) {
             is CalendarRow.Connected -> {
-                ConnectedCalendar(row = row, onChange = onCalendar)
+                ConnectedCalendar(row = row, onOptions = onCalendarOptions)
                 Text(
                     stringResource(Res.string.profile_calendar_note),
                     modifier = Modifier.padding(start = HearthTheme.spacing.xs),
@@ -242,14 +278,16 @@ private fun CalendarSection(
 @Composable
 private fun ConnectedCalendar(
     row: CalendarRow.Connected,
-    onChange: () -> Unit,
+    onOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
+    // The whole card opens the options, as it opened Change before; the button is the visible cue
+    // and the name a screen reader hears.
     Surface(
-        onClick = onChange,
+        onClick = onOptions,
         modifier = modifier.fillMaxWidth(),
         shape = HearthShapes.bento,
         color = colors.surface,
@@ -276,7 +314,17 @@ private fun ConnectedCalendar(
                     Text(checkedAgo(minutes), style = type.caption, color = colors.textMuted)
                 }
             }
-            Text(stringResource(Res.string.profile_calendar_change), style = type.labelStrong, color = colors.primary)
+            IconButton(
+                onClick = onOptions,
+                modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
+            ) {
+                HearthIconImage(
+                    icon = HearthIcon.More,
+                    contentDescription = stringResource(Res.string.profile_calendar_options),
+                    size = HearthTheme.size.iconMd,
+                    tint = colors.textMuted,
+                )
+            }
         }
     }
 }
