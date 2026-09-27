@@ -58,7 +58,11 @@ class StepsLabelTest {
 
     @Test
     fun `GIVEN an added event WHEN labelled THEN the outcome is named`() {
-        val added = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Create, title = "Dinner together"))
+        val added =
+            AnswerPart.ToolDone(
+                "calendar_write",
+                ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+            )
 
         assertEquals(
             listOf(StepPhrase.CheckedCalendar, StepPhrase.Wrote(ToolAction.Create, "Dinner together")),
@@ -67,8 +71,12 @@ class StepsLabelTest {
     }
 
     @Test
-    fun `GIVEN a removed event WHEN labelled THEN it is named as removed, never added`() {
-        val removed = AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Print shop"))
+    fun `GIVEN a removed event WHEN labelled THEN it is named as removed and never added`() {
+        val removed =
+            AnswerPart.ToolDone(
+                "calendar_write",
+                ToolSummary(action = ToolAction.Delete, title = "Print shop"),
+            )
 
         assertEquals(
             listOf(StepPhrase.CheckedCalendar, StepPhrase.Wrote(ToolAction.Delete, "Print shop")),

@@ -164,9 +164,11 @@ class ToolStepTest {
     }
 
     @Test
-    fun `GIVEN a removed event WHEN described THEN it says it was removed, with the removal's own icon`() {
+    fun `GIVEN a removed event WHEN described THEN it says it was removed with the removal's own icon`() {
         val step =
-            toolStep(AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Print shop")))
+            toolStep(
+                AnswerPart.ToolDone("calendar_write", ToolSummary(action = ToolAction.Delete, title = "Print shop")),
+            )
 
         assertEquals(StepWords.Named(Res.string.tool_calendar_remove_done, "Print shop"), step.words)
         assertEquals(HearthIcon.CalendarRemove, step.icon)

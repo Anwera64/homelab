@@ -22,6 +22,7 @@ import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
 import org.jetbrains.compose.resources.getString
+import kotlin.math.ceil
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -92,7 +93,7 @@ class ToolStepLineTest {
         }
 
     @Test
-    fun `GIVEN a page with a long title WHEN drawn THEN the line stays on one line and shortens the title, never the site`() =
+    fun `GIVEN a page with a long title WHEN drawn THEN the line stays on one line and shortens the title and never the site`() =
         runComposeUiTest {
             val long =
                 ToolSource(
@@ -110,12 +111,11 @@ class ToolStepLineTest {
 
             val title = layoutOf("Read ${long.title}")
             assertEquals(1, title.lineCount)
-            assertTrue(title.isLineEllipsized(0), "the title is shortened")
+            assertFalse(title.isShownWhole(), "the title is shortened")
 
             val site = layoutOf(" · rsf.org")
             assertEquals(1, site.lineCount)
-            assertFalse(site.hasVisualOverflow, "the site is shown whole")
-            assertFalse(site.isLineEllipsized(0), "the site is never shortened")
+            assertTrue(site.isShownWhole(), "the site is shown whole")
         }
 
     @Test
@@ -130,8 +130,8 @@ class ToolStepLineTest {
                 }
             }
 
-            assertFalse(layoutOf("Read Menu and opening hours").isLineEllipsized(0))
-            assertFalse(layoutOf(" · lapubilla.cat").isLineEllipsized(0))
+            assertTrue(layoutOf("Read Menu and opening hours").isShownWhole())
+            assertTrue(layoutOf(" · lapubilla.cat").isShownWhole())
         }
 
     @Test
@@ -172,6 +172,14 @@ class ToolStepLineTest {
         }
         return layouts.single()
     }
+
+    /**
+     * Every character shown, with room for all of it. Asked this way because on the JVM, where these
+     * run, the text layout reports no line as ellipsized and counts unwrapped text as overflowing.
+     */
+    private fun TextLayoutResult.isShownWhole(): Boolean =
+        getLineEnd(lineCount - 1, visibleEnd = true) == layoutInput.text.length &&
+            size.width >= ceil(multiParagraph.maxIntrinsicWidth)
 
     private fun ComposeUiTest.linksIn(text: String): List<String> {
         val shown = onNodeWithText(text).fetchSemanticsNode().config[SemanticsProperties.Text].first()

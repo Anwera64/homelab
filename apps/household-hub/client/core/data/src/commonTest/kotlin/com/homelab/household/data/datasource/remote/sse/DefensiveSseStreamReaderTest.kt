@@ -318,7 +318,10 @@ class DefensiveSseStreamReaderTest {
 
             val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
 
-            assertEquals(ChatStreamEvent.ToolExecuting(tool = "calendar_write", action = ToolAction.Delete), events.single())
+            assertEquals(
+                ChatStreamEvent.ToolExecuting(tool = "calendar_write", action = ToolAction.Delete),
+                events.single(),
+            )
         }
 
     @Test

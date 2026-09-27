@@ -254,7 +254,10 @@ class DataMappersTest {
             )
 
         actions.forEach { (code, action) ->
-            val parts = partsOf("""[{"type": "tool", "tool": "document_writer", "success": true, "summary": {"action": "$code"}}]""")
+            val parts =
+                partsOf(
+                    """[{"type": "tool", "tool": "document_writer", "success": true, "summary": {"action": "$code"}}]""",
+                )
             assertEquals(listOf(AnswerPart.ToolDone("document_writer", ToolSummary(action = action))), parts, code)
         }
     }
@@ -262,7 +265,9 @@ class DataMappersTest {
     @Test
     fun `GIVEN an action this phone does not know WHEN mapped THEN it is left out rather than guessed`() {
         val parts =
-            partsOf("""[{"type": "tool", "tool": "calendar_write", "success": true, "summary": {"action": "obliterate"}}]""")
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": true, "summary": {"action": "obliterate"}}]""",
+            )
 
         assertEquals(listOf(AnswerPart.ToolDone("calendar_write", ToolSummary())), parts)
     }
