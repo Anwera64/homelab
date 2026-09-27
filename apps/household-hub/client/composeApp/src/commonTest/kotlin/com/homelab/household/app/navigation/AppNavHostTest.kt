@@ -282,6 +282,39 @@ class AppNavHostTest {
         }
 
     @Test
+    fun `GIVEN the picker WHEN Google is picked and signed in THEN the profile is back past the picker`() =
+        runComposeUiTest {
+            // GIVEN
+            backStack[0] = Destination.Profile
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
+
+            // WHEN
+            onNodeWithText(StubScreens.PICK_GOOGLE).performClick()
+            onNodeWithText(StubScreens.GOOGLE_SIGN_IN).assertIsDisplayed()
+            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+
+            // THEN
+            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile), backStack.toList())
+        }
+
+    @Test
+    fun `GIVEN a Google calendar that needs signing in again WHEN the profile asks for it THEN the sign-in opens straight away`() =
+        runComposeUiTest {
+            // GIVEN
+            backStack[0] = Destination.Profile
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+
+            // WHEN
+            onNodeWithText(StubScreens.SIGN_IN_TO_GOOGLE_AGAIN).performClick()
+
+            // THEN
+            onNodeWithText(StubScreens.GOOGLE_SIGN_IN).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile, Destination.GoogleCalendarSignIn), backStack.toList())
+        }
+
+    @Test
     fun back_from_a_calendar_s_details_returns_to_the_picker() =
         runComposeUiTest {
             backStack[0] = Destination.Profile

@@ -93,4 +93,7 @@ sealed interface Destination : NavKey {
     data class CalendarConnect(
         val provider: CalendarProvider,
     ) : Destination
+
+    /** Google takes no password: its calendar is connected, or connected again, by signing in with Google. */
+    data object GoogleCalendarSignIn : Destination
 }

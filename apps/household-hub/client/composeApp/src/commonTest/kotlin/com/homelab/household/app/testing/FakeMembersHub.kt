@@ -83,6 +83,16 @@ class FakeMembersHub {
             "created_at":"$checkedAt","updated_at":"$checkedAt"}"""
     }
 
+    /** Emma's Google calendar, whose sign-in Google no longer accepts. */
+    fun hasAGoogleCalendarNeedingSignInAgain() {
+        calendar =
+            """{"id":"cal-1","user_id":"emma","provider":"google_caldav",
+            "url":"https://apidata.googleusercontent.com/caldav/v2/emma@gmail.com/events",
+            "username":"emma@gmail.com","calendar_name":"Default","is_active":true,
+            "auth_kind":"oauth","needs_reconnect":true,
+            "created_at":"2026-09-26T20:04:00","updated_at":"2026-09-26T20:04:00"}"""
+    }
+
     fun livesAlone() {
         household = listOf(household.first())
     }

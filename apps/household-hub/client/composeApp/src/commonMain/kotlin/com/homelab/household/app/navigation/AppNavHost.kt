@@ -171,6 +171,7 @@ fun AppNavHost(
                             onLeave = { backStack.add(Destination.LeaveHousehold) },
                             onSignedOut = { backStack.startOver(Destination.SignIn) },
                             onCalendar = { backStack.add(Destination.CalendarPicker) },
+                            onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
                         )
                     }
                 }
@@ -224,7 +225,15 @@ fun AppNavHost(
                     WithEntryViewModels {
                         screens.CalendarPicker(
                             onBack = { backStack.removeLastOrNull() },
-                            onPick = { provider -> backStack.add(Destination.CalendarConnect(provider)) },
+                            onPick = { provider ->
+                                backStack.add(
+                                    if (provider.signsIn) {
+                                        Destination.GoogleCalendarSignIn
+                                    } else {
+                                        Destination.CalendarConnect(provider)
+                                    },
+                                )
+                            },
                         )
                     }
                 }
@@ -234,12 +243,15 @@ fun AppNavHost(
                             provider = destination.provider,
                             onBack = { backStack.removeLastOrNull() },
                             // Connected: back to the profile, past the picker, with the new row in it.
-                            onConnect = {
-                                backStack.removeAll {
-                                    it == Destination.CalendarPicker ||
-                                        it is Destination.CalendarConnect
-                                }
-                            },
+                            onConnect = { backStack.backToProfile() },
+                        )
+                    }
+                }
+                entry<Destination.GoogleCalendarSignIn> {
+                    WithEntryViewModels {
+                        screens.GoogleCalendarSignIn(
+                            onBack = { backStack.removeLastOrNull() },
+                            onConnect = { backStack.backToProfile() },
                         )
                     }
                 }
@@ -289,4 +301,13 @@ private fun SnapshotStateList<NavKey>.Tabs(selected: NavTab) {
         },
         onNewChat = { add(Destination.Conversation()) },
     )
+}
+
+/** A calendar connected: back to the profile, past the picker, with the new row in it. */
+private fun MutableList<NavKey>.backToProfile() {
+    removeAll {
+        it == Destination.CalendarPicker ||
+            it is Destination.CalendarConnect ||
+            it == Destination.GoogleCalendarSignIn
+    }
 }

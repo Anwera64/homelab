@@ -2,6 +2,7 @@ package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
+import com.homelab.household.app.screens.calendarconnect.GoogleCalendarSignInScreen
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderScreen
 import com.homelab.household.app.screens.changepin.ChangePinScreen
 import com.homelab.household.app.screens.chats.ChatsScreen
@@ -118,6 +119,7 @@ interface AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onCalendarSignInAgain: () -> Unit,
     )
 
     @Composable fun Members(
@@ -157,6 +159,11 @@ interface AppScreens {
 
     @Composable fun CalendarConnect(
         provider: CalendarProvider,
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
+    )
+
+    @Composable fun GoogleCalendarSignIn(
         onBack: () -> Unit,
         onConnect: () -> Unit,
     )
@@ -291,6 +298,7 @@ object RealAppScreens : AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onCalendarSignInAgain: () -> Unit,
     ) {
         ProfileScreen(
             onBack = onBack,
@@ -299,6 +307,7 @@ object RealAppScreens : AppScreens {
             onLeave = onLeave,
             onSignedOut = onSignedOut,
             onCalendar = onCalendar,
+            onCalendarSignInAgain = onCalendarSignInAgain,
         )
     }
 
@@ -365,5 +374,13 @@ object RealAppScreens : AppScreens {
         onConnect: () -> Unit,
     ) {
         CalendarConnectScreen(provider = provider, onBack = onBack, onConnect = onConnect)
+    }
+
+    @Composable
+    override fun GoogleCalendarSignIn(
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
+    ) {
+        GoogleCalendarSignInScreen(onBack = onBack, onConnect = onConnect)
     }
 }

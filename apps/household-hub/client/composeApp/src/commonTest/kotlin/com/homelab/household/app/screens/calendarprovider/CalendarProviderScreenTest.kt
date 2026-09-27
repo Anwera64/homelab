@@ -2,9 +2,6 @@ package com.homelab.household.app.screens.calendarprovider
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -51,7 +48,7 @@ class CalendarProviderScreenTest {
         }
 
     @Test
-    fun `GIVEN the provider list WHEN Google is tapped THEN nothing opens`() =
+    fun `GIVEN the provider list WHEN Google is tapped THEN its sign-in opens`() =
         runComposeUiTest {
             // GIVEN
             val picked = mutableListOf<CalendarProvider>()
@@ -61,21 +58,20 @@ class CalendarProviderScreenTest {
             onNodeWithText(getString(Res.string.calendar_google)).performClick()
 
             // THEN
-            assertEquals(emptyList(), picked)
+            assertEquals(listOf(CalendarProvider.GOOGLE), picked)
         }
 
     @Test
-    fun `GIVEN Google needs a sign-in the hub can't do yet WHEN the list is shown THEN Google says it's coming soon`() =
+    fun `GIVEN Google only takes a sign-in WHEN the list is shown THEN Google says so`() =
         runComposeUiTest {
             // GIVEN
-            val google = getString(Res.string.calendar_google)
+            val caption = getString(Res.string.calendar_google_caption)
 
             // WHEN
             setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = {}) } }
 
             // THEN
-            onNodeWithText(getString(Res.string.calendar_google_caption)).assertIsDisplayed()
-            assertEquals("Coming soon", getString(Res.string.calendar_google_caption))
-            onNode(hasClickAction() and hasText(google, substring = true)).assertIsNotEnabled()
+            onNodeWithText(caption).assertIsDisplayed()
+            assertEquals("Sign in with Google", caption)
         }
 }
