@@ -1,6 +1,7 @@
 package com.homelab.household.app.navigation
 
 import androidx.navigation3.runtime.NavKey
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 
@@ -84,4 +85,12 @@ sealed interface Destination : NavKey {
     data object LeaveHousehold : Destination
 
     data object ChangePin : Destination
+
+    /** Where your calendar lives: the first step of connecting one, from the profile. */
+    data object CalendarPicker : Destination
+
+    /** The details that provider needs, tried by the hub before anything is kept. */
+    data class CalendarConnect(
+        val provider: CalendarProvider,
+    ) : Destination
 }

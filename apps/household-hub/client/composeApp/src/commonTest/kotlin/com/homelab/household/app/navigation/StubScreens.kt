@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
 
@@ -193,9 +194,11 @@ class StubScreens : AppScreens {
         onChangePin: () -> Unit,
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
+        onCalendar: () -> Unit,
     ) {
         Column {
             Text(PROFILE)
+            Text(GO_TO_CALENDAR, modifier = Modifier.clickable { onCalendar() })
             Text(GO_TO_MEMBERS, modifier = Modifier.clickable { onMembers() })
             Text(GO_TO_CHANGE_PIN, modifier = Modifier.clickable { onChangePin() })
             Text(GO_TO_LEAVE, modifier = Modifier.clickable { onLeave() })
@@ -276,6 +279,31 @@ class StubScreens : AppScreens {
         }
     }
 
+    @Composable
+    override fun CalendarPicker(
+        onBack: () -> Unit,
+        onPick: (CalendarProvider) -> Unit,
+    ) {
+        Column {
+            Text(CALENDAR_PICKER)
+            Text(PICK_APPLE, modifier = Modifier.clickable { onPick(CalendarProvider.APPLE) })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun CalendarConnect(
+        provider: CalendarProvider,
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
+    ) {
+        Column {
+            Text(calendarConnectOf(provider))
+            Text(CALENDAR_CONNECTED, modifier = Modifier.clickable { onConnect() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
     companion object {
         const val LAUNCH = "launch screen"
         const val SIGN_IN = "sign in screen"
@@ -297,6 +325,13 @@ class StubScreens : AppScreens {
         const val INVITE_CREATE = "invite create screen"
         const val LEAVE = "leave household screen"
         const val CHANGE_PIN = "change pin screen"
+        const val CALENDAR_PICKER = "calendar picker screen"
+        const val GO_TO_CALENDAR = "go to calendar"
+        const val PICK_APPLE = "pick apple"
+        const val CALENDAR_CONNECTED = "calendar connected"
+
+        fun calendarConnectOf(provider: CalendarProvider) = "calendar connect screen for $provider"
+
         const val GO_TO_SIGN_IN = "go to sign in"
         const val GO_TO_FIRST_RUN = "go to first run"
         const val GO_TO_PROFILE = "go to profile"

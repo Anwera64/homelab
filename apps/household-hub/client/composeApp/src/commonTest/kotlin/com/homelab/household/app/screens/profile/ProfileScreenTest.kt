@@ -10,6 +10,9 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.components.SKELETON_GROUP_TAG
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.calendar_apple
+import com.homelab.household.app.resources.profile_calendar_change
+import com.homelab.household.app.resources.profile_calendar_connect
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
@@ -45,6 +48,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignOut = {},
+                        onCalendar = {},
                     )
                 }
             }
@@ -65,7 +69,14 @@ class ProfileScreenTest {
         runScreenTest {
             setContent {
                 TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(onBack = {}, onMembers = {}, onChangePin = {}, onLeave = {}, onSignedOut = {})
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                        onCalendar = {},
+                    )
                 }
             }
 
@@ -88,6 +99,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignedOut = {},
+                        onCalendar = {},
                     )
                 }
             }
@@ -113,6 +125,7 @@ class ProfileScreenTest {
                         onChangePin = {},
                         onLeave = {},
                         onSignedOut = { signedOut++ },
+                        onCalendar = {},
                     )
                 }
             }
@@ -128,7 +141,7 @@ class ProfileScreenTest {
     @Test
     fun every_previewed_state_draws() {
         val states = ProfileUiStateProvider().values.toList()
-        assertEquals(5, states.size)
+        assertEquals(6, states.size)
 
         states.forEach { state ->
             runComposeUiTest {
@@ -141,12 +154,65 @@ class ProfileScreenTest {
                             onChangePin = {},
                             onLeave = {},
                             onSignOut = {},
+                            onCalendar = {},
                         )
                     }
                 }
 
                 onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
             }
+        }
+    }
+
+    @Test
+    fun a_connected_calendar_shows_its_account_and_offers_to_change_it() {
+        val hub = FakeMembersHub()
+        hub.hasACalendar()
+        var calendar = 0
+
+        runScreenTest {
+            setContent {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                        onCalendar = { calendar++ },
+                    )
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText("emma@icloud.com"), timeoutMillis = wait)
+            onNodeWithText(getString(Res.string.calendar_apple)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.profile_calendar_change)).performClick()
+            waitUntil(timeoutMillis = wait) { calendar == 1 }
+        }
+    }
+
+    @Test
+    fun no_calendar_offers_to_connect_one() {
+        val hub = FakeMembersHub()
+        var calendar = 0
+
+        runScreenTest {
+            setContent {
+                TestApp(hub.engine, sessionStorage = signedIn()) {
+                    ProfileScreen(
+                        onBack = {},
+                        onMembers = {},
+                        onChangePin = {},
+                        onLeave = {},
+                        onSignedOut = {},
+                        onCalendar = { calendar++ },
+                    )
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_calendar_connect)), timeoutMillis = wait)
+            onNodeWithText(getString(Res.string.profile_calendar_connect)).performClick()
+            waitUntil(timeoutMillis = wait) { calendar == 1 }
         }
     }
 }

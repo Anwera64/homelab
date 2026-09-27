@@ -1,9 +1,11 @@
 package com.homelab.household.di
 
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
+import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
+import com.homelab.household.domain.repository.CalendarRepository
 import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
@@ -14,12 +16,14 @@ import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.HasStoredSessionUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
+import com.homelab.household.presentation.calendarconnect.CalendarConnectViewModel
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.dashboard.DashboardViewModel
 import com.homelab.household.presentation.firstrun.FirstRunViewModel
 import com.homelab.household.presentation.launch.LaunchViewModel
 import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
 import com.homelab.household.presentation.pinentry.PinEntryViewModel
+import com.homelab.household.presentation.profile.ProfileViewModel
 import com.homelab.household.presentation.profilepicker.ProfilePickerViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
@@ -55,6 +59,7 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<SpaceRepository>())
         assertNotNull(get<MemoryRepository>())
         assertNotNull(get<GossipRepository>())
+        assertNotNull(get<CalendarRepository>())
 
         // Use cases
         assertNotNull(get<LoginUseCase>())
@@ -70,6 +75,8 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<MemoryAuditViewModel>())
         assertNotNull(get<FirstRunViewModel>())
         assertNotNull(get<ProfilePickerViewModel>())
+        assertNotNull(get<ProfileViewModel>())
+        assertNotNull(get<CalendarConnectViewModel> { parametersOf(CalendarProvider.GOOGLE) })
         assertNotNull(
             get<PinEntryViewModel> { parametersOf(Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")) },
         )

@@ -28,7 +28,7 @@ class KtorCalendarRemoteDataSource(
             if (response.status == HttpStatusCode.NotFound) {
                 null
             } else {
-                response.ensureJsonSuccess().body()
+                response.ensureJsonSuccess().body<CalendarCredentialReadDto>()
             }
         }
 
