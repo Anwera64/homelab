@@ -92,7 +92,7 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "enum": ["general", "science"],
                             "description": (
-                                "'science' searches arXiv, Wikipedia, Wikidata and Wolfram Alpha: for papers, "
+                                "'science' searches academic sources such as paper databases and encyclopedias: for papers, "
                                 "data and definitions. 'general' searches the whole web: for news, reports "
                                 "from NGOs and governments, and current events (default: general)"
                             ),

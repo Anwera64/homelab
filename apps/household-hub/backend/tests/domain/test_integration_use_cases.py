@@ -492,6 +492,17 @@ def test_GIVEN_the_tool_catalog_WHEN_searxng_search_is_offered_THEN_the_model_ca
     assert "category" not in search.parameters_schema["required"]
 
 
+def test_GIVEN_the_science_category_WHEN_described_to_the_model_THEN_it_names_no_engines_it_cannot_promise():
+    """SearXNG answers a science search from its whole science category (PubMed, Semantic Scholar...),
+    not only the engines the hub asks for, so the description must not promise a fixed list."""
+    search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
+
+    description = search.parameters_schema["properties"]["category"]["description"]
+
+    for engine in ("arXiv", "Wikipedia", "Wikidata", "Wolfram Alpha"):
+        assert engine not in description
+
+
 def test_the_model_is_not_offered_a_way_around_the_search_cache():
     """A model retrying with `fresh` hit throttled engines again and again (#42)."""
     search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
