@@ -88,6 +88,16 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "description": "The search keywords or query",
                         },
+                        "category": {
+                            "type": "string",
+                            "enum": ["general", "science"],
+                            "description": (
+                                "'science' searches academic sources such as paper databases and encyclopedias: for papers, "
+                                "data and definitions. 'general' searches the whole web: for news, reports "
+                                "from NGOs and governments, and current events (default: general)"
+                            ),
+                            "default": "general",
+                        },
                         "limit": {
                             "type": "integer",
                             "description": "Number of search results to return (default: 5)",

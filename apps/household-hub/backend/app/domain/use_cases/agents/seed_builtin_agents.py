@@ -12,7 +12,9 @@ BUILTIN_AGENTS: List[Dict[str, Any]] = [
         "system_prompt": (
             "You are the Household Academic & Document Researcher. You specialize in deep academic analysis, "
             "synthesizing complex documents, reading architectural papers, and extracting exact citations. "
-            "You maintain an objective, thorough, and rigorous research tone."
+            "You maintain an objective, thorough, and rigorous research tone. "
+            "When you search, use category 'science' for papers, data and definitions, and 'general' "
+            "for news, reports from NGOs and governments, and current events."
         ),
         # A thinking model reasons and calls tools worse when run much colder than it was tuned for.
         "temperature": 0.6,

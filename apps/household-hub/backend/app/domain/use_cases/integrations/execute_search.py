@@ -5,6 +5,9 @@ from app.domain.repositories.search_connector import ISearchConnector
 
 REPUTABLE_ACADEMIC_ENGINES = ["arxiv", "wikipedia", "wikidata", "wolframalpha"]
 
+GENERAL = "general"
+SCIENCE = "science"
+
 
 class ExecuteSearchUseCase:
     def __init__(self, search_connector: ISearchConnector):
@@ -13,17 +16,17 @@ class ExecuteSearchUseCase:
     async def execute(
         self,
         query: str,
-        role: str = "assistant",
+        category: str = GENERAL,
         fresh: bool = False,
         limit: int = 10,
         timeout: float = 8.0,
     ) -> SearchResult:
-        if role == "researcher":
-            # Force reputable scholarly sources and science category
-            category = "science"
+        if category == SCIENCE:
+            # Papers, data and definitions: only reputable scholarly engines
             engines = REPUTABLE_ACADEMIC_ENGINES
         else:
-            category = "general"
+            # Anything else, a model's typo included, is still worth a search
+            category = GENERAL
             engines = None
 
         return await self.search_connector.search(
