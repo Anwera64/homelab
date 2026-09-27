@@ -18,6 +18,8 @@ from app.domain.exceptions import (
     TrashGracePeriodException,
     SecretModeViolationException,
     InvalidOperationException,
+    ApprovalPendingException,
+    AlreadyDecidedException,
     CalendarIntegrationException,
     CalendarAuthException,
     CalendarUnreachableException,
@@ -144,6 +146,21 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc)},
+        )
+
+    # A card is waiting: the phone keeps what was typed and asks for the card to be answered first.
+    @app.exception_handler(ApprovalPendingException)
+    async def approval_pending_handler(request: Request, exc: ApprovalPendingException):
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc), "code": "approval_pending"},
+        )
+
+    @app.exception_handler(AlreadyDecidedException)
+    async def already_decided_handler(request: Request, exc: AlreadyDecidedException):
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc), "code": "already_decided"},
         )
 
     # Both are 400 with a code, not a 5xx: the phone reads 502-504 as the hub itself being down.

@@ -666,17 +666,14 @@ async def test_a_tool_decision_shows_its_words_as_they_come():
 
 
 @pytest.mark.asyncio
-async def test_a_write_the_decision_asks_for_still_waits_for_approval():
+async def test_a_write_the_decision_asks_for_pauses_the_turn_for_approval():
     user = User(id="u1", full_name="Alex")
     agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_write"])
     session_repo = FakeSessionRepository(sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1")])
     tc = LLMToolCall(id="c1", name="calendar_write", arguments={"title": "Dinner"})
     tool_executor = FakeToolExecutor()
     llm_client = FakeLLMClient(
-        stream_chunks_list=[
-            [LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls")],
-            [LLMResponseChunk(delta_content="Shall I add it?")],
-        ]
+        stream_chunks_list=[[LLMResponseChunk(tool_calls=[tc], finish_reason="tool_calls")]]
     )
 
     events = [
@@ -686,13 +683,12 @@ async def test_a_write_the_decision_asks_for_still_waits_for_approval():
         )
     ]
 
-    proposals = [ev for ev in events if ev["type"] == "tool_call"]
-    assert proposals and proposals[0]["data"]["status"] == "proposal_pending"
+    proposals = [ev for ev in events if ev["type"] == "tool_approval_proposal"]
+    assert proposals and proposals[0]["tool_call_id"] == "c1"
     assert tool_executor.executed_calls == []
-    # The turn now waits on the member, so the model says so with no tools to try the write again.
-    assert len(llm_client.stream_calls) == 2
-    assert llm_client.stream_calls[1]["tools"] is None
-    assert events[-1]["assistant_content"] == "Shall I add it?"
+    # The turn waits on the member: the model is not asked to say more until they decide.
+    assert len(llm_client.stream_calls) == 1
+    assert events[-1]["type"] == "awaiting_approval"
 
 
 @pytest.mark.asyncio

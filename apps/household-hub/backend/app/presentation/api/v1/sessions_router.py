@@ -16,8 +16,7 @@ from app.presentation.schemas.session_schemas import (
 from app.presentation.schemas.chat_schemas import (
     ChatTurnRequest,
     ChatTurnResponse,
-    ToolApprovalRequest,
-    ToolApprovalResponse,
+    ToolDecisionRequest,
 )
 from app.presentation.mappers.session_presentation_mapper import SessionPresentationMapper
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
@@ -29,6 +28,7 @@ from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 from app.domain.use_cases.agents.get_agent import GetAgentUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.chat.tool_approval import card_to_decide, refuse_while_awaiting_approval
 from app.presentation.api.session_lock import SessionLockRegistry
 from app.presentation.api.turn_log import TurnLog, TurnLogRegistry
 from app.presentation.api.deps import (
@@ -178,21 +178,65 @@ async def archive_session(
     return SessionPresentationMapper.to_response(session)
 
 
-@router.post("/{session_id}/tools/approve", response_model=ToolApprovalResponse)
-async def approve_tool(
+@router.post("/{session_id}/tools/{tool_call_id}/decision")
+async def decide_tool_proposal(
     session_id: str,
-    payload: ToolApprovalRequest,
+    tool_call_id: str,
+    payload: ToolDecisionRequest,
     get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
+    stream_runner = Depends(get_background_chat_stream_runner),
+    turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
+    x_timezone: Optional[str] = Header(None, alias="X-Timezone"),
     current_user: User = Depends(get_current_user),
 ):
-    """Approve or reject a tool proposal for an active session."""
-    await get_session_uc.execute(session_id=session_id, current_user=current_user)
-    status_str = "approved" if payload.approved else "rejected"
-    return ToolApprovalResponse(
-        status=status_str,
-        tool_call_id=payload.tool_call_id,
-        result={"status": status_str, "tool_call_id": payload.tool_call_id}
-    )
+    """
+    The member's answer to one waiting card, streamed like any other turn.
+
+    While other cards from the same step still wait, the stream only says the turn is still paused
+    (`awaiting_approval`). After the last one, the approved writes run, the declined ones are told
+    to the model, and the paused answer carries on to `done`. 404 for a card that is not waiting
+    here, 409 `already_decided` for one already answered.
+    """
+    if not await lock_registry.try_acquire(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session {session_id} is currently processing another message.",
+        )
+
+    try:
+        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        card_to_decide(messages, tool_call_id)
+        question = next((m.content for m in reversed(messages) if m.role == "user"), "")
+        agent_id = session_entity.agent_id or ""
+    except Exception:
+        await lock_registry.release(session_id)
+        raise
+
+    log = turn_logs.start(session_id)
+
+    async def worker():
+        try:
+            await stream_runner(
+                session_id=session_id,
+                current_user=current_user,
+                content=question,
+                auto_approve_writes=False,
+                queue=log,
+                agent_id=agent_id,
+                decision={
+                    "tool_call_id": tool_call_id,
+                    "approved": payload.approved,
+                    "modified_arguments": payload.modified_arguments,
+                },
+                timezone_name=x_timezone,
+            )
+        finally:
+            await lock_registry.release(session_id)
+
+    turn_logs.spawn(worker())
+
+    return StreamingResponse(_sse(log), media_type="text/event-stream")
 
 
 @router.post("/{session_id}/chat", response_model=ChatTurnResponse)
@@ -214,6 +258,7 @@ async def chat_turn(
     """
     async with lock_registry.acquire(session_id):
         session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        refuse_while_awaiting_approval(messages)
         is_first_turn = len(messages) == 0
         agent_id = session_entity.agent_id or ""
         agent = await agent_uc.execute(agent_id) if agent_id else None
@@ -344,6 +389,7 @@ async def chat_turn_stream(
 
     try:
         session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        refuse_while_awaiting_approval(messages)
         is_first_turn = len(messages) == 0
         agent_id = session_entity.agent_id or ""
         agent = await agent_uc.execute(agent_id) if agent_id else None

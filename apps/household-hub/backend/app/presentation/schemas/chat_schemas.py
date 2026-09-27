@@ -18,13 +18,7 @@ class ChatTurnResponse(BaseModel):
     session_title: Optional[str] = None
 
 
-class ToolApprovalRequest(BaseModel):
-    tool_call_id: str
+class ToolDecisionRequest(BaseModel):
     approved: bool
+    # The details the member changed on the card, over the ones the model proposed.
     modified_arguments: Optional[Dict[str, Any]] = None
-
-
-class ToolApprovalResponse(BaseModel):
-    status: str
-    tool_call_id: str
-    result: Optional[Any] = None

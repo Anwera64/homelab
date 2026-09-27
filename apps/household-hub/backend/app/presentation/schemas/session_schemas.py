@@ -62,3 +62,6 @@ class SessionDetailRead(SessionRead):
     # is ambiguous: still being answered, or the turn died. Set by the router from the session
     # lock registry, which is presentation's own bookkeeping and no business of the entity.
     turn_running: bool = False
+    # The newest answer is paused on a card: its parts hold the proposals still waiting. A new
+    # message answers 409 approval_pending until each has been decided.
+    awaiting_approval: bool = False

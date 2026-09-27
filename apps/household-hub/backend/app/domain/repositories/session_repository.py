@@ -24,6 +24,14 @@ class ISessionRepository(Protocol):
     async def add_message(self, message: ChatMessage) -> ChatMessage:
         ...
 
+    async def update_message(self, message: ChatMessage) -> ChatMessage:
+        """Rewrites a saved message's content and metadata: a paused answer carrying on in place."""
+        ...
+
+    async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
+        """The ids of every chat with this agent, archived or not."""
+        ...
+
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[ChatMessage]:
         ...
 
