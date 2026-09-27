@@ -14,6 +14,10 @@ class CalendarCredentialDataMapper:
             encrypted_secret=model.encrypted_secret,
             calendar_name=model.calendar_name,
             is_active=model.is_active,
+            auth_kind=model.auth_kind,
+            encrypted_refresh_token=model.encrypted_refresh_token,
+            token_expires_at=model.token_expires_at,
+            needs_reconnect=model.needs_reconnect,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -29,6 +33,10 @@ class CalendarCredentialDataMapper:
             encrypted_secret=entity.encrypted_secret,
             calendar_name=entity.calendar_name,
             is_active=entity.is_active,
+            auth_kind=entity.auth_kind,
+            encrypted_refresh_token=entity.encrypted_refresh_token,
+            token_expires_at=entity.token_expires_at,
+            needs_reconnect=entity.needs_reconnect,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

@@ -21,6 +21,7 @@ from app.domain.exceptions import (
     CalendarIntegrationException,
     CalendarAuthException,
     CalendarUnreachableException,
+    CalendarSignInNotConfiguredException,
     SearchServiceException,
     DocumentParsingException,
     ToolNotFoundException,
@@ -158,6 +159,13 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc), "code": "calendar_unreachable"},
+        )
+
+    @app.exception_handler(CalendarSignInNotConfiguredException)
+    async def google_not_configured_handler(request: Request, exc: CalendarSignInNotConfiguredException):
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": str(exc), "code": "google_not_configured"},
         )
 
     @app.exception_handler(CalendarIntegrationException)

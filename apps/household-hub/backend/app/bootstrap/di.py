@@ -59,6 +59,8 @@ from app.data.repositories.pin_reset_repository_impl import PinResetRepositoryIm
 from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
 from app.data.connectors.pymupdf_document_reader import PyMuPDFDocumentReader
 from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+from app.data.connectors.google_oauth_client import GoogleOAuthClient
+from app.data.security.jwt_sign_in_state_service import JwtSignInStateService
 from app.data.connectors.ollama_llm_connector import OllamaLLMConnector
 from app.data.connectors.ollama_embedder import OllamaEmbedder
 from app.data.connectors.http_page_reader import HttpPageReader
@@ -132,6 +134,11 @@ from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
+from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.google_calendar_sign_in import (
+    CompleteGoogleCalendarSignInUseCase,
+    StartGoogleCalendarSignInUseCase,
+)
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
@@ -192,6 +199,16 @@ _searxng_connector = SearXNGSearchConnector(
 )
 _document_reader = PyMuPDFDocumentReader()
 _caldav_connector = CalDavCalendarConnector()
+_google_oauth = (
+    GoogleOAuthClient(
+        client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
+        client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
+        redirect_uri=settings.google_oauth_redirect_uri,
+    )
+    if settings.GOOGLE_OAUTH_CLIENT_ID
+    else None
+)
+_sign_in_states = JwtSignInStateService(secret_key=settings.SECRET_KEY)
 _ollama_connector = OllamaLLMConnector(
     base_url=settings.OLLAMA_BASE_URL,
     timeout_seconds=settings.OLLAMA_TIMEOUT_SECONDS,
@@ -238,6 +255,7 @@ def get_container(session: AsyncSession):
     pin_reset_repo = PinResetRepositoryImpl(pin_reset_ds, _pin_reset_mapper)
 
     uow = SqliteUnitOfWork(session)
+    calendar_secrets = CalendarSecretResolver(calendar_cred_repo, _secret_cipher, uow, _google_oauth)
 
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
@@ -270,6 +288,7 @@ def get_container(session: AsyncSession):
         uow=uow,
         allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
         page_reader=_page_reader,
+        calendar_secrets=calendar_secrets,
     )
 
     chat_turn_uc = ProcessChatTurnUseCase(
@@ -515,10 +534,14 @@ def get_container(session: AsyncSession):
         pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, uow),
         pres_deps.get_user_calendar_use_case: GetUserCalendarUseCase(calendar_cred_repo),
         pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
-        pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
-        pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
-        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher),
-        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
+        pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+        pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
+        pres_deps.get_start_google_calendar_sign_in_use_case: StartGoogleCalendarSignInUseCase(_sign_in_states, _google_oauth),
+        pres_deps.get_complete_google_calendar_sign_in_use_case: CompleteGoogleCalendarSignInUseCase(
+            _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow
+        ),
         pres_deps.get_execute_search_use_case: ExecuteSearchUseCase(_searxng_connector),
         pres_deps.get_parse_pdf_document_use_case: ParsePdfDocumentUseCase(_document_reader, max_size_bytes=settings.MAX_PDF_SIZE_BYTES),
         pres_deps.get_save_document_use_case: SaveDocumentUseCase(document_repo, uow),
@@ -536,6 +559,7 @@ def get_container(session: AsyncSession):
             uow=uow,
             allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
             page_reader=_page_reader,
+            calendar_secrets=calendar_secrets,
         ),
 
         # Gossip Bus & Stage 3 Chat
@@ -623,6 +647,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_create_calendar_event_use_case,
         pres_deps.get_update_calendar_event_use_case,
         pres_deps.get_delete_calendar_event_use_case,
+        pres_deps.get_start_google_calendar_sign_in_use_case,
+        pres_deps.get_complete_google_calendar_sign_in_use_case,
         pres_deps.get_execute_search_use_case,
         pres_deps.get_parse_pdf_document_use_case,
         pres_deps.get_save_document_use_case,

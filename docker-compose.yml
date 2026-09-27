@@ -406,6 +406,10 @@ services:
     container_name: household-hub
     environment:
       - TZ=${TZ:-America/Mexico_City}
+      # Google Calendar sign-in (#54); empty ID leaves Google unavailable in the app.
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-https://hub.${DOMAIN_NAME:-spicy-llama.duckdns.org}}
     volumes:
       # SQLite in WAL mode needs real file locks, which the Windows share does not give it.
       - household_hub_data:/data

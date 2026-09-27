@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, false as sa_false
 from app.data.models.base import Base
 
 
@@ -20,5 +20,9 @@ class CalendarCredentialModel(Base):
     encrypted_secret = Column(Text, nullable=False)
     calendar_name = Column(String(128), default="Default", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    auth_kind = Column(String(16), default="password", server_default="password", nullable=False)  # "password" | "oauth"
+    encrypted_refresh_token = Column(Text, nullable=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    needs_reconnect = Column(Boolean, default=False, server_default=sa_false(), nullable=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)

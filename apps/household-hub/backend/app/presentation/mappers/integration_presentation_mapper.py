@@ -29,6 +29,8 @@ class IntegrationPresentationMapper:
             username=entity.username,
             calendar_name=entity.calendar_name,
             is_active=entity.is_active,
+            auth_kind=entity.auth_kind,
+            needs_reconnect=entity.needs_reconnect,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

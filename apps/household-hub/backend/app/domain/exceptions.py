@@ -103,6 +103,26 @@ class CalendarUnreachableException(CalendarIntegrationException):
     pass
 
 
+class CalendarSignInExpiredException(CalendarIntegrationException):
+    """A sign-in came back with a state the hub did not issue, or issued too long ago."""
+    pass
+
+
+class CalendarSignInDeniedException(CalendarIntegrationException):
+    """The member said no on Google's consent screen, or Google refused the sign-in code."""
+    pass
+
+
+class CalendarOAuthRevokedException(CalendarIntegrationException):
+    """Google no longer honours the stored refresh token: revoked, or expired after 7 days in Testing."""
+    pass
+
+
+class CalendarSignInNotConfiguredException(CalendarIntegrationException):
+    """The hub has no Google OAuth client configured, so nobody can sign in with Google."""
+    pass
+
+
 class ToolFailureReason:
     """
     Why a tool failed, as a code the phone puts into words (#40). The exception's message is written

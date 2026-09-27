@@ -7,7 +7,7 @@ from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
 from app.domain.entities.calendar_event import CalendarEvent
-from app.domain.entities.integration_credential import CalendarCredential
+from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
     CalendarIntegrationException,
@@ -24,6 +24,8 @@ class CalDavCalendarConnector(ICalendarConnector):
     """
 
     def _sync_get_client(self, credential: CalendarCredential, secret: str) -> caldav.DAVClient:
+        if credential.auth_kind == OAUTH:
+            return caldav.DAVClient(url=credential.url, password=secret, auth_type="bearer")
         return caldav.DAVClient(
             url=credential.url,
             username=credential.username,
@@ -37,14 +39,22 @@ class CalDavCalendarConnector(ICalendarConnector):
         """
         try:
             client = self._sync_get_client(credential, secret)
-            client.principal().calendars()
+            if credential.auth_kind == OAUTH:
+                client.calendar(url=credential.url).get_display_name()
+            else:
+                client.principal().calendars()
             return True
         except AuthorizationError as e:
             raise CalendarAuthException(f"CalDAV server at {credential.url} refused the credentials: {e}")
         except Exception as e:
             raise CalendarUnreachableException(f"CalDAV server at {credential.url} could not be reached: {e}")
 
-    def _sync_get_target_calendar(self, client: caldav.DAVClient, calendar_name: str):
+    def _sync_get_target_calendar(self, client: caldav.DAVClient, credential: CalendarCredential):
+        # A Google sign-in's address is the calendar itself; Google's CalDAV has no discovery to lean on.
+        if credential.auth_kind == OAUTH:
+            return client.calendar(url=credential.url)
+
+        calendar_name = credential.calendar_name
         principal = client.principal()
         calendars = principal.calendars()
         if not calendars:
@@ -68,7 +78,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> List[CalendarEvent]:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             raw_events = target_cal.date_search(start=start_time, end=end_time, expand=True)
 
             events: List[CalendarEvent] = []
@@ -135,7 +145,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             cal = ICalendar()
             cal.add("prodid", "-//Household Hub//CalDAV Connector//EN")
             cal.add("version", "2.0")
@@ -182,7 +192,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             try:
                 event = target_cal.event_by_uid(event_id)
             except Exception as e:
@@ -274,7 +284,7 @@ class CalDavCalendarConnector(ICalendarConnector):
     ) -> bool:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential.calendar_name)
+            target_cal = self._sync_get_target_calendar(client, credential)
             event = target_cal.event_by_uid(event_id)
             event.delete()
             return True

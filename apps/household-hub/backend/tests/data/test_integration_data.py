@@ -104,6 +104,57 @@ async def test_calendar_credential_repository(data_db_session: AsyncSession):
     assert (await repo.get_by_user_id("user-42")) is None
 
 
+async def _emma_calendars(session: AsyncSession) -> CalendarCredentialRepositoryImpl:
+    from app.data.models.user_model import UserModel
+    session.add(UserModel(id="member-1", full_name="Emma", hashed_pin="hash"))
+    await session.commit()
+    return CalendarCredentialRepositoryImpl(SqliteCalendarCredentialDataSource(session), CalendarCredentialDataMapper())
+
+
+@pytest.mark.asyncio
+async def test_a_google_sign_in_is_kept_and_replaced_with_its_tokens(data_db_session: AsyncSession):
+    """GIVEN a member with a password calendar WHEN they sign in with Google and later need to reconnect THEN every token field round-trips."""
+    repo = await _emma_calendars(data_db_session)
+    await repo.save(CalendarCredential(
+        user_id="member-1", provider="apple_icloud", url="https://caldav.icloud.com",
+        username="emma@icloud.com", encrypted_secret="enc-password",
+    ))
+    expiry = datetime(2026, 9, 27, 13, 0, tzinfo=timezone.utc)
+
+    await repo.save(CalendarCredential(
+        user_id="member-1", provider="google_caldav",
+        url="https://apidata.googleusercontent.com/caldav/v2/emma@gmail.com/events",
+        username="emma@gmail.com", encrypted_secret="enc-access", auth_kind="oauth",
+        encrypted_refresh_token="enc-refresh", token_expires_at=expiry, needs_reconnect=True,
+    ))
+    await data_db_session.commit()
+    fetched = await repo.get_by_user_id("member-1")
+
+    assert fetched.provider == "google_caldav"
+    assert fetched.auth_kind == "oauth"
+    assert fetched.encrypted_secret == "enc-access"
+    assert fetched.encrypted_refresh_token == "enc-refresh"
+    assert fetched.token_expires_at.replace(tzinfo=timezone.utc) == expiry
+    assert fetched.needs_reconnect is True
+
+
+@pytest.mark.asyncio
+async def test_a_password_calendar_reads_back_as_a_password_one(data_db_session: AsyncSession):
+    """GIVEN a calendar saved with a password WHEN it is read back THEN it has no tokens and needs nothing."""
+    repo = await _emma_calendars(data_db_session)
+    await repo.save(CalendarCredential(
+        user_id="member-1", provider="apple_icloud", url="https://caldav.icloud.com",
+        username="emma@icloud.com", encrypted_secret="enc-password",
+    ))
+
+    fetched = await repo.get_by_user_id("member-1")
+
+    assert fetched.auth_kind == "password"
+    assert fetched.encrypted_refresh_token is None
+    assert fetched.token_expires_at is None
+    assert fetched.needs_reconnect is False
+
+
 @pytest.mark.asyncio
 async def test_document_repository(data_db_session: AsyncSession):
     # Insert parent user and space to satisfy foreign key

@@ -4,7 +4,7 @@ from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.exceptions import CalendarIntegrationException
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
-from app.domain.repositories.secret_cipher import ISecretCipher
+from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 
 
 class GetCalendarEventsUseCase:
@@ -12,11 +12,11 @@ class GetCalendarEventsUseCase:
         self,
         credential_repo: ICalendarCredentialRepository,
         connector: ICalendarConnector,
-        cipher: ISecretCipher,
+        secrets: CalendarSecretResolver,
     ):
         self.credential_repo = credential_repo
         self.connector = connector
-        self.cipher = cipher
+        self.secrets = secrets
 
     async def execute(
         self,
@@ -30,7 +30,7 @@ class GetCalendarEventsUseCase:
         if not credential or not credential.is_active:
             raise CalendarIntegrationException("No calendar configured for user.")
 
-        secret = self.cipher.decrypt(credential.encrypted_secret)
+        secret = await self.secrets.resolve(credential)
         return await self.connector.fetch_events(
             credential=credential,
             secret=secret,

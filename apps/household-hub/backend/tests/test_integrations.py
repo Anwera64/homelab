@@ -507,3 +507,160 @@ async def test_connecting_a_calendar_says_why_it_failed_and_keeps_nothing(client
 
     me = await client.get("/api/v1/integrations/calendars/me", headers=headers)
     assert me.status_code == 404
+
+
+# =========================================================================
+# Google Calendar sign-in (#54)
+# =========================================================================
+from datetime import datetime, timedelta, timezone as _tz
+from urllib.parse import parse_qs, urlparse
+
+from app.domain.entities.oauth_grant import OAuthGrant
+from app.domain.exceptions import CalendarSignInDeniedException
+
+
+class FakeGoogleOAuth:
+    """Google's side of the sign-in: hands out a consent URL and swaps any code for tokens."""
+
+    def __init__(self, error=None):
+        self.error = error
+
+    def authorization_url(self, state: str) -> str:
+        return f"https://accounts.google.com/o/oauth2/v2/auth?state={state}"
+
+    async def exchange_code(self, code: str) -> OAuthGrant:
+        if self.error:
+            raise self.error
+        return OAuthGrant(
+            access_token="access-1",
+            refresh_token="refresh-1",
+            expires_at=datetime.now(_tz.utc) + timedelta(hours=1),
+            email="emma@gmail.com",
+        )
+
+    async def refresh(self, refresh_token: str) -> OAuthGrant:
+        raise NotImplementedError
+
+
+async def _start_google_sign_in(client, headers) -> str:
+    resp = await client.post("/api/v1/integrations/calendars/google/start", headers=headers)
+    assert resp.status_code == 200, resp.text
+    return parse_qs(urlparse(resp.json()["authorization_url"]).query)["state"][0]
+
+
+@pytest.mark.asyncio
+async def test_signing_in_with_google_connects_the_calendar_and_hands_back_to_the_app(client: httpx.AsyncClient):
+    token = await create_authenticated_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch("app.bootstrap.di._google_oauth", FakeGoogleOAuth()), patch(
+        "app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector.test_connection", return_value=True
+    ):
+        state = await _start_google_sign_in(client, headers)
+        callback = await client.get(
+            "/api/v1/integrations/calendars/google/callback", params={"state": state, "code": "the-code"}
+        )
+
+    assert callback.status_code == 302
+    assert callback.headers["location"] == "hyggehub://calendar/connected"
+    me = (await client.get("/api/v1/integrations/calendars/me", headers=headers)).json()
+    assert me["provider"] == "google_caldav"
+    assert me["auth_kind"] == "oauth"
+    assert me["needs_reconnect"] is False
+    assert me["username"] == "emma@gmail.com"
+    assert me["url"] == "https://apidata.googleusercontent.com/caldav/v2/emma@gmail.com/events"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "google_error, connection_error, params, reason",
+    [
+        (None, None, {"error": "access_denied"}, "denied"),
+        (CalendarSignInDeniedException("code refused"), None, {"code": "the-code"}, "denied"),
+        (None, CalendarAuthException("401"), {"code": "the-code"}, "rejected"),
+        (None, CalendarUnreachableException("down"), {"code": "the-code"}, "unreachable"),
+    ],
+)
+async def test_a_google_sign_in_that_fails_says_why_and_keeps_nothing(
+    client: httpx.AsyncClient, google_error, connection_error, params, reason
+):
+    token = await create_authenticated_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch("app.bootstrap.di._google_oauth", FakeGoogleOAuth(error=google_error)), patch(
+        "app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector.test_connection",
+        side_effect=connection_error, return_value=True,
+    ):
+        state = await _start_google_sign_in(client, headers)
+        callback = await client.get("/api/v1/integrations/calendars/google/callback", params={"state": state, **params})
+
+    assert callback.status_code == 302
+    assert callback.headers["location"] == f"hyggehub://calendar/failed?reason={reason}"
+    assert (await client.get("/api/v1/integrations/calendars/me", headers=headers)).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_google_callback_with_a_foreign_state_is_refused_as_expired(client: httpx.AsyncClient):
+    with patch("app.bootstrap.di._google_oauth", FakeGoogleOAuth()):
+        callback = await client.get(
+            "/api/v1/integrations/calendars/google/callback", params={"state": "forged", "code": "the-code"}
+        )
+
+    assert callback.status_code == 302
+    assert callback.headers["location"] == "hyggehub://calendar/failed?reason=expired"
+
+
+@pytest.mark.asyncio
+async def test_starting_a_google_sign_in_needs_a_member(client: httpx.AsyncClient):
+    with patch("app.bootstrap.di._google_oauth", FakeGoogleOAuth()):
+        resp = await client.post("/api/v1/integrations/calendars/google/start")
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_starting_a_google_sign_in_on_a_hub_without_google_says_so(client: httpx.AsyncClient):
+    token = await create_authenticated_user(client)
+
+    with patch("app.bootstrap.di._google_oauth", None):
+        resp = await client.post(
+            "/api/v1/integrations/calendars/google/start", headers={"Authorization": f"Bearer {token}"}
+        )
+
+    assert resp.status_code == 503
+    assert resp.json()["code"] == "google_not_configured"
+
+
+@pytest.mark.asyncio
+async def test_a_google_calendar_can_not_be_connected_with_a_password(client: httpx.AsyncClient):
+    token = await create_authenticated_user(client)
+
+    resp = await client.post(
+        "/api/v1/integrations/calendars",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "provider": "google_caldav",
+            "url": "https://apidata.googleusercontent.com/caldav/v2/emma@gmail.com/events",
+            "username": "emma@gmail.com",
+            "password": "an-app-password",
+        },
+    )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_password_calendar_reads_back_as_needing_nothing(client: httpx.AsyncClient):
+    token = await create_authenticated_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch("app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector.test_connection", return_value=True):
+        await client.post(
+            "/api/v1/integrations/calendars",
+            headers=headers,
+            json={"provider": "apple_icloud", "url": "https://caldav.icloud.com", "username": "emma@icloud.com", "password": "pw"},
+        )
+    me = (await client.get("/api/v1/integrations/calendars/me", headers=headers)).json()
+
+    assert me["auth_kind"] == "password"
+    assert me["needs_reconnect"] is False
