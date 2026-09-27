@@ -134,7 +134,9 @@ async def test_a_google_sign_in_is_kept_and_replaced_with_its_tokens(data_db_ses
     assert fetched.auth_kind == "oauth"
     assert fetched.encrypted_secret == "enc-access"
     assert fetched.encrypted_refresh_token == "enc-refresh"
-    assert fetched.token_expires_at.replace(tzinfo=timezone.utc) == expiry
+    # SQLite drops the zone; the hub compares this with an aware "now", so it must come back aware.
+    assert fetched.token_expires_at == expiry
+    assert fetched.token_expires_at.tzinfo is not None
     assert fetched.needs_reconnect is True
 
 
