@@ -65,7 +65,12 @@ fun CalendarProviderScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
                 CalendarProvider.entries.forEach { provider ->
-                    ProviderCard(provider = provider, onClick = { onPick(provider) })
+                    ProviderCard(
+                        provider = provider,
+                        // Google's CalDAV only takes a Google sign-in, which the hub can't do yet.
+                        enabled = provider != CalendarProvider.GOOGLE,
+                        onClick = { onPick(provider) },
+                    )
                 }
             }
 
@@ -93,6 +98,7 @@ fun CalendarProviderScreen(
 @Composable
 private fun ProviderCard(
     provider: CalendarProvider,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -101,6 +107,7 @@ private fun ProviderCard(
 
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = HearthShapes.bento,
         color = colors.surface,
@@ -124,12 +131,14 @@ private fun ProviderCard(
                 Text(providerName(provider), style = type.bodyStrong, color = colors.textPrimary)
                 Text(providerCaption(provider), style = type.caption, color = colors.textMuted)
             }
-            HearthIconImage(
-                icon = HearthIcon.ChevronRight,
-                contentDescription = null,
-                size = HearthTheme.size.iconMd,
-                tint = colors.textMuted,
-            )
+            if (enabled) {
+                HearthIconImage(
+                    icon = HearthIcon.ChevronRight,
+                    contentDescription = null,
+                    size = HearthTheme.size.iconMd,
+                    tint = colors.textMuted,
+                )
+            }
         }
     }
 }

@@ -163,7 +163,7 @@
     <string name="calendar_apple_glyph">🍎</string>
     <string name="calendar_apple_caption">Needs an app-specific password</string>
     <string name="calendar_google">Google Calendar</string>
-    <string name="calendar_google_caption">Also needs an app password</string>
+    <string name="calendar_google_caption">Coming soon</string>
     <string name="calendar_other">Other CalDAV</string>
     <string name="calendar_other_caption">Nextcloud, Fastmail, self-hosted</string>
     <string name="calendar_provider_note">Credentials are encrypted on the hub and never leave your home network.</string>

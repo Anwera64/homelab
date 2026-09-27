@@ -2,14 +2,17 @@ package com.homelab.household.app.screens.calendarprovider
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.calendar_apple
 import com.homelab.household.app.resources.calendar_google
+import com.homelab.household.app.resources.calendar_google_caption
 import com.homelab.household.app.resources.calendar_other
-import com.homelab.household.app.resources.calendar_provider_title
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.CalendarProvider
 import org.jetbrains.compose.resources.getString
@@ -20,16 +23,59 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class CalendarProviderScreenTest {
     @Test
-    fun each_provider_opens_its_own_details() =
+    fun `GIVEN the provider list WHEN Apple is tapped THEN Apple's details open`() =
         runComposeUiTest {
+            // GIVEN
             val picked = mutableListOf<CalendarProvider>()
             setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
 
-            onNodeWithText(getString(Res.string.calendar_provider_title)).assertIsDisplayed()
+            // WHEN
             onNodeWithText(getString(Res.string.calendar_apple)).performClick()
-            onNodeWithText(getString(Res.string.calendar_google)).performClick()
+
+            // THEN
+            assertEquals(listOf(CalendarProvider.APPLE), picked)
+        }
+
+    @Test
+    fun `GIVEN the provider list WHEN another CalDAV server is tapped THEN its details open`() =
+        runComposeUiTest {
+            // GIVEN
+            val picked = mutableListOf<CalendarProvider>()
+            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
+
+            // WHEN
             onNodeWithText(getString(Res.string.calendar_other)).performClick()
 
-            assertEquals(listOf(CalendarProvider.APPLE, CalendarProvider.GOOGLE, CalendarProvider.OTHER), picked)
+            // THEN
+            assertEquals(listOf(CalendarProvider.OTHER), picked)
+        }
+
+    @Test
+    fun `GIVEN the provider list WHEN Google is tapped THEN nothing opens`() =
+        runComposeUiTest {
+            // GIVEN
+            val picked = mutableListOf<CalendarProvider>()
+            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
+
+            // WHEN
+            onNodeWithText(getString(Res.string.calendar_google)).performClick()
+
+            // THEN
+            assertEquals(emptyList(), picked)
+        }
+
+    @Test
+    fun `GIVEN Google needs a sign-in the hub can't do yet WHEN the list is shown THEN Google says it's coming soon`() =
+        runComposeUiTest {
+            // GIVEN
+            val google = getString(Res.string.calendar_google)
+
+            // WHEN
+            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = {}) } }
+
+            // THEN
+            onNodeWithText(getString(Res.string.calendar_google_caption)).assertIsDisplayed()
+            assertEquals("Coming soon", getString(Res.string.calendar_google_caption))
+            onNode(hasClickAction() and hasText(google, substring = true)).assertIsNotEnabled()
         }
 }
