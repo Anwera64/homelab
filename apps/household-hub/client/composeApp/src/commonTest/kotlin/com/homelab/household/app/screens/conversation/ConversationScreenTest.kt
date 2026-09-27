@@ -453,7 +453,8 @@ class ConversationScreenTest {
             setContent(conversation(stateNamed("Researching: a search, a page read and one blocked")))
 
             onNodeWithText("Searched the web for “Hong Kong press freedom” · 2 results").assertIsDisplayed()
-            onNodeWithText("Read Hong Kong: press freedom index · rsf.org").assertIsDisplayed()
+            onNodeWithText("Read Hong Kong: press freedom index").assertIsDisplayed()
+            onNodeWithText(" · rsf.org", useUnmergedTree = true).assertIsDisplayed()
             onNodeWithText("Couldn’t read scmp.com · it blocks automated reading").assertIsDisplayed()
             onNodeWithText(getString(Res.string.tool_read_page_done)).assertDoesNotExist()
         }
@@ -507,7 +508,7 @@ class ConversationScreenTest {
             fold.assertIsDisplayed()
             // How many steps it holds is still told to a screen reader.
             assertEquals("Show 5 steps", fold.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
-            onNodeWithText("Read Hong Kong: press freedom index · rsf.org").assertDoesNotExist()
+            onNodeWithText("Read Hong Kong: press freedom index").assertDoesNotExist()
         }
 
     @Test

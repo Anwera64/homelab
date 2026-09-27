@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -95,7 +96,12 @@ class DefensiveSseStreamReader(
 
             "tool_executing" -> {
                 val tool = element["tool"]?.jsonPrimitive?.content ?: ""
-                ChatStreamEvent.ToolExecuting(tool = tool)
+                val action =
+                    ((element["arguments"] as? JsonObject)?.get("action") as? JsonPrimitive)
+                        ?.takeIf { it.isString }
+                        ?.content
+                        ?.let(ToolSummaryDataMapper::actionFromCode)
+                ChatStreamEvent.ToolExecuting(tool = tool, action = action)
             }
 
             "accepted" -> {

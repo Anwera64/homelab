@@ -56,6 +56,8 @@ class HearthIconsTest {
             "delete",
             // The receipt under a question the hub has, drawn on the Chat Turn States canvas
             "sent",
+            // Removing an event, drawn on the Tools page's approval board
+            "calendarRemove",
         )
 
     private val solidShapeCounts =

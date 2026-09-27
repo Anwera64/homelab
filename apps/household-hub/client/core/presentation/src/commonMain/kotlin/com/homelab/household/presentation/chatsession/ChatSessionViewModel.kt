@@ -439,6 +439,7 @@ class ChatSessionViewModel(
                                 _uiState.update {
                                     it.copy(
                                         activeTool = event.tool,
+                                        activeToolAction = event.action,
                                         isThinking = false,
                                         parts = answer.parts(),
                                     )
@@ -447,7 +448,9 @@ class ChatSessionViewModel(
 
                             is ChatStreamEvent.ToolResult -> {
                                 answer.tool(event.tool, event.success, event.summary)
-                                _uiState.update { it.copy(activeTool = null, parts = answer.parts()) }
+                                _uiState.update {
+                                    it.copy(activeTool = null, activeToolAction = null, parts = answer.parts())
+                                }
                             }
 
                             is ChatStreamEvent.Delta -> {
@@ -498,6 +501,7 @@ class ChatSessionViewModel(
                                             } + assistantMsg,
                                         isThinking = false,
                                         activeTool = null,
+                                        activeToolAction = null,
                                         parts = emptyList(),
                                     )
                                 }
@@ -519,6 +523,7 @@ class ChatSessionViewModel(
                                         turnState = TurnState.Failed,
                                         isThinking = false,
                                         activeTool = null,
+                                        activeToolAction = null,
                                         parts = answer.parts(),
                                     )
                                 }
@@ -572,6 +577,7 @@ private fun ChatSessionUiState.startingTurn() =
         errorMessage = null,
         isThinking = false,
         activeTool = null,
+        activeToolAction = null,
         parts = emptyList(),
     )
 
