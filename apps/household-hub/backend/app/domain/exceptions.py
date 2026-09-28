@@ -97,6 +97,11 @@ class AlreadyDecidedException(InvalidOperationException):
     pass
 
 
+class AlwaysAsksException(InvalidOperationException):
+    """Raised for turning on auto-approve for an action that always asks: removing or replacing."""
+    pass
+
+
 class ToolFailureReason:
     """
     Why a tool failed, as a code the phone puts into words (#40). The exception's message is written

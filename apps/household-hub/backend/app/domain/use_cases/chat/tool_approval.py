@@ -1,10 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
 from app.domain.entities.llm_message import LLMMessage, LLMToolCall
 from app.domain.entities.session import ChatMessage
 from app.domain.exceptions import AlreadyDecidedException, ApprovalPendingException, EntityNotFoundException
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.chat.tool_approval_settings import can_run_without_asking
 from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, write_action
 
 
@@ -18,12 +19,15 @@ PAUSED_TURN = "paused_turn"
 DECLINED = "The member declined this action. It was not done; don't try it again unless they ask."
 
 
-def needs_asking(tool: str, auto_approve_writes: bool, is_turn_secret: bool) -> bool:
+def needs_asking(call: LLMToolCall, auto: FrozenSet[Tuple[str, str]], is_turn_secret: bool) -> bool:
     """
-    A write asks the member first. A secret turn never asks: writes are refused in secret mode, so a
-    card would only ask for something that cannot happen.
+    A write asks the member first, unless they made that action automatic ([auto]). A secret turn
+    never asks: writes are refused in secret mode, so a card would only ask for something that
+    cannot happen.
     """
-    return tool in WRITE_ACTIONS and not auto_approve_writes and not is_turn_secret
+    if call.name not in WRITE_ACTIONS or is_turn_secret:
+        return False
+    return not can_run_without_asking(call.name, write_action(call.name, call.arguments), auto)
 
 
 def proposal_part(call: LLMToolCall) -> Dict[str, Any]:

@@ -20,6 +20,7 @@ from app.domain.exceptions import (
     InvalidOperationException,
     ApprovalPendingException,
     AlreadyDecidedException,
+    AlwaysAsksException,
     CalendarIntegrationException,
     CalendarAuthException,
     CalendarUnreachableException,
@@ -154,6 +155,13 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": str(exc), "code": "approval_pending"},
+        )
+
+    @app.exception_handler(AlwaysAsksException)
+    async def always_asks_handler(request: Request, exc: AlwaysAsksException):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc), "code": "always_asks"},
         )
 
     @app.exception_handler(AlreadyDecidedException)

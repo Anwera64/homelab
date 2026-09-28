@@ -221,7 +221,6 @@ async def decide_tool_proposal(
                 session_id=session_id,
                 current_user=current_user,
                 content=question,
-                auto_approve_writes=False,
                 queue=log,
                 agent_id=agent_id,
                 decision={
@@ -268,7 +267,6 @@ async def chat_turn(
             session_id=session_id,
             current_user=current_user,
             content=payload.content,
-            auto_approve_writes=payload.auto_approve_writes,
             timezone_name=x_timezone,
         )
 
@@ -347,7 +345,6 @@ async def regenerate_answer(
                 session_id=session_id,
                 current_user=current_user,
                 content=question,
-                auto_approve_writes=False,
                 queue=log,
                 agent_id=agent_id,
                 agent_name=agent_name,
@@ -406,7 +403,6 @@ async def chat_turn_stream(
                 session_id=session_id,
                 current_user=current_user,
                 content=payload.content,
-                auto_approve_writes=payload.auto_approve_writes,
                 queue=log,
                 agent_id=agent_id,
                 agent_name=agent_name,

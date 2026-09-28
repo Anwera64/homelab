@@ -6,7 +6,6 @@ from app.presentation.schemas.session_schemas import ChatMessageRead
 class ChatTurnRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=65536)
     is_secret: bool = False
-    auto_approve_writes: bool = False
 
 
 class ChatTurnResponse(BaseModel):
