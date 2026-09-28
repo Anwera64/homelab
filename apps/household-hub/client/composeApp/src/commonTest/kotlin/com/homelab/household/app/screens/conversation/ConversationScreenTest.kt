@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -60,6 +62,8 @@ import com.homelab.household.app.resources.tool_calendar_remove_card
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_card_scope_following
+import com.homelab.household.app.resources.tool_card_scope_this
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
@@ -94,7 +98,7 @@ class ConversationScreenTest {
         onTryAgain: () -> Unit = {},
         onSelectAgent: (String) -> Unit = {},
         onRetryAgents: () -> Unit = {},
-        onDecide: (String, Boolean) -> Unit = { _, _ -> },
+        onDecide: (String, Boolean, Map<String, Any?>?) -> Unit = { _, _, _ -> },
     ): @Composable () -> Unit =
         {
             StillTheme {
@@ -732,7 +736,7 @@ class ConversationScreenTest {
     fun `GIVEN a removal waiting on the member WHEN drawn THEN the card says what goes and when and asks Keep it or Remove`() =
         runComposeUiTest {
             val decided = mutableListOf<Pair<String, Boolean>>()
-            setContent(conversation(stateNamed("Approving a removal"), onDecide = { id, ok -> decided += id to ok }))
+            setContent(conversation(stateNamed("Approving a removal"), onDecide = { id, ok, _ -> decided += id to ok }))
 
             onNodeWithText(getString(Res.string.tool_calendar_remove_card)).assertIsDisplayed()
             onNodeWithText("Print shop").assertIsDisplayed()
@@ -745,6 +749,64 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.tool_card_keep)).performClick()
 
             assertEquals(listOf("c-1" to true, "c-1" to false), decided)
+        }
+
+    /** Canvas: RepeatAdd. How often sits under the first date, and a new event has no dates to choose between. */
+    @Test
+    fun `GIVEN a repeating event to add WHEN drawn THEN the card says how often and asks nothing more`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approving a repeating event")))
+
+            onNodeWithText("Tue 29 Sep, 07:00").assertIsDisplayed()
+            onNodeWithText("Every Tue and Thu until 24 Dec").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).assertDoesNotExist()
+        }
+
+    /** Canvas: RepeatRemoveA. The switch starts on what the agent understood; Remove sends the member's pick. */
+    @Test
+    fun `GIVEN one date of a series to remove WHEN the member picks this and following THEN Remove sends that`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, Map<String, Any?>?>>()
+            setContent(
+                conversation(stateNamed("Removing one date of a series"), onDecide = { id, ok, changes ->
+                    decided +=
+                        Triple(id, ok, changes)
+                }),
+            )
+
+            onNodeWithText("Every Tue and Thu until 24 Dec").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).assertIsNotSelected()
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_remove)).performClick()
+
+            val expected: List<Triple<String, Boolean, Map<String, Any?>?>> =
+                listOf(
+                    Triple(
+                        "c-1",
+                        true,
+                        mapOf("scope" to "following"),
+                    ),
+                )
+            assertEquals(expected, decided)
+        }
+
+    @Test
+    fun `GIVEN one date of a series to remove WHEN removed as proposed THEN nothing extra is sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Map<String, Any?>?>()
+            setContent(
+                conversation(stateNamed("Removing one date of a series"), onDecide = { _, _, changes ->
+                    decided +=
+                        changes
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_remove)).performClick()
+
+            assertEquals(listOf<Map<String, Any?>?>(null), decided)
         }
 
     @Test

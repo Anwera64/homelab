@@ -170,6 +170,15 @@ enum class HearthIcon(
 
     // Tools - drawn on the "approved and declined" board: what a declined write leaves, "Not added".
     Declined("declined", strokes("M7.6 7.6 16.4 16.4M16.4 7.6 7.6 16.4")),
+
+    // Tools - drawn on the "Repeating events" row: the line saying how often an event repeats.
+    Repeat(
+        "repeat",
+        strokes(
+            "M16.6 3.6l3 3-3 3M4 11.4v-1.6a3.2 3.2 0 0 1 3.2-3.2h12.4",
+            "M7.4 20.4l-3-3 3-3M20 12.6v1.6a3.2 3.2 0 0 1-3.2 3.2H4.4",
+        ),
+    ),
     ;
 
     private val restingVector: ImageVector by lazy { build(strokeWidth = 1.5f) }

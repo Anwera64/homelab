@@ -104,7 +104,7 @@ fun ConversationContent(
     memberName: String = "",
     onSelectAgent: (String) -> Unit = {},
     onRetryAgents: () -> Unit = {},
-    onDecide: (toolCallId: String, approved: Boolean) -> Unit = { _, _ -> },
+    onDecide: (toolCallId: String, approved: Boolean, changes: Map<String, Any?>?) -> Unit = { _, _, _ -> },
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -411,7 +411,7 @@ private fun Answer(
     parts: List<AnswerPart>,
     written: String,
     folded: Boolean,
-    onDecide: (toolCallId: String, approved: Boolean) -> Unit,
+    onDecide: (toolCallId: String, approved: Boolean, changes: Map<String, Any?>?) -> Unit,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)

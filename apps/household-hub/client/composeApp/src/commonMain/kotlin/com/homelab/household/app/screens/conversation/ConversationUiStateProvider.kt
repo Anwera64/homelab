@@ -338,6 +338,69 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                         ),
                     turnState = TurnState.AwaitingApproval,
                 ),
+            // Canvas: RepeatAdd. A repeating event says how often under its first date.
+            "Approving a repeating event" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put gym in on Tuesdays and Thursdays at 7, until Christmas", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Both mornings are clear. I can add it now.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("Both mornings are clear. I can add it now."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Create,
+                                            arguments =
+                                                mapOf(
+                                                    "action" to "create",
+                                                    "title" to "Gym",
+                                                    "start_time" to "2026-09-29T07:00:00",
+                                                    "end_time" to "2026-09-29T08:00:00",
+                                                    "repeat" to GYM_REPEAT,
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // Canvas: RepeatRemoveA. One date of a series: the switch asks which dates go.
+            "Removing one date of a series" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Skip gym this Thursday, I have the jury", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Got it. I'll take Thursday's off and leave the rest.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("Got it. I'll take Thursday's off and leave the rest."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Delete,
+                                            arguments =
+                                                mapOf(
+                                                    "action" to "delete",
+                                                    "event_id" to "gym-1",
+                                                    "title" to "Gym",
+                                                    "start_time" to "2026-10-01T07:00:00",
+                                                    "occurrence_start" to "2026-10-01T07:00:00",
+                                                    "repeat" to GYM_REPEAT,
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
             // The turn carried on: one write done, the other declined, both on their record lines.
             "Approved and declined" to
                 agent.copy(
@@ -406,3 +469,6 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
 private val rsf = ToolSource("Hong Kong: press freedom index", "https://rsf.org/en/country/hong-kong")
 private val scmp = ToolSource("Hong Kong news", "https://www.scmp.com/news/hong-kong")
 private val hkja = ToolSource("Annual report: a shrinking space", "https://www.hkja.org.hk/")
+
+private val GYM_REPEAT =
+    mapOf("frequency" to "weekly", "interval" to 1L, "days" to listOf("TU", "TH"), "until" to "2026-12-24")

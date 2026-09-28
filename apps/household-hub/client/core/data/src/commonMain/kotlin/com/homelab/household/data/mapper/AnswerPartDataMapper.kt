@@ -87,10 +87,26 @@ object AnswerPartDataMapper {
 
     private fun plain(value: JsonElement): Any? =
         when (value) {
-            is JsonNull -> null
-            is JsonObject -> value.mapValues { (_, item) -> plain(item) }
-            is JsonArray -> value.map(::plain)
-            is JsonPrimitive -> if (value.isString) value.content else value.booleanOrNull ?: value.longOrNull ?: value.doubleOrNull
+            is JsonNull -> {
+                null
+            }
+
+            is JsonObject -> {
+                value.mapValues { (_, item) -> plain(item) }
+            }
+
+            is JsonArray -> {
+                value.map(::plain)
+            }
+
+            is JsonPrimitive -> {
+                if (value.isString) {
+                    value.content
+                } else {
+                    value.booleanOrNull ?: value.longOrNull
+                        ?: value.doubleOrNull
+                }
+            }
         }
 
     /** The other way, for details changed on a card: the same plain values, as JSON. */
