@@ -80,6 +80,9 @@ import org.jetbrains.compose.resources.stringResource
 
 const val CONVERSATION_TRANSCRIPT_TAG = "ConversationTranscript"
 
+/** The Undo line's place in the transcript, which no message id can take. */
+private const val MADE_AUTOMATIC_KEY = "made-automatic"
+
 /**
  * A conversation, and a new one — the same screen.
  *
@@ -106,6 +109,8 @@ fun ConversationContent(
     onRetryAgents: () -> Unit = {},
     onDecide: (toolCallId: String, approved: Boolean) -> Unit = { _, _ -> },
     onConnectCalendar: () -> Unit = {},
+    onApproveAutomatically: (toolCallId: String) -> Unit = { onDecide(it, true) },
+    onUndoAutomatic: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -340,6 +345,7 @@ fun ConversationContent(
                         onDecide = onDecide,
                         onConnectCalendar = onConnectCalendar,
                         onAskAgain = question?.let { { onSend(it) } },
+                        onApproveAutomatically = onApproveAutomatically,
                     )
                 } else {
                     MessageBubble(
@@ -368,6 +374,7 @@ fun ConversationContent(
                         folded = false,
                         onDecide = onDecide,
                         onConnectCalendar = onConnectCalendar,
+                        onApproveAutomatically = onApproveAutomatically,
                     ) {
                         val tool = state.activeTool
                         when {
@@ -385,6 +392,14 @@ fun ConversationContent(
                             }
                         }
                     }
+                }
+            }
+
+            // After the answer it belongs to, until the next message is sent.
+            val madeAutomatic = state.madeAutomatic
+            if (madeAutomatic != null) {
+                item(key = MADE_AUTOMATIC_KEY) {
+                    NowAutomaticLine(madeAutomatic, onUndo = onUndoAutomatic)
                 }
             }
         }
@@ -426,6 +441,7 @@ private fun Answer(
     onDecide: (toolCallId: String, approved: Boolean) -> Unit,
     onConnectCalendar: () -> Unit,
     onAskAgain: (() -> Unit)? = null,
+    onApproveAutomatically: (toolCallId: String) -> Unit,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)
@@ -440,7 +456,11 @@ private fun Answer(
 
                     // Never folded away: it is the one thing in an answer waiting on you.
                     is AnswerRun.Card -> {
-                        ToolApprovalCard(card = run.card, onDecide = onDecide)
+                        ToolApprovalCard(
+                            card = run.card,
+                            onDecide = onDecide,
+                            onApproveAutomatically = onApproveAutomatically,
+                        )
                     }
 
                     // Nor is a fix: the one thing that gets the agent going again.

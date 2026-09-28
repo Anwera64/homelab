@@ -28,6 +28,7 @@ import com.homelab.household.app.resources.tool_results_hide
 import com.homelab.household.app.resources.tool_results_show
 import com.homelab.household.app.resources.tool_search_done_query
 import com.homelab.household.app.resources.tool_search_results
+import com.homelab.household.app.resources.tool_step_automatic
 import com.homelab.household.app.resources.tool_step_named
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
@@ -72,7 +73,7 @@ private fun ToolStepLine(
 ) {
     val colors = HearthTheme.colors
     val iconTint = if (step.failed) colors.error else colors.textMuted
-    val (text, kept) = stepText(step)
+    val (text, kept) = stepText(step).let { if (step.automatic) automatic(it) else it }
 
     if (step.results.isEmpty()) {
         ToolRecordLine(icon = step.icon, text = text, modifier = modifier, iconTint = iconTint, kept = kept)
@@ -170,6 +171,20 @@ private fun stepText(step: ToolStep): StepText =
             StepText(failure(stringResource(words.words), words.reason?.let { stringResource(it) }))
         }
     }
+
+/**
+ * "Added to your calendar · Print shop cutoff · automatic": said after everything else on the line,
+ * after a kept end too, so it is never the part that gives way.
+ */
+@Composable
+private fun automatic(words: StepText): StepText {
+    val tagged = stringResource(Res.string.tool_step_automatic, "")
+    return if (words.kept != null) {
+        words.copy(kept = words.kept + tagged)
+    } else {
+        StepText(words.text + AnnotatedString(tagged))
+    }
+}
 
 /** What failed, in red; why, when it is known, stays muted after it. */
 @Composable

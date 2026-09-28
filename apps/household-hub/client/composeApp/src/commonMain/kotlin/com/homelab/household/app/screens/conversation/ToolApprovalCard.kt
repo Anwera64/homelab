@@ -6,11 +6,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.homelab.household.app.components.ActionCard
 import com.homelab.household.app.components.CardButtonRow
 import com.homelab.household.app.components.DestructiveButton
+import com.homelab.household.app.components.HearthCheckboxRow
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.ToolRecordLine
@@ -56,6 +61,10 @@ import org.jetbrains.compose.resources.stringResource
  * What it will do and to what, with Decline on the left and Approve on the right. A removal reads
  * in red and asks "Keep it" or "Remove", so saying yes to losing something is never the easy tap.
  *
+ * A write that can be made automatic (adding events, creating notes) also offers "Auto-approve …
+ * from now on" (canvas: ToolAutoApprove). Ticking it changes nothing until Approve: then
+ * [onApproveAutomatically] is called instead of [onDecide]. Removing and replacing never offer it.
+ *
  * Once answered while the step's other cards still wait, it shrinks to its record line, so what is
  * left to answer stands out; when the last one is answered the turn carries on and the hub turns
  * each into the step it became.
@@ -65,6 +74,7 @@ fun ToolApprovalCard(
     card: AnswerPart.Proposal,
     onDecide: (toolCallId: String, approved: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onApproveAutomatically: (toolCallId: String) -> Unit = { onDecide(it, true) },
 ) {
     val label = toolLabel(card.tool, card.action)
     val details = approvalCardDetails(card)
@@ -89,7 +99,7 @@ fun ToolApprovalCard(
         }
 
         ProposalStatus.Pending -> {
-            PendingCard(card, label, name, details, onDecide, modifier)
+            PendingCard(card, label, name, details, onDecide, onApproveAutomatically, modifier)
         }
     }
 }
@@ -101,11 +111,13 @@ private fun PendingCard(
     name: String,
     details: ApprovalCardDetails,
     onDecide: (toolCallId: String, approved: Boolean) -> Unit,
+    onApproveAutomatically: (toolCallId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val ask = cardAsk(card.action)
+    var automatic by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     val tint = if (ask == CardAsk.Approve) colors.textPrimary else colors.error
 
     ActionCard(modifier = modifier) {
@@ -131,6 +143,14 @@ private fun PendingCard(
                 Text(text = caption, style = type.caption, color = colors.textMuted)
             }
         }
+        val automaticAsk = label.automaticAsk
+        if (automaticAsk != null && ask == CardAsk.Approve) {
+            HearthCheckboxRow(
+                text = stringResource(automaticAsk),
+                checked = automatic,
+                onCheckedChange = { automatic = it },
+            )
+        }
         CardButtonRow {
             val no = if (ask == CardAsk.Approve) Res.string.tool_card_decline else Res.string.tool_card_keep
             SecondaryButton(
@@ -142,7 +162,9 @@ private fun PendingCard(
                 CardAsk.Approve -> {
                     PrimaryButton(
                         text = stringResource(Res.string.tool_card_approve),
-                        onClick = { onDecide(card.toolCallId, true) },
+                        onClick = {
+                            if (automatic) onApproveAutomatically(card.toolCallId) else onDecide(card.toolCallId, true)
+                        },
                         modifier = Modifier.weight(1f),
                         lifted = false,
                     )

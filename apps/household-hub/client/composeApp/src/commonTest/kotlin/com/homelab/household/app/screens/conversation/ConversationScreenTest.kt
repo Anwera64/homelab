@@ -11,12 +11,15 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -52,12 +55,16 @@ import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.resources.tool_automatic_undo
+import com.homelab.household.app.resources.tool_calendar_add_automatic_ask
 import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_add_failed
+import com.homelab.household.app.resources.tool_calendar_add_now_automatic
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
 import com.homelab.household.app.resources.tool_calendar_remove_card
+import com.homelab.household.app.resources.tool_card_approve
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
@@ -103,6 +110,8 @@ class ConversationScreenTest {
         onRetryAgents: () -> Unit = {},
         onDecide: (String, Boolean) -> Unit = { _, _ -> },
         onConnectCalendar: () -> Unit = {},
+        onApproveAutomatically: (String) -> Unit = {},
+        onUndoAutomatic: () -> Unit = {},
     ): @Composable () -> Unit =
         {
             StillTheme {
@@ -116,6 +125,8 @@ class ConversationScreenTest {
                     onRetryAgents = onRetryAgents,
                     onDecide = onDecide,
                     onConnectCalendar = onConnectCalendar,
+                    onApproveAutomatically = onApproveAutomatically,
+                    onUndoAutomatic = onUndoAutomatic,
                     onBack = {},
                     memberName = "Emma",
                 )
@@ -838,5 +849,73 @@ class ConversationScreenTest {
             // Opened, the fold shows the red step under its label; the card is still there.
             onAllNodesWithText(getString(Res.string.tool_calendar_add_failed)).assertCountEquals(2)
             onNodeWithText(getString(Res.string.tool_fix_reconnect_calendar)).assertIsDisplayed()
+        }
+
+    // ---- auto-approve from the card (slice 4, PR 5) -------------------------
+
+    /** Canvas: ToolAutoApprove. Ticking the box changes nothing until Approve. */
+    @Test
+    fun `GIVEN an add waiting on the member WHEN the box is ticked and it is approved THEN it is approved automatically`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            val automatic = mutableListOf<String>()
+            setContent(
+                conversation(
+                    stateNamed("Auto-approving an add"),
+                    onDecide = { id, ok -> decided += id to ok },
+                    onApproveAutomatically = { automatic += it },
+                ),
+            )
+            val box = onNodeWithText(getString(Res.string.tool_calendar_add_automatic_ask))
+            box.assertIsOff()
+
+            box.performClick()
+            box.assertIsOn()
+            onNodeWithText(getString(Res.string.tool_card_approve)).performClick()
+
+            assertEquals(listOf("c-1"), automatic)
+            assertEquals(emptyList(), decided)
+        }
+
+    @Test
+    fun `GIVEN an add waiting on the member WHEN approved without ticking THEN it is only approved`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            val automatic = mutableListOf<String>()
+            setContent(
+                conversation(
+                    stateNamed("Auto-approving an add"),
+                    onDecide = { id, ok -> decided += id to ok },
+                    onApproveAutomatically = { automatic += it },
+                ),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_approve)).performClick()
+
+            assertEquals(listOf("c-1" to true), decided)
+            assertEquals(emptyList(), automatic)
+        }
+
+    @Test
+    fun `GIVEN a removal waiting on the member WHEN drawn THEN it never offers to make removing automatic`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approving a removal")))
+
+            onNodeWithText(getString(Res.string.tool_calendar_remove_card)).assertIsDisplayed()
+            onAllNodes(hasText("Auto-approve", substring = true)).assertCountEquals(0)
+        }
+
+    /** Canvas: ToolAutoApproved. */
+    @Test
+    fun `GIVEN an add made automatic WHEN drawn THEN its record says automatic and Undo asks again`() =
+        runComposeUiTest {
+            var undone = false
+            setContent(conversation(stateNamed("Adding is automatic"), onUndoAutomatic = { undone = true }))
+
+            onNodeWithText("Added to your calendar · Print shop cutoff · automatic").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_calendar_add_now_automatic)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_automatic_undo)).performClick()
+
+            assertTrue(undone)
         }
 }
