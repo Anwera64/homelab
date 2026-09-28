@@ -13,6 +13,7 @@ import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolSummary
+import com.homelab.household.domain.model.alwaysAsks
 import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
@@ -22,6 +23,7 @@ import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.ResumeTurnUseCase
+import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
@@ -53,6 +55,8 @@ class ChatSessionViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     /** Names the owner of someone else's agent in the picker. */
     private val listHouseholdMembersUseCase: ListHouseholdMembersUseCase,
+    /** Makes a write automatic from its card's checkbox, and asks again on Undo. */
+    private val setToolApprovalUseCase: SetToolApprovalUseCase,
     /** Times each stretch of thinking for the answer's "Thought for N s". Injected so a test can move it. */
     private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
@@ -282,10 +286,12 @@ class ChatSessionViewModel(
             )
 
         // The message is on its way, so the composer lets go of it — and not a moment earlier.
+        // The last answer's Undo goes with it: it belonged to that answer.
         _uiState.update {
             it.startingTurn().copy(
                 messages = it.messages + userMsg,
                 composerText = "",
+                madeAutomatic = null,
             )
         }
 
@@ -484,7 +490,7 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.ToolResult -> {
-                                answer.tool(event.tool, event.success, event.summary)
+                                answer.tool(event.tool, event.success, event.summary, event.automatic)
                                 _uiState.update {
                                     it.copy(activeTool = null, activeToolAction = null, parts = answer.parts())
                                 }
@@ -618,6 +624,35 @@ class ChatSessionViewModel(
         )
     }
 
+    /**
+     * Approve, with the card's "from now on" box ticked: the write is made automatic first, so the
+     * hub already knows when the turn carries on, and any more of the same in this answer run
+     * without a card. If the setting can't be saved, this card is still approved; the next one asks.
+     */
+    fun approveAutomatically(toolCallId: String) {
+        val card = _uiState.value.pendingProposals.firstOrNull { it.toolCallId == toolCallId } ?: return
+        val action = card.action
+        if (action == null || alwaysAsks(action)) {
+            decide(toolCallId, approved = true)
+            return
+        }
+        viewModelScope.launch {
+            val saved = runCatchingSafe { setToolApprovalUseCase(card.tool, action, automatic = true) }.isSuccess
+            if (saved) _uiState.update { it.copy(madeAutomatic = AutomaticWrite(card.tool, action)) }
+            decide(toolCallId, approved = true)
+        }
+    }
+
+    /** Undo on "Adding events is now automatic": the next one asks again. */
+    fun undoAutomatic() {
+        val made = _uiState.value.madeAutomatic ?: return
+        viewModelScope.launch {
+            runCatchingSafe { setToolApprovalUseCase(made.tool, made.action, automatic = false) }
+                .onSuccess { _uiState.update { it.copy(madeAutomatic = null) } }
+                .onFailure { e -> _uiState.update { it.copy(errorMessage = e.message ?: "Couldn’t undo") } }
+        }
+    }
+
     /** A message the hub would not take while a card waits: back in the composer, and held. */
     private fun holdUnsent(userMessageId: String?) {
         _uiState.update { state ->
@@ -728,9 +763,11 @@ private class AnswerPartsBuilder(
         name: String,
         succeeded: Boolean,
         summary: ToolSummary? = null,
+        automatic: Boolean = false,
     ) {
         stopThinking()
-        val step = if (succeeded) AnswerPart.ToolDone(name, summary) else AnswerPart.ToolFailed(name, summary)
+        val step =
+            if (succeeded) AnswerPart.ToolDone(name, summary, automatic) else AnswerPart.ToolFailed(name, summary)
         val card = decidedCard(name, ProposalStatus.Approved)
         if (card >= 0) parts[card] = step else parts += step
     }

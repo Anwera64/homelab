@@ -121,7 +121,14 @@ class DefensiveSseStreamReader(
                 val success = outcome["success"]?.jsonPrimitive?.booleanOrNull ?: true
                 val error = outcome["error"]?.jsonPrimitive?.contentOrNull
                 val summary = ToolSummaryDataMapper.fromJson(outcome["summary"])
-                ChatStreamEvent.ToolResult(tool = tool, success = success, error = error, summary = summary)
+                val automatic = (outcome["auto"] as? JsonPrimitive)?.booleanOrNull ?: false
+                ChatStreamEvent.ToolResult(
+                    tool = tool,
+                    success = success,
+                    error = error,
+                    summary = summary,
+                    automatic = automatic,
+                )
             }
 
             "tool_approval_proposal" -> {

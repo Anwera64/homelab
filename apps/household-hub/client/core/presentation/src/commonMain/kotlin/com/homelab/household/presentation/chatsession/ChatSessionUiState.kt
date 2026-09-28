@@ -37,6 +37,12 @@ sealed interface TurnState {
     data object AwaitingApproval : TurnState
 }
 
+/** A write agents now do for the member without asking: adding events, say. */
+data class AutomaticWrite(
+    val tool: String,
+    val action: ToolAction,
+)
+
 data class ChatSessionUiState(
     val isLoading: Boolean = false,
     val session: ConversationSession? = null,
@@ -88,6 +94,11 @@ data class ChatSessionUiState(
      * the composer, and a line under it asks for the card to be answered first.
      */
     val holdingForCard: Boolean = false,
+    /**
+     * A write the member just made automatic by ticking its card, offered back with Undo after the
+     * answer until the next message is sent.
+     */
+    val madeAutomatic: AutomaticWrite? = null,
     val errorMessage: String? = null,
     val isSecretLocked: Boolean = false,
 ) {
