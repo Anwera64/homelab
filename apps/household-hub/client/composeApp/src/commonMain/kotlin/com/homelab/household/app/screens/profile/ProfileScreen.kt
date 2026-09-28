@@ -19,6 +19,7 @@ fun ProfileScreen(
     onLeave: () -> Unit,
     onSignedOut: () -> Unit,
     onCalendar: () -> Unit,
+    onCalendarSignInAgain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
@@ -41,6 +42,7 @@ fun ProfileScreen(
         onLeave = onLeave,
         onSignOut = viewModel::onSignOut,
         onCalendar = onCalendar,
+        onCalendarSignInAgain = onCalendarSignInAgain,
         modifier = modifier,
         onDisconnectCalendar = viewModel::onDisconnectCalendar,
     )

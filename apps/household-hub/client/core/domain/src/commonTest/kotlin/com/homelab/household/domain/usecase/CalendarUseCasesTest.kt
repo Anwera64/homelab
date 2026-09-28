@@ -8,9 +8,11 @@ import com.homelab.household.domain.repository.CalendarRepository
 import com.homelab.household.domain.usecase.impl.ConnectCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveCalendarUseCaseImpl
+import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
@@ -53,20 +55,24 @@ class CalendarUseCasesTest {
         }
 
     @Test
-    fun `GIVEN a Google account WHEN it is connected THEN the address is built from the account and the password loses its spaces`() =
+    fun `GIVEN a Google account WHEN it is connected with a password THEN nothing is sent as Google only takes a sign-in`() =
         runTest {
-            val google = icloud.copy(provider = CalendarProvider.GOOGLE)
-            everySuspend {
-                repository.connectCalendar(
-                    CalendarProvider.GOOGLE,
-                    "https://apidata.googleusercontent.com/caldav/v2/emma.larsson@gmail.com/events",
-                    "emma.larsson@gmail.com",
-                    "abcdefghijklmnop",
-                    null,
-                )
-            } returns google
+            assertFailsWith<ValidationException> {
+                connect(CalendarProvider.GOOGLE, "emma.larsson@gmail.com", "abcd efgh ijkl mnop")
+            }
 
-            assertEquals(google, connect(CalendarProvider.GOOGLE, "emma.larsson@gmail.com", "abcd efgh ijkl mnop"))
+            verifySuspend(VerifyMode.not) { repository.connectCalendar(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `GIVEN the hub can start a Google sign-in WHEN a member starts one THEN they get Google's page to open`() =
+        runTest {
+            everySuspend { repository.startGoogleSignIn() } returns
+                "https://accounts.google.com/o/oauth2/v2/auth?state=s"
+
+            val page = StartGoogleCalendarSignInUseCaseImpl(repository)()
+
+            assertEquals("https://accounts.google.com/o/oauth2/v2/auth?state=s", page)
         }
 
     @Test

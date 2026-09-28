@@ -20,12 +20,16 @@ class FakeCalendarHub {
     val requests: List<String> get() = sent.toList()
 
     private var answer: suspend MockRequestHandleScope.() -> HttpResponseData = { connected() }
+    private var googleAnswer: suspend MockRequestHandleScope.() -> HttpResponseData = {
+        json("""{"authorization_url":"$GOOGLE_PAGE"}""")
+    }
 
     val engine: HttpClientEngine =
         MockEngine { request ->
             (request.body as? TextContent)?.let { sent += it.text }
             when (request.url.encodedPath) {
                 "/api/v1/integrations/calendars" -> answer()
+                "/api/v1/integrations/calendars/google/start" -> googleAnswer()
                 else -> respond("", HttpStatusCode.NotFound)
             }
         }
@@ -39,6 +43,16 @@ class FakeCalendarHub {
     fun cannotReachTheServer() {
         answer =
             { json("""{"detail":"could not be reached","code":"calendar_unreachable"}""", HttpStatusCode.BadRequest) }
+    }
+
+    /** The hub has no Google sign-in set up. */
+    fun hasNoGoogleSignIn() {
+        googleAnswer = {
+            json(
+                """{"detail":"This hub has no Google sign-in configured.","code":"google_not_configured"}""",
+                HttpStatusCode.ServiceUnavailable,
+            )
+        }
     }
 
     private fun MockRequestHandleScope.connected() =
@@ -57,4 +71,8 @@ class FakeCalendarHub {
         status = status,
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
+
+    companion object {
+        const val GOOGLE_PAGE = "https://accounts.google.com/o/oauth2/v2/auth?state=s"
+    }
 }

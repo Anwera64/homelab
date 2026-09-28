@@ -16,17 +16,11 @@ class ConnectCalendarUseCaseImpl(
         server: String,
         calendarName: String,
     ): CalendarConnection {
+        if (provider.signsIn) throw ValidationException("Google calendars are connected by signing in with Google")
+
         val trimmedAccount = account.trim()
-        // Google shows its app password in four groups with spaces; it is the same password without them.
-        val cleanPassword =
-            if (provider ==
-                CalendarProvider.GOOGLE
-            ) {
-                password.filterNot { it.isWhitespace() }
-            } else {
-                password.trim()
-            }
-        val address = provider.presetServer(trimmedAccount) ?: server.trim()
+        val cleanPassword = password.trim()
+        val address = provider.presetServer() ?: server.trim()
 
         if (trimmedAccount.isEmpty()) throw ValidationException("Account cannot be blank")
         if (cleanPassword.isEmpty()) throw ValidationException("Password cannot be blank")

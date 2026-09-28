@@ -47,6 +47,5 @@ fun CalendarConnectScreen(
 private fun instructionsFor(provider: CalendarProvider): String? =
     when (provider) {
         CalendarProvider.APPLE -> "https://support.apple.com/102654"
-        CalendarProvider.GOOGLE -> "https://support.google.com/accounts/answer/185833"
-        CalendarProvider.OTHER -> null
+        CalendarProvider.GOOGLE, CalendarProvider.OTHER -> null
     }

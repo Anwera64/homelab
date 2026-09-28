@@ -3,11 +3,13 @@ package com.homelab.household.data.datasource.remote
 import com.homelab.household.data.datasource.remote.`interface`.CalendarRemoteDataSource
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
 import com.homelab.household.data.dto.CalendarCredentialReadDto
+import com.homelab.household.data.dto.GoogleSignInStartDto
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.pinRefusal
 import com.homelab.household.data.network.reachingHub
 import com.homelab.household.domain.exception.CalendarRejectedException
 import com.homelab.household.domain.exception.CalendarUnreachableException
+import com.homelab.household.domain.exception.GoogleSignInUnavailableException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -54,8 +56,21 @@ class KtorCalendarRemoteDataSource(
             client.delete("$baseUrl/api/v1/integrations/calendars").ensureJsonSuccess()
         }
 
+    override suspend fun startGoogleSignIn(): String =
+        reachingHub {
+            val response = client.post("$baseUrl/api/v1/integrations/calendars/google/start")
+            // Before ensureJsonSuccess, which reads every 503 as the hub being down.
+            if (response.status == HttpStatusCode.ServiceUnavailable &&
+                response.pinRefusal()?.code == GOOGLE_NOT_CONFIGURED
+            ) {
+                throw GoogleSignInUnavailableException()
+            }
+            response.ensureJsonSuccess().body<GoogleSignInStartDto>().authorizationUrl
+        }
+
     private companion object {
         const val REJECTED = "calendar_rejected"
         const val UNREACHABLE = "calendar_unreachable"
+        const val GOOGLE_NOT_CONFIGURED = "google_not_configured"
     }
 }

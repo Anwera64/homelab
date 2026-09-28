@@ -3,8 +3,8 @@ package com.homelab.household.presentation.calendarconnect
 import com.homelab.household.domain.model.CalendarProvider
 
 /**
- * The details one provider needs. Apple's server is fixed and Google's is built from the account as
- * it is typed, so only [CalendarProvider.OTHER] asks for [server].
+ * The details one provider needs. Apple's server is fixed, so only [CalendarProvider.OTHER] asks for
+ * [server]. Google never comes here: it signs in instead.
  */
 data class CalendarConnectUiState(
     val provider: CalendarProvider,
@@ -18,5 +18,5 @@ data class CalendarConnectUiState(
     val status: CalendarConnectStatus = CalendarConnectStatus.Idle,
 ) {
     /** The address the hub will be given, shown read-only, or null when the member types it. */
-    val presetServer: String? get() = provider.presetServer(account)
+    val presetServer: String? get() = provider.presetServer()
 }

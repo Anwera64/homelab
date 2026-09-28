@@ -13,20 +13,12 @@ class CalendarConnectUiStateProvider : PreviewParameterProvider<CalendarConnectU
             account = "emma@icloud.com",
             password = "abcd-efgh-ijkl-mnop",
         )
-    private val google =
-        CalendarConnectUiState(
-            provider = CalendarProvider.GOOGLE,
-            account = "emma.larsson@gmail.com",
-            password = "abcd efgh ijkl mnop",
-        )
 
     private val named =
         listOf(
             "Apple, empty" to CalendarConnectUiState(provider = CalendarProvider.APPLE),
             "Apple, checking" to apple.copy(status = CalendarConnectStatus.Checking),
             "Apple, rejected" to apple.copy(password = "my-apple-id", status = CalendarConnectStatus.Rejected),
-            "Google, filled in" to google,
-            "Google, rejected" to google.copy(status = CalendarConnectStatus.Rejected),
             "Other, nothing typed yet" to
                 CalendarConnectUiState(
                     provider = CalendarProvider.OTHER,

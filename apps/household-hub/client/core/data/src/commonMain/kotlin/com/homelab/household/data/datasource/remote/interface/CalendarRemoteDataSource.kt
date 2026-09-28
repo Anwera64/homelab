@@ -15,4 +15,7 @@ interface CalendarRemoteDataSource {
     suspend fun configureCalendar(credential: CalendarCredentialCreateDto): CalendarCredentialReadDto
 
     suspend fun deleteCalendar()
+
+    /** Google's sign-in page. Throws `GoogleSignInUnavailableException` when the hub has no Google sign-in set up. */
+    suspend fun startGoogleSignIn(): String
 }

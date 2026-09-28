@@ -46,17 +46,6 @@ import com.homelab.household.app.resources.calendar_apple_warning_detail
 import com.homelab.household.app.resources.calendar_back
 import com.homelab.household.app.resources.calendar_checking
 import com.homelab.household.app.resources.calendar_connect
-import com.homelab.household.app.resources.calendar_google_account
-import com.homelab.household.app.resources.calendar_google_instructions
-import com.homelab.household.app.resources.calendar_google_password
-import com.homelab.household.app.resources.calendar_google_password_helper
-import com.homelab.household.app.resources.calendar_google_rejected
-import com.homelab.household.app.resources.calendar_google_rejected_detail
-import com.homelab.household.app.resources.calendar_google_step_one
-import com.homelab.household.app.resources.calendar_google_step_three
-import com.homelab.household.app.resources.calendar_google_step_two
-import com.homelab.household.app.resources.calendar_google_warning
-import com.homelab.household.app.resources.calendar_google_warning_detail
 import com.homelab.household.app.resources.calendar_hub_unreachable
 import com.homelab.household.app.resources.calendar_name
 import com.homelab.household.app.resources.calendar_name_placeholder
@@ -70,7 +59,6 @@ import com.homelab.household.app.resources.calendar_other_warning_detail
 import com.homelab.household.app.resources.calendar_password_missing
 import com.homelab.household.app.resources.calendar_password_rejected
 import com.homelab.household.app.resources.calendar_server
-import com.homelab.household.app.resources.calendar_server_built
 import com.homelab.household.app.resources.calendar_server_missing
 import com.homelab.household.app.resources.calendar_server_placeholder
 import com.homelab.household.app.resources.calendar_server_preset
@@ -91,8 +79,8 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The details one calendar provider needs (boards "credentials + test", "Google credentials" and
- * "auth rejected"). The app-password warning comes before the field it is about, and a refused
+ * The details a password calendar needs (boards "credentials + test" and "auth rejected"). Google
+ * signs in instead ([GoogleCalendarSignInContent]). The app-password warning comes before the field it is about, and a refused
  * password swaps it for the steps to make one. Each failure lands under the field it is about.
  *
  * Stateless — [CalendarConnectScreen] owns the ViewModel.
@@ -181,7 +169,7 @@ fun CalendarConnectContent(
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         ) {
             if (rejected) {
-                Notice(
+                CalendarNotice(
                     title = stringResource(words.rejected),
                     detail = stringResource(words.rejectedDetail),
                     icon = HearthIcon.Error,
@@ -190,7 +178,7 @@ fun CalendarConnectContent(
                     steps = words.steps.map { stringResource(it) },
                 )
             } else {
-                Notice(
+                CalendarNotice(
                     title = stringResource(words.warning),
                     detail = stringResource(words.warningDetail),
                     icon = HearthIcon.Warning,
@@ -260,11 +248,7 @@ fun CalendarConnectContent(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 )
             } else {
-                PresetServer(
-                    address = preset,
-                    builtFromAccount = state.provider == CalendarProvider.GOOGLE,
-                    error = unreachable,
-                )
+                PresetServer(address = preset, error = unreachable)
             }
 
             HearthTextField(
@@ -283,48 +267,10 @@ fun CalendarConnectContent(
     }
 }
 
-/** The warning before the fields, or once the calendar has refused them, the steps to fix it. */
-@Composable
-private fun Notice(
-    title: String,
-    detail: String,
-    icon: HearthIcon,
-    background: Color,
-    ink: Color,
-    modifier: Modifier = Modifier,
-    steps: List<String> = emptyList(),
-) {
-    val type = HearthTheme.typography
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(background, HearthShapes.bento)
-                .padding(HearthTheme.spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HearthIconImage(icon = icon, contentDescription = null, size = HearthTheme.size.iconMd, tint = ink)
-            Text(title, style = type.bodyStrong, color = ink)
-        }
-        Text(detail, style = if (steps.isEmpty()) type.caption else type.label, color = ink)
-        steps.forEachIndexed { index, step ->
-            Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                Text("${index + 1}", style = type.monoSm, color = ink)
-                Text(step, style = type.caption, color = ink)
-            }
-        }
-    }
-}
-
-/** Apple's fixed address, or Google's built from the account: shown, never typed. */
+/** Apple's fixed address: shown, never typed. */
 @Composable
 private fun PresetServer(
     address: String,
-    builtFromAccount: Boolean,
     error: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -347,20 +293,15 @@ private fun PresetServer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(address, modifier = Modifier.weight(1f), style = type.mono, color = colors.textMuted)
-            if (!builtFromAccount) {
-                Text(
-                    stringResource(Res.string.calendar_server_preset),
-                    modifier =
-                        Modifier
-                            .background(colors.outlineSoft, HearthShapes.pill)
-                            .padding(horizontal = HearthTheme.spacing.sm, vertical = HearthTheme.spacing.xs),
-                    style = type.monoSm,
-                    color = colors.textMuted,
-                )
-            }
-        }
-        if (builtFromAccount && error == null) {
-            Text(stringResource(Res.string.calendar_server_built), style = type.caption, color = colors.textMuted)
+            Text(
+                stringResource(Res.string.calendar_server_preset),
+                modifier =
+                    Modifier
+                        .background(colors.outlineSoft, HearthShapes.pill)
+                        .padding(horizontal = HearthTheme.spacing.sm, vertical = HearthTheme.spacing.xs),
+                style = type.monoSm,
+                color = colors.textMuted,
+            )
         }
         if (error != null) {
             Row(
@@ -414,26 +355,8 @@ private fun wordsFor(provider: CalendarProvider): ProviderWords =
             )
         }
 
-        CalendarProvider.GOOGLE -> {
-            ProviderWords(
-                warning = Res.string.calendar_google_warning,
-                warningDetail = Res.string.calendar_google_warning_detail,
-                account = Res.string.calendar_google_account,
-                password = Res.string.calendar_google_password,
-                passwordHelper = Res.string.calendar_google_password_helper,
-                rejected = Res.string.calendar_google_rejected,
-                rejectedDetail = Res.string.calendar_google_rejected_detail,
-                steps =
-                    listOf(
-                        Res.string.calendar_google_step_one,
-                        Res.string.calendar_google_step_two,
-                        Res.string.calendar_google_step_three,
-                    ),
-                instructions = Res.string.calendar_google_instructions,
-            )
-        }
-
-        CalendarProvider.OTHER -> {
+        // Google never opens this screen: it signs in instead (GoogleCalendarSignInContent).
+        CalendarProvider.GOOGLE, CalendarProvider.OTHER -> {
             ProviderWords(
                 warning = Res.string.calendar_other_warning,
                 warningDetail = Res.string.calendar_other_warning_detail,

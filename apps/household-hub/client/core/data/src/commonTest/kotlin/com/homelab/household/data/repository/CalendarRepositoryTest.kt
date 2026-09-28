@@ -123,4 +123,32 @@ class CalendarRepositoryTest {
 
             verifySuspend(VerifyMode.exactly(1)) { remote.deleteCalendar() }
         }
+
+    @Test
+    fun `GIVEN Google no longer accepts the sign-in WHEN the calendar is asked for THEN it comes back needing a new one`() =
+        runTest {
+            // GIVEN
+            val remote = mock<CalendarRemoteDataSource>()
+            everySuspend { remote.getMyCalendar() } returns googleDto.copy(needsReconnect = true)
+
+            // WHEN
+            val calendar = repository(remote).getCalendar()
+
+            // THEN
+            assertEquals(google.copy(needsReconnect = true), calendar)
+        }
+
+    @Test
+    fun `GIVEN the hub can start a Google sign-in WHEN one is started THEN Google's page comes back`() =
+        runTest {
+            // GIVEN
+            val remote = mock<CalendarRemoteDataSource>()
+            everySuspend { remote.startGoogleSignIn() } returns "https://accounts.google.com/o/oauth2/v2/auth?state=s"
+
+            // WHEN
+            val page = repository(remote).startGoogleSignIn()
+
+            // THEN
+            assertEquals("https://accounts.google.com/o/oauth2/v2/auth?state=s", page)
+        }
 }

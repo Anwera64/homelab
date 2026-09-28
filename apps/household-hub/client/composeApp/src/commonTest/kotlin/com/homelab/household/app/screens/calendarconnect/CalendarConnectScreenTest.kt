@@ -14,8 +14,6 @@ import com.homelab.household.app.resources.calendar_apple_account
 import com.homelab.household.app.resources.calendar_apple_password
 import com.homelab.household.app.resources.calendar_apple_rejected
 import com.homelab.household.app.resources.calendar_connect
-import com.homelab.household.app.resources.calendar_google_account
-import com.homelab.household.app.resources.calendar_google_password
 import com.homelab.household.app.resources.calendar_other_account
 import com.homelab.household.app.resources.calendar_other_password
 import com.homelab.household.app.resources.calendar_password_rejected
@@ -121,28 +119,6 @@ class CalendarConnectScreenTest {
 
         // Tapping early asked the hub nothing; only the second, complete try reached it.
         assertEquals(1, hub.requests.size)
-    }
-
-    @Test
-    fun google_shows_the_address_it_builds_from_the_account() {
-        val hub = FakeCalendarHub()
-
-        runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) {
-                    CalendarConnectScreen(provider = CalendarProvider.GOOGLE, onBack = {}, onConnect = {})
-                }
-            }
-
-            onNodeWithContentDescription(getString(Res.string.calendar_google_account))
-                .performTextInput("emma.larsson@gmail.com")
-
-            waitUntilExactlyOneExists(
-                hasText("https://apidata.googleusercontent.com/caldav/v2/emma.larsson@gmail.com/events"),
-                timeoutMillis = wait,
-            )
-            onNodeWithContentDescription(getString(Res.string.calendar_google_password)).assertIsDisplayed()
-        }
     }
 
     @Test

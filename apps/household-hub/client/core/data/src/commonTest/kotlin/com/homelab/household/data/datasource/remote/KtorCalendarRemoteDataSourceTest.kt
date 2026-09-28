@@ -4,6 +4,7 @@ import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
 import com.homelab.household.domain.exception.CalendarRejectedException
 import com.homelab.household.domain.exception.CalendarUnreachableException
+import com.homelab.household.domain.exception.GoogleSignInUnavailableException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import io.ktor.client.HttpClient
@@ -25,6 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** The wire for connecting the member's calendar, and the two ways the hub's test of it can fail. */
 class KtorCalendarRemoteDataSourceTest {
@@ -184,5 +186,97 @@ class KtorCalendarRemoteDataSourceTest {
 
             assertEquals(HttpMethod.Delete, method)
             assertEquals("/api/v1/integrations/calendars", path)
+        }
+
+    // ---- Google sign-in -----------------------------------------------------
+
+    @Test
+    fun `GIVEN a Google calendar that needs signing in again WHEN it is asked for THEN the hub's flag comes through`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine {
+                    respondJson(
+                        calendarJson
+                            .replace("\"apple_icloud\"", "\"google_caldav\"")
+                            .replace(
+                                "\"is_active\": true",
+                                "\"is_active\": true, \"auth_kind\": \"oauth\", \"needs_reconnect\": true",
+                            ),
+                    )
+                }
+
+            // WHEN
+            val calendar = dataSource(engine).getMyCalendar()
+
+            // THEN
+            assertEquals(true, calendar?.needsReconnect)
+        }
+
+    @Test
+    fun `GIVEN a hub from before Google sign-in WHEN the calendar is asked for THEN it needs nothing`() =
+        runTest {
+            // GIVEN
+            val engine = MockEngine { respondJson(calendarJson) }
+
+            // WHEN
+            val calendar = dataSource(engine).getMyCalendar()
+
+            // THEN
+            assertEquals(false, calendar?.needsReconnect)
+        }
+
+    @Test
+    fun `GIVEN the hub can start a Google sign-in WHEN one is started THEN it is posted and Google's page comes back`() =
+        runTest {
+            // GIVEN
+            var method: HttpMethod? = null
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    method = request.method
+                    path = request.url.encodedPath
+                    respondJson("""{"authorization_url":"https://accounts.google.com/o/oauth2/v2/auth?state=s"}""")
+                }
+
+            // WHEN
+            val page = dataSource(engine).startGoogleSignIn()
+
+            // THEN
+            assertEquals(HttpMethod.Post, method)
+            assertEquals("/api/v1/integrations/calendars/google/start", path)
+            assertEquals("https://accounts.google.com/o/oauth2/v2/auth?state=s", page)
+        }
+
+    @Test
+    fun `GIVEN the hub has no Google sign-in set up WHEN one is started THEN it says so rather than offline`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine {
+                    respondJson(
+                        """{"detail":"This hub has no Google sign-in configured.","code":"google_not_configured"}""",
+                        HttpStatusCode.ServiceUnavailable,
+                    )
+                }
+
+            // WHEN
+            val failure = assertFailsWith<GoogleSignInUnavailableException> { dataSource(engine).startGoogleSignIn() }
+
+            // THEN
+            assertEquals("This hub isn't set up for Google sign-in", failure.message)
+        }
+
+    @Test
+    fun `GIVEN a proxy answering 503 for a hub that is down WHEN a sign-in is started THEN the hub is offline`() =
+        runTest {
+            // GIVEN
+            val engine = MockEngine { respond("Service Unavailable", HttpStatusCode.ServiceUnavailable) }
+
+            // WHEN
+            val failure = assertFailsWith<ServerOfflineException> { dataSource(engine).startGoogleSignIn() }
+
+            // THEN
+            assertTrue(failure.message.orEmpty().contains("503"), "was ${failure.message}")
         }
 }

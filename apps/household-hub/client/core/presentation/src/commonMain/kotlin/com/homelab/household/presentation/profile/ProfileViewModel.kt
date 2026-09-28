@@ -116,6 +116,7 @@ class ProfileViewModel(
             provider = connection.provider,
             account = connection.account,
             minutesAgo = connection.connectedAt?.let(::minutesSince),
+            needsSignInAgain = connection.needsReconnect,
         )
 
     /** The hub writes its times in UTC, and not always with the zone on the end. */

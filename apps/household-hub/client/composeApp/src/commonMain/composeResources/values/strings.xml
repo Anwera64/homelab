@@ -176,29 +176,23 @@
     <string name="calendar_apple_glyph">🍎</string>
     <string name="calendar_apple_caption">Needs an app-specific password</string>
     <string name="calendar_google">Google Calendar</string>
-    <string name="calendar_google_caption">Coming soon</string>
+    <string name="calendar_google_caption">Sign in with Google</string>
     <string name="calendar_other">Other CalDAV</string>
     <string name="calendar_other_caption">Nextcloud, Fastmail, self-hosted</string>
-    <string name="calendar_provider_note">Credentials are encrypted on the hub and never leave your home network.</string>
+    <string name="calendar_provider_note">Passwords and Google sign-ins are encrypted on the hub and never leave your home network.</string>
 
     <string name="calendar_apple_warning">Not your Apple ID password</string>
     <string name="calendar_apple_warning_detail">Apple blocks normal passwords over CalDAV. Generate an app-specific password at account.apple.com → Sign-In and Security → App-Specific Passwords.</string>
-    <string name="calendar_google_warning">Turn on 2-Step Verification first</string>
-    <string name="calendar_google_warning_detail">Google only offers App Passwords once 2-Step is on — without it the page doesn’t exist. Then: myaccount.google.com → Security → App passwords.</string>
     <string name="calendar_other_warning">Use an app password if your server has them</string>
     <string name="calendar_other_warning_detail">Many servers refuse your normal password to calendar apps. Nextcloud and Fastmail both let you make one just for this.</string>
 
     <string name="calendar_apple_account">Apple ID</string>
     <string name="calendar_apple_password">App-specific password</string>
     <string name="calendar_apple_password_helper">Four groups of four, as Apple shows it</string>
-    <string name="calendar_google_account">Google account</string>
-    <string name="calendar_google_password">App password</string>
-    <string name="calendar_google_password_helper">Google shows it with spaces — paste it either way</string>
     <string name="calendar_other_account">Username</string>
     <string name="calendar_other_password">Password</string>
     <string name="calendar_server">Server</string>
     <string name="calendar_server_preset">preset</string>
-    <string name="calendar_server_built">Built from your address — Google gives every account its own URL.</string>
     <string name="calendar_server_placeholder">https://cloud.example.com/remote.php/dav</string>
     <string name="calendar_name">Calendar</string>
     <string name="calendar_name_placeholder">The first calendar on the account</string>
@@ -219,17 +213,39 @@
     <string name="calendar_apple_step_two">Sign-In and Security → App-Specific Passwords</string>
     <string name="calendar_apple_step_three">Generate one, name it HyggeHub, paste it below</string>
     <string name="calendar_apple_instructions">Open Apple’s instructions</string>
-    <string name="calendar_google_rejected">Google rejected those details</string>
-    <string name="calendar_google_rejected_detail">Almost always the password. Google refuses your normal password over CalDAV — it has to be an app password.</string>
-    <string name="calendar_google_step_one">Turn on 2-Step Verification at myaccount.google.com</string>
-    <string name="calendar_google_step_two">Security → App passwords</string>
-    <string name="calendar_google_step_three">Create one, name it HyggeHub, paste it below</string>
-    <string name="calendar_google_instructions">Open Google’s instructions</string>
     <string name="calendar_other_rejected">The server rejected those details</string>
     <string name="calendar_other_rejected_detail">Check the username and password. If your server offers app passwords, it may refuse your normal one.</string>
     <string name="calendar_password_rejected">That password was refused.</string>
     <string name="calendar_unreachable">The hub couldn’t reach this server. Nothing was saved.</string>
     <string name="calendar_hub_unreachable">Can’t reach your hub. Nothing was saved.</string>
+
+    <!-- Signing in with Google (#54): the hub keeps the sign-in, the browser does the asking. -->
+    <string name="google_signin_title">Sign in with Google</string>
+    <string name="google_signin_detail">Google only lets calendar apps in through its own sign-in, so there is no password to paste. Your browser opens, you say yes, and you come straight back.</string>
+    <string name="google_signin_steps">In the browser</string>
+    <string name="google_signin_step_one">Pick your Google account</string>
+    <string name="google_signin_step_two">If Google shows a box for your calendar, tick it. It starts empty.</string>
+    <string name="google_signin_step_three">Continue, and you land back here</string>
+    <string name="google_signin_note">The hub keeps the sign-in, not this phone, so agents can check your calendar even when your phone is off. No password is ever typed here.</string>
+    <string name="google_signin_button">Sign in with Google</string>
+    <string name="google_signin_again">Sign in again</string>
+    <string name="google_signin_waiting">Finish signing in in your browser…</string>
+    <string name="a11y_google_signin_waiting">Waiting for the Google sign-in to finish</string>
+    <string name="google_signin_denied">Google didn’t share your calendar</string>
+    <string name="google_signin_denied_detail">The sign-in finished without calendar access, so nothing was saved. Sign in again and tick the calendar box when Google asks.</string>
+    <string name="google_signin_expired">That sign-in took too long</string>
+    <string name="google_signin_expired_detail">Start it again. Nothing was saved.</string>
+    <string name="google_signin_rejected">Google refused the sign-in</string>
+    <string name="google_signin_rejected_detail">Try again. Nothing was saved.</string>
+    <string name="google_signin_unreachable">The hub couldn’t reach Google</string>
+    <string name="google_signin_unreachable_detail">Nothing was saved. Try again in a moment.</string>
+    <string name="google_signin_failed">The sign-in didn’t finish</string>
+    <string name="google_signin_failed_detail">Nothing was saved. Try again.</string>
+    <string name="google_signin_unavailable">This hub isn’t set up for Google yet</string>
+    <string name="google_signin_unavailable_detail">Whoever runs the hub has to add a Google sign-in to it first. Apple and other calendars still work.</string>
+    <string name="profile_calendar_sign_in_needed">Google stopped accepting the sign-in</string>
+    <string name="profile_calendar_sign_in_needed_detail">Agents can’t read or add to it until you sign in again. Your events are untouched.</string>
+    <string name="profile_calendar_sign_in_again">Sign in again</string>
 
     <!-- Slice 2 · members -->
     <string name="members_back">Back to your profile</string>

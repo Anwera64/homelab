@@ -29,5 +29,6 @@ object CalendarDataMapper {
             server = dto.url,
             calendarName = dto.calendarName,
             connectedAt = dto.updatedAt,
+            needsReconnect = dto.needsReconnect,
         )
 }

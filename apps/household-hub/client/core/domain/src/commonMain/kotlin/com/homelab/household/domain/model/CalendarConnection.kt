@@ -11,4 +11,6 @@ data class CalendarConnection(
     val server: String,
     val calendarName: String,
     val connectedAt: String? = null,
+    /** Google stopped accepting the sign-in, so agents can't use the calendar until the member signs in again. */
+    val needsReconnect: Boolean = false,
 )

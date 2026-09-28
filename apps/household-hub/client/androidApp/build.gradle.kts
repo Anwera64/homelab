@@ -35,6 +35,7 @@ dependencies {
     implementation(project(":composeApp"))
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)

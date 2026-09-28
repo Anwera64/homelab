@@ -73,7 +73,21 @@ class FakeExternalApps : ExternalApps {
     var tailscaleOpened = 0
         private set
 
+    /** Where the browser comes back to after a sign-in; null is the member closing it first. */
+    var browserReturnsTo: String? = null
+
+    private val pages = mutableListOf<String>()
+    val pagesOpened: List<String> get() = pages.toList()
+
     override fun openTailscale() {
         tailscaleOpened++
+    }
+
+    override suspend fun signInInBrowser(
+        page: String,
+        callbackScheme: String,
+    ): String? {
+        pages += page
+        return browserReturnsTo
     }
 }

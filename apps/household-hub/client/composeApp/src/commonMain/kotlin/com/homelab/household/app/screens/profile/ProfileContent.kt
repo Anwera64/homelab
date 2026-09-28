@@ -32,6 +32,7 @@ import com.homelab.household.app.components.HearthChip
 import com.homelab.household.app.components.HearthScaffold
 import com.homelab.household.app.components.HearthTopBar
 import com.homelab.household.app.components.MemberAvatar
+import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.SettingsRow
 import com.homelab.household.app.components.SkeletonBlock
 import com.homelab.household.app.components.SkeletonCircle
@@ -52,6 +53,9 @@ import com.homelab.household.app.resources.profile_calendar_connect
 import com.homelab.household.app.resources.profile_calendar_connect_caption
 import com.homelab.household.app.resources.profile_calendar_note
 import com.homelab.household.app.resources.profile_calendar_options
+import com.homelab.household.app.resources.profile_calendar_sign_in_again
+import com.homelab.household.app.resources.profile_calendar_sign_in_needed
+import com.homelab.household.app.resources.profile_calendar_sign_in_needed_detail
 import com.homelab.household.app.resources.profile_change_pin
 import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
@@ -88,6 +92,7 @@ fun ProfileContent(
     onCalendar: () -> Unit,
     modifier: Modifier = Modifier,
     onDisconnectCalendar: () -> Unit = {},
+    onCalendarSignInAgain: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -152,6 +157,7 @@ fun ProfileContent(
                 row = calendar,
                 onCalendar = onCalendar,
                 onCalendarOptions = { sheet = CalendarSheetStep.Options },
+                onSignInAgain = onCalendarSignInAgain,
             )
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -224,6 +230,7 @@ private fun CalendarSection(
     row: CalendarRow,
     onCalendar: () -> Unit,
     onCalendarOptions: () -> Unit,
+    onSignInAgain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
@@ -238,7 +245,7 @@ private fun CalendarSection(
         )
         when (row) {
             is CalendarRow.Connected -> {
-                ConnectedCalendar(row = row, onOptions = onCalendarOptions)
+                ConnectedCalendar(row = row, onOptions = onCalendarOptions, onSignInAgain = onSignInAgain)
                 Text(
                     stringResource(Res.string.profile_calendar_note),
                     modifier = Modifier.padding(start = HearthTheme.spacing.xs),
@@ -279,6 +286,7 @@ private fun CalendarSection(
 private fun ConnectedCalendar(
     row: CalendarRow.Connected,
     onOptions: () -> Unit,
+    onSignInAgain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
@@ -293,36 +301,74 @@ private fun ConnectedCalendar(
         color = colors.surface,
         contentColor = colors.textPrimary,
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(HearthTheme.spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         ) {
-            Box(
-                modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
-                contentAlignment = Alignment.Center,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                CalendarProviderMark(provider = row.provider)
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-            ) {
-                Text(providerName(row.provider), style = type.bodyStrong, color = colors.textPrimary)
-                Text(row.account, style = type.monoSm, color = colors.textMuted, maxLines = 1)
-                row.minutesAgo?.let { minutes ->
-                    Text(checkedAgo(minutes), style = type.caption, color = colors.textMuted)
+                Box(
+                    modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CalendarProviderMark(provider = row.provider)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(providerName(row.provider), style = type.bodyStrong, color = colors.textPrimary)
+                        if (row.needsSignInAgain) {
+                            HearthIconImage(
+                                icon = HearthIcon.Error,
+                                contentDescription = null,
+                                size = HearthTheme.size.iconSm,
+                                tint = colors.error,
+                            )
+                        }
+                    }
+                    Text(row.account, style = type.monoSm, color = colors.textMuted, maxLines = 1)
+                    if (row.needsSignInAgain) {
+                        Text(
+                            stringResource(Res.string.profile_calendar_sign_in_needed),
+                            style = type.caption,
+                            color = colors.error,
+                        )
+                    } else {
+                        row.minutesAgo?.let { minutes ->
+                            Text(checkedAgo(minutes), style = type.caption, color = colors.textMuted)
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = onOptions,
+                    modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
+                ) {
+                    HearthIconImage(
+                        icon = HearthIcon.More,
+                        contentDescription = stringResource(Res.string.profile_calendar_options),
+                        size = HearthTheme.size.iconMd,
+                        tint = colors.textMuted,
+                    )
                 }
             }
-            IconButton(
-                onClick = onOptions,
-                modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
-            ) {
-                HearthIconImage(
-                    icon = HearthIcon.More,
-                    contentDescription = stringResource(Res.string.profile_calendar_options),
-                    size = HearthTheme.size.iconMd,
-                    tint = colors.textMuted,
+            // Google let go of the sign-in: the events are still there, so the row stays and asks for a new one.
+            if (row.needsSignInAgain) {
+                Text(
+                    stringResource(Res.string.profile_calendar_sign_in_needed_detail),
+                    style = type.caption,
+                    color = colors.textMuted,
+                )
+                SecondaryButton(
+                    text = stringResource(Res.string.profile_calendar_sign_in_again),
+                    onClick = onSignInAgain,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

@@ -22,6 +22,8 @@ import com.homelab.household.app.resources.calendar_sheet_change
 import com.homelab.household.app.resources.calendar_sheet_disconnect
 import com.homelab.household.app.resources.profile_calendar_connect
 import com.homelab.household.app.resources.profile_calendar_options
+import com.homelab.household.app.resources.profile_calendar_sign_in_again
+import com.homelab.household.app.resources.profile_calendar_sign_in_needed
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
@@ -58,6 +60,7 @@ class ProfileScreenTest {
                         onLeave = {},
                         onSignOut = {},
                         onCalendar = {},
+                        onCalendarSignInAgain = {},
                     )
                 }
             }
@@ -85,6 +88,7 @@ class ProfileScreenTest {
                         onLeave = {},
                         onSignedOut = {},
                         onCalendar = {},
+                        onCalendarSignInAgain = {},
                     )
                 }
             }
@@ -109,6 +113,7 @@ class ProfileScreenTest {
                         onLeave = {},
                         onSignedOut = {},
                         onCalendar = {},
+                        onCalendarSignInAgain = {},
                     )
                 }
             }
@@ -135,6 +140,7 @@ class ProfileScreenTest {
                         onLeave = {},
                         onSignedOut = { signedOut++ },
                         onCalendar = {},
+                        onCalendarSignInAgain = {},
                     )
                 }
             }
@@ -164,6 +170,7 @@ class ProfileScreenTest {
                             onLeave = {},
                             onSignOut = {},
                             onCalendar = {},
+                            onCalendarSignInAgain = {},
                         )
                     }
                 }
@@ -293,9 +300,32 @@ class ProfileScreenTest {
         }
     }
 
+    @Test
+    fun `GIVEN Google stopped accepting the sign-in WHEN the profile is shown THEN the calendar asks to sign in again`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { hasAGoogleCalendarNeedingSignInAgain() }
+        var signInAgain = 0
+
+        runScreenTest {
+            showProfile(hub, onCalendarSignInAgain = { signInAgain++ })
+            waitUntilExactlyOneExists(
+                hasText(getString(Res.string.profile_calendar_sign_in_needed)),
+                timeoutMillis = wait,
+            )
+
+            // WHEN
+            onNodeWithText(getString(Res.string.profile_calendar_sign_in_again)).performClick()
+
+            // THEN
+            waitUntil(timeoutMillis = wait) { signInAgain == 1 }
+            onNodeWithText("emma@gmail.com").assertIsDisplayed()
+        }
+    }
+
     private fun ComposeUiTest.showProfile(
         hub: FakeMembersHub,
         onCalendar: () -> Unit = {},
+        onCalendarSignInAgain: () -> Unit = {},
     ) {
         setContent {
             TestApp(hub.engine, sessionStorage = signedIn()) {
@@ -306,6 +336,7 @@ class ProfileScreenTest {
                     onLeave = {},
                     onSignedOut = {},
                     onCalendar = onCalendar,
+                    onCalendarSignInAgain = onCalendarSignInAgain,
                 )
             }
         }
@@ -332,6 +363,7 @@ class ProfileScreenTest {
                         onLeave = {},
                         onSignedOut = {},
                         onCalendar = { calendar++ },
+                        onCalendarSignInAgain = {},
                     )
                 }
             }

@@ -195,10 +195,12 @@ class StubScreens : AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onCalendarSignInAgain: () -> Unit,
     ) {
         Column {
             Text(PROFILE)
             Text(GO_TO_CALENDAR, modifier = Modifier.clickable { onCalendar() })
+            Text(SIGN_IN_TO_GOOGLE_AGAIN, modifier = Modifier.clickable { onCalendarSignInAgain() })
             Text(GO_TO_MEMBERS, modifier = Modifier.clickable { onMembers() })
             Text(GO_TO_CHANGE_PIN, modifier = Modifier.clickable { onChangePin() })
             Text(GO_TO_LEAVE, modifier = Modifier.clickable { onLeave() })
@@ -287,6 +289,7 @@ class StubScreens : AppScreens {
         Column {
             Text(CALENDAR_PICKER)
             Text(PICK_APPLE, modifier = Modifier.clickable { onPick(CalendarProvider.APPLE) })
+            Text(PICK_GOOGLE, modifier = Modifier.clickable { onPick(CalendarProvider.GOOGLE) })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -299,6 +302,18 @@ class StubScreens : AppScreens {
     ) {
         Column {
             Text(calendarConnectOf(provider))
+            Text(CALENDAR_CONNECTED, modifier = Modifier.clickable { onConnect() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun GoogleCalendarSignIn(
+        onBack: () -> Unit,
+        onConnect: () -> Unit,
+    ) {
+        Column {
+            Text(GOOGLE_SIGN_IN)
             Text(CALENDAR_CONNECTED, modifier = Modifier.clickable { onConnect() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
@@ -328,6 +343,9 @@ class StubScreens : AppScreens {
         const val CALENDAR_PICKER = "calendar picker screen"
         const val GO_TO_CALENDAR = "go to calendar"
         const val PICK_APPLE = "pick apple"
+        const val PICK_GOOGLE = "pick google"
+        const val GOOGLE_SIGN_IN = "google sign in screen"
+        const val SIGN_IN_TO_GOOGLE_AGAIN = "sign in to google again"
         const val CALENDAR_CONNECTED = "calendar connected"
 
         fun calendarConnectOf(provider: CalendarProvider) = "calendar connect screen for $provider"
