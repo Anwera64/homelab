@@ -8,7 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.homelab.household.app.components.ActionCard
 import com.homelab.household.app.components.CardButtonRow
 import com.homelab.household.app.components.PrimaryButton
@@ -43,7 +42,7 @@ fun ToolFixCard(
                 contentDescription = null,
                 size = HearthTheme.size.iconSm,
                 tint = colors.error,
-                modifier = Modifier.padding(top = ICON_NUDGE),
+                modifier = Modifier.padding(top = HearthTheme.spacing.xxs),
             )
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
                 Text(text = stringResource(fix.title), style = type.bodyStrong, color = colors.textPrimary)
@@ -60,5 +59,3 @@ fun ToolFixCard(
         }
     }
 }
-
-private val ICON_NUDGE = 2.dp
