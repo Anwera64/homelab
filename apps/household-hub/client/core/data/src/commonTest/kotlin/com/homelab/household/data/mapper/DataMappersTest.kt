@@ -296,6 +296,22 @@ class DataMappersTest {
     }
 
     @Test
+    fun `GIVEN a calendar step the hub marked fixed WHEN mapped THEN the part says it was fixed`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": false,
+                    "summary": {"action": "create", "reason": "calendar_rejected", "fixed": true}}]""",
+            )
+
+        val expected =
+            AnswerPart.ToolFailed(
+                "calendar_write",
+                ToolSummary(action = ToolAction.Create, reason = ToolFailureReason.CalendarRejected, fixed = true),
+            )
+        assertEquals(listOf(expected), parts)
+    }
+
+    @Test
     fun `GIVEN a reason this phone does not know WHEN mapped THEN it is unknown`() {
         val parts =
             partsOf(

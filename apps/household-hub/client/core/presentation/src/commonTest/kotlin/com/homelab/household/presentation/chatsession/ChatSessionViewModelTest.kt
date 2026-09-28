@@ -1415,6 +1415,32 @@ class ChatSessionViewModelTest {
             verifySuspend(VerifyMode.exactly(1)) { getSessionUseCase("s-1") }
         }
 
+    /** A calendar connected from this chat: its fix cards are redrawn from what the hub now says. */
+    @Test
+    fun `GIVEN an opened chat WHEN it is refreshed THEN it is fetched again`() =
+        runTest(testDispatcher) {
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+            viewModel.open("s-1")
+            advanceUntilIdle()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(2)) { getSessionUseCase("s-1") }
+        }
+
+    @Test
+    fun `GIVEN a new chat nobody has spoken in WHEN it is refreshed THEN nothing is fetched`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(0)) { getSessionUseCase(any()) }
+        }
+
     @Test
     fun `GIVEN a picked agent WHEN the first message is sent THEN the chat is created with that agent`() =
         runTest(testDispatcher) {

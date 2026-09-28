@@ -10,6 +10,8 @@ import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDe
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.runtime.result.LocalResultEventBus
+import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.homelab.household.app.components.HearthBottomNav
 import com.homelab.household.app.components.NavTab
@@ -48,6 +50,8 @@ fun AppNavHost(
             listOf(
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
+                // How a flow answers the screen that opened it: a calendar connected from a chat.
+                rememberResultEventBusNavEntryDecorator(),
             ),
         entryProvider =
             entryProvider {
@@ -206,17 +210,26 @@ fun AppNavHost(
                     )
                 }
                 entry<Destination.CalendarConnect> { destination ->
+                    val results = LocalResultEventBus.current
                     screens.CalendarConnect(
                         provider = destination.provider,
                         onBack = { backStack.removeLastOrNull() },
-                        // Connected: back past the picker, to wherever the calendar was asked for.
-                        onConnect = { backStack.backPastCalendarScreens() },
+                        // Connected: back past the picker, to wherever the calendar was asked for,
+                        // telling it so a chat's fix cards can show the fix.
+                        onConnect = {
+                            results.sendResult(result = CalendarConnected)
+                            backStack.backPastCalendarScreens()
+                        },
                     )
                 }
                 entry<Destination.GoogleCalendarSignIn> {
+                    val results = LocalResultEventBus.current
                     screens.GoogleCalendarSignIn(
                         onBack = { backStack.removeLastOrNull() },
-                        onConnect = { backStack.backPastCalendarScreens() },
+                        onConnect = {
+                            results.sendResult(result = CalendarConnected)
+                            backStack.backPastCalendarScreens()
+                        },
                     )
                 }
             },

@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.result.ResultEffect
+import com.homelab.household.app.navigation.CalendarConnected
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.profile.ProfileViewModel
 import org.koin.compose.viewmodel.koinViewModel
@@ -33,6 +35,8 @@ fun ConversationScreen(
     val profile by profileViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(sessionId) { viewModel.open(sessionId) }
+    // Back from connecting a calendar from a fix card: the hub has marked those steps fixed.
+    ResultEffect<CalendarConnected> { viewModel.refresh() }
     LifecycleResumeEffect(viewModel) {
         viewModel.onForeground()
         onPauseOrDispose {}

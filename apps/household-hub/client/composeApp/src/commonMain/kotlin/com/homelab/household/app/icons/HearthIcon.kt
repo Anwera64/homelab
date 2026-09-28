@@ -101,6 +101,16 @@ enum class HearthIcon(
             "M14.8 17.6h6",
         ),
     ),
+
+    // The fix card's calendar with a check, once a calendar is connected (Tools page: ToolFixedCard).
+    CalendarFixed(
+        "calendarFixed",
+        strokes(
+            "M19.4 11.6V8.6a2.8 2.8 0 0 0-2.8-2.8H5.8A2.8 2.8 0 0 0 3 8.6v9.2a2.8 2.8 0 0 0 2.8 2.8h6",
+            "M8.2 3.4v4.4M15 3.4v4.4M3 11.4h16.4",
+            "M14.6 17.8l2 2 3.8-4",
+        ),
+    ),
     Search("search", strokes(circle(10.8, 10.8, 6.4), "M15.6 15.6l4.8 4.8")),
     Document(
         "document",

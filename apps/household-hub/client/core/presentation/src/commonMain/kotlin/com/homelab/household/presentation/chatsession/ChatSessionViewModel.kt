@@ -100,6 +100,16 @@ class ChatSessionViewModel(
         }
     }
 
+    /**
+     * Fetches the open conversation again, once, when something outside it changed what the hub
+     * saved: a calendar connected from a fix card, which the hub marks on the failed steps. A new
+     * chat nobody has spoken in has nothing on the hub to fetch.
+     */
+    fun refresh() {
+        val session = _uiState.value.session ?: return
+        loadSession(session.id)
+    }
+
     private fun startNewChat() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }

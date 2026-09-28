@@ -409,6 +409,45 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                 ),
+            // Canvas: ToolFixedCard. A calendar connected since the step failed, and this is still
+            // the latest answer, so its question can be asked again from the card.
+            "A fixed tool, the latest answer" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Canvas: ToolFixedLater. The same, once a newer message has been sent: no Ask again.
+            "A fixed tool, a newer message after it" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                            said("m-3", "What else is on Friday?", MessageRole.USER),
+                            said("m-4", "Just the dentist at 10:00.", MessageRole.ASSISTANT),
+                        ),
+                ),
             // Send was pressed while a card waits: the words stay, and the line says why.
             "Waiting on a card, Send held" to
                 agent.copy(

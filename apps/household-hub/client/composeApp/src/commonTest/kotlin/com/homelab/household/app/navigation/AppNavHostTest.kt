@@ -142,6 +142,42 @@ class AppNavHostTest {
         }
 
     @Test
+    fun `GIVEN a conversation that opened the connect flow WHEN a calendar connects THEN the conversation hears it once`() =
+        runComposeUiTest {
+            // GIVEN
+            val screens = StubScreens()
+            backStack[0] = Destination.Conversation("s-1")
+            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+
+            // WHEN
+            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
+            onNodeWithText(StubScreens.PICK_APPLE).performClick()
+            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+            waitForIdle()
+
+            // THEN
+            onNodeWithText(StubScreens.conversationOf("s-1")).assertIsDisplayed()
+            assertEquals(1, screens.calendarsConnected)
+        }
+
+    @Test
+    fun `GIVEN a conversation that opened the connect flow WHEN it is left with Back THEN the conversation hears nothing`() =
+        runComposeUiTest {
+            // GIVEN
+            val screens = StubScreens()
+            backStack[0] = Destination.Conversation("s-1")
+            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+
+            // WHEN
+            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
+            onNodeWithText(StubScreens.BACK).performClick()
+            waitForIdle()
+
+            // THEN
+            assertEquals(0, screens.calendarsConnected)
+        }
+
+    @Test
     fun `GIVEN a PIN pad closed with Back WHEN it is opened again THEN it has a new ViewModel`() =
         runComposeUiTest {
             // GIVEN

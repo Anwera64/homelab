@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.result.ResultEffect
 import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
@@ -21,6 +22,10 @@ import com.homelab.household.domain.model.Member
 class StubScreens : AppScreens {
     /** Every ViewModel a destination was given, in order; the same one twice is listed once. */
     val viewModels = mutableListOf<ScreenViewModel>()
+
+    /** How many times a conversation heard that a calendar was connected from it. */
+    var calendarsConnected = 0
+        private set
 
     class ScreenViewModel : ViewModel() {
         var cleared = false
@@ -206,6 +211,8 @@ class StubScreens : AppScreens {
         onConnectCalendar: () -> Unit,
     ) {
         TakeViewModel()
+        // Listens as the real screen does, so a test sees what the connect flow sends back.
+        ResultEffect<CalendarConnected> { calendarsConnected++ }
         Column {
             Text(if (sessionId == null) NEW_CONVERSATION else conversationOf(sessionId))
             Text(RECONNECT_CALENDAR, modifier = Modifier.clickable { onConnectCalendar() })

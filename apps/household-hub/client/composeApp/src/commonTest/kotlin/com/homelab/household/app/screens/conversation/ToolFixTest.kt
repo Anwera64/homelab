@@ -1,6 +1,12 @@
 package com.homelab.household.app.screens.conversation
 
+import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_add
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_change
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_check
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_remove
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_title
 import com.homelab.household.app.resources.tool_fix_calendar_not_connected_detail
 import com.homelab.household.app.resources.tool_fix_calendar_not_connected_title
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
@@ -65,6 +71,38 @@ class ToolFixTest {
     }
 
     @Test
+    fun `GIVEN a calendar step fixed since it failed WHEN described THEN it says the calendar is connected and to ask again`() {
+        val fix = toolFix(failed("calendar_write", ToolAction.Create, ToolFailureReason.CalendarRejected, fixed = true))
+
+        assertEquals(true, fix?.fixed)
+        assertEquals(HearthIcon.CalendarFixed, fix?.icon)
+        assertEquals(Res.string.tool_fix_calendar_fixed_title, fix?.title)
+        assertEquals(Res.string.tool_fix_calendar_fixed_add, fix?.detail)
+        assertNull(fix?.outcome)
+        assertNull(fix?.action)
+    }
+
+    @Test
+    fun `GIVEN a fixed change or removal or read WHEN described THEN asking again says what it will do`() {
+        assertEquals(
+            Res.string.tool_fix_calendar_fixed_change,
+            toolFix(
+                failed("calendar_write", ToolAction.Update, ToolFailureReason.CalendarRejected, fixed = true),
+            )?.detail,
+        )
+        assertEquals(
+            Res.string.tool_fix_calendar_fixed_remove,
+            toolFix(
+                failed("calendar_write", ToolAction.Delete, ToolFailureReason.CalendarRejected, fixed = true),
+            )?.detail,
+        )
+        assertEquals(
+            Res.string.tool_fix_calendar_fixed_check,
+            toolFix(failed("calendar_read", null, ToolFailureReason.CalendarNotConnected, fixed = true))?.detail,
+        )
+    }
+
+    @Test
     fun `GIVEN a failure the member cannot fix from the phone WHEN described THEN there is no card`() {
         assertNull(toolFix(failed("searxng_search", null, ToolFailureReason.Throttled)))
         assertNull(toolFix(failed("calendar_read", null, ToolFailureReason.Unknown)))
@@ -75,5 +113,6 @@ class ToolFixTest {
         tool: String,
         action: ToolAction?,
         reason: ToolFailureReason,
-    ) = AnswerPart.ToolFailed(tool, ToolSummary(action = action, reason = reason))
+        fixed: Boolean = false,
+    ) = AnswerPart.ToolFailed(tool, ToolSummary(action = action, reason = reason, fixed = fixed))
 }

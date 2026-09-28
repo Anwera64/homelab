@@ -61,6 +61,8 @@ import com.homelab.household.app.resources.tool_calendar_remove_card
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_fix_ask_again
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_title
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_title
 import com.homelab.household.app.resources.tool_fix_nothing_added
@@ -796,6 +798,31 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.tool_fix_reconnect_calendar)).performClick()
 
             assertEquals(1, connects)
+        }
+
+    /** Canvas: ToolFixedCard. The retry icon asks the answer's question again, as a new message. */
+    @Test
+    fun `GIVEN a fixed step in the latest answer WHEN the card is drawn THEN it says the calendar is connected and Ask again sends the question`() =
+        runComposeUiTest {
+            val sent = mutableListOf<String>()
+            setContent(conversation(stateNamed("A fixed tool, the latest answer"), onSend = { sent += it }))
+
+            onNodeWithText(getString(Res.string.tool_fix_calendar_fixed_title)).assertIsDisplayed()
+            onAllNodesWithText(getString(Res.string.tool_fix_reconnect_calendar)).assertCountEquals(0)
+
+            onNodeWithContentDescription(getString(Res.string.tool_fix_ask_again)).performClick()
+
+            assertEquals(listOf("Put the print shop cutoff in my calendar"), sent)
+        }
+
+    /** Canvas: ToolFixedLater. */
+    @Test
+    fun `GIVEN a fixed step and a newer message after it WHEN the card is drawn THEN there is no Ask again`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A fixed tool, a newer message after it")))
+
+            onNodeWithText(getString(Res.string.tool_fix_calendar_fixed_title)).assertIsDisplayed()
+            onAllNodes(hasContentDescription(getString(Res.string.tool_fix_ask_again))).assertCountEquals(0)
         }
 
     @Test
