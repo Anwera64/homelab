@@ -76,6 +76,8 @@ class ChatSessionViewModel(
     /** The question the followed turn answers, so a resumed turn still marks it sent. */
     private var followingUserMessageId: String? = null
 
+    private var opened = false
+
     /**
      * Opens a conversation, or prepares one that does not exist yet.
      *
@@ -83,8 +85,14 @@ class ChatSessionViewModel(
      * created on the hub until the first message is sent, so a chat nobody spoke in is never left
      * behind. It starts with the built-in Coordinator; [selectAgent] can change that until the
      * first message, after which the session is bound to its agent for life.
+     *
+     * Only the first call opens anything. This ViewModel lives as long as its screen's place in
+     * the back stack, so a later call is the screen coming back from one it opened (connecting a
+     * calendar): starting over then would throw away a new chat mid-conversation.
      */
     fun open(sessionId: String?) {
+        if (opened) return
+        opened = true
         if (sessionId != null) {
             loadSession(sessionId)
         } else {
