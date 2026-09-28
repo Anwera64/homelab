@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
@@ -12,8 +14,28 @@ import com.homelab.household.domain.model.Member
 /**
  * Screens as black boxes: each destination says which one it is, and offers the ways out that
  * the real screen decides between.
+ *
+ * The PIN pad and the conversation each take a [ScreenViewModel], as their real screens take
+ * theirs, so a test can see which destination kept its ViewModel and which got a new one.
  */
 class StubScreens : AppScreens {
+    /** Every ViewModel a destination was given, in order; the same one twice is listed once. */
+    val viewModels = mutableListOf<ScreenViewModel>()
+
+    class ScreenViewModel : ViewModel() {
+        var cleared = false
+            private set
+
+        override fun onCleared() {
+            cleared = true
+        }
+    }
+
+    @Composable
+    private fun TakeViewModel(taken: ScreenViewModel = viewModel { ScreenViewModel() }) {
+        if (viewModels.none { it === taken }) viewModels += taken
+    }
+
     @Composable
     override fun Launch(
         onSignIn: () -> Unit,
@@ -45,6 +67,7 @@ class StubScreens : AppScreens {
         onBack: () -> Unit,
         onForget: () -> Unit,
     ) {
+        TakeViewModel()
         Column {
             Text(pinOf(member))
             Text(SIGNED_IN, modifier = Modifier.clickable { onSignedIn() })
@@ -182,6 +205,7 @@ class StubScreens : AppScreens {
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
     ) {
+        TakeViewModel()
         Column {
             Text(if (sessionId == null) NEW_CONVERSATION else conversationOf(sessionId))
             Text(RECONNECT_CALENDAR, modifier = Modifier.clickable { onConnectCalendar() })

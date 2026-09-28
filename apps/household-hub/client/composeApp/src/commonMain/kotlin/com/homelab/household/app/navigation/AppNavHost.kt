@@ -6,8 +6,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.homelab.household.app.components.HearthBottomNav
 import com.homelab.household.app.components.NavTab
@@ -39,223 +41,183 @@ fun AppNavHost(
         backStack = backStack,
         modifier = modifier,
         onBack = { backStack.removeLastOrNull() },
+        // Each destination keeps its ViewModels until it leaves the back stack, not while a screen
+        // covers it: a new chat is still there after connecting a calendar from it, and a PIN pad
+        // opened again after Back starts clean.
+        entryDecorators =
+            listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
         entryProvider =
             entryProvider {
                 entry<Destination.Launch> {
-                    WithEntryViewModels {
-                        screens.Launch(
-                            onSignIn = { backStack.startOver(Destination.SignIn) },
-                            onFirstRun = { backStack.startOver(Destination.FirstRun) },
-                        )
-                    }
+                    screens.Launch(
+                        onSignIn = { backStack.startOver(Destination.SignIn) },
+                        onFirstRun = { backStack.startOver(Destination.FirstRun) },
+                    )
                 }
                 entry<Destination.SignIn> {
-                    WithEntryViewModels {
-                        // The picker stays under the PIN pad, so back from a PIN returns to it.
-                        screens.SignIn(
-                            onSelectMember = { member -> backStack.add(Destination.Pin(member)) },
-                            onInviteCode = { backStack.add(Destination.InviteCode) },
-                        )
-                    }
+                    // The picker stays under the PIN pad, so back from a PIN returns to it.
+                    screens.SignIn(
+                        onSelectMember = { member -> backStack.add(Destination.Pin(member)) },
+                        onInviteCode = { backStack.add(Destination.InviteCode) },
+                    )
                 }
                 entry<Destination.Pin> { destination ->
-                    WithEntryViewModels {
-                        screens.Pin(
-                            member = destination.member,
-                            onSignedIn = { backStack.startOver(Destination.Home) },
-                            onBack = { backStack.removeLastOrNull() },
-                            onForget = { backStack.add(Destination.PinForgot(destination.member)) },
-                        )
-                    }
+                    screens.Pin(
+                        member = destination.member,
+                        onSignedIn = { backStack.startOver(Destination.Home) },
+                        onBack = { backStack.removeLastOrNull() },
+                        onForget = { backStack.add(Destination.PinForgot(destination.member)) },
+                    )
                 }
                 entry<Destination.FirstRun> {
-                    WithEntryViewModels {
-                        screens.FirstRun(
-                            onCreate = { backStack.startOver(Destination.Home) },
-                            onSignIn = { backStack.startOver(Destination.SignIn) },
-                        )
-                    }
+                    screens.FirstRun(
+                        onCreate = { backStack.startOver(Destination.Home) },
+                        onSignIn = { backStack.startOver(Destination.SignIn) },
+                    )
                 }
                 entry<Destination.InviteCode> {
-                    WithEntryViewModels {
-                        screens.InviteCode(
-                            onBack = { backStack.removeLastOrNull() },
-                            onInvite = { preview, code -> backStack.add(Destination.Join(preview, code)) },
-                        )
-                    }
+                    screens.InviteCode(
+                        onBack = { backStack.removeLastOrNull() },
+                        onInvite = { preview, code -> backStack.add(Destination.Join(preview, code)) },
+                    )
                 }
                 entry<Destination.Join> { destination ->
-                    WithEntryViewModels {
-                        screens.Join(
-                            preview = destination.preview,
-                            code = destination.code,
-                            onJoin = { backStack.startOver(Destination.Home) },
-                            // The code is spent or gone: back to typing one, not to the form.
-                            onExpire = { backStack.startOver(Destination.InviteCode) },
-                        )
-                    }
+                    screens.Join(
+                        preview = destination.preview,
+                        code = destination.code,
+                        onJoin = { backStack.startOver(Destination.Home) },
+                        // The code is spent or gone: back to typing one, not to the form.
+                        onExpire = { backStack.startOver(Destination.InviteCode) },
+                    )
                 }
                 entry<Destination.PinForgot> { destination ->
-                    WithEntryViewModels {
-                        screens.PinForgot(
-                            member = destination.member,
-                            onBack = { backStack.removeLastOrNull() },
-                            onHaveCode = { backStack.add(Destination.ResetCode) },
-                        )
-                    }
+                    screens.PinForgot(
+                        member = destination.member,
+                        onBack = { backStack.removeLastOrNull() },
+                        onHaveCode = { backStack.add(Destination.ResetCode) },
+                    )
                 }
                 entry<Destination.ResetCode> {
-                    WithEntryViewModels {
-                        screens.ResetCode(
-                            onBack = { backStack.removeLastOrNull() },
-                            onCode = { code -> backStack.add(Destination.NewPin(code)) },
-                        )
-                    }
+                    screens.ResetCode(
+                        onBack = { backStack.removeLastOrNull() },
+                        onCode = { code -> backStack.add(Destination.NewPin(code)) },
+                    )
                 }
                 entry<Destination.NewPin> { destination ->
-                    WithEntryViewModels {
-                        screens.NewPin(
-                            code = destination.code,
-                            onSignedIn = { backStack.startOver(Destination.Home) },
-                        )
-                    }
+                    screens.NewPin(
+                        code = destination.code,
+                        onSignedIn = { backStack.startOver(Destination.Home) },
+                    )
                 }
                 entry<Destination.Home> {
-                    WithEntryViewModels {
-                        screens.Home(
-                            onProfile = { backStack.add(Destination.Profile) },
-                            tabs = { backStack.Tabs(NavTab.Household) },
-                        )
-                    }
+                    screens.Home(
+                        onProfile = { backStack.add(Destination.Profile) },
+                        tabs = { backStack.Tabs(NavTab.Household) },
+                    )
                 }
                 entry<Destination.Schedule> {
-                    WithEntryViewModels {
-                        screens.Schedule(
-                            onProfile = { backStack.add(Destination.Profile) },
-                            tabs = { backStack.Tabs(NavTab.Schedule) },
-                        )
-                    }
+                    screens.Schedule(
+                        onProfile = { backStack.add(Destination.Profile) },
+                        tabs = { backStack.Tabs(NavTab.Schedule) },
+                    )
                 }
                 entry<Destination.Chats> {
-                    WithEntryViewModels {
-                        screens.Chats(
-                            onProfile = { backStack.add(Destination.Profile) },
-                            onOpen = { sessionId -> backStack.add(Destination.Conversation(sessionId)) },
-                            onNewChat = { backStack.add(Destination.Conversation()) },
-                            tabs = { backStack.Tabs(NavTab.Chats) },
-                        )
-                    }
+                    screens.Chats(
+                        onProfile = { backStack.add(Destination.Profile) },
+                        onOpen = { sessionId -> backStack.add(Destination.Conversation(sessionId)) },
+                        onNewChat = { backStack.add(Destination.Conversation()) },
+                        tabs = { backStack.Tabs(NavTab.Chats) },
+                    )
                 }
                 entry<Destination.MySpace> {
-                    WithEntryViewModels {
-                        screens.MySpace(
-                            onProfile = { backStack.add(Destination.Profile) },
-                            tabs = { backStack.Tabs(NavTab.MySpace) },
-                        )
-                    }
+                    screens.MySpace(
+                        onProfile = { backStack.add(Destination.Profile) },
+                        tabs = { backStack.Tabs(NavTab.MySpace) },
+                    )
                 }
                 entry<Destination.Conversation> { destination ->
-                    WithEntryViewModels {
-                        screens.Conversation(
-                            sessionId = destination.sessionId,
-                            onBack = { backStack.removeLastOrNull() },
-                            // A failed calendar step's fix: connecting lands back here, to ask again.
-                            onConnectCalendar = { backStack.add(Destination.CalendarPicker) },
-                        )
-                    }
+                    screens.Conversation(
+                        sessionId = destination.sessionId,
+                        onBack = { backStack.removeLastOrNull() },
+                        // A failed calendar step's fix: connecting lands back here, to ask again.
+                        onConnectCalendar = { backStack.add(Destination.CalendarPicker) },
+                    )
                 }
                 entry<Destination.Profile> {
-                    WithEntryViewModels {
-                        screens.Profile(
-                            onBack = { backStack.removeLastOrNull() },
-                            onMembers = { backStack.add(Destination.Members) },
-                            onChangePin = { backStack.add(Destination.ChangePin) },
-                            onLeave = { backStack.add(Destination.LeaveHousehold) },
-                            onSignedOut = { backStack.startOver(Destination.SignIn) },
-                            onCalendar = { backStack.add(Destination.CalendarPicker) },
-                            onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
-                        )
-                    }
+                    screens.Profile(
+                        onBack = { backStack.removeLastOrNull() },
+                        onMembers = { backStack.add(Destination.Members) },
+                        onChangePin = { backStack.add(Destination.ChangePin) },
+                        onLeave = { backStack.add(Destination.LeaveHousehold) },
+                        onSignedOut = { backStack.startOver(Destination.SignIn) },
+                        onCalendar = { backStack.add(Destination.CalendarPicker) },
+                        onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
+                    )
                 }
                 entry<Destination.Members> {
-                    WithEntryViewModels {
-                        screens.Members(
-                            onBack = { backStack.removeLastOrNull() },
-                            onInvite = { backStack.add(Destination.InviteCreate) },
-                            onResetPin = { member -> backStack.add(Destination.PinApprove(member)) },
-                            onRemove = { member -> backStack.add(Destination.RemoveMember(member)) },
-                        )
-                    }
+                    screens.Members(
+                        onBack = { backStack.removeLastOrNull() },
+                        onInvite = { backStack.add(Destination.InviteCreate) },
+                        onResetPin = { member -> backStack.add(Destination.PinApprove(member)) },
+                        onRemove = { member -> backStack.add(Destination.RemoveMember(member)) },
+                    )
                 }
                 entry<Destination.InviteCreate> {
-                    WithEntryViewModels {
-                        screens.InviteCreate(onBack = { backStack.removeLastOrNull() })
-                    }
+                    screens.InviteCreate(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.PinApprove> { destination ->
-                    WithEntryViewModels {
-                        screens.PinApprove(member = destination.member, onBack = { backStack.removeLastOrNull() })
-                    }
+                    screens.PinApprove(member = destination.member, onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.RemoveMember> { destination ->
-                    WithEntryViewModels {
-                        screens.RemoveMember(
-                            member = destination.member,
-                            onBack = { backStack.removeLastOrNull() },
-                            // They are gone: the list behind this screen would still show them.
-                            onRemove = { backStack.startOver(Destination.Members) },
-                        )
-                    }
+                    screens.RemoveMember(
+                        member = destination.member,
+                        onBack = { backStack.removeLastOrNull() },
+                        // They are gone: the list behind this screen would still show them.
+                        onRemove = { backStack.startOver(Destination.Members) },
+                    )
                 }
                 entry<Destination.LeaveHousehold> {
-                    WithEntryViewModels {
-                        screens.LeaveHousehold(
-                            onBack = { backStack.removeLastOrNull() },
-                            onLeft = { backStack.startOver(Destination.SignIn) },
-                        )
-                    }
+                    screens.LeaveHousehold(
+                        onBack = { backStack.removeLastOrNull() },
+                        onLeft = { backStack.startOver(Destination.SignIn) },
+                    )
                 }
                 entry<Destination.ChangePin> {
-                    WithEntryViewModels {
-                        screens.ChangePin(
-                            onBack = { backStack.removeLastOrNull() },
-                            onChange = { backStack.removeLastOrNull() },
-                        )
-                    }
+                    screens.ChangePin(
+                        onBack = { backStack.removeLastOrNull() },
+                        onChange = { backStack.removeLastOrNull() },
+                    )
                 }
                 entry<Destination.CalendarPicker> {
-                    WithEntryViewModels {
-                        screens.CalendarPicker(
-                            onBack = { backStack.removeLastOrNull() },
-                            onPick = { provider ->
-                                backStack.add(
-                                    if (provider.signsIn) {
-                                        Destination.GoogleCalendarSignIn
-                                    } else {
-                                        Destination.CalendarConnect(provider)
-                                    },
-                                )
-                            },
-                        )
-                    }
+                    screens.CalendarPicker(
+                        onBack = { backStack.removeLastOrNull() },
+                        onPick = { provider ->
+                            backStack.add(
+                                if (provider.signsIn) {
+                                    Destination.GoogleCalendarSignIn
+                                } else {
+                                    Destination.CalendarConnect(provider)
+                                },
+                            )
+                        },
+                    )
                 }
                 entry<Destination.CalendarConnect> { destination ->
-                    WithEntryViewModels {
-                        screens.CalendarConnect(
-                            provider = destination.provider,
-                            onBack = { backStack.removeLastOrNull() },
-                            // Connected: back past the picker, to wherever the calendar was asked for.
-                            onConnect = { backStack.backPastCalendarScreens() },
-                        )
-                    }
+                    screens.CalendarConnect(
+                        provider = destination.provider,
+                        onBack = { backStack.removeLastOrNull() },
+                        // Connected: back past the picker, to wherever the calendar was asked for.
+                        onConnect = { backStack.backPastCalendarScreens() },
+                    )
                 }
                 entry<Destination.GoogleCalendarSignIn> {
-                    WithEntryViewModels {
-                        screens.GoogleCalendarSignIn(
-                            onBack = { backStack.removeLastOrNull() },
-                            onConnect = { backStack.backPastCalendarScreens() },
-                        )
-                    }
+                    screens.GoogleCalendarSignIn(
+                        onBack = { backStack.removeLastOrNull() },
+                        onConnect = { backStack.backPastCalendarScreens() },
+                    )
                 }
             },
     )
@@ -263,7 +225,7 @@ fun AppNavHost(
 
 /**
  * Where the app starts, decided on the phone: home for a member still signed in here, launch for
- * everyone else. Waits for the hub on nothing — a token it no longer accepts signs the phone out
+ * everyone else. Waits for the hub on nothing â€” a token it no longer accepts signs the phone out
  * when the session is renewed, or on the next call. Hoisted so a test can watch where it goes.
  */
 @Composable
@@ -285,7 +247,7 @@ private fun SnapshotStateList<NavKey>.startOver(destination: Destination) {
  *
  * Each tab is a root rather than a push: moving between them replaces the stack, so Back from a
  * tab leaves the app instead of retracing the tabs you happened to visit. The raised + always
- * opens a conversation with no session — one is created on the first send.
+ * opens a conversation with no session â€” one is created on the first send.
  */
 @Composable
 private fun SnapshotStateList<NavKey>.Tabs(selected: NavTab) {

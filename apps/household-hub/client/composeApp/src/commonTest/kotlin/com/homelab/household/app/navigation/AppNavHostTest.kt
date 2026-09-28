@@ -12,6 +12,8 @@ import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.CalendarProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * The back stack is the navigation host's only state.
@@ -116,6 +118,48 @@ class AppNavHostTest {
 
             onNodeWithText(StubScreens.pinOf(StubScreens.EMMA)).assertIsDisplayed()
             assertEquals(listOf(Destination.SignIn, Destination.Pin(StubScreens.EMMA)), backStack.toList())
+        }
+
+    // ---- a destination's ViewModels ---------------------------------------
+
+    @Test
+    fun `GIVEN a conversation WHEN a screen is opened over it and closed THEN it still has the same ViewModel`() =
+        runComposeUiTest {
+            // GIVEN
+            val screens = StubScreens()
+            backStack[0] = Destination.Conversation()
+            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+
+            // WHEN
+            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
+            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
+            onNodeWithText(StubScreens.BACK).performClick()
+
+            // THEN
+            onNodeWithText(StubScreens.NEW_CONVERSATION).assertIsDisplayed()
+            val kept = screens.viewModels.single()
+            assertFalse(kept.cleared)
+        }
+
+    @Test
+    fun `GIVEN a PIN pad closed with Back WHEN it is opened again THEN it has a new ViewModel`() =
+        runComposeUiTest {
+            // GIVEN
+            val screens = StubScreens()
+            backStack[0] = Destination.SignIn
+            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+            onNodeWithText(StubScreens.PICK_EMMA).performClick()
+            onNodeWithText(StubScreens.BACK).performClick()
+            waitForIdle()
+
+            // WHEN
+            onNodeWithText(StubScreens.PICK_EMMA).performClick()
+            waitForIdle()
+
+            // THEN
+            assertEquals(2, screens.viewModels.size)
+            assertTrue(screens.viewModels.first().cleared)
+            assertFalse(screens.viewModels.last().cleared)
         }
 
     @Test
