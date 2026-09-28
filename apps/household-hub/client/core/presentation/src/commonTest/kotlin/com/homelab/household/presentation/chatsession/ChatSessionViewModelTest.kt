@@ -404,11 +404,17 @@ class ChatSessionViewModelTest {
             )
     }
 
+    /** The hub saves the setting. Stubbed, not autofilled: Kotlin/Native can't return a null list. */
+    private fun settingsSave() {
+        everySuspend { setToolApprovalUseCase(any(), any(), any()) } returns emptyList()
+    }
+
     @Test
     fun `GIVEN the box ticked WHEN the card is approved THEN adding events is made automatic before the turn carries on`() =
         runTest(testDispatcher) {
             openPaused(dinner)
             approvedTurn("c1")
+            settingsSave()
 
             viewModel.approveAutomatically("c1")
             advanceUntilIdle()
@@ -425,6 +431,7 @@ class ChatSessionViewModelTest {
         runTest(testDispatcher) {
             openPaused(dinner)
             approvedTurn("c1")
+            settingsSave()
             viewModel.approveAutomatically("c1")
             advanceUntilIdle()
 
@@ -468,8 +475,10 @@ class ChatSessionViewModelTest {
         runTest(testDispatcher) {
             openPaused(dinner)
             approvedTurn("c1")
+            settingsSave()
             viewModel.approveAutomatically("c1")
             advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.madeAutomatic)
             every { streamChatTurnUseCase("s-1", "Thanks", false, any()) } returns flow { awaitCancellation() }
 
             viewModel.sendMessage("Thanks")
