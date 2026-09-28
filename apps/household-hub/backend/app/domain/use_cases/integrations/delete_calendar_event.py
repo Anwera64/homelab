@@ -1,4 +1,4 @@
-from app.domain.exceptions import CalendarIntegrationException, ToolPermissionDeniedException
+from app.domain.exceptions import CalendarNotConnectedException, ToolPermissionDeniedException
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
@@ -25,7 +25,7 @@ class DeleteCalendarEventUseCase:
 
         credential = await self.credential_repo.get_by_user_id(user_id)
         if not credential or not credential.is_active:
-            raise CalendarIntegrationException("No calendar configured for user.")
+            raise CalendarNotConnectedException("No calendar configured for user.")
 
         secret = await self.secrets.resolve(credential)
         return await self.connector.delete_event(

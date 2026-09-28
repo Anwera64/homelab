@@ -659,3 +659,89 @@ async def test_execute_tool_permissions_and_secret_mode():
     )
     assert cal_res.success is False
     assert "No calendar configured" in cal_res.error
+
+
+# A calendar tool that fails says why, so the phone can offer the fix (slice 4, PR 7).
+class RefusingCalendarConnector(MockCalendarConnector):
+    """A calendar whose server now refuses the stored password or token."""
+
+    async def fetch_events(self, *args, **kwargs):
+        raise CalendarAuthException("CalDAV server refused the credentials")
+
+    async def create_event(self, *args, **kwargs):
+        raise CalendarAuthException("CalDAV server refused the credentials")
+
+
+def _execute_tool(cal_repo, cal_connector) -> ExecuteToolUseCase:
+    return ExecuteToolUseCase(
+        calendar_repo=cal_repo,
+        calendar_connector=cal_connector,
+        search_connector=MockSearchConnector(),
+        document_repo=MockDocumentRepository(),
+        document_reader=MockDocumentReader(),
+        cipher=MockSecretCipher(),
+        uow=MockUnitOfWork(),
+    )
+
+
+async def _connected_repo() -> MockCalendarCredentialRepository:
+    repo = MockCalendarCredentialRepository()
+    await repo.save(
+        CalendarCredential(
+            user_id="u1",
+            provider="apple_icloud",
+            url="https://caldav.icloud.com",
+            username="emma@icloud.com",
+            encrypted_secret="ENC:abcd-efgh-ijkl-mnop",
+            calendar_name="Default",
+        )
+    )
+    return repo
+
+
+READ_ARGUMENTS = {"start_time": "2026-09-08T00:00:00Z", "end_time": "2026-09-09T00:00:00Z"}
+ADD_ARGUMENTS = {
+    "action": "create",
+    "title": "Print shop cutoff",
+    "start_time": "2026-09-08T16:00:00Z",
+    "end_time": "2026-09-08T16:30:00Z",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool, arguments", [("calendar_read", READ_ARGUMENTS), ("calendar_write", ADD_ARGUMENTS)])
+async def test_GIVEN_the_calendar_refuses_the_sign_in_WHEN_a_calendar_tool_runs_THEN_it_fails_as_calendar_rejected(tool, arguments):
+    execute_uc = _execute_tool(await _connected_repo(), RefusingCalendarConnector())
+
+    result = await execute_uc.execute(tool_name=tool, arguments=arguments, user_id="u1", agent_tool_permissions=[tool])
+
+    assert result.success is False
+    assert result.reason == "calendar_rejected"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool, arguments", [("calendar_read", READ_ARGUMENTS), ("calendar_write", ADD_ARGUMENTS)])
+async def test_GIVEN_no_calendar_is_connected_WHEN_a_calendar_tool_runs_THEN_it_fails_as_calendar_not_connected(tool, arguments):
+    execute_uc = _execute_tool(MockCalendarCredentialRepository(), MockCalendarConnector())
+
+    result = await execute_uc.execute(tool_name=tool, arguments=arguments, user_id="u1", agent_tool_permissions=[tool])
+
+    assert result.success is False
+    assert result.reason == "calendar_not_connected"
+    assert "No calendar configured" in result.error
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_calendar_cannot_be_reached_WHEN_a_calendar_tool_runs_THEN_it_is_not_put_down_to_the_sign_in():
+    class UnreachableCalendarConnector(MockCalendarConnector):
+        async def fetch_events(self, *args, **kwargs):
+            raise CalendarUnreachableException("CalDAV server did not answer")
+
+    execute_uc = _execute_tool(await _connected_repo(), UnreachableCalendarConnector())
+
+    result = await execute_uc.execute(
+        tool_name="calendar_read", arguments=READ_ARGUMENTS, user_id="u1", agent_tool_permissions=["calendar_read"]
+    )
+
+    assert result.success is False
+    assert result.reason not in ("calendar_rejected", "calendar_not_connected")
