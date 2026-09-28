@@ -56,6 +56,10 @@ class SessionRepositoryImpl(ISessionRepository):
             raise EntityNotFoundException("Message not found")
         return self.mapper.to_domain_message(updated)
 
+    async def list_assistant_messages_mentioning(self, user_id: str, needles: List[str]) -> List[ChatMessage]:
+        models = await self.data_source.list_assistant_messages_mentioning(user_id, needles)
+        return [self.mapper.to_domain_message(m) for m in models]
+
     async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
         return await self.data_source.list_ids_by_agent_id(agent_id)
 

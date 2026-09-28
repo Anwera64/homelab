@@ -316,6 +316,53 @@ async def test_configure_calendar_auth_failure_raises():
     assert (await repo.get_by_user_id("u1")) is None
 
 
+class SpyMarkCalendarStepsFixed:
+    """Records whose steps were marked fixed, and whether that was before the calendar was committed."""
+
+    def __init__(self, uow: "MockUnitOfWork"):
+        self.uow = uow
+        self.calls: List[tuple] = []
+
+    async def execute(self, user_id: str) -> None:
+        self.calls.append((user_id, self.uow.committed))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_calendar_that_answers_WHEN_it_is_configured_THEN_the_members_failed_calendar_steps_are_marked_fixed_in_the_same_save():
+    uow = MockUnitOfWork()
+    mark_fixed = SpyMarkCalendarStepsFixed(uow)
+    use_case = ConfigureCalendarUseCase(
+        MockCalendarCredentialRepository(), MockCalendarConnector(), MockSecretCipher(), uow, mark_fixed=mark_fixed
+    )
+
+    await use_case.execute(
+        user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1@icloud.com", password="pw"
+    )
+
+    assert mark_fixed.calls == [("u1", False)]
+    assert uow.committed is True
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_calendar_that_refuses_WHEN_it_is_configured_THEN_nothing_is_marked_fixed():
+    uow = MockUnitOfWork()
+    mark_fixed = SpyMarkCalendarStepsFixed(uow)
+    use_case = ConfigureCalendarUseCase(
+        MockCalendarCredentialRepository(),
+        MockCalendarConnector(connection_error=CalendarAuthException("rejected")),
+        MockSecretCipher(),
+        uow,
+        mark_fixed=mark_fixed,
+    )
+
+    with pytest.raises(CalendarAuthException):
+        await use_case.execute(
+            user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1@icloud.com", password="pw"
+        )
+
+    assert mark_fixed.calls == []
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure",
