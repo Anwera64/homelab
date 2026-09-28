@@ -166,7 +166,8 @@ private fun reasonWords(
             Res.string.tool_reason_not_found
         }
 
-        ToolFailureReason.Unknown -> {
+        // The fix card under the step says these, with the button that fixes them.
+        ToolFailureReason.CalendarRejected, ToolFailureReason.CalendarNotConnected, ToolFailureReason.Unknown -> {
             null
         }
     }

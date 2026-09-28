@@ -553,6 +553,16 @@
     <string name="tool_card_untitled">An event</string>
     <string name="tool_card_approved">%1$s · approved</string>
     <string name="tool_card_hold">Answer the card above first</string>
+    <!-- Slice 4 · a tool that failed, and the fix (canvas: ToolFailed) -->
+    <string name="tool_fix_calendar_rejected_title">Your calendar isn’t connected</string>
+    <string name="tool_fix_calendar_rejected_detail">It stopped accepting the sign-in.</string>
+    <string name="tool_fix_calendar_not_connected_title">No calendar connected</string>
+    <string name="tool_fix_calendar_not_connected_detail">Connect one so agents can use it.</string>
+    <string name="tool_fix_nothing_added">Nothing was added.</string>
+    <string name="tool_fix_nothing_changed">Nothing was changed.</string>
+    <string name="tool_fix_nothing_removed">Nothing was removed.</string>
+    <string name="tool_fix_reconnect_calendar">Reconnect calendar</string>
+    <string name="tool_fix_connect_calendar">Connect calendar</string>
     <string name="tool_card_when">%1$s %2$d %3$s, %4$s</string>
     <string name="tool_card_when_all_day">%1$s %2$d %3$s · all day</string>
     <string name="tool_card_day_mon">Mon</string>

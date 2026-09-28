@@ -315,6 +315,24 @@ class AppNavHostTest {
         }
 
     @Test
+    fun `GIVEN a failed calendar step WHEN Reconnect calendar is tapped and a calendar connected THEN the conversation is back`() =
+        runComposeUiTest {
+            // GIVEN
+            backStack[0] = Destination.Conversation("s-1")
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+
+            // WHEN
+            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
+            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
+            onNodeWithText(StubScreens.PICK_APPLE).performClick()
+            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+
+            // THEN
+            onNodeWithText(StubScreens.conversationOf("s-1")).assertIsDisplayed()
+            assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
+        }
+
+    @Test
     fun back_from_a_calendar_s_details_returns_to_the_picker() =
         runComposeUiTest {
             backStack[0] = Destination.Profile

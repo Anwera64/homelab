@@ -273,6 +273,29 @@ class DataMappersTest {
     }
 
     @Test
+    fun `GIVEN a calendar step that failed on its sign-in or on having no calendar WHEN mapped THEN the part says which`() {
+        val reasons =
+            mapOf(
+                "calendar_rejected" to ToolFailureReason.CalendarRejected,
+                "calendar_not_connected" to ToolFailureReason.CalendarNotConnected,
+            )
+
+        reasons.forEach { (code, reason) ->
+            val parts =
+                partsOf(
+                    """[{"type": "tool", "tool": "calendar_write", "success": false,
+                        "summary": {"action": "create", "reason": "$code"}}]""",
+                )
+            val expected =
+                AnswerPart.ToolFailed(
+                    "calendar_write",
+                    ToolSummary(action = ToolAction.Create, reason = reason),
+                )
+            assertEquals(listOf(expected), parts, code)
+        }
+    }
+
+    @Test
     fun `GIVEN a reason this phone does not know WHEN mapped THEN it is unknown`() {
         val parts =
             partsOf(

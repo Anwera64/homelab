@@ -159,6 +159,8 @@ fun AppNavHost(
                         screens.Conversation(
                             sessionId = destination.sessionId,
                             onBack = { backStack.removeLastOrNull() },
+                            // A failed calendar step's fix: connecting lands back here, to ask again.
+                            onConnectCalendar = { backStack.add(Destination.CalendarPicker) },
                         )
                     }
                 }
@@ -242,8 +244,8 @@ fun AppNavHost(
                         screens.CalendarConnect(
                             provider = destination.provider,
                             onBack = { backStack.removeLastOrNull() },
-                            // Connected: back to the profile, past the picker, with the new row in it.
-                            onConnect = { backStack.backToProfile() },
+                            // Connected: back past the picker, to wherever the calendar was asked for.
+                            onConnect = { backStack.backPastCalendarScreens() },
                         )
                     }
                 }
@@ -251,7 +253,7 @@ fun AppNavHost(
                     WithEntryViewModels {
                         screens.GoogleCalendarSignIn(
                             onBack = { backStack.removeLastOrNull() },
-                            onConnect = { backStack.backToProfile() },
+                            onConnect = { backStack.backPastCalendarScreens() },
                         )
                     }
                 }
@@ -303,8 +305,11 @@ private fun SnapshotStateList<NavKey>.Tabs(selected: NavTab) {
     )
 }
 
-/** A calendar connected: back to the profile, past the picker, with the new row in it. */
-private fun MutableList<NavKey>.backToProfile() {
+/**
+ * A calendar connected: back past the picker to where it was asked for, the profile with the new
+ * row in it, or the conversation whose step needed it.
+ */
+private fun MutableList<NavKey>.backPastCalendarScreens() {
     removeAll {
         it == Destination.CalendarPicker ||
             it is Destination.CalendarConnect ||

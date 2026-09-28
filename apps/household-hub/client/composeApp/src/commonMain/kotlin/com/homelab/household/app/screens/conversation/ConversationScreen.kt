@@ -25,6 +25,7 @@ fun ConversationScreen(
     sessionId: String?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onConnectCalendar: () -> Unit = {},
 ) {
     val viewModel: ChatSessionViewModel = koinViewModel()
     val profileViewModel: ProfileViewModel = koinViewModel()
@@ -48,6 +49,7 @@ fun ConversationScreen(
         onSelectAgent = viewModel::selectAgent,
         onRetryAgents = viewModel::retryAgents,
         onDecide = { toolCallId, approved -> viewModel.decide(toolCallId, approved) },
+        onConnectCalendar = onConnectCalendar,
         modifier = modifier,
     )
 }

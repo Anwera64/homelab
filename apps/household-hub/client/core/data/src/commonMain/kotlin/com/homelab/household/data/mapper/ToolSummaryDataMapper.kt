@@ -59,6 +59,8 @@ object ToolSummaryDataMapper {
             "not_a_page" -> ToolFailureReason.NotAPage
             "unreadable" -> ToolFailureReason.Unreadable
             "not_found" -> ToolFailureReason.NotFound
+            "calendar_rejected" -> ToolFailureReason.CalendarRejected
+            "calendar_not_connected" -> ToolFailureReason.CalendarNotConnected
             else -> ToolFailureReason.Unknown
         }
 

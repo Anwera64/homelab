@@ -45,5 +45,11 @@ enum class ToolFailureReason {
     NotAPage,
     Unreadable,
     NotFound,
+
+    /** The calendar refused its password or sign-in: the member reconnects it from Profile. */
+    CalendarRejected,
+
+    /** The member has no calendar connected for a calendar tool to use. */
+    CalendarNotConnected,
     Unknown,
 }

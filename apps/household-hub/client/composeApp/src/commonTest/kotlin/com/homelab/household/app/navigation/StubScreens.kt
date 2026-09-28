@@ -180,9 +180,11 @@ class StubScreens : AppScreens {
     override fun Conversation(
         sessionId: String?,
         onBack: () -> Unit,
+        onConnectCalendar: () -> Unit,
     ) {
         Column {
             Text(if (sessionId == null) NEW_CONVERSATION else conversationOf(sessionId))
+            Text(RECONNECT_CALENDAR, modifier = Modifier.clickable { onConnectCalendar() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -347,6 +349,7 @@ class StubScreens : AppScreens {
         const val GOOGLE_SIGN_IN = "google sign in screen"
         const val SIGN_IN_TO_GOOGLE_AGAIN = "sign in to google again"
         const val CALENDAR_CONNECTED = "calendar connected"
+        const val RECONNECT_CALENDAR = "reconnect calendar"
 
         fun calendarConnectOf(provider: CalendarProvider) = "calendar connect screen for $provider"
 
