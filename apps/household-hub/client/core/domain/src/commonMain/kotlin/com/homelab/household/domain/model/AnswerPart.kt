@@ -29,4 +29,32 @@ sealed interface AnswerPart {
         val tool: String,
         val summary: ToolSummary? = null,
     ) : AnswerPart
+
+    /**
+     * A write the agent wants to make, waiting on the member: the approval card.
+     *
+     * [arguments] are what the model asked for, as the hub saved them: strings, numbers and
+     * booleans. Once every card of the step has an answer the turn carries on, and the hub turns
+     * each into a [ToolDone] or a [Declined] where it stood.
+     */
+    data class Proposal(
+        val toolCallId: String,
+        val tool: String,
+        val action: ToolAction?,
+        val arguments: Map<String, Any?> = emptyMap(),
+        val status: ProposalStatus = ProposalStatus.Pending,
+    ) : AnswerPart
+
+    /** A write the member said no to. [summary] names it, the way a done write is named. */
+    data class Declined(
+        val tool: String,
+        val summary: ToolSummary? = null,
+    ) : AnswerPart
+}
+
+/** Where a card stands. A decided card waits only for the rest of its step's cards. */
+enum class ProposalStatus {
+    Pending,
+    Approved,
+    Declined,
 }

@@ -87,6 +87,16 @@ class InvalidOperationException(DomainException):
     pass
 
 
+class ApprovalPendingException(InvalidOperationException):
+    """Raised for a new message while the chat's last answer waits on the member to answer a card."""
+    pass
+
+
+class AlreadyDecidedException(InvalidOperationException):
+    """Raised when a card the member already answered is answered again."""
+    pass
+
+
 # Integration Exceptions
 class CalendarIntegrationException(DomainException):
     """Base exception for calendar operations."""

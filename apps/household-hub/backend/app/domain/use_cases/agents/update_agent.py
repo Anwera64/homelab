@@ -3,13 +3,21 @@ from app.domain.entities.user import User
 from app.domain.entities.agent import AgentPersonality
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.chat.tool_approval import DropPendingProposalsUseCase
 from app.domain.exceptions import EntityNotFoundException, ZeroLeakViolationException, InvalidOperationException
 
 
 class UpdateAgentUseCase:
-    def __init__(self, agent_repo: IAgentRepository, uow: IUnitOfWork):
+    def __init__(
+        self,
+        agent_repo: IAgentRepository,
+        uow: IUnitOfWork,
+        drop_proposals: Optional[DropPendingProposalsUseCase] = None,
+    ):
         self.agent_repo = agent_repo
         self.uow = uow
+        # A suspended agent takes the cards its chats were waiting on with it.
+        self.drop_proposals = drop_proposals
 
     async def execute(
         self,
@@ -65,5 +73,8 @@ class UpdateAgentUseCase:
 
             updated = await self.agent_repo.update(agent)
             await self.uow.commit()
+
+        if is_active is False and self.drop_proposals is not None:
+            await self.drop_proposals.for_agent(agent.id)
 
         return updated

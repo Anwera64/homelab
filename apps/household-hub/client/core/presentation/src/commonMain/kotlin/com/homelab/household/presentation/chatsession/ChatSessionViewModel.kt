@@ -2,6 +2,7 @@ package com.homelab.household.presentation.chatsession
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.AnswerPart
@@ -10,9 +11,10 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolSummary
-import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
+import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
@@ -43,7 +45,7 @@ class ChatSessionViewModel(
     private val createSessionUseCase: CreateSessionUseCase,
     private val regenerateAnswerUseCase: RegenerateAnswerUseCase,
     private val resumeTurnUseCase: ResumeTurnUseCase,
-    private val approveToolProposalUseCase: ApproveToolProposalUseCase,
+    private val decideToolProposalUseCase: DecideToolProposalUseCase,
     private val toggleSecretModeUseCase: ToggleSecretModeUseCase,
     /** Finds the Coordinator by its slug when the whole list cannot be had. */
     private val getAgentUseCase: GetAgentUseCase,
@@ -188,6 +190,8 @@ class ChatSessionViewModel(
                         agentAvatar = agent?.avatar ?: session.agentAvatar.orEmpty(),
                         agentTagline = agent?.description.orEmpty(),
                         isSecretLocked = session.isSecretLocked,
+                        // A card left waiting is still waiting: the chat reopens on it.
+                        turnState = if (session.awaitingApproval) TurnState.AwaitingApproval else it.turnState,
                     )
                 }
                 pickUpUnansweredQuestion(session, messages)
@@ -211,6 +215,13 @@ class ChatSessionViewModel(
         autoApproveWrites: Boolean = false,
     ) {
         if (!_uiState.value.canSend) return
+
+        // A card is waiting, and the hub would refuse the message. Nothing is sent and nothing is
+        // declined on the member's behalf: the text stays where it is and the screen says why.
+        if (_uiState.value.turnState == TurnState.AwaitingApproval) {
+            _uiState.update { it.copy(holdingForCard = true, composerText = content) }
+            return
+        }
 
         val existing = _uiState.value.session
         if (existing == null) {
@@ -390,6 +401,14 @@ class ChatSessionViewModel(
                             _uiState.update { it.copy(turnState = TurnState.Failed) }
                             return@catch
                         }
+                        if (e is ApprovalPendingException) {
+                            // A card this phone had not seen yet, left by another: the message goes
+                            // back in the composer, held the same way, and the chat is read again
+                            // to show the card.
+                            holdUnsent(userMessageId)
+                            loadSession(sessionId)
+                            return@catch
+                        }
                         val failedStatus =
                             if (e is ServerOfflineException) {
                                 MessageStatus.FAILED_OFFLINE
@@ -468,7 +487,31 @@ class ChatSessionViewModel(
                             }
 
                             is ChatStreamEvent.ToolApprovalProposal -> {
-                                _uiState.update { it.copy(pendingToolProposal = event) }
+                                answer.proposal(event)
+                                _uiState.update { it.copy(isThinking = false, parts = answer.parts()) }
+                            }
+
+                            is ChatStreamEvent.ToolDeclined -> {
+                                answer.declined(event.tool, event.summary)
+                                _uiState.update { it.copy(parts = answer.parts()) }
+                            }
+
+                            // Paused on its cards: the answer so far is saved, and put where a
+                            // finished one goes, with the cards in it.
+                            is ChatStreamEvent.AwaitingApproval -> {
+                                answer.stopThinking()
+                                val paused =
+                                    ChatMessage(
+                                        id = event.messageId,
+                                        sessionId = sessionId,
+                                        role = MessageRole.ASSISTANT,
+                                        content = event.assistantContent,
+                                        status = MessageStatus.SENT,
+                                        parts = event.parts.ifEmpty { answer.parts() },
+                                    )
+                                _uiState.update { state ->
+                                    state.endingTurn(userMessageId, paused).copy(turnState = TurnState.AwaitingApproval)
+                                }
                             }
 
                             is ChatStreamEvent.Done -> {
@@ -485,26 +528,7 @@ class ChatSessionViewModel(
                                         // none, and what was watched here is the next best thing.
                                         parts = event.parts.ifEmpty { answer.parts() },
                                     )
-                                _uiState.update { state ->
-                                    state.copy(
-                                        streamingMessage = null,
-                                        turnState = TurnState.Idle,
-                                        messages =
-                                            state.messages.map { msg ->
-                                                if (msg.id ==
-                                                    userMessageId
-                                                ) {
-                                                    msg.copy(status = MessageStatus.SENT)
-                                                } else {
-                                                    msg
-                                                }
-                                            } + assistantMsg,
-                                        isThinking = false,
-                                        activeTool = null,
-                                        activeToolAction = null,
-                                        parts = emptyList(),
-                                    )
-                                }
+                                _uiState.update { state -> state.endingTurn(userMessageId, assistantMsg) }
                             }
 
                             // The stream is gone but the hub has not finished; the words so far stay.
@@ -535,19 +559,59 @@ class ChatSessionViewModel(
             }
     }
 
-    fun approveTool(
+    /**
+     * The member's answer to one card.
+     *
+     * The paused answer leaves the transcript and becomes the answer being written again, with the
+     * card marked, so what follows - the write running, the model going on - lands after it exactly
+     * as a live turn would. While other cards of its step still wait the hub only records this one
+     * and the turn pauses again; after the last it carries on to its end, as the same message.
+     */
+    fun decide(
         toolCallId: String,
         approved: Boolean,
         modifiedArguments: Map<String, Any?>? = null,
     ) {
-        val currentSession = _uiState.value.session ?: return
-        viewModelScope.launch {
-            try {
-                approveToolProposalUseCase(currentSession.id, toolCallId, approved, modifiedArguments)
-                _uiState.update { it.copy(pendingToolProposal = null) }
-            } catch (e: Throwable) {
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to approve tool") }
+        val state = _uiState.value
+        val currentSession = state.session ?: return
+        if (state.turnState != TurnState.AwaitingApproval) return
+        val paused = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT } ?: return
+        if (state.pendingProposals.none { it.toolCallId == toolCallId }) return
+
+        val decided = if (approved) ProposalStatus.Approved else ProposalStatus.Declined
+        val parts =
+            paused.parts.map { part ->
+                if (part is AnswerPart.Proposal && part.toolCallId == toolCallId) part.copy(status = decided) else part
             }
+        _uiState.update {
+            it.startingTurn().copy(
+                messages = it.messages.filterNot { msg -> msg.id == paused.id },
+                streamingMessage = paused.content,
+                parts = parts,
+                holdingForCard = false,
+            )
+        }
+
+        follow(
+            turn = decideToolProposalUseCase(currentSession.id, toolCallId, approved, modifiedArguments),
+            sessionId = currentSession.id,
+            userMessageId = null,
+            resuming = true,
+        )
+    }
+
+    /** A message the hub would not take while a card waits: back in the composer, and held. */
+    private fun holdUnsent(userMessageId: String?) {
+        _uiState.update { state ->
+            val unsent = state.messages.firstOrNull { it.id == userMessageId }
+            state.copy(
+                messages = state.messages.filterNot { it.id == userMessageId },
+                composerText = unsent?.content ?: state.composerText,
+                streamingMessage = null,
+                turnState = TurnState.AwaitingApproval,
+                holdingForCard = true,
+                parts = emptyList(),
+            )
         }
     }
 
@@ -568,6 +632,26 @@ class ChatSessionViewModel(
         }
     }
 }
+
+/**
+ * A turn that has ended, in the transcript: its question marked sent, and its answer in place of
+ * an earlier copy of itself - an answer that paused on a card carries on as the same message.
+ */
+private fun ChatSessionUiState.endingTurn(
+    userMessageId: String?,
+    answer: ChatMessage,
+) = copy(
+    streamingMessage = null,
+    turnState = TurnState.Idle,
+    messages =
+        messages
+            .filterNot { it.id == answer.id }
+            .map { msg -> if (msg.id == userMessageId) msg.copy(status = MessageStatus.SENT) else msg } + answer,
+    isThinking = false,
+    activeTool = null,
+    activeToolAction = null,
+    parts = emptyList(),
+)
 
 /** A new turn: nothing is carried over from the last one's thinking, tools or failure. */
 private fun ChatSessionUiState.startingTurn() =
@@ -618,14 +702,40 @@ private class AnswerPartsBuilder(
         }
     }
 
+    /**
+     * A write that was approved runs where its card was, the way the hub saves it; any other tool
+     * is a new step at the end.
+     */
     fun tool(
         name: String,
         succeeded: Boolean,
         summary: ToolSummary? = null,
     ) {
         stopThinking()
-        parts += if (succeeded) AnswerPart.ToolDone(name, summary) else AnswerPart.ToolFailed(name, summary)
+        val step = if (succeeded) AnswerPart.ToolDone(name, summary) else AnswerPart.ToolFailed(name, summary)
+        val card = decidedCard(name, ProposalStatus.Approved)
+        if (card >= 0) parts[card] = step else parts += step
     }
+
+    fun proposal(event: ChatStreamEvent.ToolApprovalProposal) {
+        stopThinking()
+        parts += AnswerPart.Proposal(event.toolCallId, event.tool, event.action, event.arguments)
+    }
+
+    fun declined(
+        name: String,
+        summary: ToolSummary?,
+    ) {
+        val step = AnswerPart.Declined(name, summary)
+        val card = decidedCard(name, ProposalStatus.Declined)
+        if (card >= 0) parts[card] = step else parts += step
+    }
+
+    /** The first card of [tool] answered with [status] that has not become a step yet, or -1. */
+    private fun decidedCard(
+        tool: String,
+        status: ProposalStatus,
+    ): Int = parts.indexOfFirst { it is AnswerPart.Proposal && it.tool == tool && it.status == status }
 }
 
 /** Whole seconds, and never zero: a turn that thought at all thought for "1 s", not "0 s". */

@@ -17,7 +17,17 @@ from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContex
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
-from app.domain.use_cases.chat.tool_summary import summarize_tool
+from app.domain.use_cases.chat.tool_summary import describe_write, summarize_tool
+from app.domain.use_cases.chat.tool_approval import (
+    DECLINED,
+    PAUSED_TURN,
+    card_to_decide,
+    dump_messages,
+    load_messages,
+    needs_asking,
+    proposal_event,
+    proposal_part,
+)
 from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
@@ -53,10 +63,11 @@ class _AnswerParts:
     never what was thought.
     """
 
-    def __init__(self, clock: Callable[[], float]) -> None:
+    def __init__(self, clock: Callable[[], float], parts: Optional[List[Dict[str, Any]]] = None) -> None:
         self._clock = clock
         self._thinking_since: Optional[float] = None
-        self.parts: List[Dict[str, Any]] = []
+        # A paused answer carries on from the parts it saved.
+        self.parts: List[Dict[str, Any]] = list(parts or [])
 
     def thinking(self) -> None:
         if self._thinking_since is None:
@@ -69,13 +80,21 @@ class _AnswerParts:
         else:
             self.parts.append({"type": "text", "content": content})
 
-    def tool(self, name: str, success: bool, summary: Optional[Dict[str, Any]] = None) -> None:
-        """A tool used, with what it shows on the phone when it has anything to show (#40)."""
+    def tool(
+        self, name: str, success: bool, summary: Optional[Dict[str, Any]] = None, at: Optional[int] = None
+    ) -> None:
+        """
+        A tool used, with what it shows on the phone when it has anything to show (#40). [at] puts
+        an approved write where its card was, rather than after everything since.
+        """
         self.stop_thinking()
         part: Dict[str, Any] = {"type": "tool", "tool": name, "success": success}
         if summary is not None:
             part["summary"] = summary
-        self.parts.append(part)
+        if at is None:
+            self.parts.append(part)
+        else:
+            self.parts[at] = part
 
     def stop_thinking(self) -> None:
         """Ends a stretch of thinking: whole seconds, rounded half up, and never zero."""
@@ -93,7 +112,7 @@ class _AnswerParts:
         written = ""
         tool_since_text = False
         for part in self.parts:
-            if part["type"] == "tool":
+            if part["type"] in ("tool", "proposal", "declined"):
                 tool_since_text = True
             elif part["type"] == "text":
                 if written and tool_since_text:
@@ -539,9 +558,14 @@ class ProcessChatTurnUseCase:
         A turn refused before any of that — an archived conversation, an agent in the trash, a
         session that is not yours — raises out of `_open_turn` instead and never reaches here.
         """
-        session = kwargs["session"]
+        async for event in self._say_if_it_fails(kwargs["session"], self._stream_answer(**kwargs)):
+            yield event
+
+    @staticmethod
+    async def _say_if_it_fails(session, events):
+        """[events], ended by `turn_failed` rather than an exception if the answer dies part way."""
         try:
-            async for event in self._stream_answer(**kwargs):
+            async for event in events:
                 yield event
         except Exception as exc:
             logger.error(
@@ -627,6 +651,107 @@ class ProcessChatTurnUseCase:
         )
         return f"{instruction}\n\nThe question was: {question}" if question else instruction
 
+    async def decide_stream(
+        self,
+        session_id: str,
+        current_user: User,
+        tool_call_id: str,
+        approved: bool,
+        modified_arguments: Optional[Dict[str, Any]] = None,
+        timezone_name: Optional[str] = None,
+    ):
+        """
+        The member's answer to one card, and the rest of the turn once every card has one.
+
+        The turn paused with its proposals saved on the answer (see `_finish`). While any card is
+        still waiting this only records the decision and says the turn is still paused. After the
+        last one the approved writes run, the declined ones are told to the model, and the same
+        answer carries on from where it paused, streamed like any other turn.
+
+        Nothing about the paused turn was kept in memory, so a model that was unloaded or a hub that
+        restarted in between costs only a slower first word.
+        """
+        session, agent = await self._open_turn(session_id, current_user)
+
+        recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
+        card_to_decide(recent_messages, tool_call_id)
+        paused_answer = recent_messages[-1]
+
+        metadata = dict(paused_answer.metadata_json)
+        parts = [dict(part) for part in metadata.get("parts") or []]
+        for part in parts:
+            if part.get("type") == "proposal" and part.get("tool_call_id") == tool_call_id:
+                part["status"] = "approved" if approved else "declined"
+                if approved and modified_arguments:
+                    part["arguments"] = {**part["arguments"], **modified_arguments}
+
+        yield {"type": "accepted"}
+
+        if any(part.get("type") == "proposal" and part.get("status") == "pending" for part in parts):
+            # Several writes in one step: the turn carries on after the last decision, not this one.
+            async with self.uow:
+                paused_answer.metadata_json = {**metadata, "parts": parts}
+                await self.session_repo.update_message(paused_answer)
+                await self.uow.commit()
+            yield self._awaiting_event(
+                paused_answer,
+                agent,
+                is_turn_secret=bool(metadata.get("privacy_trigger_detected")) or session.is_secret,
+                suggest_secret_mode=bool(metadata.get("suggest_secret_mode")),
+            )
+            return
+
+        async def carry_on():
+            paused = metadata[PAUSED_TURN]
+            turn = await self._begin(
+                session=session,
+                agent=agent,
+                current_user=current_user,
+                recent_messages=recent_messages[:-1],
+                privacy_trigger_detected=bool(metadata.get("privacy_trigger_detected")),
+                auto_approve_writes=bool(paused.get("auto_approve_writes")),
+                timezone_name=timezone_name,
+                parts=parts,
+                tools_executed=metadata.get("tools_executed"),
+            )
+            turn.llm_messages.extend(load_messages(paused.get("messages") or []))
+            turn.first_round = int(paused.get("round") or 0) + 1
+            turn.out_of_room = bool(paused.get("out_of_room"))
+            turn.question = paused.get("question") or turn.question
+            turn.message = paused_answer
+
+            for index, part in enumerate(turn.answer.parts):
+                if part.get("type") != "proposal":
+                    continue
+                call = LLMToolCall(id=part["tool_call_id"], name=part["tool"], arguments=part["arguments"])
+                if part["status"] == "approved":
+                    async for event in self._run_call(turn, call, current_user.id, at=index):
+                        yield event
+                else:
+                    summary = describe_write(call.name, call.arguments)
+                    turn.answer.parts[index] = {"type": "declined", "tool": call.name, "summary": summary}
+                    yield {"type": "tool_declined", "tool": call.name, "summary": summary}
+                    turn.llm_messages.append(
+                        LLMMessage(
+                            role="tool",
+                            tool_call_id=call.id,
+                            name=call.name,
+                            content=json.dumps({"declined": DECLINED}),
+                        )
+                    )
+
+            # The writes have happened. Saved before the model is asked for the rest, so an answer
+            # that dies from here on can never run them a second time.
+            await self._save(turn, paused=False)
+
+            async for event in self._rounds(turn, current_user):
+                yield event
+            async for event in self._finish(turn):
+                yield event
+
+        async for event in self._say_if_it_fails(session, carry_on()):
+            yield event
+
     async def _stream_answer(
         self,
         session,
@@ -638,9 +763,35 @@ class ProcessChatTurnUseCase:
         timezone_name: Optional[str] = None,
     ):
         """Generate and persist the answer. Everything a turn does once the question is settled."""
+        turn = await self._begin(
+            session=session,
+            agent=agent,
+            current_user=current_user,
+            recent_messages=recent_messages,
+            privacy_trigger_detected=privacy_trigger_detected,
+            auto_approve_writes=auto_approve_writes,
+            timezone_name=timezone_name,
+        )
+        async for event in self._rounds(turn, current_user):
+            yield event
+        async for event in self._finish(turn):
+            yield event
+
+    async def _begin(
+        self,
+        session,
+        agent,
+        current_user: User,
+        recent_messages,
+        privacy_trigger_detected: bool,
+        auto_approve_writes: bool,
+        timezone_name: Optional[str],
+        parts: Optional[List[Dict[str, Any]]] = None,
+        tools_executed: Optional[List[Dict[str, Any]]] = None,
+    ) -> "_Turn":
+        """A turn ready for its first round: the model, its context, the tools it may use."""
         model = await self.model_resolver.for_agent(agent)
         is_turn_secret = privacy_trigger_detected or session.is_secret
-        suggest_secret_mode = privacy_trigger_detected and not session.is_secret
 
         llm_messages = await self.context_assembler.execute(
             user=current_user,
@@ -672,153 +823,234 @@ class ProcessChatTurnUseCase:
                         }
                     )
 
-        tools_executed: List[Dict[str, Any]] = []
-        final_content_parts: List[str] = []
-        answer = _AnswerParts(self.clock)
-        awaiting_approval = False
-        sources = (
-            TurnSources(self.source_index_factory.new())
-            if agent_tools and self.source_index_factory is not None
-            else None
+        return _Turn(
+            session=session,
+            agent=agent,
+            model=model,
+            llm_messages=llm_messages,
+            turn_starts_at=len(llm_messages),
+            agent_tools=agent_tools,
+            answer=_AnswerParts(self.clock, parts),
+            tools_executed=list(tools_executed or []),
+            question=next((m.content for m in reversed(recent_messages) if m.role == "user"), ""),
+            privacy_trigger_detected=privacy_trigger_detected,
+            auto_approve_writes=auto_approve_writes,
+            is_turn_secret=is_turn_secret,
+            suggest_secret_mode=privacy_trigger_detected and not session.is_secret,
+            sources=(
+                TurnSources(self.source_index_factory.new())
+                if agent_tools and self.source_index_factory is not None
+                else None
+            ),
+            budget=_ContextBudget(self.context_window_tokens, self.answer_reserve_tokens),
         )
-        budget = _ContextBudget(self.context_window_tokens, self.answer_reserve_tokens)
-        out_of_room = False
-        question = next((m.content for m in reversed(recent_messages) if m.role == "user"), "")
-        finish_reasons: List[str] = []
 
-        # One model call per round, until a round calls no tool: that round is the answer (#35).
-        # The model may keep using tools until the last round of the budget, or until the window
-        # has no room for another round; then it is made to answer with none. A write waiting on
-        # the member ends the turn the same way, so the model says it is waiting rather than
-        # trying the write again.
-        for round_number in range(1, self.max_iterations + 1):
-            if not agent_tools or awaiting_approval:
+    async def _rounds(self, turn: "_Turn", current_user: User):
+        """
+        One model call per round, until a round calls no tool: that round is the answer (#35).
+
+        The model may keep using tools until the last round of the budget, or until the window has
+        no room for another round; then it is made to answer with none. A write that needs asking
+        pauses the turn instead: the round's other calls run first, then each write becomes a card
+        and the turn stops until the member decides (`decide_stream`).
+        """
+        for round_number in range(turn.first_round, self.max_iterations + 1):
+            if not turn.agent_tools:
                 tools = None
             elif (
                 round_number == self.max_iterations
-                or out_of_room
-                or not budget.has_room_for_a_round(llm_messages, agent_tools)
+                or turn.out_of_room
+                or not turn.budget.has_room_for_a_round(turn.llm_messages, turn.agent_tools)
             ):
-                llm_messages.append(LLMMessage(role="system", content=self._answer_now(question)))
+                turn.llm_messages.append(LLMMessage(role="system", content=self._answer_now(turn.question)))
                 tools = None
             else:
-                tools = agent_tools
+                tools = turn.agent_tools
 
             # Streamed rather than blocking. A blocking call sends nothing back until the whole
             # response exists, so a thinking model deciding on a tool used to hold the socket
             # silent until it timed out, and an agent with tools answered in one lump at the end.
             # Ollama sends a tool call whole, in one chunk, so it is simply collected.
-            decision_starts_at = len(final_content_parts)
+            round_words: List[str] = []
             tool_calls: List[LLMToolCall] = []
             async for event in self._relay(
                 self.llm_client.stream_chat_completion(
-                    messages=llm_messages,
-                    model=model,
-                    temperature=agent.temperature,
-                    top_p=agent.top_p,
+                    messages=turn.llm_messages,
+                    model=turn.model,
+                    temperature=turn.agent.temperature,
+                    top_p=turn.agent.top_p,
                     tools=tools,
                 ),
-                final_content_parts,
-                answer,
+                round_words,
+                turn.answer,
                 tool_calls,
-                finish_reasons,
+                turn.finish_reasons,
             ):
                 yield event
 
             if tools is None or not tool_calls:
-                break
+                return
 
-            llm_messages.append(
-                LLMMessage(
-                    role="assistant",
-                    content="".join(final_content_parts[decision_starts_at:]),
-                    tool_calls=tool_calls,
-                )
+            turn.llm_messages.append(
+                LLMMessage(role="assistant", content="".join(round_words), tool_calls=tool_calls)
             )
 
+            asks = [
+                tc for tc in tool_calls
+                if needs_asking(tc.name, turn.auto_approve_writes, turn.is_turn_secret)
+            ]
             for tc in tool_calls:
-                if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
-                    proposal_info = {
-                        "tool": tc.name,
-                        "status": "proposal_pending",
-                        "arguments": tc.arguments,
-                        "message": f"Action '{tc.name}' requires member confirmation.",
-                    }
-                    tools_executed.append(proposal_info)
-                    awaiting_approval = True
-                    yield {"type": "tool_call", "data": proposal_info}
-                    llm_messages.append(
-                        LLMMessage(
-                            role="tool",
-                            tool_call_id=tc.id,
-                            name=tc.name,
-                            content=json.dumps(proposal_info),
-                        )
-                    )
-                else:
-                    yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
-                    tool_result = await self._run_tool(
-                        tc, agent, current_user.id, is_turn_secret, sources=sources, offered=agent_tools
-                    )
-                    summary = summarize_tool(tc.name, tc.arguments, tool_result)
-                    exec_info = {
-                        "tool": tc.name,
-                        "success": tool_result.success,
-                        "arguments": tc.arguments,
-                        "data": tool_result.data,
-                        "error": tool_result.error,
-                        "summary": summary,
-                    }
-                    tools_executed.append(exec_info)
-                    answer.tool(tc.name, tool_result.success, summary)
-                    yield {"type": "tool_result", "data": exec_info}
-                    # The phone is sent the whole result; the model reads what fits.
-                    seen, no_room = budget.fit(
-                        tool_result.data if tool_result.success else {"error": tool_result.error},
-                        llm_messages,
-                        agent_tools,
-                    )
-                    out_of_room = out_of_room or no_room
-                    llm_messages.append(
-                        LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen)
-                    )
+                if not any(tc is ask for ask in asks):
+                    async for event in self._run_call(turn, tc, current_user.id):
+                        yield event
 
-        final_content = answer.content()
-        # The model stopped because the window was full, not because it was done. Saved as such, so
-        # it is never mistaken for a finished answer.
-        cut_off = bool(finish_reasons) and finish_reasons[-1] == "length"
-        if cut_off:
-            logger.warning("Answer in session %s was cut off by the context window", session.id)
-        extra_metadata = {"cut_off": True} if cut_off else {}
+            if asks:
+                for tc in asks:
+                    part = proposal_part(tc)
+                    turn.answer.parts.append(part)
+                    yield proposal_event(part)
+                turn.paused_in_round = round_number
+                return
 
-        async with self.uow:
-            asst_msg = ChatMessage(
-                session_id=session.id,
-                role="assistant",
-                content=final_content,
-                metadata_json={
-                    "tools_executed": tools_executed,
-                    "parts": answer.parts,
-                    "privacy_trigger_detected": privacy_trigger_detected,
-                    "suggest_secret_mode": suggest_secret_mode,
-                    **extra_metadata,
-                },
-            )
-            created_asst_msg = await self.session_repo.add_message(asst_msg)
-            session.touch()
-            await self.session_repo.update(session)
-            await self.uow.commit()
+    async def _run_call(self, turn: "_Turn", tc: LLMToolCall, user_id: str, at: Optional[int] = None):
+        """Runs one call and records it: a step in the answer, and a result for the model to read."""
+        yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
+        tool_result = await self._run_tool(
+            tc, turn.agent, user_id, turn.is_turn_secret, sources=turn.sources, offered=turn.agent_tools
+        )
+        summary = summarize_tool(tc.name, tc.arguments, tool_result)
+        exec_info = {
+            "tool": tc.name,
+            "success": tool_result.success,
+            "arguments": tc.arguments,
+            "data": tool_result.data,
+            "error": tool_result.error,
+            "summary": summary,
+        }
+        turn.tools_executed.append(exec_info)
+        turn.answer.tool(tc.name, tool_result.success, summary, at=at)
+        yield {"type": "tool_result", "data": exec_info}
+        # The phone is sent the whole result; the model reads what fits.
+        seen, no_room = turn.budget.fit(
+            tool_result.data if tool_result.success else {"error": tool_result.error},
+            turn.llm_messages,
+            turn.agent_tools,
+        )
+        turn.out_of_room = turn.out_of_room or no_room
+        turn.llm_messages.append(LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen))
+
+    async def _finish(self, turn: "_Turn"):
+        """Saves the answer, and says it is done or waiting on the member."""
+        paused = turn.paused_in_round is not None
+        cut_off = False
+        if not paused:
+            # The model stopped because the window was full, not because it was done. Saved as such,
+            # so it is never mistaken for a finished answer.
+            cut_off = bool(turn.finish_reasons) and turn.finish_reasons[-1] == "length"
+            if cut_off:
+                logger.warning("Answer in session %s was cut off by the context window", turn.session.id)
+
+        saved = await self._save(turn, paused=paused, cut_off=cut_off)
+
+        if paused:
+            yield self._awaiting_event(saved, turn.agent, turn.is_turn_secret, turn.suggest_secret_mode)
+            return
 
         yield {
             "cut_off": cut_off,
             "type": "done",
-            "message_id": created_asst_msg.id,
-            "assistant_content": final_content,
+            "message_id": saved.id,
+            "assistant_content": saved.content,
+            "suggest_secret_mode": turn.suggest_secret_mode,
+            "is_turn_secret": turn.is_turn_secret,
+            "agent_id": turn.agent.id,
+            "agent_name": turn.agent.name,
+            "tools_executed": turn.tools_executed,
+            "parts": turn.answer.parts,
+        }
+
+    async def _save(self, turn: "_Turn", paused: bool, cut_off: bool = False) -> ChatMessage:
+        """
+        Writes the answer as it stands: a new message the first time, the same one after a pause.
+
+        A paused answer also keeps what the turn needs to carry on (PAUSED_TURN): the model's side
+        of the turn so far and the round it paused in.
+        """
+        metadata: Dict[str, Any] = {
+            "tools_executed": turn.tools_executed,
+            "parts": turn.answer.parts,
+            "privacy_trigger_detected": turn.privacy_trigger_detected,
+            "suggest_secret_mode": turn.suggest_secret_mode,
+        }
+        if cut_off:
+            metadata["cut_off"] = True
+        if paused:
+            metadata[PAUSED_TURN] = {
+                "messages": dump_messages(turn.llm_messages[turn.turn_starts_at:]),
+                "round": turn.paused_in_round,
+                "out_of_room": turn.out_of_room,
+                "auto_approve_writes": turn.auto_approve_writes,
+                "question": turn.question,
+            }
+
+        async with self.uow:
+            if turn.message is None:
+                turn.message = await self.session_repo.add_message(
+                    ChatMessage(
+                        session_id=turn.session.id,
+                        role="assistant",
+                        content=turn.answer.content(),
+                        metadata_json=metadata,
+                    )
+                )
+            else:
+                turn.message.content = turn.answer.content()
+                turn.message.metadata_json = metadata
+                turn.message = await self.session_repo.update_message(turn.message)
+            turn.session.touch()
+            await self.session_repo.update(turn.session)
+            await self.uow.commit()
+        return turn.message
+
+    @staticmethod
+    def _awaiting_event(message: ChatMessage, agent, is_turn_secret: bool, suggest_secret_mode: bool) -> Dict[str, Any]:
+        """The end of a turn that is waiting on the member's cards, not finished."""
+        return {
+            "type": "awaiting_approval",
+            "message_id": message.id,
+            "assistant_content": message.content,
             "suggest_secret_mode": suggest_secret_mode,
             "is_turn_secret": is_turn_secret,
             "agent_id": agent.id,
             "agent_name": agent.name,
-            "tools_executed": tools_executed,
-            "parts": answer.parts,
+            "parts": (message.metadata_json or {}).get("parts") or [],
         }
 
+
+@dataclass
+class _Turn:
+    """What a streamed turn carries from round to round, and across a pause for approval."""
+
+    session: ConversationSession
+    agent: Any
+    model: str
+    llm_messages: List[LLMMessage]
+    # Where this turn's own messages start: everything before is the assembled context, rebuilt
+    # rather than saved when a paused turn carries on.
+    turn_starts_at: int
+    agent_tools: List[Dict[str, Any]]
+    answer: _AnswerParts
+    tools_executed: List[Dict[str, Any]]
+    question: str
+    privacy_trigger_detected: bool
+    auto_approve_writes: bool
+    is_turn_secret: bool
+    suggest_secret_mode: bool
+    sources: Optional[TurnSources]
+    budget: _ContextBudget
+    first_round: int = 1
+    out_of_room: bool = False
+    finish_reasons: List[str] = field(default_factory=list)
+    paused_in_round: Optional[int] = None
+    # The saved answer this turn carries on, once there is one.
+    message: Optional[ChatMessage] = None

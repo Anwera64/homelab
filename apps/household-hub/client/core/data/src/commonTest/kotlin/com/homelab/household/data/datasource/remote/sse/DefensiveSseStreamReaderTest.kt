@@ -2,6 +2,7 @@ package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -399,5 +400,79 @@ class DefensiveSseStreamReaderTest {
             // THEN
             assertEquals(listOf("t:1"), reportedIds)
             assertEquals(2, events.size)
+        }
+
+    // ---- approval cards (slice 4, PR 3) -----------------------------------
+
+    @Test
+    fun `GIVEN a write that needs asking WHEN its proposal is read THEN the card has its call id and action and details`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_approval_proposal", "tool_call_id": "c1", "tool": "calendar_write", "action": "delete", "arguments": {"action": "delete", "title": "Print shop cutoff", "start_time": "2026-09-11T18:00:00", "is_all_day": false, "reminder": 15}}
+
+                """.trimIndent()
+
+            val proposal =
+                reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList().single()
+                    as ChatStreamEvent.ToolApprovalProposal
+
+            assertEquals("c1", proposal.toolCallId)
+            assertEquals("calendar_write", proposal.tool)
+            assertEquals(ToolAction.Delete, proposal.action)
+            assertEquals("Print shop cutoff", proposal.arguments["title"])
+            assertEquals("2026-09-11T18:00:00", proposal.arguments["start_time"])
+            assertEquals(false, proposal.arguments["is_all_day"])
+            assertEquals(15L, proposal.arguments["reminder"])
+        }
+
+    @Test
+    fun `GIVEN a turn paused on a card WHEN its end is read THEN the saved answer carries the waiting card`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "awaiting_approval", "message_id": "m1", "assistant_content": "I can add it now.", "agent_name": "Home Coordinator", "parts": [{"type": "text", "content": "I can add it now."}, {"type": "proposal", "tool_call_id": "c1", "tool": "calendar_write", "action": "create", "arguments": {"title": "Dinner together"}, "status": "pending"}]}
+
+                """.trimIndent()
+
+            val paused =
+                reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList().single()
+                    as ChatStreamEvent.AwaitingApproval
+
+            assertEquals("m1", paused.messageId)
+            assertEquals(
+                listOf(
+                    AnswerPart.Text("I can add it now."),
+                    AnswerPart.Proposal(
+                        toolCallId = "c1",
+                        tool = "calendar_write",
+                        action = ToolAction.Create,
+                        arguments = mapOf("title" to "Dinner together"),
+                        status = ProposalStatus.Pending,
+                    ),
+                ),
+                paused.parts,
+            )
+        }
+
+    @Test
+    fun `GIVEN a declined write WHEN the answer carries on THEN the step and the saved part both name it`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_declined", "tool": "calendar_write", "summary": {"action": "create", "title": "Buy flowers"}}
+
+                data: {"type": "done", "message_id": "m1", "assistant_content": "Left it off.", "parts": [{"type": "declined", "tool": "calendar_write", "summary": {"action": "create", "title": "Buy flowers"}}, {"type": "text", "content": "Left it off."}]}
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            val named = ToolSummary(action = ToolAction.Create, title = "Buy flowers")
+            assertEquals(ChatStreamEvent.ToolDeclined("calendar_write", named), events[0])
+            assertEquals(
+                AnswerPart.Declined("calendar_write", named),
+                (events[1] as ChatStreamEvent.Done).parts.first(),
+            )
         }
 }

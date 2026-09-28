@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,6 +161,7 @@ from app.domain.use_cases.gossip.manage_gossip_milestones import (
     RevokeGossipMilestoneUseCase,
 )
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
+from app.domain.use_cases.chat.tool_approval import DropPendingProposalsUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
@@ -255,6 +256,7 @@ def get_container(session: AsyncSession):
     pin_reset_repo = PinResetRepositoryImpl(pin_reset_ds, _pin_reset_mapper)
 
     uow = SqliteUnitOfWork(session)
+    drop_proposals_uc = DropPendingProposalsUseCase(session_repo, uow)
     calendar_secrets = CalendarSecretResolver(calendar_cred_repo, _secret_cipher, uow, _google_oauth)
 
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
@@ -399,6 +401,7 @@ def get_container(session: AsyncSession):
         is_first_turn: bool = False,
         regenerate: bool = False,
         timezone_name: Optional[str] = None,
+        decision: Optional[Dict[str, Any]] = None,
     ):
         try:
             async with AsyncSessionLocal() as bg_sess:
@@ -408,21 +411,29 @@ def get_container(session: AsyncSession):
                 # Regenerating answers the question already in the transcript, so `content` is
                 # only what reflection is told about afterwards — the turn itself reads it back
                 # from the conversation rather than being handed it again.
-                turn = (
-                    bg_stream_uc.regenerate_stream(
+                # A decision carries on the answer that paused for it; `content` is again only the
+                # question, for reflection once the answer is done.
+                if decision is not None:
+                    turn = bg_stream_uc.decide_stream(
+                        session_id=session_id,
+                        current_user=current_user,
+                        timezone_name=timezone_name,
+                        **decision,
+                    )
+                elif regenerate:
+                    turn = bg_stream_uc.regenerate_stream(
                         session_id=session_id,
                         current_user=current_user,
                         timezone_name=timezone_name,
                     )
-                    if regenerate
-                    else bg_stream_uc.execute_stream(
+                else:
+                    turn = bg_stream_uc.execute_stream(
                         session_id=session_id,
                         current_user=current_user,
                         content=content,
                         auto_approve_writes=auto_approve_writes,
                         timezone_name=timezone_name,
                     )
-                )
                 async for event in turn:
                     if event.get("type") == "done":
                         final_event = event
@@ -507,8 +518,8 @@ def get_container(session: AsyncSession):
         pres_deps.get_list_agents_use_case: ListAgentsUseCase(agent_repo),
         pres_deps.get_agent_use_case: GetAgentUseCase(agent_repo),
         pres_deps.get_create_agent_use_case: CreateAgentUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
-        pres_deps.get_update_agent_use_case: UpdateAgentUseCase(agent_repo, uow),
-        pres_deps.get_soft_delete_agent_use_case: SoftDeleteAgentUseCase(agent_repo, uow),
+        pres_deps.get_update_agent_use_case: UpdateAgentUseCase(agent_repo, uow, drop_proposals_uc),
+        pres_deps.get_soft_delete_agent_use_case: SoftDeleteAgentUseCase(agent_repo, uow, drop_proposals_uc),
         pres_deps.get_restore_agent_use_case: RestoreAgentUseCase(agent_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
         pres_deps.get_list_trash_agents_use_case: ListTrashAgentsUseCase(agent_repo, settings.AGENT_DELETE_GRACE_DAYS),
         pres_deps.get_purge_trash_agent_use_case: PurgeTrashAgentUseCase(agent_repo, session_repo, uow),

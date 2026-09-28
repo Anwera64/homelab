@@ -47,22 +47,32 @@ def summarize_tool(tool: str, arguments: Dict[str, Any], result: ToolExecutionRe
         return {"sources": _sources([data])}
 
     if tool in WRITE_ACTIONS:
-        summary = _action(tool, arguments)
-        title = arguments.get("title")
-        if title and tool == "calendar_write":
-            summary["title"] = _clip(str(title))
-        return summary or None
+        return describe_write(tool, arguments) or None
 
     return None
 
 
-def _action(tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """A write tool's action as the tool names it; one it doesn't have is left out, never guessed."""
+def write_action(tool: str, arguments: Dict[str, Any]) -> Optional[str]:
+    """A write tool's action as the tool names it; one it doesn't have is None, never guessed."""
     actions = WRITE_ACTIONS.get(tool)
     if actions is None:
-        return {}
-    action = arguments.get("action") or "create"
-    return {"action": action} if action in actions else {}
+        return None
+    action = (arguments or {}).get("action") or "create"
+    return action if action in actions else None
+
+
+def describe_write(tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """What a write step shows whether it ran or not: its action, and the event it was about."""
+    summary = _action(tool, arguments or {})
+    title = (arguments or {}).get("title")
+    if title and tool == "calendar_write":
+        summary["title"] = _clip(str(title))
+    return summary
+
+
+def _action(tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    action = write_action(tool, arguments)
+    return {"action": action} if action is not None else {}
 
 
 def _sources(items: List[Any]) -> List[Dict[str, str]]:

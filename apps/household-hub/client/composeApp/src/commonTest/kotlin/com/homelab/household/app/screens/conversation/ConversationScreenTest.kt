@@ -52,9 +52,14 @@ import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
+import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
+import com.homelab.household.app.resources.tool_calendar_remove_card
+import com.homelab.household.app.resources.tool_card_hold
+import com.homelab.household.app.resources.tool_card_keep
+import com.homelab.household.app.resources.tool_card_remove
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
@@ -89,6 +94,7 @@ class ConversationScreenTest {
         onTryAgain: () -> Unit = {},
         onSelectAgent: (String) -> Unit = {},
         onRetryAgents: () -> Unit = {},
+        onDecide: (String, Boolean) -> Unit = { _, _ -> },
     ): @Composable () -> Unit =
         {
             StillTheme {
@@ -100,6 +106,7 @@ class ConversationScreenTest {
                     onTryAgain = onTryAgain,
                     onSelectAgent = onSelectAgent,
                     onRetryAgents = onRetryAgents,
+                    onDecide = onDecide,
                     onBack = {},
                     memberName = "Emma",
                 )
@@ -718,5 +725,48 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.agent_picker_failed_title)).assertIsDisplayed()
             onNodeWithText(getString(Res.string.conversation_try_again)).performClick()
             assertTrue(retried)
+        }
+
+    /** Canvas: ToolApproveRemove. The removal reads in red and "Remove" is the answer on the right. */
+    @Test
+    fun `GIVEN a removal waiting on the member WHEN drawn THEN the card says what goes and when and asks Keep it or Remove`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            setContent(conversation(stateNamed("Approving a removal"), onDecide = { id, ok -> decided += id to ok }))
+
+            onNodeWithText(getString(Res.string.tool_calendar_remove_card)).assertIsDisplayed()
+            onNodeWithText("Print shop").assertIsDisplayed()
+            onNodeWithText("Fri 11 Sep, 18:00").assertIsDisplayed()
+            val keep = onNodeWithText(getString(Res.string.tool_card_keep)).getUnclippedBoundsInRoot()
+            val remove = onNodeWithText(getString(Res.string.tool_card_remove)).getUnclippedBoundsInRoot()
+            assertTrue(keep.right <= remove.left, "the main action is on the right")
+
+            onNodeWithText(getString(Res.string.tool_card_remove)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_keep)).performClick()
+
+            assertEquals(listOf("c-1" to true, "c-1" to false), decided)
+        }
+
+    @Test
+    fun `GIVEN one write approved and one declined WHEN the answer is drawn THEN the fold names both and opens to their record lines`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approved and declined")))
+
+            val fold = onNodeWithText("Added Dinner together, didn’t add Buy flowers")
+            fold.assertIsDisplayed()
+            fold.performClick()
+
+            onNodeWithText("Added to your calendar · Dinner together").assertIsDisplayed()
+            onNodeWithText("${getString(Res.string.tool_calendar_add_declined)} · Buy flowers").assertIsDisplayed()
+        }
+
+    @Test
+    fun `GIVEN Send pressed while a card waits WHEN drawn THEN the words stay and the hold line asks for the card first`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Waiting on a card, Send held")))
+
+            onNodeWithText(getString(Res.string.tool_card_hold)).assertIsDisplayed()
+            onNode(hasSetTextAction()).assertTextContains("Also lunch on Sunday?")
+            onNodeWithText("Dinner together").assertIsDisplayed()
         }
 }

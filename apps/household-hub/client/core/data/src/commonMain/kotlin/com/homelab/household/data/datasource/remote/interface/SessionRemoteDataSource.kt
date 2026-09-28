@@ -3,6 +3,7 @@ package com.homelab.household.data.datasource.remote.`interface`
 import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.network.TurnGoneException
+import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatStreamEvent
 import kotlinx.coroutines.flow.Flow
@@ -36,17 +37,21 @@ interface SessionRemoteDataSource {
 
     suspend fun deleteSession(sessionId: String)
 
-    suspend fun approveToolProposal(
+    /**
+     * The member's answer to one card, and the rest of the paused turn, streamed like [openChatStream].
+     */
+    fun openDecisionStream(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-    ): Boolean
+        modifiedArguments: Map<String, Any?>? = null,
+    ): Flow<ChatStreamEvent>
 
     /**
      * The agent's reply, token by token, for as long as the collector keeps up.
      *
      * Throws [SessionConflictException] when the hub is already working on a turn for this
-     * conversation. That is a refusal rather than a failure, and what to do about it — wait, and
+     * conversation, and [ApprovalPendingException] when its last answer is waiting on a card. That is a refusal rather than a failure, and what to do about it — wait, and
      * read the conversation back until the reply lands — is the repository's decision, not this
      * layer's.
      */

@@ -2,6 +2,7 @@ package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_add_done
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_remove_done
@@ -211,5 +212,17 @@ class ToolStepTest {
         assertEquals("scmp.com", hostOf("https://www.scmp.com/news/hong-kong?x=1"))
         assertEquals("example.org", hostOf("http://example.org:8080/a"))
         assertEquals("hkja.org.hk", hostOf("https://HKJA.org.hk"))
+    }
+
+    @Test
+    fun `GIVEN a declined write WHEN put to a person THEN it names what did not happen and is not red`() {
+        val step =
+            toolStep(
+                AnswerPart.Declined("calendar_write", ToolSummary(title = "Buy flowers", action = ToolAction.Create)),
+            )
+
+        assertEquals(HearthIcon.Declined, step.icon)
+        assertFalse(step.failed)
+        assertEquals(StepWords.Named(Res.string.tool_calendar_add_declined, "Buy flowers"), step.words)
     }
 }

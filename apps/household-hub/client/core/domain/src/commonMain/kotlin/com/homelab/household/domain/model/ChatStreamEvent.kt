@@ -40,10 +40,33 @@ sealed interface ChatStreamEvent {
         val summary: ToolSummary? = null,
     ) : ChatStreamEvent
 
+    /**
+     * A write that needs the member's say-so. The turn pauses after the step's last one, with
+     * [AwaitingApproval]; [toolCallId] is what the card's answer is sent back with.
+     */
     data class ToolApprovalProposal(
+        val toolCallId: String,
         val tool: String,
+        val action: ToolAction? = null,
         val arguments: Map<String, Any?> = emptyMap(),
-        val message: String = "",
+    ) : ChatStreamEvent
+
+    /** A write the member declined, told to the model instead of run. */
+    data class ToolDeclined(
+        val tool: String,
+        val summary: ToolSummary? = null,
+    ) : ChatStreamEvent
+
+    /**
+     * The turn is paused on its cards, and saved: [parts] carry each [AnswerPart.Proposal]. It ends
+     * the stream the way [Done] does, but the answer is not finished; it carries on once every card
+     * has been answered, as the same message.
+     */
+    data class AwaitingApproval(
+        val messageId: String,
+        val assistantContent: String,
+        val parts: List<AnswerPart> = emptyList(),
+        val agentName: String = "",
     ) : ChatStreamEvent
 
     data class Done(

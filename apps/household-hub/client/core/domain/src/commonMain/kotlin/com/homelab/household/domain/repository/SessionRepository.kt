@@ -60,12 +60,16 @@ interface SessionRepository {
         afterAssistantMessageId: String? = null,
     ): Flow<ChatStreamEvent>
 
-    suspend fun approveToolProposal(
+    /**
+     * Answers one approval card and follows the rest of the turn, recovering a dropped stream the
+     * way [streamChatTurn] does. The paused answer carries on as the same message.
+     */
+    fun decideToolProposal(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
         modifiedArguments: Map<String, Any?>? = null,
-    ): Boolean
+    ): Flow<ChatStreamEvent>
 
     suspend fun lockAllSecretSessions(): Int
 

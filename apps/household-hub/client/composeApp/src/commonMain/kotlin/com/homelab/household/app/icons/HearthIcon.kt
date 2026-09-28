@@ -167,6 +167,9 @@ enum class HearthIcon(
     // Profile - drawn on the Calendar & offline canvas rather than the sheet. Wider set and larger
     // dots than `streaming`, which means something else: an answer still arriving.
     More("more", solids(circle(5.6, 12.0, 1.6), circle(12.0, 12.0, 1.6), circle(18.4, 12.0, 1.6))),
+
+    // Tools - drawn on the "approved and declined" board: what a declined write leaves, "Not added".
+    Declined("declined", strokes("M7.6 7.6 16.4 16.4M16.4 7.6 7.6 16.4")),
     ;
 
     private val restingVector: ImageVector by lazy { build(strokeWidth = 1.5f) }

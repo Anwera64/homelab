@@ -74,6 +74,18 @@ fun toolStep(part: AnswerPart.ToolDone): ToolStep = toolStep(part.tool, succeede
 
 fun toolStep(part: AnswerPart.ToolFailed): ToolStep = toolStep(part.tool, succeeded = false, part.summary)
 
+/**
+ * A write the member said no to: "Not added · Buy flowers". Not a failure, so never red: nothing
+ * went wrong, the answer was no.
+ */
+fun toolStep(part: AnswerPart.Declined): ToolStep {
+    val label = toolLabel(part.tool, part.summary?.action)
+    val declined = label.declined ?: label.failed
+    val title = part.summary?.title
+    val words = if (title != null) StepWords.Named(declined, title) else StepWords.Plain(declined)
+    return ToolStep(HearthIcon.Declined, failed = false, words)
+}
+
 private fun toolStep(
     tool: String,
     succeeded: Boolean,

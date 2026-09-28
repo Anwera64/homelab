@@ -15,4 +15,5 @@ data class SessionDetailReadDto(
     @SerialName("updated_at") val updated_at: String? = null,
     val messages: List<ChatMessageReadDto> = emptyList(),
     @SerialName("turn_running") val turn_running: Boolean = false,
+    @SerialName("awaiting_approval") val awaiting_approval: Boolean = false,
 )

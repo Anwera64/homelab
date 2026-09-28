@@ -1,6 +1,7 @@
 package com.homelab.household.presentation.chatsession
 
 import app.cash.turbine.test
+import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.AgentPersonality
 import com.homelab.household.domain.model.AnswerPart
@@ -9,13 +10,14 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.domain.model.User
-import com.homelab.household.domain.usecase.ApproveToolProposalUseCase
 import com.homelab.household.domain.usecase.CreateSessionUseCase
+import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
@@ -68,7 +70,7 @@ class ChatSessionViewModelTest {
     private val resumeTurnUseCase = mock<ResumeTurnUseCase>()
     private val listAgentsUseCase = mock<ListAgentsUseCase>(MockMode.autofill)
     private val createSessionUseCase = mock<CreateSessionUseCase>(MockMode.autofill)
-    private val approveToolProposalUseCase = mock<ApproveToolProposalUseCase>()
+    private val decideToolProposalUseCase = mock<DecideToolProposalUseCase>()
     private val toggleSecretModeUseCase = mock<ToggleSecretModeUseCase>()
     private val getAgentUseCase = mock<GetAgentUseCase>(MockMode.autofill)
     private val getCurrentUserUseCase = mock<GetCurrentUserUseCase>(MockMode.autofill)
@@ -87,7 +89,7 @@ class ChatSessionViewModelTest {
                 createSessionUseCase = createSessionUseCase,
                 regenerateAnswerUseCase = regenerateAnswerUseCase,
                 resumeTurnUseCase = resumeTurnUseCase,
-                approveToolProposalUseCase = approveToolProposalUseCase,
+                decideToolProposalUseCase = decideToolProposalUseCase,
                 toggleSecretModeUseCase = toggleSecretModeUseCase,
                 getAgentUseCase = getAgentUseCase,
                 getCurrentUserUseCase = getCurrentUserUseCase,
@@ -104,7 +106,7 @@ class ChatSessionViewModelTest {
             createSessionUseCase = createSessionUseCase,
             regenerateAnswerUseCase = regenerateAnswerUseCase,
             resumeTurnUseCase = resumeTurnUseCase,
-            approveToolProposalUseCase = approveToolProposalUseCase,
+            decideToolProposalUseCase = decideToolProposalUseCase,
             toggleSecretModeUseCase = toggleSecretModeUseCase,
             getAgentUseCase = getAgentUseCase,
             getCurrentUserUseCase = getCurrentUserUseCase,
@@ -169,44 +171,219 @@ class ChatSessionViewModelTest {
             assertEquals("I'm doing great!", state.messages[1].content)
         }
 
+    // ---- approval cards (slice 4, PR 3) -----------------------------------
+
+    private val dinner =
+        AnswerPart.Proposal(
+            toolCallId = "c1",
+            tool = "calendar_write",
+            action = ToolAction.Create,
+            arguments = mapOf("title" to "Dinner together", "start_time" to "2026-10-03T20:30:00"),
+        )
+    private val flowers = dinner.copy(toolCallId = "c2", arguments = mapOf("title" to "Buy flowers"))
+    private val question =
+        ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Dinner Saturday?")
+
+    private fun pausedAnswer(vararg cards: AnswerPart.Proposal) =
+        ChatMessage(
+            id = "m-2",
+            sessionId = "s-1",
+            role = MessageRole.ASSISTANT,
+            content = "I can add it now.",
+            parts = listOf(AnswerPart.Text("I can add it now.")) + cards,
+        )
+
+    /** A chat whose newest answer is paused on [cards], opened the way the hub reports it. */
+    private fun TestScope.openPaused(vararg cards: AnswerPart.Proposal) {
+        val session = ConversationSession(id = "s-1", userId = "u-1", awaitingApproval = true)
+        everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question, pausedAnswer(*cards)))
+        viewModel.loadSession("s-1")
+        advanceUntilIdle()
+    }
+
     @Test
-    fun tool_approval_proposal_is_stored_in_state() =
+    fun `GIVEN a turn that asks before a write WHEN it pauses THEN the answer stays with its card and the turn waits`() =
         runTest(testDispatcher) {
-            val session = ConversationSession(id = "s-1", userId = "u-1")
-            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(ConversationSession(id = "s-1", userId = "u-1"), emptyList())
             viewModel.loadSession("s-1")
             advanceUntilIdle()
-
-            val proposal =
-                ChatStreamEvent.ToolApprovalProposal(
-                    tool = "database_wipe",
-                    message = "Allow wiping db?",
+            every { streamChatTurnUseCase("s-1", "Dinner Saturday?", false, any()) } returns
+                flowOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.Delta("I can add it now."),
+                    ChatStreamEvent.ToolApprovalProposal("c1", "calendar_write", ToolAction.Create, dinner.arguments),
+                    ChatStreamEvent.AwaitingApproval(
+                        messageId = "m-2",
+                        assistantContent = "I can add it now.",
+                        parts = pausedAnswer(dinner).parts,
+                    ),
                 )
-            every { streamChatTurnUseCase("s-1", "Wipe it", false, any()) } returns flowOf(proposal)
 
-            viewModel.sendMessage("Wipe it")
+            viewModel.sendMessage("Dinner Saturday?")
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertNotNull(state.pendingToolProposal)
-            assertEquals("database_wipe", state.pendingToolProposal?.tool)
+            assertEquals(TurnState.AwaitingApproval, state.turnState)
+            assertNull(state.streamingMessage)
+            assertEquals(pausedAnswer(dinner).parts, state.messages.last().parts)
+            assertEquals(listOf(dinner), state.pendingProposals)
         }
 
     @Test
-    fun approve_tool_dispatches_usecase_and_clears_proposal() =
+    fun `GIVEN a chat opened while a card waits WHEN it loads THEN the turn waits on the card`() =
         runTest(testDispatcher) {
-            val session = ConversationSession(id = "s-1", userId = "u-1")
-            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
-            viewModel.loadSession("s-1")
-            advanceUntilIdle()
+            openPaused(dinner)
 
-            everySuspend { approveToolProposalUseCase("s-1", "tc-1", true, null) } returns true
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.AwaitingApproval, state.turnState)
+            assertEquals(listOf(dinner), state.pendingProposals)
+        }
 
-            viewModel.approveTool("tc-1", approved = true)
+    @Test
+    fun `GIVEN a waiting card WHEN Send is tapped THEN nothing is sent and the text stays and the hold line shows`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            viewModel.composerTextChanged("Also lunch?")
+
+            viewModel.sendMessage("Also lunch?")
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertNull(state.pendingToolProposal)
+            verify(VerifyMode.not) { streamChatTurnUseCase(any(), any(), any(), any()) }
+            assertEquals("Also lunch?", state.composerText)
+            assertTrue(state.holdingForCard)
+            assertEquals(2, state.messages.size)
+        }
+
+    @Test
+    fun `GIVEN a waiting card WHEN it is approved THEN the same answer carries on to its end`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            viewModel.sendMessage("Also lunch?")
+            val done =
+                listOf(
+                    AnswerPart.Text("I can add it now."),
+                    AnswerPart.ToolDone(
+                        "calendar_write",
+                        ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                    ),
+                    AnswerPart.Text("Done."),
+                )
+            every { decideToolProposalUseCase("s-1", "c1", true, null) } returns
+                flowOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.ToolExecuting("calendar_write", action = ToolAction.Create),
+                    ChatStreamEvent.ToolResult(
+                        "calendar_write",
+                        success = true,
+                        summary =
+                            done[1].let {
+                                (it as AnswerPart.ToolDone).summary
+                            },
+                    ),
+                    ChatStreamEvent.Delta("Done."),
+                    ChatStreamEvent.Done(
+                        messageId = "m-2",
+                        assistantContent = "I can add it now.\n\nDone.",
+                        parts = done,
+                    ),
+                )
+
+            viewModel.decide("c1", approved = true)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.Idle, state.turnState)
+            assertFalse(state.holdingForCard)
+            assertEquals(listOf("m-1", "m-2"), state.messages.map { it.id })
+            assertEquals(done, state.messages.last().parts)
+            assertTrue(state.pendingProposals.isEmpty())
+        }
+
+    @Test
+    fun `GIVEN a card being answered WHEN the write runs THEN it takes the card's place in the answer`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            every { decideToolProposalUseCase("s-1", "c1", false, null) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    emit(
+                        ChatStreamEvent.ToolDeclined(
+                            "calendar_write",
+                            ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                        ),
+                    )
+                    awaitCancellation()
+                }
+
+            viewModel.decide("c1", approved = false)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.Streaming, state.turnState)
+            assertEquals(listOf("m-1"), state.messages.map { it.id })
+            assertEquals(
+                listOf(
+                    AnswerPart.Text("I can add it now."),
+                    AnswerPart.Declined(
+                        "calendar_write",
+                        ToolSummary(action = ToolAction.Create, title = "Dinner together"),
+                    ),
+                ),
+                state.parts,
+            )
+        }
+
+    @Test
+    fun `GIVEN two cards WHEN the first is answered THEN the turn still waits on the second`() =
+        runTest(testDispatcher) {
+            openPaused(dinner, flowers)
+            val afterFirst = pausedAnswer(dinner.copy(status = ProposalStatus.Approved), flowers)
+            every { decideToolProposalUseCase("s-1", "c1", true, null) } returns
+                flowOf(
+                    ChatStreamEvent.Accepted,
+                    ChatStreamEvent.AwaitingApproval(
+                        messageId = "m-2",
+                        assistantContent = afterFirst.content,
+                        parts = afterFirst.parts,
+                    ),
+                )
+
+            viewModel.decide("c1", approved = true)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(TurnState.AwaitingApproval, state.turnState)
+            assertEquals(listOf(flowers), state.pendingProposals)
+            assertEquals(listOf("m-1", "m-2"), state.messages.map { it.id })
+        }
+
+    @Test
+    fun `GIVEN the hub holding a card this phone has not seen WHEN a message is sent THEN it is held and not failed`() =
+        runTest(testDispatcher) {
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(ConversationSession(id = "s-1", userId = "u-1"), listOf(question))
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+            every { streamChatTurnUseCase("s-1", "Also lunch?", false, any()) } returns
+                flow { throw ApprovalPendingException() }
+            // Read again, the chat shows the card another phone left waiting.
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(
+                    ConversationSession(id = "s-1", userId = "u-1", awaitingApproval = true),
+                    listOf(question, pausedAnswer(dinner)),
+                )
+
+            viewModel.sendMessage("Also lunch?")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("Also lunch?", state.composerText)
+            assertTrue(state.holdingForCard)
+            assertNull(state.errorMessage)
+            assertEquals(TurnState.AwaitingApproval, state.turnState)
+            assertEquals(listOf("m-1", "m-2"), state.messages.map { it.id })
         }
 
     @Test

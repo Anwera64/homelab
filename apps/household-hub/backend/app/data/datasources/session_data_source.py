@@ -44,6 +44,12 @@ class ISessionDataSource(Protocol):
     async def add_message(self, message: MessageModel) -> MessageModel:
         ...
 
+    async def update_message(self, message_id: str, content: str, metadata_json: dict) -> Optional[MessageModel]:
+        ...
+
+    async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
+        ...
+
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[MessageModel]:
         ...
 
@@ -117,6 +123,20 @@ class SqliteSessionDataSource(ISessionDataSource):
         self.session.add(message)
         await self.session.flush()
         return message
+
+    async def update_message(self, message_id: str, content: str, metadata_json: dict) -> Optional[MessageModel]:
+        model = await self.session.get(MessageModel, message_id)
+        if model is None:
+            return None
+        model.content = content
+        # A new dict, so the JSON column sees the change rather than the same object mutated.
+        model.metadata_json = dict(metadata_json)
+        await self.session.flush()
+        return model
+
+    async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
+        res = await self.session.execute(select(SessionModel.id).where(SessionModel.agent_id == agent_id))
+        return list(res.scalars().all())
 
     async def get_messages(self, session_id: str, limit: int = 50, before_id: Optional[str] = None) -> List[MessageModel]:
         msg_stmt = select(MessageModel).where(MessageModel.session_id == session_id)

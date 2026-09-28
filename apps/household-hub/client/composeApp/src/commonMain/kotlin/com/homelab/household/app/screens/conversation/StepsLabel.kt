@@ -38,6 +38,13 @@ sealed interface StepPhrase {
         val title: String?,
     ) : StepPhrase
 
+    /** A write the member said no to, named: "didn’t add Buy flowers". Never counted as failed. */
+    data class Declined(
+        val tool: String,
+        val action: ToolAction?,
+        val title: String?,
+    ) : StepPhrase
+
     /** A tool with no words of its own in a label, named by its usual done words for its [action]. */
     data class Did(
         val tool: String,
@@ -61,13 +68,21 @@ sealed interface StepPhrase {
 fun stepsLabel(steps: List<AnswerPart>): StepsLabel? {
     if (steps.size < 2) return null
 
-    val done = steps.filterIsInstance<AnswerPart.ToolDone>().filter { it.tool !in SILENT }
     val failed = steps.filterIsInstance<AnswerPart.ToolFailed>().filter { it.tool !in SILENT }
 
     // Each kind once, in the order it first ran, with how many steps it stands for. A write's kind
-    // is its action too, so adding one event and removing another are never one phrase.
-    val kinds = LinkedHashMap<Pair<String, ToolAction?>, MutableList<AnswerPart.ToolDone>>()
-    done.forEach { kinds.getOrPut(it.tool to it.summary?.action) { mutableListOf() } += it }
+    // is its action too, so adding one event and removing another are never one phrase; and one
+    // declined is its own kind, so "added" never counts a write that didn't happen.
+    val kinds = LinkedHashMap<Kind, MutableList<AnswerPart>>()
+    steps.forEach { step ->
+        val kind =
+            when (step) {
+                is AnswerPart.ToolDone -> Kind(step.tool, step.summary?.action, declined = false)
+                is AnswerPart.Declined -> Kind(step.tool, step.summary?.action, declined = true)
+                else -> null
+            }
+        if (kind != null && kind.tool !in SILENT) kinds.getOrPut(kind) { mutableListOf() } += step
+    }
 
     if (kinds.isEmpty()) {
         val first = failed.firstOrNull() ?: return StepsLabel(emptyList())
@@ -77,24 +92,36 @@ fun stepsLabel(steps: List<AnswerPart>): StepsLabel? {
     val named = kinds.entries.take(NAMED_KINDS)
     val more = kinds.entries.drop(NAMED_KINDS).sumOf { it.value.size }
     return StepsLabel(
-        named.map { (kind, runs) -> phraseFor(kind.first, kind.second, runs) },
+        named.map { (kind, runs) -> phraseFor(kind, runs) },
         more = more,
         failed = failed.size,
     )
 }
 
+private data class Kind(
+    val tool: String,
+    val action: ToolAction?,
+    val declined: Boolean,
+)
+
 private fun phraseFor(
-    tool: String,
-    action: ToolAction?,
-    runs: List<AnswerPart.ToolDone>,
-): StepPhrase =
-    when (tool) {
+    kind: Kind,
+    runs: List<AnswerPart>,
+): StepPhrase {
+    val tool = kind.tool
+    val action = kind.action
+    val title = (runs.singleOrNull() as? AnswerPart.ToolDone)?.summary?.title
+    if (kind.declined) {
+        return StepPhrase.Declined(tool, action, (runs.singleOrNull() as? AnswerPart.Declined)?.summary?.title)
+    }
+    return when (tool) {
         "searxng_search" -> StepPhrase.Searched(runs.size)
         "read_page" -> StepPhrase.Read(runs.size)
         "calendar_read" -> StepPhrase.CheckedCalendar
-        "calendar_write" -> StepPhrase.Wrote(action, runs.singleOrNull()?.summary?.title)
+        "calendar_write" -> StepPhrase.Wrote(action, title)
         else -> StepPhrase.Did(tool, action)
     }
+}
 
 private const val NAMED_KINDS = 2
 

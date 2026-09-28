@@ -13,6 +13,9 @@ import com.homelab.household.app.resources.steps_label_more
 import com.homelab.household.app.resources.steps_phrase_added
 import com.homelab.household.app.resources.steps_phrase_changed
 import com.homelab.household.app.resources.steps_phrase_checked_calendar
+import com.homelab.household.app.resources.steps_phrase_not_added
+import com.homelab.household.app.resources.steps_phrase_not_changed
+import com.homelab.household.app.resources.steps_phrase_not_removed
 import com.homelab.household.app.resources.steps_phrase_read
 import com.homelab.household.app.resources.steps_phrase_removed
 import com.homelab.household.app.resources.steps_phrase_searched
@@ -85,6 +88,13 @@ private fun phrase(phrase: StepPhrase): String =
                 ?: stringResource(toolLabel(CALENDAR_WRITE, phrase.action).done).replaceFirstChar { it.lowercase() }
         }
 
+        is StepPhrase.Declined -> {
+            phrase.title?.let { stringResource(declinedNamed(phrase.action), it) }
+                ?: (toolLabel(phrase.tool, phrase.action).declined ?: toolLabel(phrase.tool, phrase.action).failed)
+                    .let { stringResource(it) }
+                    .replaceFirstChar { it.lowercase() }
+        }
+
         is StepPhrase.Did -> {
             stringResource(toolLabel(phrase.tool, phrase.action).done).replaceFirstChar { it.lowercase() }
         }
@@ -101,6 +111,14 @@ private fun wroteNamed(action: ToolAction?): StringResource =
         ToolAction.Update -> Res.string.steps_phrase_changed
         ToolAction.Delete -> Res.string.steps_phrase_removed
         else -> Res.string.steps_phrase_updated
+    }
+
+/** "didn’t add %s", "didn’t remove %s": what the member said no to, named. */
+private fun declinedNamed(action: ToolAction?): StringResource =
+    when (action) {
+        ToolAction.Delete -> Res.string.steps_phrase_not_removed
+        ToolAction.Update, ToolAction.Replace -> Res.string.steps_phrase_not_changed
+        else -> Res.string.steps_phrase_not_added
     }
 
 private const val CALENDAR_WRITE = "calendar_write"

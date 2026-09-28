@@ -60,6 +60,8 @@ class HearthIconsTest {
             "more",
             // Removing an event, drawn on the Tools page's approval board
             "calendarRemove",
+            // A write the member declined, on its record line: the Tools page's "approved and declined" board
+            "declined",
         )
 
     private val solidShapeCounts =

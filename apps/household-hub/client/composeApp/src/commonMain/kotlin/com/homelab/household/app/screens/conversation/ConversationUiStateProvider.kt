@@ -6,6 +6,7 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -306,6 +307,94 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             said("m-2", "Done — Saturday at 20:00, in your iCloud calendar.", MessageRole.ASSISTANT),
                             said("m-3", "Actually, make it 20:30", MessageRole.USER, MessageStatus.FAILED_OFFLINE),
                         ),
+                ),
+            // Canvas: ToolApproveRemove. Red, and yes is "Remove": losing something is never the easy tap.
+            "Approving a removal" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Cancel the print shop pickup, we'll do it Monday", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "I'll take it off your calendar.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("I'll take it off your calendar."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Delete,
+                                            arguments =
+                                                mapOf(
+                                                    "action" to "delete",
+                                                    "event_id" to "e-9",
+                                                    "title" to "Print shop",
+                                                    "start_time" to "2026-09-11T18:00:00",
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // The turn carried on: one write done, the other declined, both on their record lines.
+            "Approved and declined" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said(
+                                "m-1",
+                                "Dinner Saturday at 20:30, and remind me to buy flowers Friday",
+                                MessageRole.USER,
+                            ),
+                            said(
+                                "m-2",
+                                "Dinner's in. I left the flowers out, as you asked.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(
+                                            "calendar_write",
+                                            ToolSummary(title = "Dinner together", action = ToolAction.Create),
+                                        ),
+                                        AnswerPart.Declined(
+                                            "calendar_write",
+                                            ToolSummary(title = "Buy flowers", action = ToolAction.Create),
+                                        ),
+                                        AnswerPart.Text("Dinner's in. I left the flowers out, as you asked."),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Send was pressed while a card waits: the words stay, and the line says why.
+            "Waiting on a card, Send held" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put dinner in the calendar for Saturday", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Create,
+                                            arguments =
+                                                mapOf(
+                                                    "title" to "Dinner together",
+                                                    "start_time" to "2026-10-03T20:30:00",
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                    composerText = "Also lunch on Sunday?",
+                    holdingForCard = true,
                 ),
         )
 

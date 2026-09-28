@@ -61,6 +61,7 @@ class SessionRepositoryTest {
         messages: List<ChatMessageReadDto>,
         isSecret: Boolean = false,
         turnRunning: Boolean = false,
+        awaitingApproval: Boolean = false,
     ) = SessionDetailReadDto(
         id = id,
         user_id = "u-1",
@@ -68,6 +69,7 @@ class SessionRepositoryTest {
         is_secret = isSecret,
         messages = messages,
         turn_running = turnRunning,
+        awaiting_approval = awaitingApproval,
     )
 
     private fun repository(
@@ -814,5 +816,94 @@ class SessionRepositoryTest {
 
             // WHEN / THEN
             assertFailsWith<DomainException> { repository(remote).retryMessage("m-nowhere") }
+        }
+
+    // ---- approval cards (slice 4, PR 3) -----------------------------------
+
+    @Test
+    fun `GIVEN a conversation paused on a card WHEN it is opened THEN it says so`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Dinner?")), awaitingApproval = true)
+
+            val (session, _) = repository(remote).getSession("s-1")
+
+            assertTrue(session.awaitingApproval)
+        }
+
+    @Test
+    fun `GIVEN a turn that pauses on a card WHEN it is sent THEN the pause is its end and nothing is read back`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            val paused = ChatStreamEvent.AwaitingApproval(messageId = "m2", assistantContent = "I can add it now.")
+            every { remote.openChatStream(any(), any(), any()) } returns flowOf(ChatStreamEvent.Accepted, paused)
+
+            val events = repository(remote).streamChatTurn("s-1", "Dinner?").toList()
+
+            assertEquals(paused, events.last())
+            verifySuspend(VerifyMode.not) { remote.fetchSession(any()) }
+        }
+
+    @Test
+    fun `GIVEN a card answered WHEN the rest of the turn streams back THEN it passes through untouched`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            val done = ChatStreamEvent.Done(messageId = "m2", assistantContent = "Done.")
+            every { remote.openDecisionStream("s-1", "c1", true, null) } returns
+                flowOf(ChatStreamEvent.Accepted, ChatStreamEvent.Delta("Done."), done)
+
+            val events = repository(remote).decideToolProposal("s-1", "c1", approved = true).toList()
+
+            assertEquals(done, events.last())
+        }
+
+    @Test
+    fun `GIVEN a decision whose stream drops WHEN the conversation is read back THEN a turn paused again is its end`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openDecisionStream(any(), any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    throw ServerOfflineException()
+                }
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(
+                        messageDto("m1", "s-1", "user", "Dinner and flowers?"),
+                        messageDto("m2", "s-1", "assistant", "I can add both."),
+                    ),
+                    awaitingApproval = true,
+                )
+
+            val events = repository(remote, pollDelayMs = 10).decideToolProposal("s-1", "c1", approved = true).toList()
+
+            val paused = events.last() as ChatStreamEvent.AwaitingApproval
+            assertEquals("m2", paused.messageId)
+        }
+
+    @Test
+    fun `GIVEN an answer carried on in place WHEN it is read back while the hub still writes it THEN it is not taken as done`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            every { remote.openDecisionStream(any(), any(), any(), any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    throw ServerOfflineException()
+                }
+            every { remote.resumeTurnStream("s-1") } returns flow { throw TurnGoneException() }
+            val answer = messageDto("m2", "s-1", "assistant", "I can add it now.")
+            var polls = 0
+            everySuspend { remote.fetchSession("s-1") } calls {
+                polls++
+                detailDto("s-1", listOf(messageDto("m1", "s-1", "user", "Dinner?"), answer), turnRunning = polls == 1)
+            }
+
+            val events = repository(remote, pollDelayMs = 10).decideToolProposal("s-1", "c1", approved = true).toList()
+
+            assertTrue(events.last() is ChatStreamEvent.Done)
+            assertEquals(2, polls)
         }
 }
