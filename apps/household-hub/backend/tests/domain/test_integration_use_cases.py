@@ -91,6 +91,8 @@ class MockCalendarConnector:
         self.should_auth_fail = should_auth_fail
         self.connection_error = connection_error
         self.events: List[CalendarEvent] = []
+        # What the last update or delete said about a repeating event's dates.
+        self.series_calls: List[dict] = []
 
     async def test_connection(self, credential: CalendarCredential, secret: str) -> bool:
         if self.connection_error is not None:
@@ -119,6 +121,7 @@ class MockCalendarConnector:
         location: str = "",
         is_all_day: bool = False,
         timeout: float = 10.0,
+        repeat=None,
     ) -> CalendarEvent:
         event = CalendarEvent(
             id=f"evt-{len(self.events) + 1}",
@@ -129,6 +132,7 @@ class MockCalendarConnector:
             location=location,
             is_all_day=is_all_day,
             calendar_name=credential.calendar_name,
+            repeat=repeat,
         )
         self.events.append(event)
         return event
@@ -145,7 +149,11 @@ class MockCalendarConnector:
         location: Optional[str] = None,
         is_all_day: Optional[bool] = None,
         timeout: float = 10.0,
+        repeat=None,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> CalendarEvent:
+        self.series_calls.append({"occurrence_start": occurrence_start, "scope": scope, "repeat": repeat})
         for evt in self.events:
             if evt.id == event_id:
                 if title:
@@ -169,7 +177,10 @@ class MockCalendarConnector:
         secret: str,
         event_id: str,
         timeout: float = 10.0,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> bool:
+        self.series_calls.append({"occurrence_start": occurrence_start, "scope": scope})
         for i, evt in enumerate(self.events):
             if evt.id == event_id:
                 del self.events[i]
@@ -659,3 +670,113 @@ async def test_execute_tool_permissions_and_secret_mode():
     )
     assert cal_res.success is False
     assert "No calendar configured" in cal_res.error
+
+
+def _calendar_tool(connector: MockCalendarConnector, repo: MockCalendarCredentialRepository) -> ExecuteToolUseCase:
+    return ExecuteToolUseCase(
+        calendar_repo=repo,
+        calendar_connector=connector,
+        search_connector=MockSearchConnector(),
+        document_repo=MockDocumentRepository(),
+        document_reader=MockDocumentReader(),
+        cipher=MockSecretCipher(),
+        uow=MockUnitOfWork(),
+        allow_calendar_delete=True,
+    )
+
+
+async def _icloud(repo: MockCalendarCredentialRepository) -> None:
+    await repo.save(
+        CalendarCredential(
+            user_id="u1",
+            provider="apple_icloud",
+            url="https://caldav.icloud.com",
+            username="u1@icloud.com",
+            encrypted_secret="ENC:pass123",
+            calendar_name="Home",
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_calendar_write_makes_a_repeating_event_and_read_says_how_it_repeats():
+    from app.domain.entities.calendar_event import Repeat
+
+    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
+    await _icloud(repo)
+    tool = _calendar_tool(connector, repo)
+
+    created = await tool.execute(
+        tool_name="calendar_write",
+        arguments={
+            "action": "create",
+            "title": "Gym",
+            "start_time": "2026-09-29T07:00:00Z",
+            "end_time": "2026-09-29T08:00:00Z",
+            "repeat": {"frequency": "weekly", "days": ["TU", "TH"], "until": "2026-12-24"},
+        },
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+    assert created.success, created.error
+    assert connector.events[0].repeat == Repeat(frequency="weekly", days=["TU", "TH"], until=datetime(2026, 12, 24).date())
+
+    connector.events[0].occurrence_start = datetime(2026, 10, 1, 7, 0, tzinfo=timezone.utc)
+    read = await tool.execute(
+        tool_name="calendar_read",
+        arguments={"start_time": "2026-09-28T00:00:00Z", "end_time": "2026-10-04T00:00:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_read"],
+    )
+    (event,) = read.data["events"]
+    assert event["occurrence_start"] == "2026-10-01T07:00:00+00:00"
+    assert event["repeat"] == {"frequency": "weekly", "interval": 1, "days": ["TU", "TH"], "until": "2026-12-24"}
+
+
+@pytest.mark.asyncio
+async def test_calendar_write_passes_which_dates_of_a_repeating_event_it_means():
+    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
+    await _icloud(repo)
+    connector.events.append(
+        CalendarEvent(id="gym-1", title="Gym", start_time=datetime(2026, 9, 29, 7, tzinfo=timezone.utc), end_time=datetime(2026, 9, 29, 8, tzinfo=timezone.utc))
+    )
+    tool = _calendar_tool(connector, repo)
+
+    await tool.execute(
+        tool_name="calendar_write",
+        arguments={"action": "update", "event_id": "gym-1", "title": "Swim", "occurrence_start": "2026-10-06T07:00:00Z", "scope": "following"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+    await tool.execute(
+        tool_name="calendar_write",
+        arguments={"action": "delete", "event_id": "gym-1", "occurrence_start": "2026-10-01T07:00:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    moved, removed = connector.series_calls
+    assert moved["scope"] == "following" and moved["occurrence_start"] == datetime(2026, 10, 6, 7, tzinfo=timezone.utc)
+    assert removed["scope"] == "this" and removed["occurrence_start"] == datetime(2026, 10, 1, 7, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_calendar_write_tells_the_model_what_is_wrong_with_a_repeat():
+    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
+    await _icloud(repo)
+
+    result = await _calendar_tool(connector, repo).execute(
+        tool_name="calendar_write",
+        arguments={
+            "action": "create",
+            "title": "Gym",
+            "start_time": "2026-09-29T07:00:00Z",
+            "end_time": "2026-09-29T08:00:00Z",
+            "repeat": {"frequency": "fortnightly"},
+        },
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    assert result.success is False and "repeat.frequency" in result.error
+    assert connector.events == []

@@ -77,20 +77,21 @@ object AnswerPartDataMapper {
         }
 
     /**
-     * A write's details as the model asked for them. Only plain values are kept, since a card shows
-     * words, times and yes-or-no: anything nested is left out rather than guessed at.
+     * A write's details as the model asked for them: words, numbers and yes-or-no, and the lists and
+     * objects some carry, like how an event repeats. A value this phone can't read is left out.
      */
     fun argumentsFromJson(element: JsonElement?): Map<String, Any?> =
         (element as? JsonObject)
             .orEmpty()
-            .mapNotNull { (key, value) ->
-                when {
-                    value is JsonNull -> key to null
-                    value !is JsonPrimitive -> null
-                    value.isString -> key to value.content
-                    else -> key to (value.booleanOrNull ?: value.longOrNull ?: value.doubleOrNull)
-                }
-            }.toMap()
+            .mapValues { (_, value) -> plain(value) }
+
+    private fun plain(value: JsonElement): Any? =
+        when (value) {
+            is JsonNull -> null
+            is JsonObject -> value.mapValues { (_, item) -> plain(item) }
+            is JsonArray -> value.map(::plain)
+            is JsonPrimitive -> if (value.isString) value.content else value.booleanOrNull ?: value.longOrNull ?: value.doubleOrNull
+        }
 
     /** The other way, for details changed on a card: the same plain values, as JSON. */
     fun argumentsToJson(arguments: Map<String, Any?>): JsonObject =

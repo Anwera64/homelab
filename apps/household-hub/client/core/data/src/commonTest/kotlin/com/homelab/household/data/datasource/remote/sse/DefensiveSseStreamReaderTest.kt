@@ -405,6 +405,25 @@ class DefensiveSseStreamReaderTest {
     // ---- approval cards (slice 4, PR 3) -----------------------------------
 
     @Test
+    fun `GIVEN a repeating event WHEN its proposal is read THEN the card keeps how it repeats`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_approval_proposal", "tool_call_id": "c1", "tool": "calendar_write", "action": "create", "arguments": {"title": "Gym", "repeat": {"frequency": "weekly", "interval": 1, "days": ["TU", "TH"], "until": "2026-12-24"}}}
+
+                """.trimIndent()
+
+            val proposal =
+                reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList().single()
+                    as ChatStreamEvent.ToolApprovalProposal
+
+            assertEquals(
+                mapOf("frequency" to "weekly", "interval" to 1L, "days" to listOf("TU", "TH"), "until" to "2026-12-24"),
+                proposal.arguments["repeat"],
+            )
+        }
+
+    @Test
     fun `GIVEN a write that needs asking WHEN its proposal is read THEN the card has its call id and action and details`() =
         runTest {
             val ssePayload =

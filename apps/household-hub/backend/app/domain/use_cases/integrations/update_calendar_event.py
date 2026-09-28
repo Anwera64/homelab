@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from app.domain.entities.calendar_event import CalendarEvent
+from app.domain.entities.calendar_event import CalendarEvent, Repeat
 from app.domain.exceptions import CalendarIntegrationException
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
@@ -29,6 +29,9 @@ class UpdateCalendarEventUseCase:
         location: Optional[str] = None,
         is_all_day: Optional[bool] = None,
         timeout: float = 10.0,
+        repeat: Optional[Repeat] = None,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> CalendarEvent:
         credential = await self.credential_repo.get_by_user_id(user_id)
         if not credential or not credential.is_active:
@@ -46,4 +49,7 @@ class UpdateCalendarEventUseCase:
             location=location,
             is_all_day=is_all_day,
             timeout=timeout,
+            repeat=repeat,
+            occurrence_start=occurrence_start,
+            scope=scope,
         )

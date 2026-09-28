@@ -71,6 +71,47 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "description": "Event ID required when action is 'update' or 'delete'",
                         },
+                        "repeat": {
+                            "type": "object",
+                            "description": (
+                                "Makes the event repeat. On create: how the new event repeats. On update "
+                                "of a repeating event with scope 'following': how it repeats from that "
+                                "date on (pass it as calendar_read gave it when that doesn't change). "
+                                "On delete: the event's repeat as calendar_read gave it."
+                            ),
+                            "properties": {
+                                "frequency": {"type": "string", "enum": ["daily", "weekly", "monthly", "yearly"]},
+                                "interval": {
+                                    "type": "integer",
+                                    "description": "Every how many days, weeks, months or years (default 1)",
+                                    "minimum": 1,
+                                },
+                                "days": {
+                                    "type": "array",
+                                    "items": {"type": "string", "enum": ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]},
+                                    "description": "The weekdays of a weekly repeat",
+                                },
+                                "until": {"type": "string", "description": "Last day it can happen, YYYY-MM-DD"},
+                                "count": {"type": "integer", "description": "How many times in all", "minimum": 1},
+                            },
+                            "required": ["frequency"],
+                        },
+                        "occurrence_start": {
+                            "type": "string",
+                            "description": (
+                                "Required to update or delete a repeating event (one calendar_read gave an "
+                                "occurrence_start for): the occurrence_start of the date meant."
+                            ),
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": ["this", "following"],
+                            "description": (
+                                "For a repeating event: 'this' changes or removes only that date (default), "
+                                "'following' that date and every later one."
+                            ),
+                            "default": "this",
+                        },
                     },
                     "required": ["action"],
                 },
