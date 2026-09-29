@@ -1,27 +1,38 @@
 package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * What an approval card shows, read from what the model asked for (canvas: ToolApproveRemove):
- * "Print shop", "Fri 11 Sep, 18:00". What it can't read it leaves out rather than guess at.
+ * What an approval card shows about the write it asks for (canvas: ToolApproveRemove): "Print shop",
+ * "Fri 11 Sep, 18:00". It reads the details the data layer already made sense of; what the model
+ * left out, the card leaves out.
  */
 class ApprovalCardDetailsTest {
     private fun card(
         action: ToolAction?,
-        vararg arguments: Pair<String, Any?>,
+        details: ProposalDetails,
         tool: String = "calendar_write",
-    ) = AnswerPart.Proposal("c-1", tool, action, mapOf(*arguments))
+    ) = AnswerPart.Proposal("c-1", tool, action, details)
 
     @Test
-    fun `GIVEN an event with a time WHEN read THEN it shows its title and its weekday and date and time as written`() {
+    fun `GIVEN an event with a time WHEN read THEN it shows its title and its weekday and date and time`() {
         val details =
             approvalCardDetails(
-                card(ToolAction.Delete, "title" to "Print shop", "start_time" to "2026-09-11T18:00:00+02:00"),
+                card(
+                    ToolAction.Delete,
+                    ProposalDetails.CalendarEvent(
+                        title = "Print shop",
+                        start = EventMoment(2026, 9, 11, hour = 18, minute = 0, offset = "+02:00"),
+                        end = null,
+                        allDay = false,
+                    ),
+                ),
             )
 
         assertEquals(
@@ -36,8 +47,12 @@ class ApprovalCardDetailsTest {
             approvalCardDetails(
                 card(
                     ToolAction.Create,
-                    "start_time" to "2026-10-03T00:00:00",
-                    "is_all_day" to true,
+                    ProposalDetails.CalendarEvent(
+                        null,
+                        EventMoment(2026, 10, 3, hour = 0, minute = 0),
+                        null,
+                        allDay = true,
+                    ),
                 ),
             )
 
@@ -46,16 +61,24 @@ class ApprovalCardDetailsTest {
     }
 
     @Test
-    fun `GIVEN dates across leap years and January WHEN read THEN the weekday is right`() {
-        assertEquals(1, cardWhen("2000-02-29")?.weekday)
-        assertEquals(0, cardWhen("2024-01-01")?.weekday)
-        assertNull(cardWhen("2024-01-01")?.time)
+    fun `GIVEN a morning time WHEN read THEN it is written with two digits`() {
+        val details =
+            approvalCardDetails(
+                card(
+                    ToolAction.Create,
+                    ProposalDetails.CalendarEvent(null, EventMoment(2026, 10, 3, 9, 5), null, false),
+                ),
+            )
+
+        assertEquals("09:05", details.whenAt?.time)
     }
 
     @Test
-    fun `GIVEN a time that is not a timestamp WHEN read THEN it is not shown`() {
-        assertNull(cardWhen("tomorrow at six"))
-        assertNull(cardWhen("2026-13-01"))
+    fun `GIVEN an event without a time it could read WHEN read THEN no time is shown`() {
+        val details =
+            approvalCardDetails(card(ToolAction.Update, ProposalDetails.CalendarEvent("Dentist", null, null, false)))
+
+        assertEquals(ApprovalCardDetails("Dentist"), details)
     }
 
     @Test
@@ -64,8 +87,7 @@ class ApprovalCardDetailsTest {
             approvalCardDetails(
                 card(
                     ToolAction.Replace,
-                    "title" to "Shopping",
-                    "content" to "\nMilk, eggs\nBread",
+                    ProposalDetails.Note("Shopping", "\nMilk, eggs\nBread"),
                     tool = "document_writer",
                 ),
             )
@@ -74,84 +96,18 @@ class ApprovalCardDetailsTest {
     }
 
     @Test
+    fun `GIVEN a write the phone has no words for WHEN read THEN the card shows no details`() {
+        assertEquals(
+            ApprovalCardDetails(title = null),
+            approvalCardDetails(card(ToolAction.Create, ProposalDetails.Other)),
+        )
+    }
+
+    @Test
     fun `GIVEN each action WHEN asked THEN only removing and replacing ask in the destructive style`() {
         assertEquals(CardAsk.Approve, cardAsk(ToolAction.Create))
         assertEquals(CardAsk.Approve, cardAsk(null))
         assertEquals(CardAsk.Remove, cardAsk(ToolAction.Delete))
         assertEquals(CardAsk.Replace, cardAsk(ToolAction.Replace))
-    }
-
-    // ---- repeating events ---------------------------------------------------
-
-    private val gym =
-        mapOf("frequency" to "weekly", "interval" to 1L, "days" to listOf("TU", "TH"), "until" to "2026-12-24")
-
-    @Test
-    fun `GIVEN a weekly event on two days until a date WHEN read THEN the card knows its days and last date`() {
-        val details = approvalCardDetails(card(ToolAction.Create, "title" to "Gym", "repeat" to gym))
-
-        assertEquals(
-            CardRepeat(
-                every = RepeatEvery.Week,
-                weekdays = listOf(1, 3),
-                until = CardWhen(weekday = 3, day = 24, month = 12, time = null),
-            ),
-            details.repeat,
-        )
-        assertNull(details.scope, "a new event has no dates to choose between")
-    }
-
-    @Test
-    fun `GIVEN every other month six times WHEN read THEN the card knows the gap and the count`() {
-        val repeat =
-            approvalCardDetails(
-                card(
-                    ToolAction.Create,
-                    "repeat" to mapOf("frequency" to "monthly", "interval" to 2L, "count" to 6L),
-                ),
-            ).repeat
-
-        assertEquals(CardRepeat(every = RepeatEvery.Month, interval = 2, count = 6), repeat)
-    }
-
-    @Test
-    fun `GIVEN a repeat the card has no words for WHEN read THEN no repeat line is shown`() {
-        assertNull(approvalCardDetails(card(ToolAction.Create, "repeat" to mapOf("frequency" to "hourly"))).repeat)
-        assertNull(approvalCardDetails(card(ToolAction.Create, "repeat" to "weekly")).repeat)
-        assertNull(
-            approvalCardDetails(
-                card(
-                    ToolAction.Create,
-                    "repeat" to mapOf("frequency" to "weekly", "days" to listOf("XX")),
-                ),
-            ).repeat,
-        )
-    }
-
-    @Test
-    fun `GIVEN one date of a series to remove WHEN read THEN the card asks which dates and starts on only this one unless the agent said otherwise`() {
-        val one = card(ToolAction.Delete, "occurrence_start" to "2026-10-01T07:00:00Z", "repeat" to gym)
-        val rest = card(ToolAction.Update, "occurrence_start" to "2026-10-06T07:00:00Z", "scope" to "following")
-
-        assertEquals(CardScope.OnlyThis, approvalCardDetails(one).scope)
-        assertEquals(CardScope.ThisAndFollowing, approvalCardDetails(rest).scope)
-        assertNull(
-            approvalCardDetails(card(ToolAction.Delete, "title" to "Dentist")).scope,
-            "a one-off has no dates to choose between",
-        )
-    }
-
-    @Test
-    fun `GIVEN the member switched which dates WHEN approving THEN only the change is sent`() {
-        assertEquals(
-            mapOf("scope" to "following"),
-            scopeChange(proposed = CardScope.OnlyThis, chosen = CardScope.ThisAndFollowing),
-        )
-        assertEquals(
-            mapOf("scope" to "this"),
-            scopeChange(proposed = CardScope.ThisAndFollowing, chosen = CardScope.OnlyThis),
-        )
-        assertNull(scopeChange(proposed = CardScope.OnlyThis, chosen = CardScope.OnlyThis))
-        assertNull(scopeChange(proposed = null, chosen = null))
     }
 }

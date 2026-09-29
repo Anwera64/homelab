@@ -22,6 +22,7 @@ from app.data.datasources.memory_data_source import SqliteMemoryDataSource
 from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
 from app.data.datasources.llm_model_data_source import SqliteLLMModelDataSource
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
+from app.data.datasources.tool_approval_data_source import SqliteToolApprovalDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.gossip_data_source import SqliteGossipDataSource
 from app.data.datasources.invite_data_source import SqliteInviteDataSource
@@ -36,6 +37,7 @@ from app.data.mappers.memory_data_mapper import MemoryDataMapper
 from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
 from app.data.mappers.llm_model_data_mapper import LLMModelDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
+from app.data.mappers.tool_approval_data_mapper import ToolApprovalDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.gossip_data_mapper import GossipDataMapper
 from app.data.mappers.invite_data_mapper import InviteDataMapper
@@ -50,6 +52,7 @@ from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
 from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
 from app.data.repositories.llm_model_repository_impl import LLMModelRepositoryImpl
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
+from app.data.repositories.tool_approval_repository_impl import ToolApprovalRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
 from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
 from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
@@ -132,6 +135,7 @@ from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
 
 # Integration Use Cases
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
+from app.domain.use_cases.integrations.mark_calendar_steps_fixed import MarkCalendarStepsFixedUseCase
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
@@ -162,7 +166,9 @@ from app.domain.use_cases.gossip.manage_gossip_milestones import (
 )
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.tool_approval import DropPendingProposalsUseCase
+from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
+from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
 
@@ -186,6 +192,7 @@ _memory_mapper = MemoryDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
 _llm_model_mapper = LLMModelDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
+_tool_approval_mapper = ToolApprovalDataMapper()
 _document_mapper = DocumentDataMapper()
 _gossip_mapper = GossipDataMapper()
 _invite_mapper = InviteDataMapper()
@@ -250,6 +257,7 @@ def get_container(session: AsyncSession):
     llm_model_repo = LLMModelRepositoryImpl(llm_model_ds, _llm_model_mapper)
     model_resolver = ResolveAgentModelUseCase(llm_model_repo)
     calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
+    tool_approval_repo = ToolApprovalRepositoryImpl(SqliteToolApprovalDataSource(session), _tool_approval_mapper)
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
     gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
     invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
@@ -306,6 +314,7 @@ def get_container(session: AsyncSession):
         source_index_factory=_source_index_factory,
         context_window_tokens=settings.LLM_CONTEXT_TOKENS,
         answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
+        approval_repo=tool_approval_repo,
     )
 
     summarize_history_uc = SummarizeHistoryUseCase(
@@ -394,7 +403,6 @@ def get_container(session: AsyncSession):
         session_id: str,
         current_user: User,
         content: str,
-        auto_approve_writes: bool,
         queue: asyncio.Queue,
         agent_id: str = "",
         agent_name: str = "",
@@ -431,7 +439,6 @@ def get_container(session: AsyncSession):
                         session_id=session_id,
                         current_user=current_user,
                         content=content,
-                        auto_approve_writes=auto_approve_writes,
                         timezone_name=timezone_name,
                     )
                 async for event in turn:
@@ -485,6 +492,8 @@ def get_container(session: AsyncSession):
         pres_deps.get_list_members_use_case: ListMembersUseCase(user_repo),
         pres_deps.get_member_use_case: GetMemberUseCase(user_repo),
         pres_deps.get_update_profile_use_case: UpdateProfileUseCase(user_repo, uow),
+        pres_deps.get_list_tool_approvals_use_case: ListToolApprovalsUseCase(tool_approval_repo),
+        pres_deps.get_set_tool_approval_use_case: SetToolApprovalUseCase(tool_approval_repo, uow),
         pres_deps.get_change_pin_use_case: ChangePinUseCase(
             VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
             user_repo,
@@ -527,6 +536,8 @@ def get_container(session: AsyncSession):
         # Sessions
         pres_deps.get_list_user_sessions_use_case: ListUserSessionsUseCase(session_repo),
         pres_deps.get_session_use_case: GetSessionUseCase(session_repo),
+        pres_deps.get_prepare_chat_turn_use_case: PrepareChatTurnUseCase(GetSessionUseCase(session_repo)),
+        pres_deps.get_prepare_tool_decision_use_case: PrepareToolDecisionUseCase(GetSessionUseCase(session_repo)),
         pres_deps.get_create_session_use_case: CreateSessionUseCase(session_repo, agent_repo, uow),
         pres_deps.get_toggle_secret_mode_use_case: ToggleSecretModeUseCase(session_repo, uow),
         pres_deps.get_archive_session_use_case: ArchiveSessionUseCase(session_repo, uow),
@@ -542,7 +553,9 @@ def get_container(session: AsyncSession):
         pres_deps.get_delete_memory_use_case: DeleteMemoryUseCase(memory_repo, uow),
 
         # Integrations
-        pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, uow),
+        pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(
+            calendar_cred_repo, _caldav_connector, _secret_cipher, uow, mark_fixed=MarkCalendarStepsFixedUseCase(session_repo)
+        ),
         pres_deps.get_user_calendar_use_case: GetUserCalendarUseCase(calendar_cred_repo),
         pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
         pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
@@ -551,7 +564,8 @@ def get_container(session: AsyncSession):
         pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
         pres_deps.get_start_google_calendar_sign_in_use_case: StartGoogleCalendarSignInUseCase(_sign_in_states, _google_oauth),
         pres_deps.get_complete_google_calendar_sign_in_use_case: CompleteGoogleCalendarSignInUseCase(
-            _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow
+            _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow,
+            mark_fixed=MarkCalendarStepsFixedUseCase(session_repo),
         ),
         pres_deps.get_execute_search_use_case: ExecuteSearchUseCase(_searxng_connector),
         pres_deps.get_parse_pdf_document_use_case: ParsePdfDocumentUseCase(_document_reader, max_size_bytes=settings.MAX_PDF_SIZE_BYTES),
@@ -620,6 +634,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_list_members_use_case,
         pres_deps.get_member_use_case,
         pres_deps.get_update_profile_use_case,
+        pres_deps.get_list_tool_approvals_use_case,
+        pres_deps.get_set_tool_approval_use_case,
         pres_deps.get_change_pin_use_case,
         pres_deps.get_remove_member_use_case,
         pres_deps.get_leave_household_use_case,
@@ -640,6 +656,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_purge_trash_agent_use_case,
         pres_deps.get_list_user_sessions_use_case,
         pres_deps.get_session_use_case,
+        pres_deps.get_prepare_chat_turn_use_case,
+        pres_deps.get_prepare_tool_decision_use_case,
         pres_deps.get_create_session_use_case,
         pres_deps.get_toggle_secret_mode_use_case,
         pres_deps.get_archive_session_use_case,

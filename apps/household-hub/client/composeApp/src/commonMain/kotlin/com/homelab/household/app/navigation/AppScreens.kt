@@ -110,6 +110,7 @@ interface AppScreens {
     @Composable fun Conversation(
         sessionId: String?,
         onBack: () -> Unit,
+        onConnectCalendar: () -> Unit,
     )
 
     @Composable fun Profile(
@@ -286,8 +287,9 @@ object RealAppScreens : AppScreens {
     override fun Conversation(
         sessionId: String?,
         onBack: () -> Unit,
+        onConnectCalendar: () -> Unit,
     ) {
-        ConversationScreen(sessionId = sessionId, onBack = onBack)
+        ConversationScreen(sessionId = sessionId, onBack = onBack, onConnectCalendar = onConnectCalendar)
     }
 
     @Composable

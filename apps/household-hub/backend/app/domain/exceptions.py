@@ -97,6 +97,31 @@ class AlreadyDecidedException(InvalidOperationException):
     pass
 
 
+class AlwaysAsksException(InvalidOperationException):
+    """Raised for turning on auto-approve for an action that always asks: removing or replacing."""
+    pass
+
+
+class ToolFailureReason:
+    """
+    Why a tool failed, as a code the phone puts into words (#40). The exception's message is written
+    for the model and can carry internals; this is the part that is safe to show.
+    """
+
+    SERVICE_UNAVAILABLE = "service_unavailable"
+    THROTTLED = "throttled"
+    BLOCKED = "blocked"
+    FORBIDDEN = "forbidden"
+    TOO_LARGE = "too_large"
+    NOT_A_PAGE = "not_a_page"
+    UNREADABLE = "unreadable"
+    NOT_FOUND = "not_found"
+    # A calendar tool the member can fix from Profile: its sign-in was refused, or there is no calendar.
+    CALENDAR_REJECTED = "calendar_rejected"
+    CALENDAR_NOT_CONNECTED = "calendar_not_connected"
+    UNKNOWN = "unknown"
+
+
 # Integration Exceptions
 class CalendarIntegrationException(DomainException):
     """Base exception for calendar operations."""
@@ -105,7 +130,14 @@ class CalendarIntegrationException(DomainException):
 
 class CalendarAuthException(CalendarIntegrationException):
     """The calendar server answered and refused the credentials (401/403): almost always the password."""
-    pass
+
+    reason = ToolFailureReason.CALENDAR_REJECTED
+
+
+class CalendarNotConnectedException(CalendarIntegrationException):
+    """The member has no calendar connected, so a calendar tool has nothing to work on."""
+
+    reason = ToolFailureReason.CALENDAR_NOT_CONNECTED
 
 
 class CalendarUnreachableException(CalendarIntegrationException):
@@ -131,23 +163,6 @@ class CalendarOAuthRevokedException(CalendarIntegrationException):
 class CalendarSignInNotConfiguredException(CalendarIntegrationException):
     """The hub has no Google OAuth client configured, so nobody can sign in with Google."""
     pass
-
-
-class ToolFailureReason:
-    """
-    Why a tool failed, as a code the phone puts into words (#40). The exception's message is written
-    for the model and can carry internals; this is the part that is safe to show.
-    """
-
-    SERVICE_UNAVAILABLE = "service_unavailable"
-    THROTTLED = "throttled"
-    BLOCKED = "blocked"
-    FORBIDDEN = "forbidden"
-    TOO_LARGE = "too_large"
-    NOT_A_PAGE = "not_a_page"
-    UNREADABLE = "unreadable"
-    NOT_FOUND = "not_found"
-    UNKNOWN = "unknown"
 
 
 class SearchServiceException(DomainException):

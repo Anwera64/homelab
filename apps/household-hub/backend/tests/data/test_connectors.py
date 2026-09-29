@@ -619,3 +619,55 @@ async def test_an_edited_event_is_saved_as_valid_icalendar():
     assert re.search(r"^DTSTAMP:\d{8}T\d{6}Z\r?$", saved, re.MULTILINE), saved
     assert re.search(r"^SEQUENCE:1\r?$", saved, re.MULTILINE), saved
     assert saved.count("DTSTART") == 1 and saved.count("DTSTAMP") == 1
+
+
+# A password Apple revoked shows up on the next read or write, not only when connecting: it has to
+# read as a refused sign-in there too, so the failed step can offer to reconnect (slice 4, PR 7).
+@pytest.mark.asyncio
+async def test_GIVEN_the_server_refuses_the_password_WHEN_events_are_read_THEN_it_reads_as_rejected():
+    from caldav.lib.error import AuthorizationError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.side_effect = AuthorizationError(url="https://caldav.icloud.com", reason="Unauthorized")
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarAuthException):
+            await connector.fetch_events(_icloud_credential(), "revoked", datetime.now(timezone.utc), datetime.now(timezone.utc))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_server_refuses_the_password_WHEN_an_event_is_added_THEN_it_reads_as_rejected():
+    from caldav.lib.error import AuthorizationError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.side_effect = AuthorizationError(url="https://caldav.icloud.com", reason="Unauthorized")
+    now = datetime.now(timezone.utc)
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarAuthException):
+            await connector.create_event(_icloud_credential(), "revoked", "Print shop cutoff", now, now)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["update", "delete"])
+async def test_GIVEN_the_server_refuses_the_password_WHEN_an_event_is_changed_or_removed_THEN_it_reads_as_rejected(operation):
+    from caldav.lib.error import AuthorizationError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+    from app.domain.exceptions import CalendarAuthException
+
+    connector = CalDavCalendarConnector()
+    client = MagicMock()
+    client.principal.return_value.calendars.return_value = [MagicMock(name="Default")]
+    client.principal.return_value.calendars.return_value[0].event_by_uid.side_effect = AuthorizationError(
+        url="https://caldav.icloud.com", reason="Unauthorized"
+    )
+    with patch.object(connector, "_sync_get_client", return_value=client):
+        with pytest.raises(CalendarAuthException):
+            if operation == "update":
+                await connector.update_event(_icloud_credential(), "revoked", "event-123", title="Dentist")
+            else:
+                await connector.delete_event(_icloud_credential(), "revoked", "event-123")

@@ -62,8 +62,8 @@ class HearthIconsTest {
             "calendarRemove",
             // A write the member declined, on its record line: the Tools page's "approved and declined" board
             "declined",
-            // How often an event repeats, on its approval card: the Tools page's "Repeating events" row
-            "repeat",
+            // A calendar step fixed since it failed, on its fix card: the Tools page's ToolFixedCard board
+            "calendarFixed",
         )
 
     private val solidShapeCounts =

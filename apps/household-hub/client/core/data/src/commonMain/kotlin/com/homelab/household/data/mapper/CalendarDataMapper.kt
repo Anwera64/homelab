@@ -28,7 +28,13 @@ object CalendarDataMapper {
             account = dto.username,
             server = dto.url,
             calendarName = dto.calendarName,
-            connectedAt = dto.updatedAt,
+            connectedAt = dto.updatedAt?.let(::zoned),
             needsReconnect = dto.needsReconnect,
         )
+
+    /** The hub writes its times in UTC, and not always with the zone on the end. */
+    private fun zoned(stamp: String): String {
+        val time = stamp.substringAfter('T', missingDelimiterValue = "")
+        return if (time.endsWith('Z') || '+' in time || '-' in time) stamp else "${stamp}Z"
+    }
 }

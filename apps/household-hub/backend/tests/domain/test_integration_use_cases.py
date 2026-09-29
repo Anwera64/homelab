@@ -327,6 +327,53 @@ async def test_configure_calendar_auth_failure_raises():
     assert (await repo.get_by_user_id("u1")) is None
 
 
+class SpyMarkCalendarStepsFixed:
+    """Records whose steps were marked fixed, and whether that was before the calendar was committed."""
+
+    def __init__(self, uow: "MockUnitOfWork"):
+        self.uow = uow
+        self.calls: List[tuple] = []
+
+    async def execute(self, user_id: str) -> None:
+        self.calls.append((user_id, self.uow.committed))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_calendar_that_answers_WHEN_it_is_configured_THEN_the_members_failed_calendar_steps_are_marked_fixed_in_the_same_save():
+    uow = MockUnitOfWork()
+    mark_fixed = SpyMarkCalendarStepsFixed(uow)
+    use_case = ConfigureCalendarUseCase(
+        MockCalendarCredentialRepository(), MockCalendarConnector(), MockSecretCipher(), uow, mark_fixed=mark_fixed
+    )
+
+    await use_case.execute(
+        user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1@icloud.com", password="pw"
+    )
+
+    assert mark_fixed.calls == [("u1", False)]
+    assert uow.committed is True
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_calendar_that_refuses_WHEN_it_is_configured_THEN_nothing_is_marked_fixed():
+    uow = MockUnitOfWork()
+    mark_fixed = SpyMarkCalendarStepsFixed(uow)
+    use_case = ConfigureCalendarUseCase(
+        MockCalendarCredentialRepository(),
+        MockCalendarConnector(connection_error=CalendarAuthException("rejected")),
+        MockSecretCipher(),
+        uow,
+        mark_fixed=mark_fixed,
+    )
+
+    with pytest.raises(CalendarAuthException):
+        await use_case.execute(
+            user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1@icloud.com", password="pw"
+        )
+
+    assert mark_fixed.calls == []
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure",
@@ -672,39 +719,100 @@ async def test_execute_tool_permissions_and_secret_mode():
     assert "No calendar configured" in cal_res.error
 
 
-def _calendar_tool(connector: MockCalendarConnector, repo: MockCalendarCredentialRepository) -> ExecuteToolUseCase:
+# A calendar tool that fails says why, so the phone can offer the fix (slice 4, PR 7).
+class RefusingCalendarConnector(MockCalendarConnector):
+    """A calendar whose server now refuses the stored password or token."""
+
+    async def fetch_events(self, *args, **kwargs):
+        raise CalendarAuthException("CalDAV server refused the credentials")
+
+    async def create_event(self, *args, **kwargs):
+        raise CalendarAuthException("CalDAV server refused the credentials")
+
+
+def _execute_tool(cal_repo, cal_connector, **options) -> ExecuteToolUseCase:
     return ExecuteToolUseCase(
-        calendar_repo=repo,
-        calendar_connector=connector,
+        calendar_repo=cal_repo,
+        calendar_connector=cal_connector,
         search_connector=MockSearchConnector(),
         document_repo=MockDocumentRepository(),
         document_reader=MockDocumentReader(),
         cipher=MockSecretCipher(),
         uow=MockUnitOfWork(),
-        allow_calendar_delete=True,
+        **options,
     )
 
 
-async def _icloud(repo: MockCalendarCredentialRepository) -> None:
+async def _connected_repo() -> MockCalendarCredentialRepository:
+    repo = MockCalendarCredentialRepository()
     await repo.save(
         CalendarCredential(
             user_id="u1",
             provider="apple_icloud",
             url="https://caldav.icloud.com",
-            username="u1@icloud.com",
-            encrypted_secret="ENC:pass123",
-            calendar_name="Home",
+            username="emma@icloud.com",
+            encrypted_secret="ENC:abcd-efgh-ijkl-mnop",
+            calendar_name="Default",
         )
     )
+    return repo
 
 
+READ_ARGUMENTS = {"start_time": "2026-09-08T00:00:00Z", "end_time": "2026-09-09T00:00:00Z"}
+ADD_ARGUMENTS = {
+    "action": "create",
+    "title": "Print shop cutoff",
+    "start_time": "2026-09-08T16:00:00Z",
+    "end_time": "2026-09-08T16:30:00Z",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool, arguments", [("calendar_read", READ_ARGUMENTS), ("calendar_write", ADD_ARGUMENTS)])
+async def test_GIVEN_the_calendar_refuses_the_sign_in_WHEN_a_calendar_tool_runs_THEN_it_fails_as_calendar_rejected(tool, arguments):
+    execute_uc = _execute_tool(await _connected_repo(), RefusingCalendarConnector())
+
+    result = await execute_uc.execute(tool_name=tool, arguments=arguments, user_id="u1", agent_tool_permissions=[tool])
+
+    assert result.success is False
+    assert result.reason == "calendar_rejected"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool, arguments", [("calendar_read", READ_ARGUMENTS), ("calendar_write", ADD_ARGUMENTS)])
+async def test_GIVEN_no_calendar_is_connected_WHEN_a_calendar_tool_runs_THEN_it_fails_as_calendar_not_connected(tool, arguments):
+    execute_uc = _execute_tool(MockCalendarCredentialRepository(), MockCalendarConnector())
+
+    result = await execute_uc.execute(tool_name=tool, arguments=arguments, user_id="u1", agent_tool_permissions=[tool])
+
+    assert result.success is False
+    assert result.reason == "calendar_not_connected"
+    assert "No calendar configured" in result.error
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_calendar_cannot_be_reached_WHEN_a_calendar_tool_runs_THEN_it_is_not_put_down_to_the_sign_in():
+    class UnreachableCalendarConnector(MockCalendarConnector):
+        async def fetch_events(self, *args, **kwargs):
+            raise CalendarUnreachableException("CalDAV server did not answer")
+
+    execute_uc = _execute_tool(await _connected_repo(), UnreachableCalendarConnector())
+
+    result = await execute_uc.execute(
+        tool_name="calendar_read", arguments=READ_ARGUMENTS, user_id="u1", agent_tool_permissions=["calendar_read"]
+    )
+
+    assert result.success is False
+    assert result.reason not in ("calendar_rejected", "calendar_not_connected")
+
+
+# Repeating events: calendar_write takes a repeat rule and says which dates a change is for.
 @pytest.mark.asyncio
 async def test_calendar_write_makes_a_repeating_event_and_read_says_how_it_repeats():
     from app.domain.entities.calendar_event import Repeat
 
-    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
-    await _icloud(repo)
-    tool = _calendar_tool(connector, repo)
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    tool = _execute_tool(repo, connector, allow_calendar_delete=True)
 
     created = await tool.execute(
         tool_name="calendar_write",
@@ -735,12 +843,11 @@ async def test_calendar_write_makes_a_repeating_event_and_read_says_how_it_repea
 
 @pytest.mark.asyncio
 async def test_calendar_write_passes_which_dates_of_a_repeating_event_it_means():
-    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
-    await _icloud(repo)
+    repo, connector = await _connected_repo(), MockCalendarConnector()
     connector.events.append(
         CalendarEvent(id="gym-1", title="Gym", start_time=datetime(2026, 9, 29, 7, tzinfo=timezone.utc), end_time=datetime(2026, 9, 29, 8, tzinfo=timezone.utc))
     )
-    tool = _calendar_tool(connector, repo)
+    tool = _execute_tool(repo, connector, allow_calendar_delete=True)
 
     await tool.execute(
         tool_name="calendar_write",
@@ -762,10 +869,9 @@ async def test_calendar_write_passes_which_dates_of_a_repeating_event_it_means()
 
 @pytest.mark.asyncio
 async def test_calendar_write_tells_the_model_what_is_wrong_with_a_repeat():
-    repo, connector = MockCalendarCredentialRepository(), MockCalendarConnector()
-    await _icloud(repo)
+    repo, connector = await _connected_repo(), MockCalendarConnector()
 
-    result = await _calendar_tool(connector, repo).execute(
+    result = await _execute_tool(repo, connector, allow_calendar_delete=True).execute(
         tool_name="calendar_write",
         arguments={
             "action": "create",

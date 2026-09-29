@@ -4,15 +4,12 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ProposalStatus
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 
 /**
  * Turns the hub's `parts` array into [AnswerPart]s.
@@ -39,8 +36,9 @@ object AnswerPartDataMapper {
                 val tool = part["tool"]?.jsonPrimitive?.contentOrNull
                 val success = part["success"]?.jsonPrimitive?.booleanOrNull
                 val summary = ToolSummaryDataMapper.fromJson(part["summary"])
+                val automatic = (part["auto"] as? JsonPrimitive)?.booleanOrNull ?: false
                 if (tool != null && success != null) {
-                    if (success) AnswerPart.ToolDone(tool, summary) else AnswerPart.ToolFailed(tool, summary)
+                    if (success) AnswerPart.ToolDone(tool, summary, automatic) else AnswerPart.ToolFailed(tool, summary)
                 } else {
                     null
                 }
@@ -57,7 +55,7 @@ object AnswerPartDataMapper {
                             (part["action"] as? JsonPrimitive)?.contentOrNull?.let(
                                 ToolSummaryDataMapper::actionFromCode,
                             ),
-                        arguments = argumentsFromJson(part["arguments"]),
+                        details = ProposalDetailsDataMapper.fromJson(tool, part["arguments"]),
                         status = statusFromCode((part["status"] as? JsonPrimitive)?.contentOrNull),
                     )
                 } else {
@@ -75,52 +73,6 @@ object AnswerPartDataMapper {
                 null
             }
         }
-
-    /**
-     * A write's details as the model asked for them: words, numbers and yes-or-no, and the lists and
-     * objects some carry, like how an event repeats. A value this phone can't read is left out.
-     */
-    fun argumentsFromJson(element: JsonElement?): Map<String, Any?> =
-        (element as? JsonObject)
-            .orEmpty()
-            .mapValues { (_, value) -> plain(value) }
-
-    private fun plain(value: JsonElement): Any? =
-        when (value) {
-            is JsonNull -> {
-                null
-            }
-
-            is JsonObject -> {
-                value.mapValues { (_, item) -> plain(item) }
-            }
-
-            is JsonArray -> {
-                value.map(::plain)
-            }
-
-            is JsonPrimitive -> {
-                if (value.isString) {
-                    value.content
-                } else {
-                    value.booleanOrNull ?: value.longOrNull
-                        ?: value.doubleOrNull
-                }
-            }
-        }
-
-    /** The other way, for details changed on a card: the same plain values, as JSON. */
-    fun argumentsToJson(arguments: Map<String, Any?>): JsonObject =
-        JsonObject(
-            arguments.mapValues { (_, value) ->
-                when (value) {
-                    null -> JsonNull
-                    is Boolean -> JsonPrimitive(value)
-                    is Number -> JsonPrimitive(value)
-                    else -> JsonPrimitive(value.toString())
-                }
-            },
-        )
 
     /** A card this phone can't place is shown as waiting: asking again is safer than assuming. */
     private fun statusFromCode(code: String?): ProposalStatus =

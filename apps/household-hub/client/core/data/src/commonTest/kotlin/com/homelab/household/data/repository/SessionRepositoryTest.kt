@@ -11,6 +11,8 @@ import com.homelab.household.domain.exception.DomainException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.ProposalDetails
 import dev.mokkery.MockMode
 import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
@@ -27,6 +29,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -854,6 +858,37 @@ class SessionRepositoryTest {
                 flowOf(ChatStreamEvent.Accepted, ChatStreamEvent.Delta("Done."), done)
 
             val events = repository(remote).decideToolProposal("s-1", "c1", approved = true).toList()
+
+            assertEquals(done, events.last())
+        }
+
+    @Test
+    fun `GIVEN a card changed before it is approved WHEN it is sent THEN the changes go as the hub's arguments`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            val done = ChatStreamEvent.Done(messageId = "m2", assistantContent = "Done.")
+            val sent =
+                buildJsonObject {
+                    put("title", "Dinner")
+                    put("start_time", "2026-10-03T21:00:00")
+                    put("is_all_day", false)
+                }
+            every { remote.openDecisionStream("s-1", "c1", true, sent) } returns flowOf(ChatStreamEvent.Accepted, done)
+
+            val events =
+                repository(remote)
+                    .decideToolProposal(
+                        "s-1",
+                        "c1",
+                        approved = true,
+                        edited =
+                            ProposalDetails.CalendarEvent(
+                                title = "Dinner",
+                                start = EventMoment(2026, 10, 3, hour = 21, minute = 0),
+                                end = null,
+                                allDay = false,
+                            ),
+                    ).toList()
 
             assertEquals(done, events.last())
         }

@@ -36,7 +36,7 @@ class CalendarRepositoryTest {
             account = "emma.larsson@gmail.com",
             server = "https://apidata.googleusercontent.com/caldav/v2/emma.larsson@gmail.com/events",
             calendarName = "Default",
-            connectedAt = "2026-09-26T20:04:00",
+            connectedAt = "2026-09-26T20:04:00Z",
         )
 
     private fun repository(remote: CalendarRemoteDataSource) = CalendarRepositoryImpl(remote = remote)

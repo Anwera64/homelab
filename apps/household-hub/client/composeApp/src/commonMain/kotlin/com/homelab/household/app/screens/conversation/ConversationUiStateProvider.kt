@@ -4,14 +4,17 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.presentation.chatsession.AgentChoice
 import com.homelab.household.presentation.chatsession.AgentOwner
+import com.homelab.household.presentation.chatsession.AutomaticWrite
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
 
@@ -74,6 +77,11 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
     private val partialAnswer =
         "Three things, in order of how much they'll bite. The panel review is tomorrow at 14:30 — " +
             "that's the one to protect. The print shop closes at 18:00 the same day, so if the boards aren't"
+
+    private val reconnectAnswer = "Once it’s reconnected, ask again and I’ll add it straight away."
+
+    private val refusedAdd =
+        ToolSummary(action = ToolAction.Create, reason = ToolFailureReason.CalendarRejected)
 
     /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
     private val longAnswer =
@@ -325,75 +333,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                             toolCallId = "c-1",
                                             tool = "calendar_write",
                                             action = ToolAction.Delete,
-                                            arguments =
-                                                mapOf(
-                                                    "action" to "delete",
-                                                    "event_id" to "e-9",
-                                                    "title" to "Print shop",
-                                                    "start_time" to "2026-09-11T18:00:00",
-                                                ),
-                                        ),
-                                    ),
-                            ),
-                        ),
-                    turnState = TurnState.AwaitingApproval,
-                ),
-            // Canvas: RepeatAdd. A repeating event says how often under its first date.
-            "Approving a repeating event" to
-                agent.copy(
-                    messages =
-                        listOf(
-                            said("m-1", "Put gym in on Tuesdays and Thursdays at 7, until Christmas", MessageRole.USER),
-                            said(
-                                "m-2",
-                                "Both mornings are clear. I can add it now.",
-                                MessageRole.ASSISTANT,
-                                parts =
-                                    listOf(
-                                        AnswerPart.Text("Both mornings are clear. I can add it now."),
-                                        AnswerPart.Proposal(
-                                            toolCallId = "c-1",
-                                            tool = "calendar_write",
-                                            action = ToolAction.Create,
-                                            arguments =
-                                                mapOf(
-                                                    "action" to "create",
-                                                    "title" to "Gym",
-                                                    "start_time" to "2026-09-29T07:00:00",
-                                                    "end_time" to "2026-09-29T08:00:00",
-                                                    "repeat" to GYM_REPEAT,
-                                                ),
-                                        ),
-                                    ),
-                            ),
-                        ),
-                    turnState = TurnState.AwaitingApproval,
-                ),
-            // Canvas: RepeatRemoveA. One date of a series: the switch asks which dates go.
-            "Removing one date of a series" to
-                agent.copy(
-                    messages =
-                        listOf(
-                            said("m-1", "Skip gym this Thursday, I have the jury", MessageRole.USER),
-                            said(
-                                "m-2",
-                                "Got it. I'll take Thursday's off and leave the rest.",
-                                MessageRole.ASSISTANT,
-                                parts =
-                                    listOf(
-                                        AnswerPart.Text("Got it. I'll take Thursday's off and leave the rest."),
-                                        AnswerPart.Proposal(
-                                            toolCallId = "c-1",
-                                            tool = "calendar_write",
-                                            action = ToolAction.Delete,
-                                            arguments =
-                                                mapOf(
-                                                    "action" to "delete",
-                                                    "event_id" to "gym-1",
-                                                    "title" to "Gym",
-                                                    "start_time" to "2026-10-01T07:00:00",
-                                                    "occurrence_start" to "2026-10-01T07:00:00",
-                                                    "repeat" to GYM_REPEAT,
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Print shop",
+                                                    start = EventMoment(2026, 9, 11, hour = 18, minute = 0),
+                                                    end = null,
+                                                    allDay = false,
                                                 ),
                                         ),
                                     ),
@@ -430,6 +375,82 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                 ),
+            // Canvas: ToolFailed. The calendar refused the sign-in, so the answer offers the fix.
+            "A tool that failed" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // The same, after other steps: the red step waits in the fold, the card stays out.
+            "A tool that failed, among other steps" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Thought(2),
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Canvas: ToolFixedCard. A calendar connected since the step failed, and this is still
+            // the latest answer, so its question can be asked again from the card.
+            "A fixed tool, the latest answer" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Canvas: ToolFixedLater. The same, once a newer message has been sent: no Ask again.
+            "A fixed tool, a newer message after it" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                            said("m-3", "What else is on Friday?", MessageRole.USER),
+                            said("m-4", "Just the dentist at 10:00.", MessageRole.ASSISTANT),
+                        ),
+                ),
             // Send was pressed while a card waits: the words stay, and the line says why.
             "Waiting on a card, Send held" to
                 agent.copy(
@@ -446,10 +467,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                             toolCallId = "c-1",
                                             tool = "calendar_write",
                                             action = ToolAction.Create,
-                                            arguments =
-                                                mapOf(
-                                                    "title" to "Dinner together",
-                                                    "start_time" to "2026-10-03T20:30:00",
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Dinner together",
+                                                    start = EventMoment(2026, 10, 3, hour = 20, minute = 30),
+                                                    end = null,
+                                                    allDay = false,
                                                 ),
                                         ),
                                     ),
@@ -458,6 +481,60 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     turnState = TurnState.AwaitingApproval,
                     composerText = "Also lunch on Sunday?",
                     holdingForCard = true,
+                ),
+            // Canvas: ToolAutoApprove. An add can be made automatic from its card.
+            "Auto-approving an add" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Can you put dinner in the calendar for Saturday?", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Saturday at 20:00 works for both of you. I can add it now.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone("calendar_read"),
+                                        AnswerPart.Text("Saturday at 20:00 works for both of you. I can add it now."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Create,
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Dinner together",
+                                                    start = EventMoment(2026, 10, 3, hour = 20, minute = 0),
+                                                    end = null,
+                                                    allDay = false,
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // Canvas: ToolAutoApproved. The next add ran without a card, and its record says so.
+            "Adding is automatic" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Add the print shop cutoff for Thursday too", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Added, Thursday at 18:00.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(
+                                            "calendar_write",
+                                            ToolSummary(title = "Print shop cutoff", action = ToolAction.Create),
+                                            automatic = true,
+                                        ),
+                                        AnswerPart.Text("Added, Thursday at 18:00."),
+                                    ),
+                            ),
+                        ),
+                    madeAutomatic = AutomaticWrite("calendar_write", ToolAction.Create),
                 ),
         )
 
@@ -469,6 +546,3 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
 private val rsf = ToolSource("Hong Kong: press freedom index", "https://rsf.org/en/country/hong-kong")
 private val scmp = ToolSource("Hong Kong news", "https://www.scmp.com/news/hong-kong")
 private val hkja = ToolSource("Annual report: a shrinking space", "https://www.hkja.org.hk/")
-
-private val GYM_REPEAT =
-    mapOf("frequency" to "weekly", "interval" to 1L, "days" to listOf("TU", "TH"), "until" to "2026-12-24")

@@ -21,6 +21,7 @@ from tests.domain.test_integration_use_cases import (
     MockCalendarCredentialRepository,
     MockSecretCipher,
     MockUnitOfWork,
+    SpyMarkCalendarStepsFixed,
 )
 
 EXPIRY = datetime(2026, 9, 27, 13, 0, tzinfo=timezone.utc)
@@ -113,6 +114,26 @@ async def test_a_finished_sign_in_connects_the_members_google_calendar():
     assert saved.token_expires_at == EXPIRY
     assert saved.needs_reconnect is False
     assert connector.tested[0][1] == "access-1"
+    assert uow.committed
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_finished_sign_in_WHEN_the_calendar_connects_THEN_the_members_failed_calendar_steps_are_marked_fixed_in_the_same_save():
+    uow = MockUnitOfWork()
+    mark_fixed = SpyMarkCalendarStepsFixed(uow)
+    use_case = CompleteGoogleCalendarSignInUseCase(
+        states=FakeStates(),
+        oauth=FakeGoogle(),
+        connector=RecordingConnector(),
+        cipher=MockSecretCipher(),
+        credential_repo=MockCalendarCredentialRepository(),
+        uow=uow,
+        mark_fixed=mark_fixed,
+    )
+
+    await use_case.execute(state="state-for-member-1", code="the-code")
+
+    assert mark_fixed.calls == [("member-1", False)]
     assert uow.committed
 
 

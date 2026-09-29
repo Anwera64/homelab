@@ -18,6 +18,7 @@ from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
+from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
@@ -43,6 +44,7 @@ from app.domain.use_cases.agents.purge_trash_agent import PurgeTrashAgentUseCase
 
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
+from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
 from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
@@ -137,6 +139,12 @@ def get_update_profile_use_case() -> UpdateProfileUseCase:
 def get_change_pin_use_case() -> ChangePinUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
+def get_list_tool_approvals_use_case() -> ListToolApprovalsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_set_tool_approval_use_case() -> SetToolApprovalUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
 def get_leave_household_use_case() -> LeaveHouseholdUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
@@ -198,6 +206,12 @@ def get_list_user_sessions_use_case() -> ListUserSessionsUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_session_use_case() -> GetSessionUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_prepare_chat_turn_use_case() -> PrepareChatTurnUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_prepare_tool_decision_use_case() -> PrepareToolDecisionUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_create_session_use_case() -> CreateSessionUseCase:

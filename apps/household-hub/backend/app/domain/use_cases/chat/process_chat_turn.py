@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Tuple
 
 from app.domain.entities.user import User
 from app.domain.entities.session import ChatMessage, ConversationSession
@@ -13,11 +13,13 @@ from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.repositories.tool_approval_repository import IToolApprovalRepository
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
-from app.domain.use_cases.chat.tool_summary import describe_write, summarize_tool
+from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, describe_write, summarize_tool
+from app.domain.use_cases.chat.tool_approval_settings import auto_approved
 from app.domain.use_cases.chat.tool_approval import (
     DECLINED,
     PAUSED_TURN,
@@ -81,16 +83,24 @@ class _AnswerParts:
             self.parts.append({"type": "text", "content": content})
 
     def tool(
-        self, name: str, success: bool, summary: Optional[Dict[str, Any]] = None, at: Optional[int] = None
+        self,
+        name: str,
+        success: bool,
+        summary: Optional[Dict[str, Any]] = None,
+        at: Optional[int] = None,
+        auto: bool = False,
     ) -> None:
         """
         A tool used, with what it shows on the phone when it has anything to show (#40). [at] puts
-        an approved write where its card was, rather than after everything since.
+        an approved write where its card was, rather than after everything since. [auto] marks a
+        write that ran without asking, because the member made it automatic.
         """
         self.stop_thinking()
         part: Dict[str, Any] = {"type": "tool", "tool": name, "success": success}
         if summary is not None:
             part["summary"] = summary
+        if auto:
+            part["auto"] = True
         if at is None:
             self.parts.append(part)
         else:
@@ -204,6 +214,7 @@ class ProcessChatTurnUseCase:
         source_index_factory: Optional[ISourceIndexFactory] = None,
         context_window_tokens: Optional[int] = None,
         answer_reserve_tokens: int = 4096,
+        approval_repo: Optional[IToolApprovalRepository] = None,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -221,6 +232,8 @@ class ProcessChatTurnUseCase:
         # The model's window, and what a turn keeps free in it for the answer. No window, no limit.
         self.context_window_tokens = context_window_tokens
         self.answer_reserve_tokens = answer_reserve_tokens
+        # Which writes each member lets agents do without asking. None: every write asks.
+        self.approval_repo = approval_repo
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -234,7 +247,6 @@ class ProcessChatTurnUseCase:
         session_id: str,
         current_user: User,
         content: str,
-        auto_approve_writes: bool = False,
         timezone_name: Optional[str] = None,
     ) -> ChatTurnResult:
         session = await self.session_repo.get_by_id(session_id)
@@ -316,6 +328,7 @@ class ProcessChatTurnUseCase:
                     )
 
         # 5. Multi-Turn Inference & Tool Loop
+        auto = await auto_approved(self.approval_repo, current_user.id)
         tools_executed: List[Dict[str, Any]] = []
         final_content = ""
         iterations = 0
@@ -360,7 +373,7 @@ class ProcessChatTurnUseCase:
 
             for tc in resp.tool_calls:
                 # Write tool confirmation policy
-                if tc.name in {"calendar_write", "document_writer"} and not auto_approve_writes:
+                if needs_asking(tc, auto, is_turn_secret):
                     proposal_info = {
                         "tool": tc.name,
                         "status": "proposal_pending",
@@ -388,6 +401,8 @@ class ProcessChatTurnUseCase:
                         "data": tool_result.data,
                         "error": tool_result.error,
                     }
+                    if tc.name in WRITE_ACTIONS and not is_turn_secret:
+                        exec_info["auto"] = True
                     tools_executed.append(exec_info)
                     llm_messages.append(
                         LLMMessage(
@@ -498,7 +513,6 @@ class ProcessChatTurnUseCase:
             current_user=current_user,
             recent_messages=recent_messages,
             privacy_trigger_detected=privacy_trigger_detected,
-            auto_approve_writes=False,
             timezone_name=timezone_name,
         ):
             yield event
@@ -508,7 +522,6 @@ class ProcessChatTurnUseCase:
         session_id: str,
         current_user: User,
         content: str,
-        auto_approve_writes: bool = False,
         timezone_name: Optional[str] = None,
     ):
         session, agent = await self._open_turn(session_id, current_user)
@@ -540,7 +553,6 @@ class ProcessChatTurnUseCase:
             current_user=current_user,
             recent_messages=recent_messages,
             privacy_trigger_detected=privacy_trigger_detected,
-            auto_approve_writes=auto_approve_writes,
             timezone_name=timezone_name,
         ):
             yield event
@@ -709,7 +721,6 @@ class ProcessChatTurnUseCase:
                 current_user=current_user,
                 recent_messages=recent_messages[:-1],
                 privacy_trigger_detected=bool(metadata.get("privacy_trigger_detected")),
-                auto_approve_writes=bool(paused.get("auto_approve_writes")),
                 timezone_name=timezone_name,
                 parts=parts,
                 tools_executed=metadata.get("tools_executed"),
@@ -759,7 +770,6 @@ class ProcessChatTurnUseCase:
         current_user: User,
         recent_messages,
         privacy_trigger_detected: bool,
-        auto_approve_writes: bool,
         timezone_name: Optional[str] = None,
     ):
         """Generate and persist the answer. Everything a turn does once the question is settled."""
@@ -769,7 +779,6 @@ class ProcessChatTurnUseCase:
             current_user=current_user,
             recent_messages=recent_messages,
             privacy_trigger_detected=privacy_trigger_detected,
-            auto_approve_writes=auto_approve_writes,
             timezone_name=timezone_name,
         )
         async for event in self._rounds(turn, current_user):
@@ -784,7 +793,6 @@ class ProcessChatTurnUseCase:
         current_user: User,
         recent_messages,
         privacy_trigger_detected: bool,
-        auto_approve_writes: bool,
         timezone_name: Optional[str],
         parts: Optional[List[Dict[str, Any]]] = None,
         tools_executed: Optional[List[Dict[str, Any]]] = None,
@@ -834,7 +842,9 @@ class ProcessChatTurnUseCase:
             tools_executed=list(tools_executed or []),
             question=next((m.content for m in reversed(recent_messages) if m.role == "user"), ""),
             privacy_trigger_detected=privacy_trigger_detected,
-            auto_approve_writes=auto_approve_writes,
+            # Read afresh each time a turn starts or carries on, so a box ticked on the card applies
+            # to the rest of the same answer.
+            auto_approved=await auto_approved(self.approval_repo, current_user.id),
             is_turn_secret=is_turn_secret,
             suggest_secret_mode=privacy_trigger_detected and not session.is_secret,
             sources=(
@@ -895,13 +905,12 @@ class ProcessChatTurnUseCase:
                 LLMMessage(role="assistant", content="".join(round_words), tool_calls=tool_calls)
             )
 
-            asks = [
-                tc for tc in tool_calls
-                if needs_asking(tc.name, turn.auto_approve_writes, turn.is_turn_secret)
-            ]
+            asks = [tc for tc in tool_calls if needs_asking(tc, turn.auto_approved, turn.is_turn_secret)]
             for tc in tool_calls:
                 if not any(tc is ask for ask in asks):
-                    async for event in self._run_call(turn, tc, current_user.id):
+                    # A write that runs without a card here does so because the member made it automatic.
+                    auto = tc.name in WRITE_ACTIONS and not turn.is_turn_secret
+                    async for event in self._run_call(turn, tc, current_user.id, auto=auto):
                         yield event
 
             if asks:
@@ -912,7 +921,9 @@ class ProcessChatTurnUseCase:
                 turn.paused_in_round = round_number
                 return
 
-    async def _run_call(self, turn: "_Turn", tc: LLMToolCall, user_id: str, at: Optional[int] = None):
+    async def _run_call(
+        self, turn: "_Turn", tc: LLMToolCall, user_id: str, at: Optional[int] = None, auto: bool = False
+    ):
         """Runs one call and records it: a step in the answer, and a result for the model to read."""
         yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
         tool_result = await self._run_tool(
@@ -927,8 +938,10 @@ class ProcessChatTurnUseCase:
             "error": tool_result.error,
             "summary": summary,
         }
+        if auto:
+            exec_info["auto"] = True
         turn.tools_executed.append(exec_info)
-        turn.answer.tool(tc.name, tool_result.success, summary, at=at)
+        turn.answer.tool(tc.name, tool_result.success, summary, at=at, auto=auto)
         yield {"type": "tool_result", "data": exec_info}
         # The phone is sent the whole result; the model reads what fits.
         seen, no_room = turn.budget.fit(
@@ -989,7 +1002,6 @@ class ProcessChatTurnUseCase:
                 "messages": dump_messages(turn.llm_messages[turn.turn_starts_at:]),
                 "round": turn.paused_in_round,
                 "out_of_room": turn.out_of_room,
-                "auto_approve_writes": turn.auto_approve_writes,
                 "question": turn.question,
             }
 
@@ -1043,7 +1055,8 @@ class _Turn:
     tools_executed: List[Dict[str, Any]]
     question: str
     privacy_trigger_detected: bool
-    auto_approve_writes: bool
+    # The (tool, action) writes the member lets agents do without asking.
+    auto_approved: FrozenSet[Tuple[str, str]]
     is_turn_secret: bool
     suggest_secret_mode: bool
     sources: Optional[TurnSources]

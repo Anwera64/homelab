@@ -125,7 +125,7 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
     })
 
     queue: asyncio.Queue = asyncio.Queue()
-    await runner("s1", User(id="u1", full_name="Alex"), "Hello", False, queue, timezone_name="Asia/Tokyo")
+    await runner("s1", User(id="u1", full_name="Alex"), "Hello", queue, timezone_name="Asia/Tokyo")
 
     # Reflection and the summary are queued, not awaited (#53); let them run.
     for _ in range(100):

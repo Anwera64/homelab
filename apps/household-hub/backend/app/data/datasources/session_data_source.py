@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import String, cast, delete, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from app.data.models.session_model import SessionModel, MessageModel
@@ -45,6 +45,9 @@ class ISessionDataSource(Protocol):
         ...
 
     async def update_message(self, message_id: str, content: str, metadata_json: dict) -> Optional[MessageModel]:
+        ...
+
+    async def list_assistant_messages_mentioning(self, user_id: str, needles: List[str]) -> List[MessageModel]:
         ...
 
     async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
@@ -133,6 +136,22 @@ class SqliteSessionDataSource(ISessionDataSource):
         model.metadata_json = dict(metadata_json)
         await self.session.flush()
         return model
+
+    async def list_assistant_messages_mentioning(self, user_id: str, needles: List[str]) -> List[MessageModel]:
+        if not needles:
+            return []
+        # The JSON column is text in SQLite, so a LIKE narrows to the answers worth reading without
+        # loading every message the member has; the caller checks each part properly.
+        metadata_text = cast(MessageModel.metadata_json, String)
+        stmt = (
+            select(MessageModel)
+            .join(SessionModel, SessionModel.id == MessageModel.session_id)
+            .where(SessionModel.user_id == user_id)
+            .where(MessageModel.role == "assistant")
+            .where(or_(*(metadata_text.like(f"%{needle}%") for needle in needles)))
+        )
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
 
     async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
         res = await self.session.execute(select(SessionModel.id).where(SessionModel.agent_id == agent_id))

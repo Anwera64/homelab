@@ -1,6 +1,7 @@
 package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ToolAction
 
 /**
@@ -115,14 +116,14 @@ private fun phraseFor(
         return StepPhrase.Declined(tool, action, (runs.singleOrNull() as? AnswerPart.Declined)?.summary?.title)
     }
     return when (tool) {
-        "searxng_search" -> StepPhrase.Searched(runs.size)
-        "read_page" -> StepPhrase.Read(runs.size)
-        "calendar_read" -> StepPhrase.CheckedCalendar
-        "calendar_write" -> StepPhrase.Wrote(action, title)
+        HubTool.WEB_SEARCH -> StepPhrase.Searched(runs.size)
+        HubTool.READ_PAGE -> StepPhrase.Read(runs.size)
+        HubTool.CALENDAR_READ -> StepPhrase.CheckedCalendar
+        HubTool.CALENDAR_WRITE -> StepPhrase.Wrote(action, title)
         else -> StepPhrase.Did(tool, action)
     }
 }
 
 private const val NAMED_KINDS = 2
 
-private val SILENT = setOf("lookup_sources")
+private val SILENT = setOf(HubTool.LOOKUP_SOURCES)

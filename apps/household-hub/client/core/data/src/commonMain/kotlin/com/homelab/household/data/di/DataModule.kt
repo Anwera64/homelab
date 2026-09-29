@@ -13,6 +13,7 @@ import com.homelab.household.data.datasource.remote.KtorMemoryRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.KtorSpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.KtorToolApprovalRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AgentRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.CalendarRemoteDataSource
@@ -22,6 +23,7 @@ import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteData
 import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SpaceRemoteDataSource
+import com.homelab.household.data.datasource.remote.`interface`.ToolApprovalRemoteDataSource
 import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
@@ -38,6 +40,7 @@ import com.homelab.household.data.repository.MemoryRepositoryImpl
 import com.homelab.household.data.repository.ServerStatusRepositoryImpl
 import com.homelab.household.data.repository.SessionRepositoryImpl
 import com.homelab.household.data.repository.SpaceRepositoryImpl
+import com.homelab.household.data.repository.ToolApprovalRepositoryImpl
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.CalendarRepository
@@ -47,6 +50,7 @@ import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
+import com.homelab.household.domain.repository.ToolApprovalRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -100,6 +104,7 @@ val dataModule =
         single<MemoryRemoteDataSource> { KtorMemoryRemoteDataSource(get(), get<HubConfig>().baseUrl) }
         single<GossipRemoteDataSource> { KtorGossipRemoteDataSource(get(), get<HubConfig>().baseUrl) }
         single<CalendarRemoteDataSource> { KtorCalendarRemoteDataSource(get(), get<HubConfig>().baseUrl) }
+        single<ToolApprovalRemoteDataSource> { KtorToolApprovalRemoteDataSource(get(), get<HubConfig>().baseUrl) }
         single { DefensiveSseStreamReader(get()) }
         single<ServerStatusRemoteDataSource> { KtorServerStatusRemoteDataSource(get(), get<HubConfig>().baseUrl) }
         single<SessionRemoteDataSource> { KtorSessionRemoteDataSource(get(), get<HubConfig>().baseUrl, get()) }
@@ -113,4 +118,5 @@ val dataModule =
         single<MemoryRepository> { MemoryRepositoryImpl(get()) }
         single<GossipRepository> { GossipRepositoryImpl(get()) }
         single<CalendarRepository> { CalendarRepositoryImpl(get()) }
+        single<ToolApprovalRepository> { ToolApprovalRepositoryImpl(get()) }
     }

@@ -1,31 +1,21 @@
 package com.homelab.household.app.screens.conversation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import com.homelab.household.app.components.ActionCard
 import com.homelab.household.app.components.CardButtonRow
 import com.homelab.household.app.components.DestructiveButton
+import com.homelab.household.app.components.HearthCheckboxRow
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.ToolRecordLine
@@ -56,29 +46,10 @@ import com.homelab.household.app.resources.tool_card_month_nov
 import com.homelab.household.app.resources.tool_card_month_oct
 import com.homelab.household.app.resources.tool_card_month_sep
 import com.homelab.household.app.resources.tool_card_remove
-import com.homelab.household.app.resources.tool_card_repeat_and
-import com.homelab.household.app.resources.tool_card_repeat_day
-import com.homelab.household.app.resources.tool_card_repeat_days
-import com.homelab.household.app.resources.tool_card_repeat_month
-import com.homelab.household.app.resources.tool_card_repeat_months
-import com.homelab.household.app.resources.tool_card_repeat_times
-import com.homelab.household.app.resources.tool_card_repeat_until
-import com.homelab.household.app.resources.tool_card_repeat_week
-import com.homelab.household.app.resources.tool_card_repeat_week_on
-import com.homelab.household.app.resources.tool_card_repeat_weeks
-import com.homelab.household.app.resources.tool_card_repeat_weeks_on
-import com.homelab.household.app.resources.tool_card_repeat_year
-import com.homelab.household.app.resources.tool_card_repeat_years
 import com.homelab.household.app.resources.tool_card_replace
-import com.homelab.household.app.resources.tool_card_scope
-import com.homelab.household.app.resources.tool_card_scope_following
-import com.homelab.household.app.resources.tool_card_scope_following_remove_note
-import com.homelab.household.app.resources.tool_card_scope_this
-import com.homelab.household.app.resources.tool_card_scope_this_remove_note
 import com.homelab.household.app.resources.tool_card_untitled
 import com.homelab.household.app.resources.tool_card_when
 import com.homelab.household.app.resources.tool_card_when_all_day
-import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ProposalStatus
@@ -90,6 +61,10 @@ import org.jetbrains.compose.resources.stringResource
  * What it will do and to what, with Decline on the left and Approve on the right. A removal reads
  * in red and asks "Keep it" or "Remove", so saying yes to losing something is never the easy tap.
  *
+ * A write that can be made automatic (adding events, creating notes) also offers "Auto-approve …
+ * from now on" (canvas: ToolAutoApprove). Ticking it changes nothing until Approve: then
+ * [onApproveAutomatically] is called instead of [onDecide]. Removing and replacing never offer it.
+ *
  * Once answered while the step's other cards still wait, it shrinks to its record line, so what is
  * left to answer stands out; when the last one is answered the turn carries on and the hub turns
  * each into the step it became.
@@ -97,8 +72,9 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ToolApprovalCard(
     card: AnswerPart.Proposal,
-    onDecide: (toolCallId: String, approved: Boolean, changes: Map<String, Any?>?) -> Unit,
+    onDecide: (toolCallId: String, approved: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onApproveAutomatically: (toolCallId: String) -> Unit = { onDecide(it, true) },
 ) {
     val label = toolLabel(card.tool, card.action)
     val details = approvalCardDetails(card)
@@ -123,7 +99,7 @@ fun ToolApprovalCard(
         }
 
         ProposalStatus.Pending -> {
-            PendingCard(card, label, name, details, onDecide, modifier)
+            PendingCard(card, label, name, details, onDecide, onApproveAutomatically, modifier)
         }
     }
 }
@@ -134,12 +110,14 @@ private fun PendingCard(
     label: ToolLabel,
     name: String,
     details: ApprovalCardDetails,
-    onDecide: (toolCallId: String, approved: Boolean, changes: Map<String, Any?>?) -> Unit,
+    onDecide: (toolCallId: String, approved: Boolean) -> Unit,
+    onApproveAutomatically: (toolCallId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val ask = cardAsk(card.action)
+    var automatic by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     val tint = if (ask == CardAsk.Approve) colors.textPrimary else colors.error
 
     ActionCard(modifier = modifier) {
@@ -164,39 +142,29 @@ private fun PendingCard(
             if (caption != null) {
                 Text(text = caption, style = type.caption, color = colors.textMuted)
             }
-            details.repeat?.let { RepeatLine(it) }
         }
-        var scope by remember(card.toolCallId) { mutableStateOf(details.scope) }
-        scope?.let { chosen ->
-            ScopeSwitch(chosen = chosen, onChoose = { scope = it })
-            if (ask == CardAsk.Remove) {
-                Text(
-                    text =
-                        stringResource(
-                            if (chosen == CardScope.OnlyThis) {
-                                Res.string.tool_card_scope_this_remove_note
-                            } else {
-                                Res.string.tool_card_scope_following_remove_note
-                            },
-                        ),
-                    style = type.caption,
-                    color = colors.textMuted,
-                )
-            }
+        val automaticAsk = label.automaticAsk
+        if (automaticAsk != null && ask == CardAsk.Approve) {
+            HearthCheckboxRow(
+                text = stringResource(automaticAsk),
+                checked = automatic,
+                onCheckedChange = { automatic = it },
+            )
         }
-        val approve = { onDecide(card.toolCallId, true, scopeChange(proposed = details.scope, chosen = scope)) }
         CardButtonRow {
             val no = if (ask == CardAsk.Approve) Res.string.tool_card_decline else Res.string.tool_card_keep
             SecondaryButton(
                 text = stringResource(no),
-                onClick = { onDecide(card.toolCallId, false, null) },
+                onClick = { onDecide(card.toolCallId, false) },
                 modifier = Modifier.weight(1f),
             )
             when (ask) {
                 CardAsk.Approve -> {
                     PrimaryButton(
                         text = stringResource(Res.string.tool_card_approve),
-                        onClick = approve,
+                        onClick = {
+                            if (automatic) onApproveAutomatically(card.toolCallId) else onDecide(card.toolCallId, true)
+                        },
                         modifier = Modifier.weight(1f),
                         lifted = false,
                     )
@@ -214,157 +182,10 @@ private fun PendingCard(
                                     Res.string.tool_card_replace
                                 },
                             ),
-                        onClick = approve,
+                        onClick = { onDecide(card.toolCallId, true) },
                         modifier = Modifier.weight(1f),
                     )
                 }
-            }
-        }
-    }
-}
-
-/** "Every Tue and Thu until 24 Dec", under the first date (canvas: RepeatAdd). */
-@Composable
-private fun RepeatLine(repeat: CardRepeat) {
-    val colors = HearthTheme.colors
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HearthIconImage(
-            icon = HearthIcon.Repeat,
-            contentDescription = null,
-            size = HearthTheme.size.iconSm,
-            tint = colors.textMuted,
-        )
-        Text(text = repeatText(repeat), style = HearthTheme.typography.caption, color = colors.textMuted)
-    }
-}
-
-@Composable
-private fun repeatText(repeat: CardRepeat): String {
-    val n = repeat.interval
-    val often =
-        when (repeat.every) {
-            RepeatEvery.Day -> {
-                if (n ==
-                    1
-                ) {
-                    stringResource(Res.string.tool_card_repeat_day)
-                } else {
-                    stringResource(Res.string.tool_card_repeat_days, n)
-                }
-            }
-
-            RepeatEvery.Week -> {
-                val days = dayList(repeat.weekdays)
-                when {
-                    days == null && n == 1 -> stringResource(Res.string.tool_card_repeat_week)
-                    days == null -> stringResource(Res.string.tool_card_repeat_weeks, n)
-                    n == 1 -> stringResource(Res.string.tool_card_repeat_week_on, days)
-                    else -> stringResource(Res.string.tool_card_repeat_weeks_on, n, days)
-                }
-            }
-
-            RepeatEvery.Month -> {
-                if (n ==
-                    1
-                ) {
-                    stringResource(Res.string.tool_card_repeat_month)
-                } else {
-                    stringResource(Res.string.tool_card_repeat_months, n)
-                }
-            }
-
-            RepeatEvery.Year -> {
-                if (n ==
-                    1
-                ) {
-                    stringResource(Res.string.tool_card_repeat_year)
-                } else {
-                    stringResource(Res.string.tool_card_repeat_years, n)
-                }
-            }
-        }
-    val until = repeat.until
-    val count = repeat.count
-    return when {
-        until != null -> {
-            stringResource(
-                Res.string.tool_card_repeat_until,
-                often,
-                until.day,
-                stringResource(
-                    MONTHS[
-                        until.month -
-                            1,
-                    ],
-                ),
-            )
-        }
-
-        count != null -> {
-            stringResource(Res.string.tool_card_repeat_times, often, count)
-        }
-
-        else -> {
-            often
-        }
-    }
-}
-
-/** "Tue", "Tue and Thu", "Mon, Wed and Fri"; null for none. */
-@Composable
-private fun dayList(weekdays: List<Int>): String? {
-    val names = weekdays.map { stringResource(WEEKDAYS[it]) }
-    if (names.isEmpty()) return null
-    if (names.size == 1) return names.single()
-    return stringResource(Res.string.tool_card_repeat_and, names.dropLast(1).joinToString(", "), names.last())
-}
-
-/**
- * Only this date, or it and every later one (canvas: RepeatRemoveA). Starts on what the agent
- * understood; the member's pick goes with Approve or Remove.
- */
-@Composable
-private fun ScopeSwitch(
-    chosen: CardScope,
-    onChoose: (CardScope) -> Unit,
-) {
-    val colors = HearthTheme.colors
-    val label = stringResource(Res.string.tool_card_scope)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(HearthShapes.item)
-                .background(colors.canvas)
-                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
-                .padding(HearthTheme.spacing.xs)
-                .semantics { contentDescription = label }
-                .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-    ) {
-        listOf(
-            CardScope.OnlyThis to Res.string.tool_card_scope_this,
-            CardScope.ThisAndFollowing to Res.string.tool_card_scope_following,
-        ).forEach { (option, words) ->
-            val selected = option == chosen
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = HearthTheme.size.touchTarget - HearthTheme.spacing.xs)
-                        .clip(HearthShapes.button)
-                        .background(if (selected) colors.surface else colors.canvas)
-                        .selectable(selected = selected, role = Role.RadioButton, onClick = { onChoose(option) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(words),
-                    style = HearthTheme.typography.label,
-                    color = if (selected) colors.textPrimary else colors.textMuted,
-                )
             }
         }
     }

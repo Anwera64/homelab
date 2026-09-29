@@ -8,8 +8,10 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
@@ -25,6 +27,7 @@ import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.ResumeTurnUseCase
+import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import dev.mokkery.MockMode
@@ -75,6 +78,7 @@ class ChatSessionViewModelTest {
     private val getAgentUseCase = mock<GetAgentUseCase>(MockMode.autofill)
     private val getCurrentUserUseCase = mock<GetCurrentUserUseCase>(MockMode.autofill)
     private val listHouseholdMembersUseCase = mock<ListHouseholdMembersUseCase>(MockMode.autofill)
+    private val setToolApprovalUseCase = mock<SetToolApprovalUseCase>(MockMode.autofill)
 
     private lateinit var viewModel: ChatSessionViewModel
 
@@ -94,6 +98,7 @@ class ChatSessionViewModelTest {
                 getAgentUseCase = getAgentUseCase,
                 getCurrentUserUseCase = getCurrentUserUseCase,
                 listHouseholdMembersUseCase = listHouseholdMembersUseCase,
+                setToolApprovalUseCase = setToolApprovalUseCase,
             )
     }
 
@@ -111,6 +116,7 @@ class ChatSessionViewModelTest {
             getAgentUseCase = getAgentUseCase,
             getCurrentUserUseCase = getCurrentUserUseCase,
             listHouseholdMembersUseCase = listHouseholdMembersUseCase,
+            setToolApprovalUseCase = setToolApprovalUseCase,
             timeSource = timeSource,
         )
 
@@ -178,9 +184,19 @@ class ChatSessionViewModelTest {
             toolCallId = "c1",
             tool = "calendar_write",
             action = ToolAction.Create,
-            arguments = mapOf("title" to "Dinner together", "start_time" to "2026-10-03T20:30:00"),
+            details =
+                ProposalDetails.CalendarEvent(
+                    title = "Dinner together",
+                    start = EventMoment(2026, 10, 3, hour = 20, minute = 30),
+                    end = null,
+                    allDay = false,
+                ),
         )
-    private val flowers = dinner.copy(toolCallId = "c2", arguments = mapOf("title" to "Buy flowers"))
+    private val flowers =
+        dinner.copy(
+            toolCallId = "c2",
+            details = ProposalDetails.CalendarEvent("Buy flowers", null, null, allDay = false),
+        )
     private val question =
         ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Dinner Saturday?")
 
@@ -212,7 +228,7 @@ class ChatSessionViewModelTest {
                 flowOf(
                     ChatStreamEvent.Accepted,
                     ChatStreamEvent.Delta("I can add it now."),
-                    ChatStreamEvent.ToolApprovalProposal("c1", "calendar_write", ToolAction.Create, dinner.arguments),
+                    ChatStreamEvent.ToolApprovalProposal("c1", "calendar_write", ToolAction.Create, dinner.details),
                     ChatStreamEvent.AwaitingApproval(
                         messageId = "m-2",
                         assistantContent = "I can add it now.",
@@ -384,6 +400,133 @@ class ChatSessionViewModelTest {
             assertNull(state.errorMessage)
             assertEquals(TurnState.AwaitingApproval, state.turnState)
             assertEquals(listOf("m-1", "m-2"), state.messages.map { it.id })
+        }
+
+    // ---- auto-approve from the card (slice 4, PR 5) -------------------------
+
+    private val removal =
+        dinner.copy(
+            toolCallId = "c3",
+            action = ToolAction.Delete,
+            details = ProposalDetails.CalendarEvent(title = "Print shop", start = null, end = null, allDay = false),
+        )
+
+    /** The rest of an approved turn: the write runs, and the answer ends. */
+    private fun approvedTurn(toolCallId: String) {
+        every { decideToolProposalUseCase("s-1", toolCallId, true, null) } returns
+            flowOf(
+                ChatStreamEvent.Accepted,
+                ChatStreamEvent.Done(messageId = "m-2", assistantContent = "Done."),
+            )
+    }
+
+    /** The hub saves the setting. Stubbed, not autofilled: Kotlin/Native can't return a null list. */
+    private fun settingsSave() {
+        everySuspend { setToolApprovalUseCase(any(), any(), any()) } returns emptyList()
+    }
+
+    @Test
+    fun `GIVEN the box ticked WHEN the card is approved THEN adding events is made automatic before the turn carries on`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            approvedTurn("c1")
+            settingsSave()
+
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+
+            verifySuspend { setToolApprovalUseCase("calendar_write", ToolAction.Create, true) }
+            verify { decideToolProposalUseCase("s-1", "c1", true, null) }
+            val state = viewModel.uiState.value
+            assertEquals(AutomaticWrite("calendar_write", ToolAction.Create), state.madeAutomatic)
+            assertEquals(TurnState.Idle, state.turnState)
+        }
+
+    @Test
+    fun `GIVEN a write just made automatic WHEN Undo is tapped THEN it asks again and the line goes`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            approvedTurn("c1")
+            settingsSave()
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+
+            viewModel.undoAutomatic()
+            advanceUntilIdle()
+
+            verifySuspend { setToolApprovalUseCase("calendar_write", ToolAction.Create, false) }
+            assertNull(viewModel.uiState.value.madeAutomatic)
+        }
+
+    @Test
+    fun `GIVEN the setting can't be saved WHEN the ticked card is approved THEN the write is still approved`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            approvedTurn("c1")
+            everySuspend { setToolApprovalUseCase(any(), any(), any()) } throws ServerOfflineException("offline")
+
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+
+            verify { decideToolProposalUseCase("s-1", "c1", true, null) }
+            assertNull(viewModel.uiState.value.madeAutomatic)
+        }
+
+    @Test
+    fun `GIVEN a removal WHEN it is approved automatically THEN nothing is made automatic`() =
+        runTest(testDispatcher) {
+            openPaused(removal)
+            approvedTurn("c3")
+
+            viewModel.approveAutomatically("c3")
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.not) { setToolApprovalUseCase(any(), any(), any()) }
+            verify { decideToolProposalUseCase("s-1", "c3", true, null) }
+            assertNull(viewModel.uiState.value.madeAutomatic)
+        }
+
+    @Test
+    fun `GIVEN a write made automatic WHEN the next message is sent THEN its Undo line goes with the answer`() =
+        runTest(testDispatcher) {
+            openPaused(dinner)
+            approvedTurn("c1")
+            settingsSave()
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.madeAutomatic)
+            every { streamChatTurnUseCase("s-1", "Thanks", false, any()) } returns flow { awaitCancellation() }
+
+            viewModel.sendMessage("Thanks")
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.madeAutomatic)
+        }
+
+    @Test
+    fun `GIVEN an add made automatic WHEN it runs without a card THEN its step says it was automatic`() =
+        runTest(testDispatcher) {
+            everySuspend { getSessionUseCase("s-1") } returns
+                Pair(ConversationSession(id = "s-1", userId = "u-1"), emptyList())
+            viewModel.loadSession("s-1")
+            advanceUntilIdle()
+            val added = ToolSummary(action = ToolAction.Create, title = "Print shop cutoff")
+            every { streamChatTurnUseCase("s-1", "Add the cutoff", false, any()) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    emit(
+                        ChatStreamEvent.ToolResult("calendar_write", success = true, summary = added, automatic = true),
+                    )
+                    awaitCancellation()
+                }
+
+            viewModel.sendMessage("Add the cutoff")
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(AnswerPart.ToolDone("calendar_write", added, automatic = true)),
+                viewModel.uiState.value.parts,
+            )
         }
 
     @Test
@@ -1385,6 +1528,60 @@ class ChatSessionViewModelTest {
             assertEquals("Academic Researcher", state.agentName)
             assertEquals("📚", state.agentAvatar)
             assertEquals("Papers, references, reading long PDFs properly.", state.agentTagline)
+        }
+
+    /** Back from a screen it opened, such as connecting a calendar: the chat is where it was left. */
+    @Test
+    fun `GIVEN a new chat under way WHEN the screen opens it again THEN it is kept and not started over`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+            viewModel.selectAgent("agent-research")
+
+            viewModel.open(null)
+            advanceUntilIdle()
+
+            assertEquals("agent-research", viewModel.uiState.value.selectedAgentId)
+            verifySuspend(VerifyMode.exactly(1)) { listAgentsUseCase() }
+        }
+
+    @Test
+    fun `GIVEN an opened chat WHEN the screen opens it again THEN it is not fetched again`() =
+        runTest(testDispatcher) {
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+
+            viewModel.open("s-1")
+            advanceUntilIdle()
+            viewModel.open("s-1")
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(1)) { getSessionUseCase("s-1") }
+        }
+
+    /** A calendar connected from this chat: its fix cards are redrawn from what the hub now says. */
+    @Test
+    fun `GIVEN an opened chat WHEN it is refreshed THEN it is fetched again`() =
+        runTest(testDispatcher) {
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+            viewModel.open("s-1")
+            advanceUntilIdle()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(2)) { getSessionUseCase("s-1") }
+        }
+
+    @Test
+    fun `GIVEN a new chat nobody has spoken in WHEN it is refreshed THEN nothing is fetched`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(0)) { getSessionUseCase(any()) }
         }
 
     @Test

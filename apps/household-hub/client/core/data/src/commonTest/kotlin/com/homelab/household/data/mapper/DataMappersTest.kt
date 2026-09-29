@@ -243,6 +243,26 @@ class DataMappersTest {
     }
 
     @Test
+    fun `GIVEN an add that ran without a card WHEN mapped THEN the part says it was automatic`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": true, "auto": true,
+                    "summary": {"action": "create", "title": "Print shop cutoff"}}]""",
+            )
+
+        assertEquals(
+            listOf(
+                AnswerPart.ToolDone(
+                    "calendar_write",
+                    ToolSummary(action = ToolAction.Create, title = "Print shop cutoff"),
+                    automatic = true,
+                ),
+            ),
+            parts,
+        )
+    }
+
+    @Test
     fun `GIVEN each write action the hub names WHEN mapped THEN each is its own action`() {
         val actions =
             mapOf(
@@ -270,6 +290,45 @@ class DataMappersTest {
             )
 
         assertEquals(listOf(AnswerPart.ToolDone("calendar_write", ToolSummary())), parts)
+    }
+
+    @Test
+    fun `GIVEN a calendar step that failed on its sign-in or on having no calendar WHEN mapped THEN the part says which`() {
+        val reasons =
+            mapOf(
+                "calendar_rejected" to ToolFailureReason.CalendarRejected,
+                "calendar_not_connected" to ToolFailureReason.CalendarNotConnected,
+            )
+
+        reasons.forEach { (code, reason) ->
+            val parts =
+                partsOf(
+                    """[{"type": "tool", "tool": "calendar_write", "success": false,
+                        "summary": {"action": "create", "reason": "$code"}}]""",
+                )
+            val expected =
+                AnswerPart.ToolFailed(
+                    "calendar_write",
+                    ToolSummary(action = ToolAction.Create, reason = reason),
+                )
+            assertEquals(listOf(expected), parts, code)
+        }
+    }
+
+    @Test
+    fun `GIVEN a calendar step the hub marked fixed WHEN mapped THEN the part says it was fixed`() {
+        val parts =
+            partsOf(
+                """[{"type": "tool", "tool": "calendar_write", "success": false,
+                    "summary": {"action": "create", "reason": "calendar_rejected", "fixed": true}}]""",
+            )
+
+        val expected =
+            AnswerPart.ToolFailed(
+                "calendar_write",
+                ToolSummary(action = ToolAction.Create, reason = ToolFailureReason.CalendarRejected, fixed = true),
+            )
+        assertEquals(listOf(expected), parts)
     }
 
     @Test

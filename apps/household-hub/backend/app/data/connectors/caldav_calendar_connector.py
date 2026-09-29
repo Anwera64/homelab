@@ -188,6 +188,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         except Exception as e:
             if isinstance(e, CalendarIntegrationException):
                 raise
+            _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to fetch CalDAV events: {str(e)}")
 
     def _sync_series_rules(self, target_cal, start_time: datetime, end_time: datetime) -> Dict[str, Repeat]:
@@ -259,6 +260,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                 repeat=repeat,
             )
         except Exception as e:
+            _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to create CalDAV event: {str(e)}")
 
     def _sync_update_event(
@@ -282,6 +284,7 @@ class CalDavCalendarConnector(ICalendarConnector):
             try:
                 event = target_cal.event_by_uid(event_id)
             except Exception as e:
+                _raise_if_refused(e, credential)
                 raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
 
             if not event:
@@ -368,6 +371,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         except Exception as e:
             if isinstance(e, CalendarIntegrationException):
                 raise
+            _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to update CalDAV event '{event_id}': {str(e)}")
 
     def _sync_update_series(
@@ -453,6 +457,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         except CalendarIntegrationException:
             raise
         except Exception as e:
+            _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to delete CalDAV event '{event_id}': {str(e)}")
 
     async def test_connection(self, credential: CalendarCredential, secret: str, timeout: float = 15.0) -> bool:
@@ -581,3 +586,12 @@ class CalDavCalendarConnector(ICalendarConnector):
             )
         except asyncio.TimeoutError:
             raise CalendarIntegrationException(f"CalDAV event deletion timed out after {timeout:.1f}s.")
+
+
+def _raise_if_refused(error: Exception, credential: CalendarCredential) -> None:
+    """
+    A password revoked after connecting shows up on the next read or write. It says "sign in again",
+    not "something failed", so the failed step can offer the member the fix.
+    """
+    if isinstance(error, AuthorizationError):
+        raise CalendarAuthException(f"CalDAV server at {credential.url} refused the credentials: {error}")

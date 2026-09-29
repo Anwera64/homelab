@@ -2,6 +2,8 @@ package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolSource
@@ -305,6 +307,25 @@ class DefensiveSseStreamReaderTest {
             )
         }
 
+    /** A write the member made automatic runs without a card, and its record says so. */
+    @Test
+    fun `GIVEN an automatic write's result WHEN read THEN the event says it was automatic`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_result", "data": {"tool": "calendar_write", "success": true, "auto": true}}
+
+                data: {"type": "tool_result", "data": {"tool": "calendar_read", "success": true}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(listOf(true, false), events.map { (it as ChatStreamEvent.ToolResult).automatic })
+        }
+
     /** A running write says which action it is, so a removal is never shown as "Adding…". */
     @Test
     fun `GIVEN a running write WHEN read THEN the event carries its action`() =
@@ -405,25 +426,6 @@ class DefensiveSseStreamReaderTest {
     // ---- approval cards (slice 4, PR 3) -----------------------------------
 
     @Test
-    fun `GIVEN a repeating event WHEN its proposal is read THEN the card keeps how it repeats`() =
-        runTest {
-            val ssePayload =
-                """
-                data: {"type": "tool_approval_proposal", "tool_call_id": "c1", "tool": "calendar_write", "action": "create", "arguments": {"title": "Gym", "repeat": {"frequency": "weekly", "interval": 1, "days": ["TU", "TH"], "until": "2026-12-24"}}}
-
-                """.trimIndent()
-
-            val proposal =
-                reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList().single()
-                    as ChatStreamEvent.ToolApprovalProposal
-
-            assertEquals(
-                mapOf("frequency" to "weekly", "interval" to 1L, "days" to listOf("TU", "TH"), "until" to "2026-12-24"),
-                proposal.arguments["repeat"],
-            )
-        }
-
-    @Test
     fun `GIVEN a write that needs asking WHEN its proposal is read THEN the card has its call id and action and details`() =
         runTest {
             val ssePayload =
@@ -439,10 +441,15 @@ class DefensiveSseStreamReaderTest {
             assertEquals("c1", proposal.toolCallId)
             assertEquals("calendar_write", proposal.tool)
             assertEquals(ToolAction.Delete, proposal.action)
-            assertEquals("Print shop cutoff", proposal.arguments["title"])
-            assertEquals("2026-09-11T18:00:00", proposal.arguments["start_time"])
-            assertEquals(false, proposal.arguments["is_all_day"])
-            assertEquals(15L, proposal.arguments["reminder"])
+            assertEquals(
+                ProposalDetails.CalendarEvent(
+                    title = "Print shop cutoff",
+                    start = EventMoment(2026, 9, 11, hour = 18, minute = 0),
+                    end = null,
+                    allDay = false,
+                ),
+                proposal.details,
+            )
         }
 
     @Test
@@ -466,7 +473,7 @@ class DefensiveSseStreamReaderTest {
                         toolCallId = "c1",
                         tool = "calendar_write",
                         action = ToolAction.Create,
-                        arguments = mapOf("title" to "Dinner together"),
+                        details = ProposalDetails.CalendarEvent("Dinner together", null, null, allDay = false),
                         status = ProposalStatus.Pending,
                     ),
                 ),
