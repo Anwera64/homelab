@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipeDown
@@ -54,6 +55,7 @@ import com.homelab.household.app.resources.conversation_still_working_detail
 import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
+import com.homelab.household.app.resources.field_changed
 import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.tool_automatic_undo
 import com.homelab.household.app.resources.tool_calendar_add_automatic_ask
@@ -65,6 +67,12 @@ import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
 import com.homelab.household.app.resources.tool_calendar_remove_card
 import com.homelab.household.app.resources.tool_card_approve
+import com.homelab.household.app.resources.tool_card_approve_with_changes
+import com.homelab.household.app.resources.tool_card_cancel
+import com.homelab.household.app.resources.tool_card_decline
+import com.homelab.household.app.resources.tool_card_edit
+import com.homelab.household.app.resources.tool_card_field_day_invalid
+import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
@@ -76,6 +84,8 @@ import com.homelab.household.app.resources.tool_fix_nothing_added
 import com.homelab.household.app.resources.tool_fix_reconnect_calendar
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
+import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
@@ -108,7 +118,7 @@ class ConversationScreenTest {
         onTryAgain: () -> Unit = {},
         onSelectAgent: (String) -> Unit = {},
         onRetryAgents: () -> Unit = {},
-        onDecide: (String, Boolean) -> Unit = { _, _ -> },
+        onDecide: (String, Boolean, ProposalDetails?) -> Unit = { _, _, _ -> },
         onConnectCalendar: () -> Unit = {},
         onApproveAutomatically: (String) -> Unit = {},
         onUndoAutomatic: () -> Unit = {},
@@ -752,7 +762,7 @@ class ConversationScreenTest {
     fun `GIVEN a removal waiting on the member WHEN drawn THEN the card says what goes and when and asks Keep it or Remove`() =
         runComposeUiTest {
             val decided = mutableListOf<Pair<String, Boolean>>()
-            setContent(conversation(stateNamed("Approving a removal"), onDecide = { id, ok -> decided += id to ok }))
+            setContent(conversation(stateNamed("Approving a removal"), onDecide = { id, ok, _ -> decided += id to ok }))
 
             onNodeWithText(getString(Res.string.tool_calendar_remove_card)).assertIsDisplayed()
             onNodeWithText("Print shop").assertIsDisplayed()
@@ -862,7 +872,7 @@ class ConversationScreenTest {
             setContent(
                 conversation(
                     stateNamed("Auto-approving an add"),
-                    onDecide = { id, ok -> decided += id to ok },
+                    onDecide = { id, ok, _ -> decided += id to ok },
                     onApproveAutomatically = { automatic += it },
                 ),
             )
@@ -885,7 +895,7 @@ class ConversationScreenTest {
             setContent(
                 conversation(
                     stateNamed("Auto-approving an add"),
-                    onDecide = { id, ok -> decided += id to ok },
+                    onDecide = { id, ok, _ -> decided += id to ok },
                     onApproveAutomatically = { automatic += it },
                 ),
             )
@@ -917,5 +927,95 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.tool_automatic_undo)).performClick()
 
             assertTrue(undone)
+        }
+
+    // ---- edit before approving (slice 4, PR 4) -------------------------------
+
+    /** Canvas: ToolEdit. The changed time is marked, and it is what reaches the hub. */
+    @Test
+    fun `GIVEN an add waiting on the member WHEN its time is edited THEN it is marked and Approve with changes sends it`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(
+                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
+                    decided +=
+                        Triple(id, ok, edit)
+                }),
+            )
+
+            val decline = onNodeWithText(getString(Res.string.tool_card_decline)).getUnclippedBoundsInRoot()
+            val edit = onNodeWithText(getString(Res.string.tool_card_edit)).getUnclippedBoundsInRoot()
+            val approve = onNodeWithText(getString(Res.string.tool_card_approve)).getUnclippedBoundsInRoot()
+            assertTrue(decline.right <= edit.left && edit.right <= approve.left, "Decline, Edit, then Approve")
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Dinner together")).assertIsDisplayed()
+            onNode(hasSetTextAction() and hasText("Sat 3 Oct")).assertIsDisplayed()
+            onNode(hasSetTextAction() and hasText("20:00")).performTextReplacement("20:30")
+
+            val time = getString(Res.string.tool_card_field_time)
+            onNodeWithText(getString(Res.string.field_changed, time)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            val later = EventMoment(2026, 10, 3, hour = 20, minute = 30)
+            assertEquals(
+                listOf(
+                    Triple<String, Boolean, ProposalDetails?>(
+                        "c-1",
+                        true,
+                        ProposalDetails.CalendarEvent(title = null, start = later, end = null, allDay = false),
+                    ),
+                ),
+                decided,
+            )
+        }
+
+    @Test
+    fun `GIVEN a card being edited WHEN a day can't be read THEN Approve says why and sends nothing`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(
+                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
+                    decided +=
+                        Triple(id, ok, edit)
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Sat 3 Oct")).performTextReplacement("someday")
+            onNodeWithText(getString(Res.string.tool_card_field_day_invalid)).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_field_day_invalid)).assertIsDisplayed()
+            assertEquals(emptyList(), decided)
+        }
+
+    @Test
+    fun `GIVEN a card being edited WHEN Cancel is tapped THEN the edits go and plain Approve sends no edit`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(
+                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
+                    decided +=
+                        Triple(id, ok, edit)
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("20:00")).performTextReplacement("21:00")
+            onNodeWithText(getString(Res.string.tool_card_cancel)).performClick()
+
+            onNodeWithText("Sat 3 Oct, 20:00").assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve)).performClick()
+
+            assertEquals(listOf(Triple<String, Boolean, ProposalDetails?>("c-1", true, null)), decided)
+        }
+
+    @Test
+    fun `GIVEN a removal waiting on the member WHEN drawn THEN it offers no Edit`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approving a removal")))
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).assertDoesNotExist()
         }
 }
