@@ -154,6 +154,19 @@ test('Pi bootstrap script', async (t) => {
     assert.match(script, /tailscale set --accept-dns=false/);
   });
 
+  await t.test('advertises the home network to the tailnet, with forwarding on', () => {
+    assert.match(script, /\/etc\/sysctl\.d\/99-tailscale\.conf/);
+    assert.match(script, /net\.ipv4\.ip_forward = 1/);
+    assert.match(script, /net\.ipv6\.conf\.all\.forwarding = 1/);
+    assert.match(script, /sysctl -p \/etc\/sysctl\.d\/99-tailscale\.conf/);
+    assert.match(script, /tailscale set --advertise-routes=192\.168\.1\.0\/24/);
+  });
+
+  await t.test('turns off the unused Wi-Fi client', () => {
+    assert.match(script, /systemctl is-enabled --quiet wpa_supplicant/);
+    assert.match(script, /systemctl disable --now wpa_supplicant/);
+  });
+
   await t.test('reminds about a pending reboot on every run until it happens', () => {
     assert.match(script, /\/sys\/class\/net\/wlan0/);
     assert.match(script, /systemctl is-active --quiet log2ram/);
