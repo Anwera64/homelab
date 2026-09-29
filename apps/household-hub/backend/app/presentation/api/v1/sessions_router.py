@@ -28,13 +28,15 @@ from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
 from app.domain.use_cases.agents.get_agent import GetAgentUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
-from app.domain.use_cases.chat.tool_approval import card_to_decide, refuse_while_awaiting_approval
+from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.presentation.api.session_lock import SessionLockRegistry
 from app.presentation.api.turn_log import TurnLog, TurnLogRegistry
 from app.presentation.api.deps import (
     get_current_user,
     get_list_user_sessions_use_case,
     get_session_use_case,
+    get_prepare_chat_turn_use_case,
+    get_prepare_tool_decision_use_case,
     get_create_session_use_case,
     get_toggle_secret_mode_use_case,
     get_archive_session_use_case,
@@ -183,7 +185,7 @@ async def decide_tool_proposal(
     session_id: str,
     tool_call_id: str,
     payload: ToolDecisionRequest,
-    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    prepare_uc: PrepareToolDecisionUseCase = Depends(get_prepare_tool_decision_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
     turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
@@ -205,10 +207,7 @@ async def decide_tool_proposal(
         )
 
     try:
-        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
-        card_to_decide(messages, tool_call_id)
-        question = next((m.content for m in reversed(messages) if m.role == "user"), "")
-        agent_id = session_entity.agent_id or ""
+        decision = await prepare_uc.execute(session_id, current_user, tool_call_id)
     except Exception:
         await lock_registry.release(session_id)
         raise
@@ -220,10 +219,10 @@ async def decide_tool_proposal(
             await stream_runner(
                 session_id=session_id,
                 current_user=current_user,
-                content=question,
+                content=decision.question,
                 auto_approve_writes=False,
                 queue=log,
-                agent_id=agent_id,
+                agent_id=decision.agent_id,
                 decision={
                     "tool_call_id": tool_call_id,
                     "approved": payload.approved,
@@ -244,7 +243,7 @@ async def chat_turn(
     session_id: str,
     payload: ChatTurnRequest,
     process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
-    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    prepare_uc: PrepareChatTurnUseCase = Depends(get_prepare_chat_turn_use_case),
     agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     reflection_runner = Depends(get_background_reflection_runner),
@@ -257,8 +256,7 @@ async def chat_turn(
     Schedules autonomous memory and gossip reflection in the background.
     """
     async with lock_registry.acquire(session_id):
-        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
-        refuse_while_awaiting_approval(messages)
+        session_entity, messages = await prepare_uc.execute(session_id, current_user)
         is_first_turn = len(messages) == 0
         agent_id = session_entity.agent_id or ""
         agent = await agent_uc.execute(agent_id) if agent_id else None
@@ -367,7 +365,7 @@ async def regenerate_answer(
 async def chat_turn_stream(
     session_id: str,
     payload: ChatTurnRequest,
-    get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
+    prepare_uc: PrepareChatTurnUseCase = Depends(get_prepare_chat_turn_use_case),
     agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
@@ -388,8 +386,7 @@ async def chat_turn_stream(
         )
 
     try:
-        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
-        refuse_while_awaiting_approval(messages)
+        session_entity, messages = await prepare_uc.execute(session_id, current_user)
         is_first_turn = len(messages) == 0
         agent_id = session_entity.agent_id or ""
         agent = await agent_uc.execute(agent_id) if agent_id else None

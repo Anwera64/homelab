@@ -1,18 +1,12 @@
 from typing import Any, Dict, List, Optional
 
 from app.domain.entities.llm_message import LLMMessage, LLMToolCall
-from app.domain.entities.session import ChatMessage
+from app.domain.entities.session import PAUSED_TURN, ChatMessage
 from app.domain.exceptions import AlreadyDecidedException, ApprovalPendingException, EntityNotFoundException
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, write_action
 
-
-# What a paused answer keeps beside its parts so the turn can carry on after the member decides:
-# the model's side of the turn so far, which round it paused in, and what it was asked. It lives on
-# the answer's own metadata, so it is saved and deleted with the chat and follows the secret-chat
-# rules without a table of its own. The phone is never sent it.
-PAUSED_TURN = "paused_turn"
 
 # What the model reads for a write the member said no to.
 DECLINED = "The member declined this action. It was not done; don't try it again unless they ask."

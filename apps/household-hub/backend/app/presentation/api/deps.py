@@ -43,6 +43,7 @@ from app.domain.use_cases.agents.purge_trash_agent import PurgeTrashAgentUseCase
 
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
+from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
 from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUseCase
 from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
@@ -198,6 +199,12 @@ def get_list_user_sessions_use_case() -> ListUserSessionsUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_session_use_case() -> GetSessionUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_prepare_chat_turn_use_case() -> PrepareChatTurnUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_prepare_tool_decision_use_case() -> PrepareToolDecisionUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_create_session_use_case() -> CreateSessionUseCase:
