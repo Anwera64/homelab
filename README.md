@@ -10,7 +10,7 @@
 [![Ollama](https://img.shields.io/badge/Ollama-Local_LLMs-black?logo=ollama&logoColor=white)](https://ollama.ai/)
 [![SearXNG](https://img.shields.io/badge/SearXNG-Privacy_Search-3C4043?logo=google&logoColor=white)](https://searxng.org/)
 
-A modern, fully automated, GPU-accelerated self-hosted media server, automation pipeline, and private AI intelligence & research stack running on Docker Compose on Windows / WSL2. Features zero-copy atomic hardlinks, VPN kill-switch isolation, TRaSH Guides quality sync, dual-mode local/remote ingress with official Let's Encrypt HTTPS via Tailscale, and a local privacy-first AI intelligence engine powered by Ollama (RTX 5080) and SearXNG.
+A modern, fully automated, GPU-accelerated self-hosted media server, automation pipeline, and private AI intelligence & research stack running on Docker Compose on Windows / WSL2. Features zero-copy atomic hardlinks, VPN kill-switch isolation, TRaSH Guides quality sync, dual-mode local/remote ingress with official Let's Encrypt HTTPS (DuckDNS wildcard) reachable over Tailscale, and a local privacy-first AI intelligence engine powered by Ollama (RTX 5080) and SearXNG.
 
 ---
 
@@ -26,7 +26,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 * **🛡️ VPN Network Isolation & Modern UI:** **qBittorrent** with **VueTorrent** WebUI skin, strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
 * **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
 * **🌐 Dual-Mode Ingress Routing:**
-  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** with zero port forwarding required.
+  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet.
   * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
 * **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation.
 * **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
@@ -40,7 +40,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 graph TD
     subgraph Ingress [Ingress & Access Layer]
         CLIENTS[📱 Home Wi-Fi Devices] -->|http://desktop-kujo8mp| CADDY[🔒 Caddy Reverse Proxy :80]
-        TAILSCALE[🔒 Tailscale Mesh Gateway] -->|https://homelab.ts.net| CADDY
+        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| CADDY
         CADDY --> HOMEPAGE[📊 Homepage Dashboard]
     end
 
@@ -120,7 +120,7 @@ graph TD
 │   └── pre-commit              # Automated pre-commit test & syntax quality gate
 ├── config/
 │   ├── caddy/
-│   │   └── Caddyfile           # Reverse proxy routing & Tailscale TLS configuration
+│   │   └── Caddyfile           # Reverse proxy routing & DuckDNS wildcard TLS configuration
 │   ├── searxng/
 │   │   └── settings.yml        # SearXNG aggregator engine & JSON API configuration
 │   └── homepage/
@@ -167,9 +167,9 @@ CONFIG_PATH=C:/Users/<Username>/Documents/Repos/Homelab/config
 WIREGUARD_PRIVATE_KEY=your_nordvpn_wireguard_private_key
 VPN_COUNTRY=United States
 
-# Tailscale Remote Access
-TS_AUTHKEY=tskey-auth-your-tailscale-key
-TS_HOSTNAME=homelab
+# DuckDNS (remote access itself comes from the Pi's Tailscale subnet route)
+DOMAIN_NAME=spicy-llama.duckdns.org
+DUCKDNS_TOKEN=your_duckdns_token
 ```
 
 ### 3. Enable Git Pre-Commit Hook

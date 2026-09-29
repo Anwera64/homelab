@@ -53,28 +53,28 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Tailscale container exposes standard ingress and local service ports in docker-compose.yml', () => {
-    const tailscaleMatch = dockerComposeContent.match(/container_name:\s*tailscale[\s\S]*?ports:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*restart:|$)/);
-    assert.ok(tailscaleMatch, 'docker-compose.yml must contain a tailscale service with a ports section');
+  await t.test('Caddy publishes the standard ingress and local service ports itself', () => {
+    const caddyMatch = dockerComposeContent.match(/container_name:\s*caddy[\s\S]*?ports:\s*\r?\n([\s\S]*?)(?=\r?\n\s*[a-z_]+:|$)/);
+    assert.ok(caddyMatch, 'docker-compose.yml must contain a caddy service with a ports section');
 
-    const tailscalePortsSection = tailscaleMatch[1];
     const exposedPorts = new Set();
     const portRegex = /-\s*(\d+):/g;
     let match;
-    while ((match = portRegex.exec(tailscalePortsSection)) !== null) {
+    while ((match = portRegex.exec(caddyMatch[1])) !== null) {
       exposedPorts.add(match[1]);
     }
 
-    assert.ok(exposedPorts.has('80'), 'Tailscale must expose port 80');
-    assert.ok(exposedPorts.has('443'), 'Tailscale must expose port 443');
-    assert.ok(exposedPorts.has('3000'), 'Tailscale must expose port 3000');
-
-    for (const port of Object.keys(PORT_TO_SERVICE)) {
-      assert.ok(
-        exposedPorts.has(port),
-        `Tailscale service in docker-compose.yml must expose local port ${port}`
-      );
+    for (const port of ['80', '443', '3000', ...Object.keys(PORT_TO_SERVICE)]) {
+      assert.ok(exposedPorts.has(port), `Caddy service in docker-compose.yml must expose port ${port}`);
     }
+  });
+
+  await t.test('The desktop runs no Tailscale: the Pi is the subnet router', () => {
+    assert.doesNotMatch(dockerComposeContent, /^\s*tailscale:\s*$/m, 'no tailscale service');
+    assert.doesNotMatch(dockerComposeContent, /network_mode:\s*"?service:tailscale/, 'Caddy must own its network');
+    assert.doesNotMatch(dockerComposeContent, /tailscale_sock/, 'no tailscale socket volume');
+    assert.doesNotMatch(dockerComposeContent, /\$\{TS_[A-Z_]+/, 'no TS_* variables');
+    assert.doesNotMatch(envExampleContent, /^TS_[A-Z_]+=/m, '.env.example must not document TS_* variables');
   });
 
   await t.test('Caddy service in docker-compose.yml builds custom image and injects DUCKDNS_TOKEN', () => {
