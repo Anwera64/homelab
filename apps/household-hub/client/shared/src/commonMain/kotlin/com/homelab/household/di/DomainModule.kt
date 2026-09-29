@@ -21,6 +21,7 @@ import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
+import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
 import com.homelab.household.domain.usecase.HasStoredSessionUseCase
 import com.homelab.household.domain.usecase.JoinHouseholdUseCase
 import com.homelab.household.domain.usecase.LeaveHouseholdUseCase
@@ -47,6 +48,7 @@ import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
 import com.homelab.household.domain.usecase.RevokeMilestoneUseCase
+import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StartGoogleCalendarSignInUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
@@ -75,6 +77,7 @@ import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetToolApprovalsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.HasStoredSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.JoinHouseholdUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LeaveHouseholdUseCaseImpl
@@ -101,6 +104,7 @@ import com.homelab.household.domain.usecase.impl.ResumeTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMilestoneUseCaseImpl
+import com.homelab.household.domain.usecase.impl.SetToolApprovalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
@@ -181,4 +185,8 @@ val domainModule =
         factory<ConnectCalendarUseCase> { ConnectCalendarUseCaseImpl(get()) }
         factory<RemoveCalendarUseCase> { RemoveCalendarUseCaseImpl(get()) }
         factory<StartGoogleCalendarSignInUseCase> { StartGoogleCalendarSignInUseCaseImpl(get()) }
+
+        // Which writes agents do without asking
+        factory<GetToolApprovalsUseCase> { GetToolApprovalsUseCaseImpl(get()) }
+        factory<SetToolApprovalUseCase> { SetToolApprovalUseCaseImpl(get()) }
     }

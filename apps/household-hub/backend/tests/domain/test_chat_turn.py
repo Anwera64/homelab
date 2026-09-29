@@ -282,10 +282,8 @@ async def test_process_chat_turn_write_tool_confirmation():
         uow=FakeUnitOfWork(),
     )
 
-    # Without auto_approve_writes=True, write tool is proposed, not executed
-    result = await use_case.execute(
-        session_id="s1", current_user=user, content="Add doctor appointment", auto_approve_writes=False
-    )
+    # Without the member making adding events automatic, the write is proposed, not executed
+    result = await use_case.execute(session_id="s1", current_user=user, content="Add doctor appointment")
     assert len(tool_executor.executed_calls) == 0  # Not executed directly
     assert len(result.tools_executed) == 1
     assert result.tools_executed[0]["status"] == "proposal_pending"

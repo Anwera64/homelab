@@ -2,15 +2,19 @@ package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.tool_calendar_add_automatic_ask
 import com.homelab.household.app.resources.tool_calendar_add_card
 import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_add_done
 import com.homelab.household.app.resources.tool_calendar_add_failed
+import com.homelab.household.app.resources.tool_calendar_add_now_automatic
 import com.homelab.household.app.resources.tool_calendar_add_running
+import com.homelab.household.app.resources.tool_calendar_change_automatic_ask
 import com.homelab.household.app.resources.tool_calendar_change_card
 import com.homelab.household.app.resources.tool_calendar_change_declined
 import com.homelab.household.app.resources.tool_calendar_change_done
 import com.homelab.household.app.resources.tool_calendar_change_failed
+import com.homelab.household.app.resources.tool_calendar_change_now_automatic
 import com.homelab.household.app.resources.tool_calendar_change_running
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
@@ -29,15 +33,19 @@ import com.homelab.household.app.resources.tool_generic_running
 import com.homelab.household.app.resources.tool_lookup_done
 import com.homelab.household.app.resources.tool_lookup_failed
 import com.homelab.household.app.resources.tool_lookup_running
+import com.homelab.household.app.resources.tool_note_append_automatic_ask
 import com.homelab.household.app.resources.tool_note_append_card
 import com.homelab.household.app.resources.tool_note_append_declined
 import com.homelab.household.app.resources.tool_note_append_done
 import com.homelab.household.app.resources.tool_note_append_failed
+import com.homelab.household.app.resources.tool_note_append_now_automatic
 import com.homelab.household.app.resources.tool_note_append_running
+import com.homelab.household.app.resources.tool_note_create_automatic_ask
 import com.homelab.household.app.resources.tool_note_create_card
 import com.homelab.household.app.resources.tool_note_create_declined
 import com.homelab.household.app.resources.tool_note_create_done
 import com.homelab.household.app.resources.tool_note_create_failed
+import com.homelab.household.app.resources.tool_note_create_now_automatic
 import com.homelab.household.app.resources.tool_note_create_running
 import com.homelab.household.app.resources.tool_note_done
 import com.homelab.household.app.resources.tool_note_failed
@@ -85,6 +93,13 @@ data class ToolLabel(
     val card: StringResource? = null,
     /** What a declined write leaves behind: "Not removed". */
     val declined: StringResource? = null,
+    /**
+     * The card's box for making this write automatic: "Auto-approve adding events from now on".
+     * Null for a write that always asks (removing, replacing) and for anything that only looks.
+     */
+    val automaticAsk: StringResource? = null,
+    /** Said once the box is ticked and the card approved: "Adding events is now automatic". */
+    val nowAutomatic: StringResource? = null,
 )
 
 /**
@@ -197,6 +212,8 @@ private val actionLabels =
                 permission = Res.string.tool_permission_calendar_add,
                 card = Res.string.tool_calendar_add_card,
                 declined = Res.string.tool_calendar_add_declined,
+                automaticAsk = Res.string.tool_calendar_add_automatic_ask,
+                nowAutomatic = Res.string.tool_calendar_add_now_automatic,
             ),
         (HubTool.CALENDAR_WRITE to ToolAction.Update) to
             ToolLabel(
@@ -207,6 +224,8 @@ private val actionLabels =
                 permission = Res.string.tool_permission_calendar_change,
                 card = Res.string.tool_calendar_change_card,
                 declined = Res.string.tool_calendar_change_declined,
+                automaticAsk = Res.string.tool_calendar_change_automatic_ask,
+                nowAutomatic = Res.string.tool_calendar_change_now_automatic,
             ),
         (HubTool.CALENDAR_WRITE to ToolAction.Delete) to
             ToolLabel(
@@ -227,6 +246,8 @@ private val actionLabels =
                 permission = Res.string.tool_permission_note_create,
                 card = Res.string.tool_note_create_card,
                 declined = Res.string.tool_note_create_declined,
+                automaticAsk = Res.string.tool_note_create_automatic_ask,
+                nowAutomatic = Res.string.tool_note_create_now_automatic,
             ),
         (HubTool.DOCUMENT_WRITER to ToolAction.Append) to
             ToolLabel(
@@ -237,6 +258,8 @@ private val actionLabels =
                 permission = Res.string.tool_permission_note_append,
                 card = Res.string.tool_note_append_card,
                 declined = Res.string.tool_note_append_declined,
+                automaticAsk = Res.string.tool_note_append_automatic_ask,
+                nowAutomatic = Res.string.tool_note_append_now_automatic,
             ),
         (HubTool.DOCUMENT_WRITER to ToolAction.Replace) to
             ToolLabel(

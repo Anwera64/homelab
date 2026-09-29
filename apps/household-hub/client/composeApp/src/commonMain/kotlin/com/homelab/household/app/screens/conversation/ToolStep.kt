@@ -30,6 +30,8 @@ data class ToolStep(
     val failed: Boolean,
     val words: StepWords,
     val results: List<ToolSource> = emptyList(),
+    /** A write that ran without a card, because the member made it automatic: "· automatic". */
+    val automatic: Boolean = false,
 )
 
 /** The line a step shows. Queries, titles and sites are shown as saved; everything else is a string resource. */
@@ -71,7 +73,8 @@ sealed interface StepWords {
     ) : StepWords
 }
 
-fun toolStep(part: AnswerPart.ToolDone): ToolStep = toolStep(part.tool, succeeded = true, part.summary)
+fun toolStep(part: AnswerPart.ToolDone): ToolStep =
+    toolStep(part.tool, succeeded = true, part.summary).copy(automatic = part.automatic)
 
 fun toolStep(part: AnswerPart.ToolFailed): ToolStep = toolStep(part.tool, succeeded = false, part.summary)
 

@@ -14,6 +14,7 @@ import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.presentation.chatsession.AgentChoice
 import com.homelab.household.presentation.chatsession.AgentOwner
+import com.homelab.household.presentation.chatsession.AutomaticWrite
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
 
@@ -480,6 +481,58 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                     turnState = TurnState.AwaitingApproval,
                     composerText = "Also lunch on Sunday?",
                     holdingForCard = true,
+                ),
+            // Canvas: ToolAutoApprove. An add can be made automatic from its card.
+            "Auto-approving an add" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Can you put dinner in the calendar for Saturday?", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Saturday at 20:00 works for both of you. I can add it now.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone("calendar_read"),
+                                        AnswerPart.Text("Saturday at 20:00 works for both of you. I can add it now."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Create,
+                                            arguments =
+                                                mapOf(
+                                                    "title" to "Dinner together",
+                                                    "start_time" to "2026-10-03T20:00:00",
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // Canvas: ToolAutoApproved. The next add ran without a card, and its record says so.
+            "Adding is automatic" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Add the print shop cutoff for Thursday too", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Added, Thursday at 18:00.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(
+                                            "calendar_write",
+                                            ToolSummary(title = "Print shop cutoff", action = ToolAction.Create),
+                                            automatic = true,
+                                        ),
+                                        AnswerPart.Text("Added, Thursday at 18:00."),
+                                    ),
+                            ),
+                        ),
+                    madeAutomatic = AutomaticWrite("calendar_write", ToolAction.Create),
                 ),
         )
 

@@ -38,6 +38,8 @@ sealed interface ChatStreamEvent {
         val error: String? = null,
         /** What the step shows on the phone, the same as the saved part will carry (#40). */
         val summary: ToolSummary? = null,
+        /** A write that ran without a card, because the member made it automatic. */
+        val automatic: Boolean = false,
     ) : ChatStreamEvent
 
     /**

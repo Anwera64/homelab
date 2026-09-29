@@ -307,6 +307,25 @@ class DefensiveSseStreamReaderTest {
             )
         }
 
+    /** A write the member made automatic runs without a card, and its record says so. */
+    @Test
+    fun `GIVEN an automatic write's result WHEN read THEN the event says it was automatic`() =
+        runTest {
+            val ssePayload =
+                """
+                data: {"type": "tool_result", "data": {"tool": "calendar_write", "success": true, "auto": true}}
+
+                data: {"type": "tool_result", "data": {"tool": "calendar_read", "success": true}}
+
+                data: [DONE]
+
+                """.trimIndent()
+
+            val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
+
+            assertEquals(listOf(true, false), events.map { (it as ChatStreamEvent.ToolResult).automatic })
+        }
+
     /** A running write says which action it is, so a removal is never shown as "Adding…". */
     @Test
     fun `GIVEN a running write WHEN read THEN the event carries its action`() =

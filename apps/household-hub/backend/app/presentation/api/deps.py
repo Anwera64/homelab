@@ -18,6 +18,7 @@ from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
+from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
@@ -136,6 +137,12 @@ def get_update_profile_use_case() -> UpdateProfileUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_change_pin_use_case() -> ChangePinUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_tool_approvals_use_case() -> ListToolApprovalsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_set_tool_approval_use_case() -> SetToolApprovalUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_leave_household_use_case() -> LeaveHouseholdUseCase:
