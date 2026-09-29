@@ -1,8 +1,8 @@
 ---
 # ==============================================================================
 # Homepage Services Configuration (DuckDNS Subdomain Architecture)
-# Homepage runs on the Pi (hosts/pi). Desktop services are reached through the
-# desktop's Caddy ports on 192.168.1.20 and checked over HTTP (siteMonitor);
+# Homepage runs on the Pi (hosts/pi). Desktop services are reached on the ports
+# their containers publish on 192.168.1.20 and checked over HTTP (siteMonitor);
 # only the Pi's own containers use Docker status (my-docker = the Pi's socket).
 # ==============================================================================
 
@@ -151,8 +151,9 @@
     - Caddy:
         icon: caddy.png
         href: https://spicy-llama.duckdns.org
-        description: Reverse Proxy & DuckDNS Wildcard TLS
-        siteMonitor: http://192.168.1.20
+        description: HTTPS Entry Point & DuckDNS Wildcard TLS (lemonpi)
+        server: my-docker
+        container: caddy
 
 - Infrastructure & System:
     - Pi-hole:

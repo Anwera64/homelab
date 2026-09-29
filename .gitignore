@@ -7,8 +7,6 @@ config/*/**
 !config/homepage/
 !config/homepage/**
 config/homepage/logs/
-!config/caddy/Caddyfile
-!config/caddy/Dockerfile
 config/ollama/
 !config/ollama-models/
 !config/ollama-models/**
