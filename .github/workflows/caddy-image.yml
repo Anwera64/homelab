@@ -1,6 +1,6 @@
 name: Caddy + DuckDNS image
 
-# Builds config/caddy/Dockerfile (Caddy with the DuckDNS DNS plugin) for the Pi (arm64) and
+# Builds hosts/pi/caddy/Dockerfile (Caddy with the DuckDNS DNS plugin) for the Pi (arm64) and
 # x86 machines, and publishes it as ghcr.io/anwera64/caddy-duckdns:<caddy version>. Compiling
 # it on the 1 GB Pi risks running out of memory, so CI does it. Monthly rebuilds pick up Caddy
 # releases; bump the tag pinned in hosts/pi/docker-compose.yml to roll one out.
@@ -9,7 +9,7 @@ on:
   push:
     branches: [ "master" ]
     paths:
-      - 'config/caddy/Dockerfile'
+      - 'hosts/pi/caddy/Dockerfile'
       - '.github/workflows/caddy-image.yml'
   schedule:
     - cron: '0 5 1 * *'
@@ -41,8 +41,8 @@ jobs:
       - name: Build for this runner to read the Caddy version
         uses: docker/build-push-action@v6
         with:
-          context: config/caddy
-          file: config/caddy/Dockerfile
+          context: hosts/pi/caddy
+          file: hosts/pi/caddy/Dockerfile
           load: true
           tags: caddy-duckdns:probe
 
@@ -53,8 +53,8 @@ jobs:
       - name: Build and push both architectures
         uses: docker/build-push-action@v6
         with:
-          context: config/caddy
-          file: config/caddy/Dockerfile
+          context: hosts/pi/caddy
+          file: hosts/pi/caddy/Dockerfile
           platforms: linux/amd64, linux/arm64
           push: true
           tags: |

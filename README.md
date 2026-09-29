@@ -26,7 +26,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 * **🛡️ VPN Network Isolation & Modern UI:** **qBittorrent** with **VueTorrent** WebUI skin, strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
 * **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
 * **🌐 Dual-Mode Ingress Routing:**
-  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet and terminates HTTPS with its own Caddy; the desktop's Caddy only publishes the containers on LAN ports.
+  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet and terminates HTTPS with its own Caddy, forwarding desktop services to the ports their containers publish.
   * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
 * **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation. It runs on the always-on Raspberry Pi (`hosts/pi`), so it stays up while the desktop is off.
 * **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
@@ -39,8 +39,8 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 ```mermaid
 graph TD
     subgraph Ingress [Ingress & Access Layer]
-        CLIENTS[📱 Home Wi-Fi Devices] -->|http://desktop-kujo8mp| CADDY[🔒 Caddy Reverse Proxy :80]
-        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| PICADDY[🔒 Pi Caddy :443] -->|LAN ports| CADDY
+        CLIENTS[📱 Home Wi-Fi Devices] -->|https://*.spicy-llama.duckdns.org| CADDY[🔒 Pi Caddy :443]
+        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| CADDY
         CADDY --> HOMEPAGE[📊 Homepage Dashboard on the Pi :3000]
     end
 
@@ -83,7 +83,7 @@ graph TD
 
 | Service | Remote Ingress (DuckDNS HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Features |
 | :--- | :--- | :--- | :--- |
-| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://desktop-kujo8mp` (Port 80) or `http://192.168.1.35:3000` (the Pi, direct) | Central dashboard & system telemetry |
+| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://192.168.1.35` (the Pi) | Central dashboard & system telemetry |
 | **Jellyfin Media** | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
 | **Jellyseerr** | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
 | **Jellystat** | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |
@@ -119,8 +119,6 @@ graph TD
 ├── .githooks/
 │   └── pre-commit              # Automated pre-commit test & syntax quality gate
 ├── config/
-│   ├── caddy/
-│   │   └── Caddyfile           # Reverse proxy routing & DuckDNS wildcard TLS configuration
 │   ├── searxng/
 │   │   └── settings.yml        # SearXNG aggregator engine & JSON API configuration
 │   └── homepage/
@@ -240,7 +238,7 @@ This repository enforces strict code quality and configuration integrity across 
 ### 1. Automated Test Suites (`tests/`)
 Running `node --test` executes 35+ automated validation checks across three dedicated suites:
 * **Ingress Link Adaptation (`adapt-links.test.js`):** Verifies that Homepage dashboard links adapt dynamically between secure Tailscale HTTPS ports and pure local HTTP LAN ports.
-* **Cross-Config Integrity (`config-integrity.test.js`):** Validates that all ports, services, and tokens across `Caddyfile`, `docker-compose.yml`, `services.yaml`, and `.env.example` stay 100% synchronized.
+* **Cross-Config Integrity (`config-integrity.test.js`):** Validates that all ports, services, and tokens across `hosts/pi/caddy/Caddyfile`, `docker-compose.yml`, `services.yaml`, and `.env.example` stay 100% synchronized.
 * **PowerShell Automation (`scripts-validation.test.js`):** Validates startup, shutdown, and Hyper-V/WSL2 setup scripts.
 
 ### 2. Git Pre-Commit Hook (`.githooks/pre-commit`)

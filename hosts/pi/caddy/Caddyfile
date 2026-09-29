@@ -1,8 +1,7 @@
 # ==============================================================================
 # Caddyfile - lemonpi HTTPS ingress (*.spicy-llama.duckdns.org -> 192.168.1.35)
-# Pi-local services are served here; desktop services go to the desktop Caddy's
-# LAN ports on 192.168.1.20 (see config/caddy/Caddyfile), which fail with a 502
-# while the desktop is off.
+# Pi-local services are served here; desktop services go to the ports their
+# containers publish on 192.168.1.20, and fail with a 502 while the desktop is off.
 # ==============================================================================
 
 {
@@ -31,9 +30,13 @@
         reverse_proxy 127.0.0.1:8081
     }
 
-    # On the desktop (its Caddy handles /emby and container names)
+    # On the desktop
     @jellyfin host jellyfin.spicy-llama.duckdns.org
     handle @jellyfin {
+        # Jellyfin 12 dropped the /emby prefix some clients still send.
+        handle_path /emby/* {
+            reverse_proxy 192.168.1.20:8096
+        }
         reverse_proxy 192.168.1.20:8096
     }
 

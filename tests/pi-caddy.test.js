@@ -21,8 +21,9 @@ function serviceBlock(compose, name) {
 test('Caddy image for the Pi is built by CI', async (t) => {
   const workflow = read(WORKFLOW_PATH);
 
-  await t.test('builds config/caddy/Dockerfile for arm64 and amd64', () => {
-    assert.match(workflow, /file:\s*config\/caddy\/Dockerfile/);
+  await t.test('builds hosts/pi/caddy/Dockerfile for arm64 and amd64', () => {
+    assert.match(workflow, /file:\s*hosts\/pi\/caddy\/Dockerfile/);
+    assert.match(workflow, /context:\s*hosts\/pi\/caddy/);
     assert.match(workflow, /platforms:\s*linux\/amd64,\s*linux\/arm64/);
   });
 
@@ -33,7 +34,7 @@ test('Caddy image for the Pi is built by CI', async (t) => {
   });
 
   await t.test('rebuilds when the Dockerfile changes and monthly for Caddy fixes', () => {
-    assert.match(workflow, /paths:\s*\n\s*-\s*['"]?config\/caddy\/Dockerfile['"]?/);
+    assert.match(workflow, /paths:\s*\n\s*-\s*['"]?hosts\/pi\/caddy\/Dockerfile['"]?/);
     assert.match(workflow, /schedule:\s*\n\s*-\s*cron:/);
   });
 });
@@ -67,11 +68,15 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.match(caddyfile, /# Default[^\n]*\n\s*handle \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3000/);
   });
 
-  await t.test('every desktop service goes to the desktop Caddy\'s LAN port', () => {
+  await t.test('Jellyfin keeps the /emby fallback for old clients', () => {
+    assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.20:8096/);
+  });
+
+  await t.test('every desktop service goes to its own published port on the desktop', () => {
     for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
       assert.match(
         caddyfile,
-        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{\\s*\\n\\s*reverse_proxy 192\\.168\\.1\\.20:${port}\\b`),
+        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy 192\\.168\\.1\\.20:${port}\\b`),
         `${service} must proxy to 192.168.1.20:${port}`
       );
     }
