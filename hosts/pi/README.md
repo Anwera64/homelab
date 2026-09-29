@@ -1,4 +1,4 @@
-# lemonpi: the house DNS and dashboard
+# lemonpi: the house DNS, dashboard and HTTPS entry point
 
 A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), wired on `eth0` at the reserved IP `192.168.1.35`. It answers DNS for every device on the LAN and the tailnet.
 
@@ -6,9 +6,10 @@ A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), w
 
 | Piece | What it does |
 | --- | --- |
-| Pi-hole v6 (Docker) | DNS and ad blocking. Admin page: http://192.168.1.35/admin |
+| Pi-hole v6 (Docker) | DNS, ad blocking and DHCP. Admin page: https://pihole.spicy-llama.duckdns.org/admin or http://192.168.1.35:8081/admin |
+| Caddy (Docker) | HTTPS for `*.spicy-llama.duckdns.org` (DuckDNS points here), wildcard cert via the DuckDNS DNS challenge. Pi-hole and Homepage are served locally; desktop services go to the desktop Caddy's LAN ports and return 502 while it's off. Image built by CI (`.github/workflows/caddy-image.yml`). |
 | Unbound (Docker) | Pi-hole's only upstream, on `127.0.0.1:5335`. Recursive from the root servers, DNSSEC on. |
-| Homepage (Docker) | The homelab dashboard at http://192.168.1.35:3000. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
+| Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org, http://192.168.1.35 or :3000. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
 | Tailscale (native) | Subnet router for `192.168.1.0/24`, so remote devices reach the LAN, and ad blocking away from home. |
 | log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
 | unattended-upgrades | Installs Debian security updates by itself. |
@@ -33,7 +34,7 @@ sudo tailscale up                   # open the printed URL to log in
 ```
 
 4. In the Tailscale admin console: disable key expiry for `lemonpi`, and under **Edit route settings** approve the `192.168.1.0/24` subnet route. With that route, tailnet devices away from home reach the whole LAN through the Pi, including `*.spicy-llama.duckdns.org`, which resolves to the desktop's LAN IP. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
-5. Fill the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap.. Switch DHCP over to Pi-hole (next section).
+5. Fill `DUCKDNS_TOKEN` and the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap. Point the DuckDNS record at 192.168.1.35.. Switch DHCP over to Pi-hole (next section).
 
 ## DHCP (Pi-hole replaces the Livebox's)
 
@@ -63,7 +64,7 @@ The script is safe to rerun. Image versions are pinned in `docker-compose.yml`; 
 dig @127.0.0.1 -p 5335 example.com      # Unbound answers
 dig @192.168.1.35 doubleclick.net       # 0.0.0.0 (blocked)
 dig @192.168.1.35 dnssec-failed.org     # SERVFAIL (DNSSEC works)
-docker compose --project-directory ~/homelab/hosts/pi ps   # all three up, Pi-hole and Unbound healthy
+docker compose --project-directory ~/homelab/hosts/pi ps   # all four up, Pi-hole and Unbound healthy
 ```
 
 ## Backups

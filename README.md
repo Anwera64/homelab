@@ -26,7 +26,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 * **🛡️ VPN Network Isolation & Modern UI:** **qBittorrent** with **VueTorrent** WebUI skin, strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
 * **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
 * **🌐 Dual-Mode Ingress Routing:**
-  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet.
+  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet and terminates HTTPS with its own Caddy; the desktop's Caddy only publishes the containers on LAN ports.
   * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
 * **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation. It runs on the always-on Raspberry Pi (`hosts/pi`), so it stays up while the desktop is off.
 * **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
@@ -40,7 +40,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 graph TD
     subgraph Ingress [Ingress & Access Layer]
         CLIENTS[📱 Home Wi-Fi Devices] -->|http://desktop-kujo8mp| CADDY[🔒 Caddy Reverse Proxy :80]
-        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| CADDY
+        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| PICADDY[🔒 Pi Caddy :443] -->|LAN ports| CADDY
         CADDY --> HOMEPAGE[📊 Homepage Dashboard on the Pi :3000]
     end
 

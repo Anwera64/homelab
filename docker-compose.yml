@@ -253,24 +253,21 @@ services:
 
   # ==============================================================================
   # 9. Reverse Proxy & Hostname Routing (Caddy)
-  # Remote access: the Pi (hosts/pi) advertises 192.168.1.0/24 to the tailnet, and
-  # *.spicy-llama.duckdns.org resolves to this machine's LAN IP.
+  # LAN gateway only: publishes the containers on this machine's ports. HTTPS for
+  # *.spicy-llama.duckdns.org is served by the Pi (hosts/pi), which forwards here.
   # ==============================================================================
   caddy:
-    build:
-      context: ./config/caddy
-      dockerfile: Dockerfile
+    image: caddy:2.11.4
     container_name: caddy
-    environment:
-      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
     volumes:
       - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
       - ${CONFIG_PATH}/caddy/data:/data
       - ${CONFIG_PATH}/caddy/config:/config
     ports:
       - 80:80
-      - 443:443
       - 3000:3000
+      # Household Hub for the Pi's Caddy
+      - 3051:3051
       # Local HTTP Service Ports
       - 8096:8096
       - 5055:5055

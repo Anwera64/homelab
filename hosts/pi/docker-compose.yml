@@ -37,6 +37,8 @@ services:
       # SD card wear: write the query database hourly, keep 30 days.
       FTLCONF_database_DBinterval: '3600'
       FTLCONF_database_maxDBdays: '30'
+      # Caddy owns 80/443 on the Pi; the admin UI lives on 8081 (and pihole.spicy-llama.duckdns.org).
+      FTLCONF_webserver_port: '8081o'
       # DHCP: the Livebox 7 won't let us change the DNS it hands out, so Pi-hole
       # replaces its DHCP server (same range, so devices keep their IPs).
       FTLCONF_dhcp_active: ${PIHOLE_DHCP_ACTIVE:-false}
@@ -52,6 +54,20 @@ services:
       - ./data/pihole:/etc/pihole
     tmpfs:
       - /var/log/pihole
+    restart: unless-stopped
+
+  # HTTPS entry point for *.spicy-llama.duckdns.org (DuckDNS points at this Pi). Pi-local
+  # services are served here; desktop services go to the desktop Caddy's LAN ports.
+  # The image (Caddy + DuckDNS DNS plugin) is built by .github/workflows/caddy-image.yml.
+  caddy:
+    image: ghcr.io/anwera64/caddy-duckdns:2.11.4
+    container_name: caddy
+    network_mode: host
+    environment:
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in hosts/pi/.env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
     restart: unless-stopped
 
   # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
