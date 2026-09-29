@@ -21,26 +21,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
   const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
 
-  await t.test('Caddyfile contains DuckDNS wildcard TLS block with dns duckdns plugin', () => {
-    assert.ok(
-      caddyfileContent.includes('*.spicy-llama.duckdns.org, spicy-llama.duckdns.org'),
-      'Caddyfile must contain wildcard entry for spicy-llama.duckdns.org'
-    );
-    assert.ok(
-      caddyfileContent.includes('dns duckdns {$DUCKDNS_TOKEN}'),
-      'Caddyfile must configure tls with dns duckdns {$DUCKDNS_TOKEN}'
-    );
-  });
-
-  await t.test('Caddyfile contains reverse proxy handlers for all core homelab services', () => {
-    const requiredServices = ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'bazarr', 'maintainerr', 'flaresolverr'];
-    for (const service of requiredServices) {
-      const handlerPattern = new RegExp(`@${service}\\s+host\\s+${service}\\.spicy-llama\\.duckdns\\.org`, 'm');
-      assert.ok(
-        handlerPattern.test(caddyfileContent),
-        `Caddyfile must contain a named host matcher for @${service}`
-      );
-    }
+  await t.test('Desktop Caddy is the LAN gateway only: HTTPS ingress lives on the Pi', () => {
+    const directives = caddyfileContent.split(/\r?\n/).filter((line) => !line.trim().startsWith('#')).join('\n');
+    assert.doesNotMatch(directives, /duckdns\.org/, 'DuckDNS names are served by hosts/pi/caddy/Caddyfile');
+    assert.doesNotMatch(directives, /\btls\s*\{/, 'the desktop Caddy terminates no TLS');
   });
 
   await t.test('Caddyfile contains local direct HTTP port proxy blocks', () => {
@@ -64,7 +48,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       exposedPorts.add(match[1]);
     }
 
-    for (const port of ['80', '443', '3000', ...Object.keys(PORT_TO_SERVICE)]) {
+    assert.doesNotMatch(caddyMatch[1], /-\s*443:443/, 'HTTPS is served by the Pi now');
+    for (const port of ['80', '3000', '3051', ...Object.keys(PORT_TO_SERVICE)]) {
       assert.ok(exposedPorts.has(port), `Caddy service in docker-compose.yml must expose port ${port}`);
     }
   });
@@ -77,15 +62,12 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.doesNotMatch(envExampleContent, /^TS_[A-Z_]+=/m, '.env.example must not document TS_* variables');
   });
 
-  await t.test('Caddy service in docker-compose.yml builds custom image and injects DUCKDNS_TOKEN', () => {
-    assert.ok(
-      dockerComposeContent.includes('context: ./config/caddy'),
-      'Caddy service must configure build context as ./config/caddy'
-    );
-    assert.ok(
-      dockerComposeContent.includes('DUCKDNS_TOKEN=${DUCKDNS_TOKEN}'),
-      'Caddy service must receive DUCKDNS_TOKEN environment variable'
-    );
+  await t.test('Desktop Caddy runs the stock pinned image and needs no DuckDNS token', () => {
+    const caddy = dockerComposeContent.match(/^  caddy:\r?\n([\s\S]*?)(?=^  [a-z0-9_-]+:\r?\n|^[a-z])/m);
+    assert.ok(caddy, 'docker-compose.yml must define a caddy service');
+    assert.match(caddy[1], /image:\s*caddy:2\.\d+/, 'desktop Caddy must use a pinned stock caddy:2.x image');
+    assert.doesNotMatch(caddy[1], /build:/, 'the DuckDNS plugin build moved to the Pi image (CI)');
+    assert.doesNotMatch(dockerComposeContent, /DUCKDNS_TOKEN/, 'only the Pi needs the DuckDNS token');
   });
 
   await t.test('Homepage (on the Pi) reaches desktop services by LAN IP, never by container name', () => {
@@ -117,7 +99,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.doesNotMatch(dockerComposeContent, /HOMEPAGE_VAR_/, 'HOMEPAGE_VAR_* now live in hosts/pi');
     assert.doesNotMatch(caddyfileContent, /reverse_proxy\s+homepage:3000/, 'no proxying to a local homepage container');
     const toPi = caddyfileContent.match(/reverse_proxy\s+192\.168\.1\.35:3000/g) || [];
-    assert.ok(toPi.length >= 3, 'the DuckDNS root, :80 and :3000 must proxy to the Pi');
+    assert.ok(toPi.length >= 2, ':80 and :3000 must proxy to the Pi (the DuckDNS root is the Pi Caddy\'s own)');
   });
 
   await t.test('Caddy exposes the Gluetun control API on :8000 for the Pi\'s Homepage widget', () => {
@@ -359,7 +341,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('Caddy proxies the hub to the container, not the host', () => {
-    assert.ok(caddyfileContent.includes('reverse_proxy household-hub:3050'), 'the hub route must target the household-hub container');
+    assert.match(caddyfileContent, /http:\/\/:3051\s*\{\s*reverse_proxy household-hub:3050/, 'the hub must be on LAN port 3051 for the Pi\'s Caddy');
     assert.ok(!caddyfileContent.includes('host.docker.internal:3050'), 'the hub route must not reach back to the Windows host');
   });
 });

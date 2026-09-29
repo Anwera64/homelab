@@ -157,7 +157,7 @@
 - Infrastructure & System:
     - Pi-hole:
         icon: pi-hole.png
-        href: http://192.168.1.35/admin
+        href: https://pihole.spicy-llama.duckdns.org/admin
         description: DNS, Ad Blocking & DHCP (lemonpi)
         server: my-docker
         container: pihole
