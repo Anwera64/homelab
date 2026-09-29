@@ -277,31 +277,22 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 10. Remote Mesh Gateway (Tailscale)
+  # 10. Reverse Proxy & Hostname Routing (Caddy)
+  # Remote access: the Pi (hosts/pi) advertises 192.168.1.0/24 to the tailnet, and
+  # *.spicy-llama.duckdns.org resolves to this machine's LAN IP.
   # ==============================================================================
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: tailscale
-    hostname: ${TS_HOSTNAME:-homelab}
+  caddy:
+    build:
+      context: ./config/caddy
+      dockerfile: Dockerfile
+    container_name: caddy
     environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      - TS_HOSTNAME=${TS_HOSTNAME:-homelab}
-      - TS_USERSPACE=false
-      - TS_PORT=41641
-      - TS_TAILSCALED_EXTRA_ARGS=--port=41641
-      - TS_ROUTES=${TS_ROUTES:-192.168.1.0/24}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
     volumes:
-      - ${CONFIG_PATH}/tailscale:/var/lib/tailscale
-      - tailscale_sock:/var/run/tailscale
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
+      - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ${CONFIG_PATH}/caddy/data:/data
+      - ${CONFIG_PATH}/caddy/config:/config
     ports:
-      # Direct Tailscale WireGuard UDP Port
-      - 41641:41641/udp
       - 80:80
       - 443:443
       - 3000:3000
@@ -318,31 +309,12 @@ services:
       - 8191:8191
       - 3080:3080
       - 3001:3001
-    restart: unless-stopped
-
-  # ==============================================================================
-  # 11. Reverse Proxy & Hostname Routing (Caddy)
-  # ==============================================================================
-  caddy:
-    build:
-      context: ./config/caddy
-      dockerfile: Dockerfile
-    container_name: caddy
-    network_mode: "service:tailscale"
-    environment:
-      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
-    volumes:
-      - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ${CONFIG_PATH}/caddy/data:/data
-      - ${CONFIG_PATH}/caddy/config:/config
-      - tailscale_sock:/var/run/tailscale
     depends_on:
-      - tailscale
       - homepage
     restart: unless-stopped
 
   # ==============================================================================
-  # 12. Automated Image Updates & Lifecycle (Watchtower)
+  # 11. Automated Image Updates & Lifecycle (Watchtower)
   # ==============================================================================
   watchtower:
     image: containrrr/watchtower:latest
@@ -359,7 +331,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 13. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
+  # 12. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
   # ==============================================================================
   ollama:
     profiles: ["ai"]
@@ -420,7 +392,6 @@ services:
       - searxng
     restart: unless-stopped
 volumes:
-  tailscale_sock:
   ollama_models:
     name: ollama_models
   household_hub_data:
