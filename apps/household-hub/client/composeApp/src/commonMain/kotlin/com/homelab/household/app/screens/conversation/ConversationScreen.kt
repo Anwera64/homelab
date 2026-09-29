@@ -54,7 +54,7 @@ fun ConversationScreen(
         onRetryAgents = viewModel::retryAgents,
         onDecide = viewModel::decide,
         onConnectCalendar = onConnectCalendar,
-        onApproveAutomatically = { toolCallId, _ -> viewModel.approveAutomatically(toolCallId) },
+        onApproveAutomatically = viewModel::approveAutomatically,
         onUndoAutomatic = viewModel::undoAutomatic,
         modifier = modifier,
     )
