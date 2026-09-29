@@ -117,6 +117,30 @@ test('Pi DNS stack: Pi-hole + Unbound', async (t) => {
     assert.deepEqual(macs, [], 'no MAC addresses in the compose file');
   });
 
+  await t.test('Homepage runs on the Pi from the repo config, pinned, with logs in RAM', () => {
+    const homepage = serviceBlock(compose, 'homepage');
+    assert.match(homepage, /image:\s*ghcr\.io\/gethomepage\/homepage:v2\.4\.0\s*$/m);
+    assert.match(homepage, /-\s*['"]?3000:3000['"]?/);
+    assert.match(homepage, /-\s*\.\.\/\.\.\/config\/homepage:\/app\/config\s*$/m);
+    assert.match(homepage, /-\s*\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+    assert.match(homepage, /tmpfs:\s*\n\s*-\s*\/app\/config\/logs/);
+    assert.match(homepage, /restart:\s*unless-stopped/);
+    assert.match(homepage, /TZ:\s*\$\{TZ:-Europe\/Madrid\}/);
+  });
+
+  await t.test('every {{HOMEPAGE_VAR_*}} in services.yaml comes from the Pi .env', () => {
+    const homepage = serviceBlock(compose, 'homepage');
+    const services = read(path.join(ROOT_DIR, 'config/homepage/services.yaml'));
+    const used = new Set([...services.matchAll(/\{\{(HOMEPAGE_VAR_[A-Z0-9_]+)\}\}/g)].map((m) => m[1]));
+    assert.ok(used.size > 0);
+    const env = read(ENV_EXAMPLE_PATH);
+    for (const name of used) {
+      const mapping = homepage.match(new RegExp(`${name}:\\s*\\$\\{([A-Z0-9_]+):-\\}`));
+      assert.ok(mapping, `homepage must map ${name} from the Pi .env`);
+      assert.match(env, new RegExp(`^${mapping[1]}=$`, 'm'), `.env.example must declare ${mapping[1]} (empty)`);
+    }
+  });
+
   await t.test('the Pi .env and runtime data stay out of git', () => {
     const ignore = read(GITIGNORE_PATH);
     assert.match(ignore, /^\.env$/m, '.env must be ignored at every depth');
@@ -166,6 +190,11 @@ test('Pi bootstrap script', async (t) => {
     assert.match(script, /net\.ipv6\.conf\.all\.forwarding = 1/);
     assert.match(script, /sysctl -p \/etc\/sysctl\.d\/99-tailscale\.conf/);
     assert.match(script, /tailscale set --advertise-routes=192\.168\.1\.0\/24/);
+  });
+
+  await t.test('adds config/homepage to the sparse checkout, as the repo owner', () => {
+    assert.match(script, /sparse-checkout list/, 'must check the current sparse paths first');
+    assert.match(script, /sudo -u "\$TARGET_USER" git -C "\$REPO_DIR" sparse-checkout add config\/homepage/);
   });
 
   await t.test('turns off the unused Wi-Fi client', () => {

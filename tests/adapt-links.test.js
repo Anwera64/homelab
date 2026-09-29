@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { adaptServiceUrl, SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { adaptServiceUrl, SERVICE_PORTS, PORT_TO_SERVICE, SERVICES_HOST, PI_HOSTS } = require('../config/homepage/adapt-links.js');
 
 test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
   const duckdnsOrigin = 'https://spicy-llama.duckdns.org/';
@@ -95,6 +95,20 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
     );
   });
 
+  await t.test('Pi Origin: Homepage served by the Pi sends local links to the services host, not the Pi', () => {
+    for (const piOrigin of ['http://192.168.1.35:3000/', 'http://lemonpi.lan:3000/', 'http://lemonpi:3000/']) {
+      assert.equal(
+        adaptServiceUrl('https://jellyfin.spicy-llama.duckdns.org', piOrigin),
+        `http://${SERVICES_HOST}:8096/`
+      );
+      assert.equal(
+        adaptServiceUrl('https://sonarr.spicy-llama.duckdns.org', piOrigin),
+        `http://${SERVICES_HOST}:8989/`
+      );
+    }
+    assert.equal(SERVICES_HOST, '192.168.1.20');
+  });
+
   await t.test('External Links Safety: never modifies external websites', () => {
     assert.equal(
       adaptServiceUrl('https://github.com/Anwera64/homelab', duckdnsOrigin),
@@ -125,5 +139,13 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
     assert.ok(portToServiceMatch, 'PORT_TO_SERVICE should exist in custom.js');
     const customPortToService = Function(`return ${portToServiceMatch[1]}`)();
     assert.deepEqual(customPortToService, PORT_TO_SERVICE);
+
+    const servicesHostMatch = customJsContent.match(/var SERVICES_HOST\s*=\s*'([^']+)';/);
+    assert.ok(servicesHostMatch, 'SERVICES_HOST should exist in custom.js');
+    assert.equal(servicesHostMatch[1], SERVICES_HOST);
+
+    const piHostsMatch = customJsContent.match(/var PI_HOSTS\s*=\s*(\[[\s\S]*?\]);/);
+    assert.ok(piHostsMatch, 'PI_HOSTS should exist in custom.js');
+    assert.deepEqual(Function(`return ${piHostsMatch[1]}`)(), PI_HOSTS);
   });
 });

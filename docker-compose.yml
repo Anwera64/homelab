@@ -232,32 +232,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 8. Dashboard & Unified Portal (Homepage)
-  # ==============================================================================
-  homepage:
-    image: ghcr.io/gethomepage/homepage:latest
-    container_name: homepage
-    environment:
-      - TZ=${TZ:-America/Mexico_City}
-      - HOMEPAGE_ALLOWED_HOSTS=*
-      - HOMEPAGE_VAR_GLUETUN_API_KEY=${GLUETUN_API_KEY}
-      - HOMEPAGE_VAR_JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
-      - HOMEPAGE_VAR_SEERR_API_KEY=${SEERR_API_KEY:-${JELLYSEERR_API_KEY}}
-      - HOMEPAGE_VAR_JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY:-${SEERR_API_KEY:-}}
-      - HOMEPAGE_VAR_SONARR_API_KEY=${SONARR_API_KEY}
-      - HOMEPAGE_VAR_RADARR_API_KEY=${RADARR_API_KEY}
-      - HOMEPAGE_VAR_PROWLARR_API_KEY=${PROWLARR_API_KEY}
-      - HOMEPAGE_VAR_BAZARR_API_KEY=${BAZARR_API_KEY}
-      - HOMEPAGE_VAR_JELLYSTAT_API_KEY=${JELLYSTAT_API_KEY:-}
-    volumes:
-      - ${CONFIG_PATH}/homepage:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
-    restart: unless-stopped
-
-  # ==============================================================================
-  # 9. TRaSH Guides Automation (Recyclarr)
+  # 8. TRaSH Guides Automation (Recyclarr)
   # ==============================================================================
   recyclarr:
     image: ghcr.io/recyclarr/recyclarr:8
@@ -277,7 +252,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 10. Reverse Proxy & Hostname Routing (Caddy)
+  # 9. Reverse Proxy & Hostname Routing (Caddy)
   # Remote access: the Pi (hosts/pi) advertises 192.168.1.0/24 to the tailnet, and
   # *.spicy-llama.duckdns.org resolves to this machine's LAN IP.
   # ==============================================================================
@@ -309,12 +284,12 @@ services:
       - 8191:8191
       - 3080:3080
       - 3001:3001
-    depends_on:
-      - homepage
+      # Gluetun control API for the Pi's Homepage widget
+      - 8000:8000
     restart: unless-stopped
 
   # ==============================================================================
-  # 11. Automated Image Updates & Lifecycle (Watchtower)
+  # 10. Automated Image Updates & Lifecycle (Watchtower)
   # ==============================================================================
   watchtower:
     image: containrrr/watchtower:latest
@@ -331,7 +306,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 12. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
+  # 11. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
   # ==============================================================================
   ollama:
     profiles: ["ai"]

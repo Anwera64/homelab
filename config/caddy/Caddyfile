@@ -88,9 +88,9 @@
         reverse_proxy household-hub:3050
     }
 
-    # Default / Dashboard (Homepage)
+    # Default / Dashboard (Homepage, on the Pi)
     handle {
-        reverse_proxy homepage:3000
+        reverse_proxy 192.168.1.35:3000
     }
 }
 
@@ -99,12 +99,17 @@
 # ------------------------------------------------------------------------------
 http://desktop-kujo8mp, http://desktop-kujo8mp.local, http://homelab.local, http://localhost, http://192.168.1.20, http://home.local, :80 {
     import security_headers
-    reverse_proxy homepage:3000
+    reverse_proxy 192.168.1.35:3000
 }
 
 http://:3000 {
     import security_headers
-    reverse_proxy homepage:3000
+    reverse_proxy 192.168.1.35:3000
+}
+
+# Gluetun control API, for the Pi's Homepage widget (authenticated by GLUETUN_API_KEY)
+http://:8000 {
+    reverse_proxy gluetun:8000
 }
 
 # ------------------------------------------------------------------------------

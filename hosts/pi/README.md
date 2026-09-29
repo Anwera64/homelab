@@ -1,4 +1,4 @@
-# lemonpi: the house DNS
+# lemonpi: the house DNS and dashboard
 
 A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), wired on `eth0` at the reserved IP `192.168.1.35`. It answers DNS for every device on the LAN and the tailnet.
 
@@ -8,7 +8,8 @@ A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), w
 | --- | --- |
 | Pi-hole v6 (Docker) | DNS and ad blocking. Admin page: http://192.168.1.35/admin |
 | Unbound (Docker) | Pi-hole's only upstream, on `127.0.0.1:5335`. Recursive from the root servers, DNSSEC on. |
-| Tailscale (native) | Reaches the Pi from anywhere, so phones keep the blocking away from home. |
+| Homepage (Docker) | The homelab dashboard at http://192.168.1.35:3000. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
+| Tailscale (native) | Subnet router for `192.168.1.0/24`, so remote devices reach the LAN, and ad blocking away from home. |
 | log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
 | unattended-upgrades | Installs Debian security updates by itself. |
 
@@ -18,7 +19,7 @@ Wi-Fi and Bluetooth are disabled (the Pi is wired). To save the SD card, Pi-hole
 
 1. Flash Raspberry Pi OS Lite (64-bit) with Raspberry Pi Imager. Set hostname `lemonpi`, user `anwera97`, and SSH with your public key. No Wi-Fi needed.
 2. In the router, reserve `192.168.1.35` for the Pi's `eth0` MAC address.
-3. On the Pi (the repo is public and only this folder is checked out):
+3. On the Pi (the repo is public; only `hosts/pi` and `config/homepage` are checked out, and bootstrap adds the second):
 
 ```sh
 sudo apt-get update && sudo apt-get install -y git
@@ -32,7 +33,7 @@ sudo tailscale up                   # open the printed URL to log in
 ```
 
 4. In the Tailscale admin console: disable key expiry for `lemonpi`, and under **Edit route settings** approve the `192.168.1.0/24` subnet route. With that route, tailnet devices away from home reach the whole LAN through the Pi, including `*.spicy-llama.duckdns.org`, which resolves to the desktop's LAN IP. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
-5. In the router, set the DHCP DNS server to `192.168.1.35` only. Do not add a public fallback, or devices will bypass Pi-hole.
+5. Fill the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap.. Switch DHCP over to Pi-hole (next section).
 
 ## DHCP (Pi-hole replaces the Livebox's)
 
@@ -62,7 +63,7 @@ The script is safe to rerun. Image versions are pinned in `docker-compose.yml`; 
 dig @127.0.0.1 -p 5335 example.com      # Unbound answers
 dig @192.168.1.35 doubleclick.net       # 0.0.0.0 (blocked)
 dig @192.168.1.35 dnssec-failed.org     # SERVFAIL (DNSSEC works)
-docker compose --project-directory ~/homelab/hosts/pi ps   # both healthy
+docker compose --project-directory ~/homelab/hosts/pi ps   # all three up, Pi-hole and Unbound healthy
 ```
 
 ## Backups

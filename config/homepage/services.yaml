@@ -1,6 +1,9 @@
 ---
 # ==============================================================================
 # Homepage Services Configuration (DuckDNS Subdomain Architecture)
+# Homepage runs on the Pi (hosts/pi). Desktop services are reached through the
+# desktop's Caddy ports on 192.168.1.20 and checked over HTTP (siteMonitor);
+# only the Pi's own containers use Docker status (my-docker = the Pi's socket).
 # ==============================================================================
 
 - Media & Streaming:
@@ -8,11 +11,10 @@
         icon: jellyfin.png
         href: https://jellyfin.spicy-llama.duckdns.org
         description: Media Streaming (RTX 5080 NVENC)
-        server: my-docker
-        container: jellyfin
+        siteMonitor: http://192.168.1.20:8096
         widget:
           type: jellyfin
-          url: http://jellyfin:8096
+          url: http://192.168.1.20:8096
           key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
           version: 2
           enableNowPlaying: true
@@ -22,22 +24,20 @@
         icon: seerr.png
         href: https://seerr.spicy-llama.duckdns.org
         description: Netflix-style Request & Discovery UI
-        server: my-docker
-        container: seerr
+        siteMonitor: http://192.168.1.20:5055
         widget:
           type: seerr
-          url: http://seerr:5055
+          url: http://192.168.1.20:5055
           key: "{{HOMEPAGE_VAR_SEERR_API_KEY}}"
 
     - Jellystat:
         icon: jellystat.png
         href: https://stat.spicy-llama.duckdns.org
         description: Playback Analytics & Viewer Statistics
-        server: my-docker
-        container: jellystat
+        siteMonitor: http://192.168.1.20:3005
         widget:
           type: customapi
-          url: http://jellystat:3000/stats/getLibraryCardStats
+          url: http://192.168.1.20:3005/stats/getLibraryCardStats
           headers:
             x-api-token: "{{HOMEPAGE_VAR_JELLYSTAT_API_KEY}}"
           mappings:
@@ -60,62 +60,55 @@
         icon: sonarr.png
         href: https://sonarr.spicy-llama.duckdns.org
         description: TV Series Management
-        server: my-docker
-        container: sonarr
+        siteMonitor: http://192.168.1.20:8989
         widget:
           type: sonarr
-          url: http://sonarr:8989
+          url: http://192.168.1.20:8989
           key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
 
     - Radarr:
         icon: radarr.png
         href: https://radarr.spicy-llama.duckdns.org
         description: Movie Collection Management
-        server: my-docker
-        container: radarr
+        siteMonitor: http://192.168.1.20:7878
         widget:
           type: radarr
-          url: http://radarr:7878
+          url: http://192.168.1.20:7878
           key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
 
     - Prowlarr:
         icon: prowlarr.png
         href: https://prowlarr.spicy-llama.duckdns.org
         description: Trackers & Indexer Proxy
-        server: my-docker
-        container: prowlarr
+        siteMonitor: http://192.168.1.20:9696
         widget:
           type: prowlarr
-          url: http://prowlarr:9696
+          url: http://192.168.1.20:9696
           key: "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}"
 
     - Bazarr:
         icon: bazarr.png
         href: https://bazarr.spicy-llama.duckdns.org
         description: Automated Subtitle Sync
-        server: my-docker
-        container: bazarr
+        siteMonitor: http://192.168.1.20:6767
         widget:
           type: bazarr
-          url: http://bazarr:6767
+          url: http://192.168.1.20:6767
           key: "{{HOMEPAGE_VAR_BAZARR_API_KEY}}"
 
     - Recyclarr:
         icon: recyclarr.png
         href: https://recyclarr.dev
         description: TRaSH Guides Quality & Format Sync (Daily 3 AM)
-        server: my-docker
-        container: recyclarr
 
     - Maintainerr:
         icon: maintainerr.png
         href: https://maintainerr.spicy-llama.duckdns.org
         description: Automated Media Lifecycle & Cleanup
-        server: my-docker
-        container: maintainerr
+        siteMonitor: http://192.168.1.20:6246
         widget:
           type: customapi
-          url: http://maintainerr:6246/api/collections
+          url: http://192.168.1.20:6246/api/collections
           mappings:
             - field: 0.mediaCount
               label: Queued Movies
@@ -129,20 +122,17 @@
         icon: qbittorrent.png
         href: https://qbit.spicy-llama.duckdns.org
         description: Download Client (VueTorrent UI - Kill-Switch Isolated)
-        server: my-docker
-        container: qbittorrent
+        siteMonitor: http://192.168.1.20:8080
         widget:
           type: qbittorrent
-          url: http://gluetun:8080
+          url: http://192.168.1.20:8080
 
     - Gluetun VPN:
         icon: gluetun.png
         description: NordVPN WireGuard Gateway
-        server: my-docker
-        container: gluetun
         widget:
           type: gluetun
-          url: http://gluetun:8000
+          url: http://192.168.1.20:8000
           key: "{{HOMEPAGE_VAR_GLUETUN_API_KEY}}"
           version: 2
 
@@ -150,9 +140,7 @@
         icon: flaresolverr.png
         href: https://flaresolverr.spicy-llama.duckdns.org
         description: Cloudflare Solver Proxy
-        server: my-docker
-        container: flaresolverr
-        ping: http://flaresolverr:8191/
+        siteMonitor: http://192.168.1.20:8191
 
 - Ingress & Security:
     - Tailscale:
@@ -164,12 +152,22 @@
         icon: caddy.png
         href: https://spicy-llama.duckdns.org
         description: Reverse Proxy & DuckDNS Wildcard TLS
-        server: my-docker
-        container: caddy
+        siteMonitor: http://192.168.1.20
 
 - Infrastructure & System:
+    - Pi-hole:
+        icon: pi-hole.png
+        href: http://192.168.1.35/admin
+        description: DNS, Ad Blocking & DHCP (lemonpi)
+        server: my-docker
+        container: pihole
+
+    - Unbound:
+        icon: unbound.png
+        description: Private DNSSEC Resolver for Pi-hole (lemonpi)
+        server: my-docker
+        container: unbound
+
     - Watchtower:
         icon: watchtower.png
-        description: Automated Image Updates (Daily 4 AM)
-        server: my-docker
-        container: watchtower
+        description: Automated Image Updates on the desktop (Daily 4 AM)
