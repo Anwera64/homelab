@@ -228,7 +228,7 @@ class ProposalDetailsDataMapperTest {
     }
 
     @Test
-    fun `GIVEN an event with a repeat but no which-dates WHEN written back THEN neither is sent, so the hub keeps what the model asked`() {
+    fun `GIVEN an event with a repeat but no which-dates WHEN written back THEN neither is sent and the hub keeps what the model asked`() {
         val arguments =
             ProposalDetailsDataMapper.toArguments(
                 ProposalDetails.CalendarEvent(null, null, null, false, repeat = EventRepeat(RepeatEvery.Day)),
