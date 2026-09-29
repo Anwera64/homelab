@@ -51,6 +51,9 @@ ensure_overlay() {
 }
 ensure_overlay disable-wifi
 ensure_overlay disable-bt
+if systemctl is-enabled --quiet wpa_supplicant 2>/dev/null; then
+  systemctl disable --now wpa_supplicant
+fi
 
 step "Fixed IP 192.168.1.35, with DNS that doesn't depend on this Pi-hole"
 # Pi-hole is the house DHCP server, so the Pi can't lease its own address.
@@ -97,6 +100,14 @@ if ! command -v tailscale >/dev/null 2>&1; then
 fi
 # The tailnet's DNS is this Pi-hole; the Pi itself must not depend on it.
 tailscale set --accept-dns=false
+# Subnet router: tailnet devices reach 192.168.1.x (and *.spicy-llama.duckdns.org) through
+# this always-on Pi. The route still has to be approved once in the Tailscale admin console.
+SYSCTL_CONF=/etc/sysctl.d/99-tailscale.conf
+if ! grep -qs 'net.ipv4.ip_forward = 1' "$SYSCTL_CONF"; then
+  printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' > "$SYSCTL_CONF"
+  sysctl -p /etc/sysctl.d/99-tailscale.conf
+fi
+tailscale set --advertise-routes=192.168.1.0/24
 
 step "Pi-hole + Unbound"
 if [ ! -f "$PI_DIR/.env" ]; then
