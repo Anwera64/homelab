@@ -88,23 +88,42 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('Homepage service.yaml {{HOMEPAGE_VAR_*}} tokens are mapped in docker-compose.yml', () => {
-    const varPattern = /\{\{HOMEPAGE_VAR_([A-Z0-9_]+)\}\}/g;
-    const requiredVars = new Set();
-    let match;
-    while ((match = varPattern.exec(servicesYamlContent)) !== null) {
-      requiredVars.add(`HOMEPAGE_VAR_${match[1]}`);
+  await t.test('Homepage (on the Pi) reaches desktop services by LAN IP, never by container name', () => {
+    const urls = [...servicesYamlContent.matchAll(/^\s*(?:url|ping|siteMonitor):\s*(\S+)/gm)].map((m) => m[1]);
+    assert.ok(urls.length > 0, 'services.yaml should declare service URLs');
+    for (const url of urls) {
+      const host = new URL(url).hostname;
+      assert.ok(host.includes('.') || host === 'localhost', `${url} uses a bare container name the Pi can't resolve`);
     }
+  });
 
-    assert.ok(requiredVars.size > 0, 'Should find HOMEPAGE_VAR_* variables in services.yaml');
-
-    for (const varName of requiredVars) {
-      const composeEnvPattern = new RegExp(`-\\s*${varName}=`);
-      assert.ok(
-        composeEnvPattern.test(dockerComposeContent),
-        `docker-compose.yml homepage container must define environment variable ${varName}`
-      );
+  await t.test('Desktop services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
+    const containers = [...servicesYamlContent.matchAll(/^\s*container:\s*(\S+)/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(containers, ['pihole', 'unbound']);
+    const expectedMonitors = {
+      Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
+      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Caddy: 80,
+    };
+    for (const [name, port] of Object.entries(expectedMonitors)) {
+      const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
+      assert.ok(block, `services.yaml must list ${name}`);
+      const monitor = port === 80 ? 'http://192.168.1.20' : `http://192.168.1.20:${port}`;
+      assert.match(block[1], new RegExp(`siteMonitor:\\s*${monitor.replace(/\./g, '\\.')}/?\\s*$`, 'm'), `${name} must be monitored at ${monitor}`);
     }
+  });
+
+  await t.test('Homepage moved to the Pi: the desktop runs none and Caddy sends dashboard traffic there', () => {
+    assert.doesNotMatch(dockerComposeContent, /^\s*homepage:\s*$/m, 'no homepage service on the desktop');
+    assert.doesNotMatch(dockerComposeContent, /HOMEPAGE_VAR_/, 'HOMEPAGE_VAR_* now live in hosts/pi');
+    assert.doesNotMatch(caddyfileContent, /reverse_proxy\s+homepage:3000/, 'no proxying to a local homepage container');
+    const toPi = caddyfileContent.match(/reverse_proxy\s+192\.168\.1\.35:3000/g) || [];
+    assert.ok(toPi.length >= 3, 'the DuckDNS root, :80 and :3000 must proxy to the Pi');
+  });
+
+  await t.test('Caddy exposes the Gluetun control API on :8000 for the Pi\'s Homepage widget', () => {
+    assert.match(caddyfileContent, /http:\/\/:8000\s*\{[\s\S]*?reverse_proxy\s+gluetun:8000/);
+    const caddyPorts = dockerComposeContent.match(/container_name:\s*caddy[\s\S]*?ports:\s*\r?\n([\s\S]*?)(?=\r?\n\s*[a-z_]+:|$)/);
+    assert.match(caddyPorts[1], /-\s*8000:8000/);
   });
 
   await t.test('All environment variables in docker-compose.yml are documented in .env.example', () => {
@@ -222,8 +241,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
   await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
     assert.ok(
-      /container:\s*seerr/.test(servicesYamlContent),
-      'Homepage services.yaml must define container: seerr'
+      /url:\s*http:\/\/192\.168\.1\.20:5055/.test(servicesYamlContent),
+      'Homepage services.yaml must point the Seerr widget at the desktop (192.168.1.20:5055)'
     );
     assert.ok(
       /type:\s*seerr/.test(servicesYamlContent),

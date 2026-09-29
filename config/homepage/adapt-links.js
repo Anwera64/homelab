@@ -34,6 +34,10 @@ const PORT_TO_SERVICE = {
   '8191': 'flaresolverr'
 };
 
+// Homepage runs on the Pi; the services themselves run on the desktop.
+const SERVICES_HOST = '192.168.1.20';
+const PI_HOSTS = ['192.168.1.35', 'lemonpi', 'lemonpi.lan', 'lemonpi.local'];
+
 function isHomelabHost(hostname, currentHostname) {
   if (!hostname) return false;
   if (hostname === currentHostname) return true;
@@ -74,6 +78,8 @@ function adaptServiceUrl(targetHref, currentOrigin) {
       (currentUrl.hostname === 'desktop-kujo8mp' || 
        currentUrl.hostname === 'localhost' || 
        currentUrl.hostname.endsWith('.local') || 
+       currentUrl.hostname.endsWith('.lan') || 
+       PI_HOSTS.indexOf(currentUrl.hostname) !== -1 || 
        /^192\.168\.\d{1,3}\.\d{1,3}$/.test(currentUrl.hostname));
 
     // When accessing locally over HTTP (e.g. desktop-kujo8mp), adapt subdomain HTTPS links to direct local HTTP ports
@@ -81,7 +87,7 @@ function adaptServiceUrl(targetHref, currentOrigin) {
       const subdomain = targetUrl.hostname.split('.')[0];
       const localPort = SERVICE_PORTS[subdomain];
       if (localPort) {
-        targetUrl.hostname = currentUrl.hostname;
+        targetUrl.hostname = PI_HOSTS.indexOf(currentUrl.hostname) !== -1 ? SERVICES_HOST : currentUrl.hostname;
         targetUrl.port = localPort;
         targetUrl.protocol = 'http:';
         return targetUrl.toString();
@@ -107,5 +113,5 @@ function adaptServiceUrl(targetHref, currentOrigin) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { adaptServiceUrl, SERVICE_PORTS, PORT_TO_SERVICE };
+  module.exports = { adaptServiceUrl, SERVICE_PORTS, PORT_TO_SERVICE, SERVICES_HOST, PI_HOSTS };
 }

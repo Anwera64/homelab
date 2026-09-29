@@ -28,7 +28,7 @@ A modern, fully automated, GPU-accelerated self-hosted media server, automation 
 * **🌐 Dual-Mode Ingress Routing:**
   * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet.
   * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
-* **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation.
+* **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation. It runs on the always-on Raspberry Pi (`hosts/pi`), so it stays up while the desktop is off.
 * **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
 * **🧪 Quality Gate & Testing:** Built-in Node.js unit test suite and Git pre-commit hooks to guarantee zero broken deployments.
 
@@ -41,7 +41,7 @@ graph TD
     subgraph Ingress [Ingress & Access Layer]
         CLIENTS[📱 Home Wi-Fi Devices] -->|http://desktop-kujo8mp| CADDY[🔒 Caddy Reverse Proxy :80]
         TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| CADDY
-        CADDY --> HOMEPAGE[📊 Homepage Dashboard]
+        CADDY --> HOMEPAGE[📊 Homepage Dashboard on the Pi :3000]
     end
 
     subgraph AIStack [Local AI Engine & Search Foundation]
@@ -83,7 +83,7 @@ graph TD
 
 | Service | Remote Ingress (DuckDNS HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Features |
 | :--- | :--- | :--- | :--- |
-| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://desktop-kujo8mp` (Port 80) | Central dashboard & system telemetry |
+| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://desktop-kujo8mp` (Port 80) or `http://192.168.1.35:3000` (the Pi, direct) | Central dashboard & system telemetry |
 | **Jellyfin Media** | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
 | **Jellyseerr** | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
 | **Jellystat** | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |

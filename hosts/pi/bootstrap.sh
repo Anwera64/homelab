@@ -109,7 +109,14 @@ if ! grep -qs 'net.ipv4.ip_forward = 1' "$SYSCTL_CONF"; then
 fi
 tailscale set --advertise-routes=192.168.1.0/24
 
-step "Pi-hole + Unbound"
+step "Homepage config in the sparse checkout"
+REPO_DIR="$(cd "$PI_DIR/../.." && pwd)"
+if [ "$(git -C "$REPO_DIR" config --get core.sparseCheckout || true)" = "true" ] \
+  && ! sudo -u "$TARGET_USER" git -C "$REPO_DIR" sparse-checkout list | grep -qx config/homepage; then
+  sudo -u "$TARGET_USER" git -C "$REPO_DIR" sparse-checkout add config/homepage
+fi
+
+step "Pi-hole + Unbound + Homepage"
 if [ ! -f "$PI_DIR/.env" ]; then
   cp "$PI_DIR/.env.example" "$PI_DIR/.env"
   chown "$TARGET_USER:" "$PI_DIR/.env"

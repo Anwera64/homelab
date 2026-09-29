@@ -53,3 +53,28 @@ services:
     tmpfs:
       - /var/log/pihole
     restart: unless-stopped
+
+  # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
+  # the sparse checkout by bootstrap.sh); desktop services are reached on 192.168.1.20.
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v2.4.0
+    container_name: homepage
+    ports:
+      - 3000:3000
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+      HOMEPAGE_ALLOWED_HOSTS: '*'
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      HOMEPAGE_VAR_SEERR_API_KEY: ${SEERR_API_KEY:-}
+      HOMEPAGE_VAR_JELLYSTAT_API_KEY: ${JELLYSTAT_API_KEY:-}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY:-}
+      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY:-}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
+      HOMEPAGE_VAR_GLUETUN_API_KEY: ${GLUETUN_API_KEY:-}
+    volumes:
+      - ../../config/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /app/config/logs
+    restart: unless-stopped
