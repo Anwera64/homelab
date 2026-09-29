@@ -1,103 +1,106 @@
-# 🛸 Automated Homelab Media & Streaming Stack
+# 🛸 Homelab: Media, Automation & Local AI
 
 [![CI](https://github.com/Anwera64/homelab/actions/workflows/test.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/test.yml)
-[![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Docker Compose](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-RTX_5080_NVENC_%26_Compute-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
-[![Tailscale](https://img.shields.io/badge/Tailscale-Mesh_VPN-2F5CFF?logo=tailscale&logoColor=white)](https://tailscale.com/)
-[![Caddy](https://img.shields.io/badge/Caddy-Reverse_Proxy-1F88C0?logo=caddy&logoColor=white)](https://caddyserver.com/)
-[![WireGuard](https://img.shields.io/badge/WireGuard-NordVPN_Killswitch-88171A?logo=wireguard&logoColor=white)](https://www.wireguard.com/)
-[![Ollama](https://img.shields.io/badge/Ollama-Local_LLMs-black?logo=ollama&logoColor=white)](https://ollama.ai/)
-[![SearXNG](https://img.shields.io/badge/SearXNG-Privacy_Search-3C4043?logo=google&logoColor=white)](https://searxng.org/)
+[![Hub client](https://github.com/Anwera64/homelab/actions/workflows/household-hub-client.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/household-hub-client.yml)
+[![Caddy image](https://github.com/Anwera64/homelab/actions/workflows/caddy-image.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/caddy-image.yml)
 
-A modern, fully automated, GPU-accelerated self-hosted media server, automation pipeline, and private AI intelligence & research stack running on Docker Compose on Windows / WSL2. Features zero-copy atomic hardlinks, VPN kill-switch isolation, TRaSH Guides quality sync, dual-mode local/remote ingress with official Let's Encrypt HTTPS (DuckDNS wildcard) reachable over Tailscale, and a local privacy-first AI intelligence engine powered by Ollama (RTX 5080) and SearXNG.
+A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house network services: DNS and DHCP, the HTTPS entry point, the dashboard and remote access. **The desktop** (Windows + Docker Desktop, RTX 5080) runs the heavy work: the media server, the *arr automation pipeline behind a VPN kill-switch, and the local AI stack with the Household Hub. When the desktop is off, the network, the dashboard and remote access keep working.
 
 ---
 
-## 🌟 Key Features
+## 🖥️ Hosts
 
-* **🧠 Local AI & Autonomous Research Engine:**
-  * **Ollama (RTX 5080 GPU):** Hardware-accelerated local inference and embeddings hosting the household chat model, `qwen3.8-rvn` (an uncensored Qwen3.8-27B that fits the GPU with a 16k context).
-  * **SearXNG:** Self-hosted private search aggregator powering agent tools with real-time JSON search results (Brave, Wikipedia, Wikidata, Arxiv, Bing, WolframAlpha) without tracking or rate limits.
-* **🍿 Hardware-Accelerated Streaming:** **Jellyfin** with full NVIDIA NVENC/NVDEC hardware transcoding for 4K HDR/Dolby Vision playback.
-* **✨ Discovery & Requests:** **Jellyseerr** for seamless movie/TV discovery and one-click requests.
-* **🤖 Complete *Arr Automation:** **Sonarr**, **Radarr**, **Prowlarr**, and **Bazarr** managing series, films, indexers, and automated subtitle synchronization.
-* **♻️ TRaSH Guides Sync:** **Recyclarr** automatically syncs TRaSH quality profiles and custom formats (including Latin American Spanish audio scoring) daily.
-* **🛡️ VPN Network Isolation & Modern UI:** **qBittorrent** with **VueTorrent** WebUI skin, strictly isolated and routed through **Gluetun** (NordVPN WireGuard) with an automatic network kill-switch. FlareSolverr uses direct DNS resolvers to ensure reliable Cloudflare challenge bypass.
-* **⚡ Zero-Copy Atomic Hardlinks:** Unified `/data` volume layout enables instantaneous, 0-byte hardlinks from download completion to media library without disk fragmentation.
-* **🌐 Dual-Mode Ingress Routing:**
-  * **Remote (Tailscale / 5G):** Official **Let's Encrypt HTTPS (Green Lock)** on `*.spicy-llama.duckdns.org` with zero port forwarding required. The always-on Raspberry Pi (`hosts/pi`) advertises the home network to the tailnet and terminates HTTPS with its own Caddy, forwarding desktop services to the ports their containers publish.
-  * **Local (Home Wi-Fi):** Native **Pure HTTP** on Port 80 / standard ports for zero-warning Smart TV and local PC access.
-* **📊 Unified Dashboard:** **Homepage** single-pane-of-glass status portal with dynamic, client-side ingress link adaptation. It runs on the always-on Raspberry Pi (`hosts/pi`), so it stays up while the desktop is off.
-* **🔄 Automated Updates & Lifecycle:** Intelligent 24h persistent timestamp boot checks in PowerShell combined with **Watchtower** (daily 4 AM cron) and automated Docker image layer pruning.
-* **🧪 Quality Gate & Testing:** Built-in Node.js unit test suite and Git pre-commit hooks to guarantee zero broken deployments.
+| Host | Address | Always on | Runs | Config |
+| :--- | :--- | :--- | :--- | :--- |
+| **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
+| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
+
+Both addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names, which Pi-hole resolves for every DHCP client.
 
 ---
 
-## 🗺️ Architecture & Topology
+## 🧭 Network Flow
+
+* **DNS and DHCP:** the router (Orange Livebox 7) won't let you change the DNS it hands out, so its DHCP server is off and **Pi-hole serves DHCP**, naming itself as DNS. Pi-hole blocks ads and trackers, then resolves through **Unbound** straight from the root servers with DNSSEC. Unbound exempts `spicy-llama.duckdns.org` from DNS-rebinding protection, because that domain points at the LAN on purpose.
+* **HTTPS:** `*.spicy-llama.duckdns.org` resolves to lemonpi. **Caddy on the Pi** holds a Let's Encrypt wildcard certificate (DuckDNS DNS challenge). It serves Homepage and Pi-hole itself, and forwards every desktop service to the port that service's container publishes on the desktop. There's no reverse proxy on the desktop.
+* **Remote access:** **Tailscale**. lemonpi advertises the home subnet (`192.168.1.0/24`) and is the tailnet's DNS, so phones get the same names, HTTPS and ad blocking away from home. No ports are forwarded to any service. At most, Tailscale's WireGuard UDP port (41641) is forwarded to the Pi, which helps direct connections but isn't required.
+* **Desktop off:** DNS, DHCP, Homepage, Pi-hole and remote access keep working. Desktop services return a 502 from the Pi's Caddy until the desktop is back.
 
 ```mermaid
 graph TD
-    subgraph Ingress [Ingress & Access Layer]
-        CLIENTS[📱 Home Wi-Fi Devices] -->|https://*.spicy-llama.duckdns.org| CADDY[🔒 Pi Caddy :443]
-        TAILSCALE[🔒 Tailscale via Pi subnet router] -->|https://*.spicy-llama.duckdns.org| CADDY
-        CADDY --> HOMEPAGE[📊 Homepage Dashboard on the Pi :3000]
+    CLIENTS[📱 Home devices] -->|DHCP + DNS| PIHOLE
+    REMOTE[🌍 Phones away from home] -->|Tailscale| TS
+
+    subgraph Pi [lemonpi - always on]
+        TS[🔒 Tailscale subnet router]
+        PIHOLE[🛡️ Pi-hole DNS · DHCP] --> UNBOUND[🔁 Unbound DNSSEC resolver]
+        CADDY[🔒 Caddy · *.spicy-llama.duckdns.org]
+        CADDY --> HOMEPAGE[📊 Homepage]
+        CADDY --> PIHOLE
     end
 
-    subgraph AIStack [Local AI Engine & Search Foundation]
-        OLLAMA[🦙 Ollama Server - RTX 5080 GPU]
-        SEARX[🔍 SearXNG Search Aggregator :8080]
+    CLIENTS -->|HTTPS| CADDY
+    TS --> CADDY
+
+    subgraph Desktop [Desktop - RTX 5080]
+        subgraph VPNNet [Gluetun VPN kill-switch]
+            GLUETUN[🛡️ Gluetun · NordVPN WireGuard]
+            QBIT[📥 qBittorrent]
+        end
+
+        subgraph ArrSuite [Arr automation]
+            PROW[🔍 Prowlarr] --> RAD[🎬 Radarr] & SON[📺 Sonarr]
+            FLARE[⚡ FlareSolverr] --> PROW
+            SEERR[✨ Seerr requests] --> RAD & SON
+            RAD & SON --> QBIT
+            BAZ[📝 Bazarr] --> RAD & SON
+            RECYC[♻️ Recyclarr] --> RAD & SON
+            MAINT[🧹 Maintainerr] --> RAD & SON
+        end
+
+        subgraph MediaStorage [Unified /data - atomic hardlinks]
+            QBIT -->|1. Downloads| DOWN["/data/Downloads/complete"]
+            RAD -->|2. Hardlink| MOVIES["/data/Videos/Movies"]
+            SON -->|2. Hardlink| SHOWS["/data/Videos/Shows"]
+            MOVIES & SHOWS --> JELLY[🍿 Jellyfin · NVENC]
+            JELLY --> JSTAT[📊 Jellystat]
+            JELLY --> MAINT
+        end
+
+        subgraph AIStack [AI profile]
+            HUB[🏠 Household Hub] --> OLLAMA[🦙 Ollama · RTX 5080]
+            HUB --> SEARX[🔍 SearXNG]
+        end
     end
 
-    subgraph VPNNet [Gluetun VPN Network Isolation]
-        GLUETUN[🛡️ Gluetun VPN - NordVPN WireGuard]
-        QBIT[📥 qBittorrent Web UI]
-    end
-
-    subgraph ArrSuite [Arr Automation & Quality Engine]
-        PROW[🔍 Prowlarr Indexer Proxy] --> RAD[🎬 Radarr Movies] & SON[📺 Sonarr Series]
-        FLARE[⚡ FlareSolverr Challenge Solver] --> PROW
-        SEERR[✨ Jellyseerr Request Portal] --> RAD & SON
-        RAD & SON --> QBIT
-        BAZ[📝 Bazarr Subtitles] --> RAD & SON
-        RECYC[♻️ Recyclarr - TRaSH Guides Sync] --> RAD & SON
-        MAINT[🧹 Maintainerr - Automated Cleanup] --> RAD & SON
-    end
-
-    subgraph MediaStorage [Unified Storage - Atomic Hardlinks]
-        QBIT -->|1. Downloads| DOWN["/data/Downloads/complete"]
-        RAD -->|2. Instant Hardlink| MOVIES["/data/Videos/Movies"]
-        SON -->|2. Instant Hardlink| SHOWS["/data/Videos/Shows"]
-        MOVIES --> JELLY[🍿 Jellyfin Server - RTX 5080 NVENC]
-        SHOWS --> JELLY
-        JELLY --> JSTAT[📊 Jellystat - Playback Analytics]
-        JELLY --> MAINT
-    end
-
-    HOMEPAGE --> ArrSuite & JELLY & QBIT & JSTAT
+    CADDY -->|published LAN ports| JELLY & SEERR & ArrSuite & QBIT & JSTAT & HUB
+    HOMEPAGE -.->|HTTP checks + widgets| Desktop
 ```
 
 ---
 
-## 🌐 Web UI Service Endpoints
+## 🌐 Service Endpoints
 
-| Service | Remote Ingress (DuckDNS HTTPS) | Local Ingress (Home Wi-Fi HTTP) | Role & Features |
-| :--- | :--- | :--- | :--- |
-| **Homepage Portal** | `https://home.spicy-llama.duckdns.org` | `http://192.168.1.35` (the Pi) | Central dashboard & system telemetry |
-| **Jellyfin Media** | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8096` | 4K NVENC Hardware Transcoding |
-| **Jellyseerr** | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:5055` | Netflix-style request & discovery portal |
-| **Jellystat** | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:3005` | Playback analytics & viewer statistics |
-| **qBittorrent** | `https://qbit.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8080` | Download client (VueTorrent UI, Kill-switch protected) |
-| **Sonarr** | `https://sonarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8989` | TV Series management & monitoring |
-| **Radarr** | `https://radarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:7878` | Movie collection management |
-| **Prowlarr** | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:9696` | Torrent indexer proxy & FlareSolverr |
-| **Bazarr** | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6767` | Automated subtitle downloader & sync |
-| **Maintainerr** | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:6246` | Automated media lifecycle & cleanup |
-| **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality profile sync |
-| **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
-| **FlareSolverr** | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp:8191` | Cloudflare challenge bypass API |
-| **SearXNG Aggregator** | Internal Container (`http://searxng:8080`) | N/A | Private search backend (JSON API, Wolfram Alpha enabled) |
-| **Household Hub** | `https://hub.spicy-llama.duckdns.org` | `http://127.0.0.1:3050` (host only) | Family assistant backend, reaches Ollama and SearXNG over the compose network (AI profile) |
+| Service | Host | HTTPS (home + Tailscale) | Local HTTP | Role |
+| :--- | :--- | :--- | :--- | :--- |
+| **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | `http://lemonpi.lan` | Dashboard: HTTP checks for desktop services, Docker status for the Pi's |
+| **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | `http://lemonpi.lan:8081/admin` | DNS, ad blocking and DHCP |
+| **Jellyfin** | Desktop | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8096` | Media server with NVENC transcoding |
+| **Seerr** | Desktop | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:5055` | Request & discovery portal |
+| **Jellystat** | Desktop | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3005` | Playback analytics |
+| **qBittorrent** | Desktop | `https://qbit.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8080` | Download client (VueTorrent), published through Gluetun |
+| **Sonarr** | Desktop | `https://sonarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8989` | TV series |
+| **Radarr** | Desktop | `https://radarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:7878` | Movies |
+| **Prowlarr** | Desktop | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:9696` | Indexer proxy |
+| **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6767` | Subtitles |
+| **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6246` | Media lifecycle & cleanup |
+| **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8191` | Cloudflare challenge solver |
+| **Household Hub** | Desktop (AI profile) | `https://hub.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3051` (`/docs` on the PC: `http://127.0.0.1:3050`) | Family assistant backend |
+| **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |
+| **SearXNG** | Desktop (AI profile) | — | internal `http://searxng:8080` | Private search for the hub |
+| **Ollama** | Desktop (AI profile) | — | `http://127.0.0.1:11434` (PC only) | Local LLM inference |
+| **Recyclarr** | Desktop | — | — | TRaSH Guides sync, daily 3 AM |
+| **Watchtower** | Desktop | — | — | Image updates, daily 4 AM |
 
 ---
 
@@ -107,158 +110,141 @@ graph TD
 .
 ├── .github/
 │   └── workflows/
-│       └── test.yml            # Automated CI workflow (Node.js test suites & Compose validation)
-├── docker-compose.yml          # Master multi-container service orchestration
-├── .env.example                # Environment variables template
-├── startup_homelab.ps1         # One-click healthcheck & startup script
-├── stop_homelab.ps1            # Clean shutdown script
-├── compact_docker_disk.ps1     # Shrinks Docker's virtual disk after removing models/images
-├── enable_virtualization.ps1   # Windows Hyper-V / WSL2 setup helper
-├── AGENTS.md                   # Strict development & pair-programming rules
-├── ROADMAP.md                  # Master architecture & enhancement roadmap
+│       ├── test.yml                 # CI: node tests + compose validation
+│       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
+│       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
 ├── .githooks/
-│   └── pre-commit              # Automated pre-commit test & syntax quality gate
+│   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
+├── docker-compose.yml               # Desktop stack
+├── .env.example                     # Desktop environment template
+├── startup_homelab.ps1              # Desktop: start with update check and health checks
+├── stop_homelab.ps1                 # Desktop: clean shutdown
+├── compact_docker_disk.ps1          # Desktop: shrink Docker's virtual disk
+├── enable_virtualization.ps1        # Desktop: Hyper-V / WSL2 setup helper
+├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture)
+├── ROADMAP.md                       # Roadmap
+├── hosts/
+│   └── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
+│       ├── README.md                # Pi setup, DHCP switch-over, checks, backups
+│       ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
+│       ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage
+│       ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
+│       ├── caddy/
+│       │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
+│       │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
+│       └── unbound/
+│           └── unbound.conf         # Recursive DNSSEC resolver on 127.0.0.1:5335
+├── apps/
+│   └── household-hub/               # Household Hub: backend (FastAPI) and client (KMP)
 ├── config/
-│   ├── searxng/
-│   │   └── settings.yml        # SearXNG aggregator engine & JSON API configuration
-│   └── homepage/
-│       ├── adapt-links.js      # Dynamic client-side ingress link adapter
-│       ├── custom.js           # Browser DOM link rewriter
-│       ├── custom.css          # Homepage dashboard styling overrides
-│       ├── services.yaml       # Dashboard service definitions & API widgets
-│       ├── settings.yaml       # Homepage global settings & layout
-│       ├── widgets.yaml        # Dashboard system & search widgets
-│       ├── bookmarks.yaml      # Quick bookmark links
-│       └── docker.yaml         # Local Docker daemon socket provider
+│   ├── homepage/                    # Homepage config, served from the Pi
+│   │   ├── services.yaml            # Services, widgets and HTTP checks
+│   │   ├── adapt-links.js           # Link adapter: HTTPS names remotely, LAN ports locally
+│   │   ├── custom.js                # The adapter, running in the browser
+│   │   ├── custom.css               # Styling overrides
+│   │   ├── settings.yaml            # Layout
+│   │   ├── widgets.yaml             # Header widgets
+│   │   ├── bookmarks.yaml           # Bookmarks
+│   │   └── docker.yaml              # Docker socket (the Pi's own containers)
+│   ├── ollama-models/               # Tracked Modelfiles and the model manifest
+│   └── searxng/
+│       └── settings.yml             # SearXNG engines and JSON API
 └── tests/
-    ├── adapt-links.test.js        # Link adapter unit test suite
-    ├── config-integrity.test.js   # Cross-configuration & port alignment test suite
-    └── scripts-validation.test.js # PowerShell automation scripts test suite
+    ├── adapt-links.test.js          # Link adapter
+    ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
+    ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
+    ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
+    ├── ci-workflow.test.js          # Hub client CI workflow
+    ├── scripts-validation.test.js   # PowerShell scripts
+    └── readme.test.js               # This README matches the repo
 ```
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Setup
 
-### 1. Prerequisites
-* **Docker Desktop for Windows** (with WSL2 Backend enabled).
-* **NVIDIA Container Toolkit** (for GPU transcoding support).
-* **Node.js v18+** (for running local validation unit tests).
+### lemonpi
+See [`hosts/pi/README.md`](hosts/pi/README.md): a sparse clone of `hosts/pi` (plus `config/homepage`), then `sudo hosts/pi/bootstrap.sh`. It covers the DHCP switch-over from the Livebox, Tailscale, and pointing DuckDNS at the Pi.
 
-### 2. Setup Environment
-Clone the repository and copy the environment template:
+### Desktop
+Prerequisites: Docker Desktop (WSL2 backend), the NVIDIA Container Toolkit (GPU transcoding and Ollama), and Node.js 18+ (tests).
+
 ```powershell
 git clone git@github.com:Anwera64/homelab.git
 cd homelab
 Copy-Item .env.example .env
+git config core.hooksPath .githooks
 ```
 
-Edit `.env` to configure your storage paths and VPN credentials:
+Edit `.env` for your paths and VPN key:
 ```ini
-# Storage Paths
 MEDIA_ROOT=C:/Users/<Username>
 MOVIES_PATH=C:/Users/<Username>/Videos/Movies
 SHOWS_PATH=C:/Users/<Username>/Videos/Shows
 CONFIG_PATH=C:/Users/<Username>/Documents/Repos/Homelab/config
 
-# VPN Configuration (Gluetun - NordVPN)
 WIREGUARD_PRIVATE_KEY=your_nordvpn_wireguard_private_key
 VPN_COUNTRY=United States
 
-# DuckDNS (remote access itself comes from the Pi's Tailscale subnet route)
 DOMAIN_NAME=spicy-llama.duckdns.org
-DUCKDNS_TOKEN=your_duckdns_token
 ```
 
-### 3. Enable Git Pre-Commit Hook
+Then start it with `.\startup_homelab.ps1`.
+
+The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the published ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
 ```powershell
-git config core.hooksPath .githooks
-```
-
-### 4. Start the Homelab Stack
-Run the automated startup script:
-```powershell
-.\startup_homelab.ps1
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696
 ```
 
 ---
 
-## 🛠️ Management & Operations
+## 🛠️ Operations
 
-* **Start Stack (with 24h Update Check & Auto-Prune):** `.\startup_homelab.ps1`
-  * Fully initializes both the Media automation pipeline and the AI stack (`profiles: ["ai"]`).
-  * Downloads, SHA256-checks and registers every model listed in `config/ollama-models/models.json` that Ollama is missing.
-  * Automatically registers and activates the Open WebUI memory loading indicator filter.
-* **Start Media Stack Only (Without AI Services):** `.\startup_homelab.ps1 -DisableAI`
-* **Fast Start (Bypass Update Check for Instant Boot):** `.\startup_homelab.ps1 -SkipUpdate`
-* **Force Update on Boot:** `.\startup_homelab.ps1 -ForceUpdate`
-* **Stop Stack:** `.\stop_homelab.ps1`
-* **Ollama Model Storage:** models live in the `ollama_models` Docker volume (inside Docker's own disk, for fast loads), not in `config/ollama`. Keys stay in `config/ollama`; the tracked Modelfiles live in `config/ollama-models`.
-* **Switching the Chat Model:** add the model to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the Household Hub backend to its name, and restart both. Agents follow the household default, so nothing else changes. To change an installed model's Modelfile (e.g. its context size), re-run `docker exec ollama ollama create <name> -f /root/.ollama/imports/<modelfile>` after copying it there. An embedding model such as `bge-m3` can be added the same way once a feature needs it.
-* **Reclaim Disk Space After Removing Models or Images** (admin PowerShell; Docker is down for a few minutes):
-  ```powershell
-  .\compact_docker_disk.ps1
-  ```
-* **Watchtower Manual Update Check:**
-  ```powershell
-  docker compose run --rm watchtower --run-once
-  ```
-* **View Live Container Logs:**
-  ```powershell
-  docker compose logs -f <service-name>
-  ```
-* **Run Automated Unit Tests:**
-  ```powershell
-  node --test
-  ```
+**Desktop**
+* **Start (24h update check and prune):** `.\startup_homelab.ps1`. This also downloads, SHA256-checks and registers the models in `config/ollama-models/models.json` that Ollama is missing.
+* **Start without the AI profile:** `.\startup_homelab.ps1 -NoAI`. For the media stack only: `.\startup_homelab.ps1 -ArrOnly`.
+* **Skip or force the update check:** `.\startup_homelab.ps1 -SkipUpdate` or `.\startup_homelab.ps1 -ForceUpdate`.
+* **Stop:** `.\stop_homelab.ps1`
+* **Ollama models:** they live in the `ollama_models` Docker volume. Keys stay in `config/ollama`, and the tracked Modelfiles in `config/ollama-models`.
+* **Switching the chat model:** add it to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the hub, and restart both.
+* **Reclaim disk after removing models or images** (admin): `.\compact_docker_disk.ps1`
+* **Logs:** `docker compose logs -f <service>`
+
+**lemonpi**
+* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; bump them in a PR.
+* **Caddy image:** CI builds it monthly and on changes to `hosts/pi/caddy/Dockerfile`. Bump the pinned tag to roll it out.
+* **Checks, backups and rollback:** see [`hosts/pi/README.md`](hosts/pi/README.md).
+
+**Tests:** `node --test`
 
 ---
 
-## 🍿 Dynamic Bitrate & Remote Streaming Guide
+## 🍿 Streaming Notes
 
-Jellyfin is configured with full **NVIDIA NVENC/NVDEC hardware acceleration** (RTX 5080) with real-time HEVC/AV1 encoding and HDR tonemapping to guarantee smooth playback across any network connection:
+Jellyfin uses **NVIDIA NVENC/NVDEC** (RTX 5080) for HEVC/AV1 encoding and HDR tone mapping:
 
-* **🏠 Home Wi-Fi / Local LAN:** Automatically DirectPlays full uncompressed 4K HDR Remux streams (80–100+ Mbps) with zero transcoding overhead.
-* **🌐 Remote Networks (5G / Hotel / External Wi-Fi):**
-  * The server enforces a **40 Mbps remote ceiling**, preventing raw 4K Remuxes from saturating cellular or remote bandwidth.
-  * When client quality is set to **"Auto"**, the player dynamically tests connection speed and requests the optimal transcode tier (e.g. 4 Mbps on slow Wi-Fi, 15 Mbps on medium, 35 Mbps on 5G/fast Wi-Fi).
-  * The RTX 5080 GPU transcodes streams on-the-fly at **>10x real-time speed** (<0.05s per segment), eliminating buffering.
+* **At home:** clients direct-play full 4K HDR remuxes (80–100+ Mbps) without transcoding.
+* **Away:** the server caps remote streams at **40 Mbps**. With the client quality on **Auto**, the player picks a transcode tier to fit the connection, and the GPU transcodes far faster than real time.
 
-### Recommended Client App Settings (Jellyfin Mobile / Android TV / Web)
-1. **Bitrate / Playback Quality:** Set to **Auto** (Settings ➔ Playback ➔ Bitrate).
-2. **Video Player Type:** Set to **ExoPlayer** (Android / Google TV) for hardware-accelerated HLS playback.
-3. **In-Video Quality Selector:** Can be toggled on-the-fly (e.g., down to 1080p 10 Mbps or 720p 4 Mbps) if traveling through low-signal areas.
+Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Google TV.
 
 ---
 
-## 🧪 Quality Gate & Automated Testing
+## 🧪 Quality Gate
 
-This repository enforces strict code quality and configuration integrity across local and continuous integration environments:
-
-### 1. Automated Test Suites (`tests/`)
-Running `node --test` executes 35+ automated validation checks across three dedicated suites:
-* **Ingress Link Adaptation (`adapt-links.test.js`):** Verifies that Homepage dashboard links adapt dynamically between secure Tailscale HTTPS ports and pure local HTTP LAN ports.
-* **Cross-Config Integrity (`config-integrity.test.js`):** Validates that all ports, services, and tokens across `hosts/pi/caddy/Caddyfile`, `docker-compose.yml`, `services.yaml`, and `.env.example` stay 100% synchronized.
-* **PowerShell Automation (`scripts-validation.test.js`):** Validates startup, shutdown, and Hyper-V/WSL2 setup scripts.
-
-### 2. Git Pre-Commit Hook (`.githooks/pre-commit`)
-Automatically executed prior to every local commit:
-1. Runs the full Node.js test suite (`node --test`).
-2. Validates `docker-compose.yml` syntax and variable bindings (`docker compose config -q`).
-3. Automatically aborts the commit if any validation fails.
-
-### 3. Continuous Integration (`.github/workflows/test.yml`)
-GitHub Actions executes the full test runner and Docker Compose validation across all pushes and pull requests to `main` and `master`.
+* **Tests (`node --test`):** about 100 checks across seven suites (see `tests/` above). They keep the desktop compose file, the Pi compose file and Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
+* **Pre-commit hook (`.githooks/pre-commit`):**
+  * the test suite
+  * `docker compose config` for both the desktop and Pi stacks
+  * the hub backend's Clean Architecture boundary tests
+  * for hub client changes, ktlint and the architecture tests
+* **CI (`.github/workflows/`):**
+  * the tests and compose validation on every push and PR
+  * the hub client build
+  * the Pi's Caddy image build
 
 ---
 
-## 📄 License & Acknowledgments
+## 📄 Acknowledgments
 
-* Media Management Suite: [LinuxServer.io](https://www.linuxserver.io/)
-* Torrent WebUI Skin: [VueTorrent](https://github.com/VueTorrent/VueTorrent)
-* Transcoding Engine: [Jellyfin](https://jellyfin.org/)
-* Quality Guides: [TRaSH Guides](https://trash-guides.info/)
-* Reverse Proxy: [Caddy](https://caddyserver.com/)
-* Mesh Network: [Tailscale](https://tailscale.com/)
-* Local AI Inference Engine: [Ollama](https://ollama.ai/)
-* Privacy Search Aggregator: [SearXNG](https://searxng.org/)
+[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/)
