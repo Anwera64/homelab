@@ -82,6 +82,12 @@ test('Pi DNS stack: Pi-hole + Unbound', async (t) => {
     assert.doesNotMatch(conf, /^\s*include-toplevel:/m, 'config must be self-contained');
   });
 
+  await t.test('unbound.conf lets our own domain resolve to LAN IPs, and only ours', () => {
+    const conf = read(UNBOUND_CONF_PATH);
+    const privateDomains = [...conf.matchAll(/^\s*private-domain:\s*"([^"]+)"/gm)].map((m) => m[1]);
+    assert.deepEqual(privateDomains, ['spicy-llama.duckdns.org']);
+  });
+
   await t.test('.env.example declares the password and Barcelona timezone', () => {
     const env = read(ENV_EXAMPLE_PATH);
     assert.match(env, /^PIHOLE_PASSWORD=/m);
