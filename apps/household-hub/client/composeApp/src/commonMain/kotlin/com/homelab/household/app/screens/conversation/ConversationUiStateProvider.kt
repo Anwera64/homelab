@@ -4,8 +4,10 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
@@ -330,12 +332,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                             toolCallId = "c-1",
                                             tool = "calendar_write",
                                             action = ToolAction.Delete,
-                                            arguments =
-                                                mapOf(
-                                                    "action" to "delete",
-                                                    "event_id" to "e-9",
-                                                    "title" to "Print shop",
-                                                    "start_time" to "2026-09-11T18:00:00",
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Print shop",
+                                                    start = EventMoment(2026, 9, 11, hour = 18, minute = 0),
+                                                    end = null,
+                                                    allDay = false,
                                                 ),
                                         ),
                                     ),
@@ -464,10 +466,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                             toolCallId = "c-1",
                                             tool = "calendar_write",
                                             action = ToolAction.Create,
-                                            arguments =
-                                                mapOf(
-                                                    "title" to "Dinner together",
-                                                    "start_time" to "2026-10-03T20:30:00",
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Dinner together",
+                                                    start = EventMoment(2026, 10, 3, hour = 20, minute = 30),
+                                                    end = null,
+                                                    allDay = false,
                                                 ),
                                         ),
                                     ),

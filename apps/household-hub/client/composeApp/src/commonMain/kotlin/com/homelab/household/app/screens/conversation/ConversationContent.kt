@@ -461,7 +461,7 @@ private fun Answer(
                             }
                         } else {
                             // Out in the open, a step with a fix card after it would say twice what broke.
-                            val shown = run.steps.filterNot { it is AnswerPart.ToolFailed && toolFix(it) != null }
+                            val shown = if (run.fixedAfter) run.steps.dropLast(1) else run.steps
                             if (shown.isNotEmpty()) Steps(shown)
                         }
                     }
@@ -483,8 +483,10 @@ private sealed interface AnswerRun {
         val text: String,
     ) : AnswerRun
 
+    /** [fixedAfter]: the last step failed and a fix card follows the run, saying what broke. */
     data class Steps(
         val steps: List<AnswerPart>,
+        val fixedAfter: Boolean = false,
     ) : AnswerRun
 
     data class Card(
@@ -537,7 +539,7 @@ private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
                 steps += part
                 val fix = toolFix(part)
                 if (fix != null) {
-                    runs += AnswerRun.Steps(steps)
+                    runs += AnswerRun.Steps(steps, fixedAfter = true)
                     steps = mutableListOf()
                     runs += AnswerRun.Fix(fix)
                 }

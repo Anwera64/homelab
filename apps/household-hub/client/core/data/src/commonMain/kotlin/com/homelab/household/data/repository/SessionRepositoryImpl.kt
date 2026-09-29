@@ -3,6 +3,7 @@ package com.homelab.household.data.repository
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.mapper.ChatMessageDataMapper
+import com.homelab.household.data.mapper.ProposalDetailsDataMapper
 import com.homelab.household.data.mapper.SessionDataMapper
 import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.domain.exception.DomainException
@@ -11,6 +12,7 @@ import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.delay
@@ -67,10 +69,15 @@ class SessionRepositoryImpl(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>?,
+        edited: ProposalDetails?,
     ): Flow<ChatStreamEvent> =
         recoverable(
-            remote.openDecisionStream(sessionId, toolCallId, approved, modifiedArguments),
+            remote.openDecisionStream(
+                sessionId,
+                toolCallId,
+                approved,
+                edited?.let(ProposalDetailsDataMapper::toArguments),
+            ),
             sessionId,
             afterAssistantMessageId = null,
         )

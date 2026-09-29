@@ -66,6 +66,7 @@ import com.homelab.household.app.resources.tool_read_page_running
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.app.resources.tool_search_running
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ToolAction
 import org.jetbrains.compose.resources.StringResource
 
@@ -109,8 +110,8 @@ fun toolPermissionLabel(tool: String): StringResource = toolLabel(tool, WRITE_TO
 
 private val WRITE_TOOLS_FIRST_ACTION =
     mapOf(
-        "calendar_write" to ToolAction.Create,
-        "document_writer" to ToolAction.Create,
+        HubTool.CALENDAR_WRITE to ToolAction.Create,
+        HubTool.DOCUMENT_WRITER to ToolAction.Create,
     )
 
 private val generic =
@@ -124,7 +125,7 @@ private val generic =
 
 private val labels =
     mapOf(
-        "calendar_read" to
+        HubTool.CALENDAR_READ to
             ToolLabel(
                 running = Res.string.tool_calendar_read_running,
                 done = Res.string.tool_calendar_read_done,
@@ -133,7 +134,7 @@ private val labels =
                 permission = Res.string.tool_permission_calendar_read,
             ),
         // Saved before the hub said which action a write was: it could have been any of them.
-        "calendar_write" to
+        HubTool.CALENDAR_WRITE to
             ToolLabel(
                 running = Res.string.tool_calendar_write_running,
                 done = Res.string.tool_calendar_write_done,
@@ -141,7 +142,7 @@ private val labels =
                 icon = HearthIcon.Schedule,
                 permission = Res.string.tool_permission_calendar_add,
             ),
-        "searxng_search" to
+        HubTool.WEB_SEARCH to
             ToolLabel(
                 running = Res.string.tool_search_running,
                 done = Res.string.tool_search_done,
@@ -150,7 +151,7 @@ private val labels =
                 permission = Res.string.tool_permission_search,
             ),
         // Reading pages and looking through them come with searching, so their permission is its.
-        "read_page" to
+        HubTool.READ_PAGE to
             ToolLabel(
                 running = Res.string.tool_read_page_running,
                 done = Res.string.tool_read_page_done,
@@ -158,7 +159,7 @@ private val labels =
                 icon = HearthIcon.Document,
                 permission = Res.string.tool_permission_search,
             ),
-        "lookup_sources" to
+        HubTool.LOOKUP_SOURCES to
             ToolLabel(
                 running = Res.string.tool_lookup_running,
                 done = Res.string.tool_lookup_done,
@@ -166,7 +167,7 @@ private val labels =
                 icon = HearthIcon.Search,
                 permission = Res.string.tool_permission_search,
             ),
-        "pdf_reader" to
+        HubTool.PDF_READER to
             ToolLabel(
                 running = Res.string.tool_pdf_running,
                 done = Res.string.tool_pdf_done,
@@ -174,7 +175,7 @@ private val labels =
                 icon = HearthIcon.Document,
                 permission = Res.string.tool_permission_pdf,
             ),
-        "document_writer" to
+        HubTool.DOCUMENT_WRITER to
             ToolLabel(
                 running = Res.string.tool_note_running,
                 done = Res.string.tool_note_done,
@@ -187,7 +188,7 @@ private val labels =
 /** Each write by what it does, so the card, the step and the fold all say the same thing. */
 private val actionLabels =
     mapOf(
-        ("calendar_write" to ToolAction.Create) to
+        (HubTool.CALENDAR_WRITE to ToolAction.Create) to
             ToolLabel(
                 running = Res.string.tool_calendar_add_running,
                 done = Res.string.tool_calendar_add_done,
@@ -197,7 +198,7 @@ private val actionLabels =
                 card = Res.string.tool_calendar_add_card,
                 declined = Res.string.tool_calendar_add_declined,
             ),
-        ("calendar_write" to ToolAction.Update) to
+        (HubTool.CALENDAR_WRITE to ToolAction.Update) to
             ToolLabel(
                 running = Res.string.tool_calendar_change_running,
                 done = Res.string.tool_calendar_change_done,
@@ -207,7 +208,7 @@ private val actionLabels =
                 card = Res.string.tool_calendar_change_card,
                 declined = Res.string.tool_calendar_change_declined,
             ),
-        ("calendar_write" to ToolAction.Delete) to
+        (HubTool.CALENDAR_WRITE to ToolAction.Delete) to
             ToolLabel(
                 running = Res.string.tool_calendar_remove_running,
                 done = Res.string.tool_calendar_remove_done,
@@ -217,7 +218,7 @@ private val actionLabels =
                 card = Res.string.tool_calendar_remove_card,
                 declined = Res.string.tool_calendar_remove_declined,
             ),
-        ("document_writer" to ToolAction.Create) to
+        (HubTool.DOCUMENT_WRITER to ToolAction.Create) to
             ToolLabel(
                 running = Res.string.tool_note_create_running,
                 done = Res.string.tool_note_create_done,
@@ -227,7 +228,7 @@ private val actionLabels =
                 card = Res.string.tool_note_create_card,
                 declined = Res.string.tool_note_create_declined,
             ),
-        ("document_writer" to ToolAction.Append) to
+        (HubTool.DOCUMENT_WRITER to ToolAction.Append) to
             ToolLabel(
                 running = Res.string.tool_note_append_running,
                 done = Res.string.tool_note_append_done,
@@ -237,7 +238,7 @@ private val actionLabels =
                 card = Res.string.tool_note_append_card,
                 declined = Res.string.tool_note_append_declined,
             ),
-        ("document_writer" to ToolAction.Replace) to
+        (HubTool.DOCUMENT_WRITER to ToolAction.Replace) to
             ToolLabel(
                 running = Res.string.tool_note_replace_running,
                 done = Res.string.tool_note_replace_done,

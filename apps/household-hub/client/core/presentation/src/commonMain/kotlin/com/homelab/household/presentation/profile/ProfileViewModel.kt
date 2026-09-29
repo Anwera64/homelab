@@ -119,16 +119,12 @@ class ProfileViewModel(
             needsSignInAgain = connection.needsReconnect,
         )
 
-    /** The hub writes its times in UTC, and not always with the zone on the end. */
-    private fun minutesSince(stamp: String): Long? {
-        val time = stamp.substringAfter('T', missingDelimiterValue = "")
-        val zoned = if (time.endsWith('Z') || '+' in time || '-' in time) stamp else "${stamp}Z"
-        return try {
-            (clock.now() - Instant.parse(zoned)).inWholeMinutes.coerceAtLeast(0)
+    private fun minutesSince(stamp: String): Long? =
+        try {
+            (clock.now() - Instant.parse(stamp)).inWholeMinutes.coerceAtLeast(0)
         } catch (_: IllegalArgumentException) {
             null
         }
-    }
 
     private fun failureOf(error: Throwable): ProfileStatus =
         if (error is ServerOfflineException) ProfileStatus.Unreachable else ProfileStatus.Failed

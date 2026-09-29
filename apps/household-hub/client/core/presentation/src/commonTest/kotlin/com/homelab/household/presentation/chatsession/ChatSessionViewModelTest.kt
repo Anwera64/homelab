@@ -8,8 +8,10 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
@@ -178,9 +180,19 @@ class ChatSessionViewModelTest {
             toolCallId = "c1",
             tool = "calendar_write",
             action = ToolAction.Create,
-            arguments = mapOf("title" to "Dinner together", "start_time" to "2026-10-03T20:30:00"),
+            details =
+                ProposalDetails.CalendarEvent(
+                    title = "Dinner together",
+                    start = EventMoment(2026, 10, 3, hour = 20, minute = 30),
+                    end = null,
+                    allDay = false,
+                ),
         )
-    private val flowers = dinner.copy(toolCallId = "c2", arguments = mapOf("title" to "Buy flowers"))
+    private val flowers =
+        dinner.copy(
+            toolCallId = "c2",
+            details = ProposalDetails.CalendarEvent("Buy flowers", null, null, allDay = false),
+        )
     private val question =
         ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Dinner Saturday?")
 
@@ -212,7 +224,7 @@ class ChatSessionViewModelTest {
                 flowOf(
                     ChatStreamEvent.Accepted,
                     ChatStreamEvent.Delta("I can add it now."),
-                    ChatStreamEvent.ToolApprovalProposal("c1", "calendar_write", ToolAction.Create, dinner.arguments),
+                    ChatStreamEvent.ToolApprovalProposal("c1", "calendar_write", ToolAction.Create, dinner.details),
                     ChatStreamEvent.AwaitingApproval(
                         messageId = "m-2",
                         assistantContent = "I can add it now.",

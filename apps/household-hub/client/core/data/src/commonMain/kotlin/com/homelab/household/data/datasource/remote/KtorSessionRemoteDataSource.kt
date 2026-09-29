@@ -8,10 +8,10 @@ import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SessionSecretToggleDto
 import com.homelab.household.data.dto.ToolDecisionRequestDto
-import com.homelab.household.data.mapper.AnswerPartDataMapper
 import com.homelab.household.data.network.NetworkExceptionHelper
 import com.homelab.household.data.network.TurnGoneException
 import com.homelab.household.data.network.ensureJsonSuccess
+import com.homelab.household.data.network.pinRefusal
 import com.homelab.household.data.network.reachingHub
 import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.SessionConflictException
@@ -29,7 +29,6 @@ import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpStatement
 import io.ktor.client.statement.bodyAsChannel
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -38,6 +37,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.serialization.json.JsonObject
 
 class KtorSessionRemoteDataSource(
     private val client: HttpClient,
@@ -98,7 +98,7 @@ class KtorSessionRemoteDataSource(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>?,
+        modifiedArguments: JsonObject?,
     ): Flow<ChatStreamEvent> =
         openTurnStream(sessionId, onStart = { lastEventIds.remove(sessionId) }) {
             client.preparePost("$baseUrl/api/v1/sessions/$sessionId/tools/$toolCallId/decision") {
@@ -106,7 +106,7 @@ class KtorSessionRemoteDataSource(
                 setBody(
                     ToolDecisionRequestDto(
                         approved = approved,
-                        modified_arguments = modifiedArguments?.let(AnswerPartDataMapper::argumentsToJson),
+                        modified_arguments = modifiedArguments,
                     ),
                 )
             }
@@ -172,7 +172,7 @@ class KtorSessionRemoteDataSource(
                         // Two refusals share the status: a turn already running, which is worth
                         // waiting for, and a card waiting, which is not - the member has to answer it.
                         HttpStatusCode.Conflict -> {
-                            if (response.bodyAsText().contains(APPROVAL_PENDING)) throw ApprovalPendingException()
+                            if (response.pinRefusal()?.code == APPROVAL_PENDING) throw ApprovalPendingException()
                             throw SessionConflictException()
                         }
 

@@ -23,6 +23,7 @@ import com.homelab.household.app.resources.steps_phrase_searched_times
 import com.homelab.household.app.resources.steps_phrase_searched_twice
 import com.homelab.household.app.resources.steps_phrase_updated
 import com.homelab.household.app.theme.HearthTheme
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ToolAction
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -85,7 +86,9 @@ private fun phrase(phrase: StepPhrase): String =
 
         is StepPhrase.Wrote -> {
             phrase.title?.let { stringResource(wroteNamed(phrase.action), it) }
-                ?: stringResource(toolLabel(CALENDAR_WRITE, phrase.action).done).replaceFirstChar { it.lowercase() }
+                ?: stringResource(
+                    toolLabel(HubTool.CALENDAR_WRITE, phrase.action).done,
+                ).replaceFirstChar { it.lowercase() }
         }
 
         is StepPhrase.Declined -> {
@@ -120,8 +123,6 @@ private fun declinedNamed(action: ToolAction?): StringResource =
         ToolAction.Update, ToolAction.Replace -> Res.string.steps_phrase_not_changed
         else -> Res.string.steps_phrase_not_added
     }
-
-private const val CALENDAR_WRITE = "calendar_write"
 
 // The same separator the step lines use between what happened and more about it.
 private const val SEPARATOR = " · "

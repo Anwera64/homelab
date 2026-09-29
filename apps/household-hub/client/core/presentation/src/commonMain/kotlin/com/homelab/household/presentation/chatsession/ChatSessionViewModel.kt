@@ -11,6 +11,7 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.domain.usecase.CreateSessionUseCase
@@ -588,7 +589,7 @@ class ChatSessionViewModel(
     fun decide(
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>? = null,
+        edited: ProposalDetails? = null,
     ) {
         val state = _uiState.value
         val currentSession = state.session ?: return
@@ -611,7 +612,7 @@ class ChatSessionViewModel(
         }
 
         follow(
-            turn = decideToolProposalUseCase(currentSession.id, toolCallId, approved, modifiedArguments),
+            turn = decideToolProposalUseCase(currentSession.id, toolCallId, approved, edited),
             sessionId = currentSession.id,
             userMessageId = null,
             resuming = true,
@@ -737,7 +738,7 @@ private class AnswerPartsBuilder(
 
     fun proposal(event: ChatStreamEvent.ToolApprovalProposal) {
         stopThinking()
-        parts += AnswerPart.Proposal(event.toolCallId, event.tool, event.action, event.arguments)
+        parts += AnswerPart.Proposal(event.toolCallId, event.tool, event.action, event.details)
     }
 
     fun declined(

@@ -2,6 +2,7 @@ package com.homelab.household.domain.usecase.impl
 
 import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import kotlinx.coroutines.flow.Flow
@@ -13,10 +14,10 @@ class DecideToolProposalUseCaseImpl(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>?,
+        edited: ProposalDetails?,
     ): Flow<ChatStreamEvent> {
         if (sessionId.isBlank()) throw ValidationException("Session ID cannot be blank")
         if (toolCallId.isBlank()) throw ValidationException("Tool call ID cannot be blank")
-        return sessionRepository.decideToolProposal(sessionId, toolCallId, approved, modifiedArguments)
+        return sessionRepository.decideToolProposal(sessionId, toolCallId, approved, edited)
     }
 }

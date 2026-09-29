@@ -3,6 +3,7 @@ package com.homelab.household.domain.repository
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.ProposalDetails
 import kotlinx.coroutines.flow.Flow
 
 interface SessionRepository {
@@ -68,7 +69,7 @@ interface SessionRepository {
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>? = null,
+        edited: ProposalDetails? = null,
     ): Flow<ChatStreamEvent>
 
     suspend fun lockAllSecretSessions(): Int
