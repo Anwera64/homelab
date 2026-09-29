@@ -405,7 +405,11 @@ class ChatSessionViewModelTest {
     // ---- auto-approve from the card (slice 4, PR 5) -------------------------
 
     private val removal =
-        dinner.copy(toolCallId = "c3", action = ToolAction.Delete, arguments = mapOf("title" to "Print shop"))
+        dinner.copy(
+            toolCallId = "c3",
+            action = ToolAction.Delete,
+            details = ProposalDetails.CalendarEvent(title = "Print shop", start = null, end = null, allDay = false),
+        )
 
     /** The rest of an approved turn: the write runs, and the answer ends. */
     private fun approvedTurn(toolCallId: String) {

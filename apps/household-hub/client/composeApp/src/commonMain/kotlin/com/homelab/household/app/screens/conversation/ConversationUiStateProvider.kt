@@ -500,10 +500,12 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                             toolCallId = "c-1",
                                             tool = "calendar_write",
                                             action = ToolAction.Create,
-                                            arguments =
-                                                mapOf(
-                                                    "title" to "Dinner together",
-                                                    "start_time" to "2026-10-03T20:00:00",
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Dinner together",
+                                                    start = EventMoment(2026, 10, 3, hour = 20, minute = 0),
+                                                    end = null,
+                                                    allDay = false,
                                                 ),
                                         ),
                                     ),
