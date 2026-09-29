@@ -440,8 +440,8 @@ private fun Answer(
     folded: Boolean,
     onDecide: (toolCallId: String, approved: Boolean) -> Unit,
     onConnectCalendar: () -> Unit,
-    onAskAgain: (() -> Unit)? = null,
     onApproveAutomatically: (toolCallId: String) -> Unit,
+    onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)
