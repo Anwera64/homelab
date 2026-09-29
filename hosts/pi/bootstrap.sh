@@ -12,7 +12,6 @@ set -euo pipefail
 PI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_USER="${SUDO_USER:-$(stat -c %U "$PI_DIR")}"
 CONFIG_TXT=/boot/firmware/config.txt
-REBOOT_NEEDED=0
 CODENAME="$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -21,6 +20,16 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 step() { printf '\n==> %s\n' "$*"; }
+
+# A reboot is pending until Wi-Fi is gone and log2ram runs, whichever run made the change.
+finish() {
+  if [ -e /sys/class/net/wlan0 ] || ! systemctl is-active --quiet log2ram; then
+    step "Reboot to apply the Wi-Fi/Bluetooth and log2ram changes: sudo reboot"
+  fi
+  if ! tailscale status >/dev/null 2>&1; then
+    echo "Tailscale isn't logged in yet: run sudo tailscale up"
+  fi
+}
 
 step "Packages"
 export DEBIAN_FRONTEND=noninteractive
@@ -38,11 +47,20 @@ step "Wi-Fi and Bluetooth off (the Pi is wired)"
 ensure_overlay() {
   if ! grep -qxF "dtoverlay=$1" "$CONFIG_TXT"; then
     printf '\n[all]\ndtoverlay=%s\n' "$1" >> "$CONFIG_TXT"
-    REBOOT_NEEDED=1
   fi
 }
 ensure_overlay disable-wifi
 ensure_overlay disable-bt
+
+step "Fixed IP 192.168.1.35, with DNS that doesn't depend on this Pi-hole"
+# Pi-hole is the house DHCP server, so the Pi can't lease its own address.
+ETH_CON="$(nmcli -g GENERAL.CONNECTION device show eth0)"
+if [ "$(nmcli -g ipv4.method con show "$ETH_CON")" != "manual" ] \
+  || [ "$(nmcli -g ipv4.dns con show "$ETH_CON")" != "1.1.1.1,9.9.9.9" ]; then
+  nmcli con mod "$ETH_CON" ipv4.method manual ipv4.addresses 192.168.1.35/24 \
+    ipv4.gateway 192.168.1.1 ipv4.dns "1.1.1.1 9.9.9.9" ipv4.ignore-auto-dns yes
+  nmcli device reapply eth0
+fi
 
 step "log2ram (logs in RAM, synced to the SD card daily)"
 if ! dpkg -s log2ram >/dev/null 2>&1; then
@@ -51,7 +69,6 @@ if ! dpkg -s log2ram >/dev/null 2>&1; then
     > /etc/apt/sources.list.d/azlux.list
   apt-get update -q
   apt-get install -y -q log2ram
-  REBOOT_NEEDED=1
 fi
 sed -i 's/^SIZE=.*/SIZE=128M/' /etc/log2ram.conf
 
@@ -78,6 +95,8 @@ step "Tailscale"
 if ! command -v tailscale >/dev/null 2>&1; then
   curl -fsSL https://tailscale.com/install.sh | sh
 fi
+# The tailnet's DNS is this Pi-hole; the Pi itself must not depend on it.
+tailscale set --accept-dns=false
 
 step "Pi-hole + Unbound"
 if [ ! -f "$PI_DIR/.env" ]; then
@@ -85,15 +104,10 @@ if [ ! -f "$PI_DIR/.env" ]; then
   chown "$TARGET_USER:" "$PI_DIR/.env"
   chmod 600 "$PI_DIR/.env"
   echo "Created $PI_DIR/.env. Set PIHOLE_PASSWORD in it, then rerun this script."
+  finish
   exit 0
 fi
 docker compose --project-directory "$PI_DIR" up -d --remove-orphans
 
-if [ "$REBOOT_NEEDED" -eq 1 ]; then
-  step "Done. Reboot to apply the Wi-Fi/Bluetooth and log2ram changes: sudo reboot"
-else
-  step "Done."
-fi
-if ! tailscale status >/dev/null 2>&1; then
-  echo "Tailscale isn't logged in yet: run sudo tailscale up"
-fi
+step "Done."
+finish

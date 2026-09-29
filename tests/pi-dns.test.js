@@ -12,7 +12,8 @@ const GITIGNORE_PATH = path.join(ROOT_DIR, '.gitignore');
 const BOOTSTRAP_PATH = path.join(PI_DIR, 'bootstrap.sh');
 const GITATTRIBUTES_PATH = path.join(ROOT_DIR, '.gitattributes');
 
-const read = (file) => fs.readFileSync(file, 'utf8');
+// Git on Windows may check files out with CRLF; the assertions are about content, not line endings.
+const read = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 
 // The block of one compose service: from its "  name:" line up to the next top-level service or section.
 function serviceBlock(compose, name) {
@@ -87,6 +88,29 @@ test('Pi DNS stack: Pi-hole + Unbound', async (t) => {
     assert.match(env, /^TZ=Europe\/Madrid$/m);
   });
 
+  await t.test('Pi-hole can serve DHCP, off until .env switches it on', () => {
+    assert.match(pihole, /cap_add:\s*\n\s*-\s*NET_ADMIN/);
+    assert.match(pihole, /FTLCONF_dhcp_active:\s*['"]?\$\{PIHOLE_DHCP_ACTIVE:-false\}/);
+  });
+
+  await t.test('Pi-hole DHCP matches the Livebox range, so devices keep their IPs', () => {
+    assert.match(pihole, /FTLCONF_dhcp_start:\s*['"]?192\.168\.1\.10['"]?/);
+    assert.match(pihole, /FTLCONF_dhcp_end:\s*['"]?192\.168\.1\.150['"]?/);
+    assert.match(pihole, /FTLCONF_dhcp_router:\s*['"]?192\.168\.1\.1['"]?\s*$/m);
+    assert.match(pihole, /FTLCONF_dhcp_netmask:\s*['"]?255\.255\.255\.0['"]?/);
+    assert.match(pihole, /FTLCONF_dhcp_leaseTime:\s*['"]?24h['"]?/);
+  });
+
+  await t.test('static leases come from .env, never the repo', () => {
+    assert.match(pihole, /FTLCONF_dhcp_hosts:\s*['"]?\$\{PIHOLE_DHCP_HOSTS:-\}/);
+    const env = read(ENV_EXAMPLE_PATH);
+    assert.match(env, /^PIHOLE_DHCP_ACTIVE=false$/m);
+    assert.match(env, /^PIHOLE_DHCP_HOSTS=$/m);
+    assert.match(env, /MAC,IP,name/, '.env.example must document the lease format');
+    const macs = compose.match(/([0-9a-f]{2}:){5}[0-9a-f]{2}/gi) || [];
+    assert.deepEqual(macs, [], 'no MAC addresses in the compose file');
+  });
+
   await t.test('the Pi .env and runtime data stay out of git', () => {
     const ignore = read(GITIGNORE_PATH);
     assert.match(ignore, /^\.env$/m, '.env must be ignored at every depth');
@@ -117,6 +141,24 @@ test('Pi bootstrap script', async (t) => {
     assert.match(script, /"log-driver":\s*"journald"/);
   });
 
+  await t.test('pins the Pi to 192.168.1.35 itself, since it becomes the DHCP server', () => {
+    assert.match(script, /nmcli -g ipv4\.method con show/, 'must check the current method first');
+    assert.match(script, /ipv4\.method manual/);
+    assert.match(script, /ipv4\.addresses 192\.168\.1\.35\/24/);
+    assert.match(script, /ipv4\.gateway 192\.168\.1\.1/);
+  });
+
+  await t.test('the Pi resolves without its own Pi-hole, so it can always repair itself', () => {
+    assert.match(script, /ipv4\.ignore-auto-dns yes/);
+    assert.match(script, /ipv4\.dns "1\.1\.1\.1 9\.9\.9\.9"/);
+    assert.match(script, /tailscale set --accept-dns=false/);
+  });
+
+  await t.test('reminds about a pending reboot on every run until it happens', () => {
+    assert.match(script, /\/sys\/class\/net\/wlan0/);
+    assert.match(script, /systemctl is-active --quiet log2ram/);
+  });
+
   await t.test('turns on unattended security upgrades', () => {
     assert.match(script, /APT::Periodic::Unattended-Upgrade "1"/);
   });
@@ -132,7 +174,7 @@ test('Pi bootstrap script', async (t) => {
   });
 
   await t.test('keeps LF line endings, even from a Windows checkout', () => {
-    assert.doesNotMatch(script, /\r/);
+    assert.doesNotMatch(fs.readFileSync(BOOTSTRAP_PATH, 'utf8'), /\r/);
     assert.match(read(GITATTRIBUTES_PATH), /^hosts\/pi\/\*\*\/\*\.sh text eol=lf$/m);
   });
 
