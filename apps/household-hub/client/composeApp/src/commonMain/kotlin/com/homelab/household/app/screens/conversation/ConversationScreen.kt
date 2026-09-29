@@ -52,9 +52,9 @@ fun ConversationScreen(
         memberName = profile.member?.fullName.orEmpty(),
         onSelectAgent = viewModel::selectAgent,
         onRetryAgents = viewModel::retryAgents,
-        onDecide = { toolCallId, approved -> viewModel.decide(toolCallId, approved) },
+        onDecide = viewModel::decide,
         onConnectCalendar = onConnectCalendar,
-        onApproveAutomatically = viewModel::approveAutomatically,
+        onApproveAutomatically = { toolCallId, _ -> viewModel.approveAutomatically(toolCallId) },
         onUndoAutomatic = viewModel::undoAutomatic,
         modifier = modifier,
     )

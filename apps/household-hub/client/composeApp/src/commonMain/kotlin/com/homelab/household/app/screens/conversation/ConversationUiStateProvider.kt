@@ -373,6 +373,62 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                         ),
                     turnState = TurnState.AwaitingApproval,
                 ),
+            // Canvas: RepeatRemoveA. One date of a series: the switch asks which dates go.
+            "Removing one date of a series" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Skip gym this Thursday, I have the jury", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "Got it. I'll take Thursday's off and leave the rest.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("Got it. I'll take Thursday's off and leave the rest."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Delete,
+                                            details =
+                                                gym(
+                                                    EventMoment(2026, 10, 1, hour = 7, minute = 0),
+                                                    EventScope.OnlyThis,
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // Canvas: RepeatChange. One date of a series moves; the switch asks whether the rest do.
+            "Changing one date of a series" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Move Tuesday's gym to 8", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "I'll move Tuesday's to 8.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("I'll move Tuesday's to 8."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Update,
+                                            details =
+                                                gym(
+                                                    EventMoment(2026, 10, 6, hour = 8, minute = 0),
+                                                    EventScope.OnlyThis,
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
             // The turn carried on: one write done, the other declined, both on their record lines.
             "Approved and declined" to
                 agent.copy(
@@ -581,7 +637,7 @@ private fun gym(
 ) = ProposalDetails.CalendarEvent(
     title = "Gym",
     start = start,
-    end = start.copy(hour = 8),
+    end = start.copy(hour = start.hour?.plus(1)),
     allDay = false,
     repeat = EventRepeat(RepeatEvery.Week, weekdays = listOf(1, 3), until = EventMoment(2026, 12, 24)),
     scope = scope,

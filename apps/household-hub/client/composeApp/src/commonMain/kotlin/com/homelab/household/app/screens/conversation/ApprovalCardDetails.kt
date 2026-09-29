@@ -3,19 +3,23 @@ package com.homelab.household.app.screens.conversation
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
+import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 
 /**
  * What an approval card shows about the write it asks for (canvas: ToolApproveRemove), from its
  * details: the event or note by its [title], [whenAt] for an event, and the first words of a note's
- * [preview], and how an event [repeat]s. Anything the model left out is simply not shown.
+ * [preview], how an event [repeat]s, and, for one date of a repeating event, which dates the agent
+ * took the change to be for: the [scope] the card's switch starts on. Anything the model left out is
+ * simply not shown.
  */
 data class ApprovalCardDetails(
     val title: String?,
     val whenAt: CardWhen? = null,
     val preview: String? = null,
     val repeat: EventRepeat? = null,
+    val scope: EventScope? = null,
 )
 
 /**
@@ -55,6 +59,7 @@ fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
                 title = details.title,
                 whenAt = details.start?.let { cardWhen(it, details.allDay) },
                 repeat = details.repeat,
+                scope = details.scope,
             )
         }
 
@@ -66,6 +71,18 @@ fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
             ApprovalCardDetails(title = null)
         }
     }
+
+/**
+ * What the card sends as edited when the member answers with [chosen] dates: the write's details
+ * with that pick, or null when it is what the agent proposed, so an unchanged card sends nothing.
+ */
+fun scopeEdit(
+    card: AnswerPart.Proposal,
+    chosen: EventScope?,
+): ProposalDetails? {
+    val details = card.details as? ProposalDetails.CalendarEvent ?: return null
+    return if (chosen == null || chosen == details.scope) null else details.copy(scope = chosen)
+}
 
 /** A moment as the card says it; a whole day, or any moment of an all-day event, has no time. */
 private fun cardWhen(

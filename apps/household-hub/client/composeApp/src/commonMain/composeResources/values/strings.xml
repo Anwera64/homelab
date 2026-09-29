@@ -602,6 +602,11 @@
     <string name="tool_card_month_oct">Oct</string>
     <string name="tool_card_month_nov">Nov</string>
     <string name="tool_card_month_dec">Dec</string>
+    <string name="tool_card_scope">Which dates</string>
+    <string name="tool_card_scope_this">Only this date</string>
+    <string name="tool_card_scope_following">This and following</string>
+    <string name="tool_card_scope_this_remove_note">The other dates stay on your calendar.</string>
+    <string name="tool_card_scope_following_remove_note">Earlier dates stay on your calendar.</string>
     <string name="tool_card_repeat_day">Every day</string>
     <string name="tool_card_repeat_days">Every %1$d days</string>
     <string name="tool_card_repeat_week">Every week</string>

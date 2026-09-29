@@ -72,6 +72,7 @@ import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
 import kotlinx.coroutines.flow.filterIsInstance
@@ -107,9 +108,12 @@ fun ConversationContent(
     memberName: String = "",
     onSelectAgent: (String) -> Unit = {},
     onRetryAgents: () -> Unit = {},
-    onDecide: (toolCallId: String, approved: Boolean) -> Unit = { _, _ -> },
+    onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit = { _, _, _ -> },
     onConnectCalendar: () -> Unit = {},
-    onApproveAutomatically: (toolCallId: String) -> Unit = { onDecide(it, true) },
+    onApproveAutomatically: (
+        toolCallId: String,
+        edited: ProposalDetails?,
+    ) -> Unit = { id, edited -> onDecide(id, true, edited) },
     onUndoAutomatic: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
@@ -438,9 +442,9 @@ private fun Answer(
     parts: List<AnswerPart>,
     written: String,
     folded: Boolean,
-    onDecide: (toolCallId: String, approved: Boolean) -> Unit,
+    onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onConnectCalendar: () -> Unit,
-    onApproveAutomatically: (toolCallId: String) -> Unit,
+    onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
     onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
