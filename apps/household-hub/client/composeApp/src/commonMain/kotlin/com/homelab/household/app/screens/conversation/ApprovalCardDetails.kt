@@ -2,18 +2,20 @@ package com.homelab.household.app.screens.conversation
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 
 /**
  * What an approval card shows about the write it asks for (canvas: ToolApproveRemove), from its
  * details: the event or note by its [title], [whenAt] for an event, and the first words of a note's
- * [preview]. Anything the model left out is simply not shown.
+ * [preview], and how an event [repeat]s. Anything the model left out is simply not shown.
  */
 data class ApprovalCardDetails(
     val title: String?,
     val whenAt: CardWhen? = null,
     val preview: String? = null,
+    val repeat: EventRepeat? = null,
 )
 
 /**
@@ -49,7 +51,11 @@ fun cardAsk(action: ToolAction?): CardAsk =
 fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
     when (val details = card.details) {
         is ProposalDetails.CalendarEvent -> {
-            ApprovalCardDetails(title = details.title, whenAt = details.start?.let { cardWhen(it, details.allDay) })
+            ApprovalCardDetails(
+                title = details.title,
+                whenAt = details.start?.let { cardWhen(it, details.allDay) },
+                repeat = details.repeat,
+            )
         }
 
         is ProposalDetails.Note -> {

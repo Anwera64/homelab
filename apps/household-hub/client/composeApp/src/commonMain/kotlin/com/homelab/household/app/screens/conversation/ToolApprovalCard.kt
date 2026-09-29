@@ -46,13 +46,28 @@ import com.homelab.household.app.resources.tool_card_month_nov
 import com.homelab.household.app.resources.tool_card_month_oct
 import com.homelab.household.app.resources.tool_card_month_sep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_card_repeat_and
+import com.homelab.household.app.resources.tool_card_repeat_day
+import com.homelab.household.app.resources.tool_card_repeat_days
+import com.homelab.household.app.resources.tool_card_repeat_month
+import com.homelab.household.app.resources.tool_card_repeat_months
+import com.homelab.household.app.resources.tool_card_repeat_times
+import com.homelab.household.app.resources.tool_card_repeat_until
+import com.homelab.household.app.resources.tool_card_repeat_week
+import com.homelab.household.app.resources.tool_card_repeat_week_on
+import com.homelab.household.app.resources.tool_card_repeat_weeks
+import com.homelab.household.app.resources.tool_card_repeat_weeks_on
+import com.homelab.household.app.resources.tool_card_repeat_year
+import com.homelab.household.app.resources.tool_card_repeat_years
 import com.homelab.household.app.resources.tool_card_replace
 import com.homelab.household.app.resources.tool_card_untitled
 import com.homelab.household.app.resources.tool_card_when
 import com.homelab.household.app.resources.tool_card_when_all_day
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.ProposalStatus
+import com.homelab.household.domain.model.RepeatEvery
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -142,6 +157,7 @@ private fun PendingCard(
             if (caption != null) {
                 Text(text = caption, style = type.caption, color = colors.textMuted)
             }
+            details.repeat?.let { RepeatLine(it) }
         }
         val automaticAsk = label.automaticAsk
         if (automaticAsk != null && ask == CardAsk.Approve) {
@@ -189,6 +205,74 @@ private fun PendingCard(
             }
         }
     }
+}
+
+/** "Every Tue and Thu until 24 Dec", under the first date (canvas: RepeatAdd). */
+@Composable
+private fun RepeatLine(repeat: EventRepeat) {
+    val colors = HearthTheme.colors
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HearthIconImage(
+            icon = HearthIcon.Repeat,
+            contentDescription = null,
+            size = HearthTheme.size.iconSm,
+            tint = colors.textMuted,
+        )
+        Text(text = repeatText(repeat), style = HearthTheme.typography.caption, color = colors.textMuted)
+    }
+}
+
+@Composable
+private fun repeatText(repeat: EventRepeat): String {
+    val often = oftenText(repeat)
+    val until = repeat.until
+    val count = repeat.count
+    return when {
+        until != null -> {
+            val month = stringResource(MONTHS[until.month - 1])
+            stringResource(Res.string.tool_card_repeat_until, often, until.day, month)
+        }
+
+        count != null -> {
+            stringResource(Res.string.tool_card_repeat_times, often, count)
+        }
+
+        else -> {
+            often
+        }
+    }
+}
+
+/** "Every day", "Every 2 weeks on Mon and Fri": how often, without when it ends. */
+@Composable
+private fun oftenText(repeat: EventRepeat): String {
+    val n = repeat.interval
+    val (one, many) =
+        when (repeat.every) {
+            RepeatEvery.Day -> Res.string.tool_card_repeat_day to Res.string.tool_card_repeat_days
+            RepeatEvery.Week -> Res.string.tool_card_repeat_week to Res.string.tool_card_repeat_weeks
+            RepeatEvery.Month -> Res.string.tool_card_repeat_month to Res.string.tool_card_repeat_months
+            RepeatEvery.Year -> Res.string.tool_card_repeat_year to Res.string.tool_card_repeat_years
+        }
+    val days = if (repeat.every == RepeatEvery.Week) dayList(repeat.weekdays) else null
+    return when {
+        days != null && n == 1 -> stringResource(Res.string.tool_card_repeat_week_on, days)
+        days != null -> stringResource(Res.string.tool_card_repeat_weeks_on, n, days)
+        n == 1 -> stringResource(one)
+        else -> stringResource(many, n)
+    }
+}
+
+/** "Tue", "Tue and Thu", "Mon, Wed and Fri"; null for none. */
+@Composable
+private fun dayList(weekdays: List<Int>): String? {
+    val names = weekdays.map { stringResource(WEEKDAYS[it]) }
+    if (names.isEmpty()) return null
+    if (names.size == 1) return names.single()
+    return stringResource(Res.string.tool_card_repeat_and, names.dropLast(1).joinToString(", "), names.last())
 }
 
 @Composable

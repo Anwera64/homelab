@@ -767,6 +767,17 @@ class ConversationScreenTest {
             assertEquals(listOf("c-1" to true, "c-1" to false), decided)
         }
 
+    /** Canvas: RepeatAdd. How often sits under the first date, and a new event has no dates to choose between. */
+    @Test
+    fun `GIVEN a repeating event to add WHEN drawn THEN the card says how often and asks nothing more`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approving a repeating event")))
+
+            onNodeWithText("Tue 29 Sep, 07:00").assertIsDisplayed()
+            onNodeWithText("Every Tue and Thu until 24 Dec").assertIsDisplayed()
+            onNodeWithText("Only this date").assertDoesNotExist()
+        }
+
     @Test
     fun `GIVEN one write approved and one declined WHEN the answer is drawn THEN the fold names both and opens to their record lines`() =
         runComposeUiTest {
