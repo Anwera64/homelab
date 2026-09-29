@@ -53,6 +53,7 @@ import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.tool_calendar_add_declined
+import com.homelab.household.app.resources.tool_calendar_add_failed
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
@@ -60,6 +61,12 @@ import com.homelab.household.app.resources.tool_calendar_remove_card
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_fix_ask_again
+import com.homelab.household.app.resources.tool_fix_calendar_fixed_title
+import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
+import com.homelab.household.app.resources.tool_fix_calendar_rejected_title
+import com.homelab.household.app.resources.tool_fix_nothing_added
+import com.homelab.household.app.resources.tool_fix_reconnect_calendar
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
@@ -95,6 +102,7 @@ class ConversationScreenTest {
         onSelectAgent: (String) -> Unit = {},
         onRetryAgents: () -> Unit = {},
         onDecide: (String, Boolean) -> Unit = { _, _ -> },
+        onConnectCalendar: () -> Unit = {},
     ): @Composable () -> Unit =
         {
             StillTheme {
@@ -107,6 +115,7 @@ class ConversationScreenTest {
                     onSelectAgent = onSelectAgent,
                     onRetryAgents = onRetryAgents,
                     onDecide = onDecide,
+                    onConnectCalendar = onConnectCalendar,
                     onBack = {},
                     memberName = "Emma",
                 )
@@ -768,5 +777,66 @@ class ConversationScreenTest {
             onNodeWithText(getString(Res.string.tool_card_hold)).assertIsDisplayed()
             onNode(hasSetTextAction()).assertTextContains("Also lunch on Sunday?")
             onNodeWithText("Dinner together").assertIsDisplayed()
+        }
+
+    /** Canvas: ToolFailed. What broke, that nothing was added, and the button that fixes it. */
+    @Test
+    fun `GIVEN an add the calendar refused WHEN the answer is drawn THEN the card says so and Reconnect calendar opens the connect flow`() =
+        runComposeUiTest {
+            var connects = 0
+            setContent(conversation(stateNamed("A tool that failed"), onConnectCalendar = { connects++ }))
+
+            onNodeWithText(getString(Res.string.tool_fix_calendar_rejected_title)).assertIsDisplayed()
+            val caption =
+                "${getString(
+                    Res.string.tool_fix_calendar_rejected_detail,
+                )} ${getString(Res.string.tool_fix_nothing_added)}"
+            onNodeWithText(caption).assertIsDisplayed()
+            // The card says what broke; the red step isn't repeated above it.
+            onAllNodesWithText(getString(Res.string.tool_calendar_add_failed)).assertCountEquals(0)
+
+            onNodeWithText(getString(Res.string.tool_fix_reconnect_calendar)).performClick()
+
+            assertEquals(1, connects)
+        }
+
+    /** Canvas: ToolFixedCard. The retry icon asks the answer's question again, as a new message. */
+    @Test
+    fun `GIVEN a fixed step in the latest answer WHEN the card is drawn THEN it says the calendar is connected and Ask again sends the question`() =
+        runComposeUiTest {
+            val sent = mutableListOf<String>()
+            setContent(conversation(stateNamed("A fixed tool, the latest answer"), onSend = { sent += it }))
+
+            onNodeWithText(getString(Res.string.tool_fix_calendar_fixed_title)).assertIsDisplayed()
+            onAllNodesWithText(getString(Res.string.tool_fix_reconnect_calendar)).assertCountEquals(0)
+
+            onNodeWithContentDescription(getString(Res.string.tool_fix_ask_again)).performClick()
+
+            assertEquals(listOf("Put the print shop cutoff in my calendar"), sent)
+        }
+
+    /** Canvas: ToolFixedLater. */
+    @Test
+    fun `GIVEN a fixed step and a newer message after it WHEN the card is drawn THEN there is no Ask again`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A fixed tool, a newer message after it")))
+
+            onNodeWithText(getString(Res.string.tool_fix_calendar_fixed_title)).assertIsDisplayed()
+            onAllNodes(hasContentDescription(getString(Res.string.tool_fix_ask_again))).assertCountEquals(0)
+        }
+
+    @Test
+    fun `GIVEN an add the calendar refused after other steps WHEN the answer is drawn THEN the red step stays in the fold and the card stays out`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("A tool that failed, among other steps")))
+
+            onNodeWithText(getString(Res.string.tool_fix_reconnect_calendar)).assertIsDisplayed()
+            val fold = onNodeWithText(getString(Res.string.tool_calendar_add_failed))
+            fold.assertIsDisplayed()
+            fold.performClick()
+
+            // Opened, the fold shows the red step under its label; the card is still there.
+            onAllNodesWithText(getString(Res.string.tool_calendar_add_failed)).assertCountEquals(2)
+            onNodeWithText(getString(Res.string.tool_fix_reconnect_calendar)).assertIsDisplayed()
         }
 }

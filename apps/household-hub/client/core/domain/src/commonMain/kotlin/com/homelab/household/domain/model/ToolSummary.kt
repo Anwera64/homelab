@@ -15,6 +15,11 @@ data class ToolSummary(
     val title: String? = null,
     /** What a write did; null for a step that only looks, or one saved before the hub said. */
     val action: ToolAction? = null,
+    /**
+     * A failed step the member has since put right: a calendar connected after it failed for want
+     * of one. The hub marks it for good; a later failure is a new step.
+     */
+    val fixed: Boolean = false,
 )
 
 /**
@@ -45,5 +50,11 @@ enum class ToolFailureReason {
     NotAPage,
     Unreadable,
     NotFound,
+
+    /** The calendar refused its password or sign-in: the member reconnects it from Profile. */
+    CalendarRejected,
+
+    /** The member has no calendar connected for a calendar tool to use. */
+    CalendarNotConnected,
     Unknown,
 }

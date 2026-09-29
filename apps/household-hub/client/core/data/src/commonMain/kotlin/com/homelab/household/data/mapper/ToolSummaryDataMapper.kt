@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
@@ -28,6 +29,7 @@ object ToolSummaryDataMapper {
             reason = summary.string("reason")?.let(::reasonFromCode),
             title = summary.string("title"),
             action = summary.string("action")?.let(::actionFromCode),
+            fixed = (summary["fixed"] as? JsonPrimitive)?.booleanOrNull == true,
         )
     }
 
@@ -59,6 +61,8 @@ object ToolSummaryDataMapper {
             "not_a_page" -> ToolFailureReason.NotAPage
             "unreadable" -> ToolFailureReason.Unreadable
             "not_found" -> ToolFailureReason.NotFound
+            "calendar_rejected" -> ToolFailureReason.CalendarRejected
+            "calendar_not_connected" -> ToolFailureReason.CalendarNotConnected
             else -> ToolFailureReason.Unknown
         }
 

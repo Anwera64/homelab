@@ -132,6 +132,7 @@ from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
 
 # Integration Use Cases
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
+from app.domain.use_cases.integrations.mark_calendar_steps_fixed import MarkCalendarStepsFixedUseCase
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
@@ -542,7 +543,9 @@ def get_container(session: AsyncSession):
         pres_deps.get_delete_memory_use_case: DeleteMemoryUseCase(memory_repo, uow),
 
         # Integrations
-        pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(calendar_cred_repo, _caldav_connector, _secret_cipher, uow),
+        pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(
+            calendar_cred_repo, _caldav_connector, _secret_cipher, uow, mark_fixed=MarkCalendarStepsFixedUseCase(session_repo)
+        ),
         pres_deps.get_user_calendar_use_case: GetUserCalendarUseCase(calendar_cred_repo),
         pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
         pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
@@ -551,7 +554,8 @@ def get_container(session: AsyncSession):
         pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
         pres_deps.get_start_google_calendar_sign_in_use_case: StartGoogleCalendarSignInUseCase(_sign_in_states, _google_oauth),
         pres_deps.get_complete_google_calendar_sign_in_use_case: CompleteGoogleCalendarSignInUseCase(
-            _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow
+            _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow,
+            mark_fixed=MarkCalendarStepsFixedUseCase(session_repo),
         ),
         pres_deps.get_execute_search_use_case: ExecuteSearchUseCase(_searxng_connector),
         pres_deps.get_parse_pdf_document_use_case: ParsePdfDocumentUseCase(_document_reader, max_size_bytes=settings.MAX_PDF_SIZE_BYTES),

@@ -1387,6 +1387,60 @@ class ChatSessionViewModelTest {
             assertEquals("Papers, references, reading long PDFs properly.", state.agentTagline)
         }
 
+    /** Back from a screen it opened, such as connecting a calendar: the chat is where it was left. */
+    @Test
+    fun `GIVEN a new chat under way WHEN the screen opens it again THEN it is kept and not started over`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+            viewModel.selectAgent("agent-research")
+
+            viewModel.open(null)
+            advanceUntilIdle()
+
+            assertEquals("agent-research", viewModel.uiState.value.selectedAgentId)
+            verifySuspend(VerifyMode.exactly(1)) { listAgentsUseCase() }
+        }
+
+    @Test
+    fun `GIVEN an opened chat WHEN the screen opens it again THEN it is not fetched again`() =
+        runTest(testDispatcher) {
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+
+            viewModel.open("s-1")
+            advanceUntilIdle()
+            viewModel.open("s-1")
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(1)) { getSessionUseCase("s-1") }
+        }
+
+    /** A calendar connected from this chat: its fix cards are redrawn from what the hub now says. */
+    @Test
+    fun `GIVEN an opened chat WHEN it is refreshed THEN it is fetched again`() =
+        runTest(testDispatcher) {
+            val session = ConversationSession(id = "s-1", userId = "u-1")
+            everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
+            viewModel.open("s-1")
+            advanceUntilIdle()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(2)) { getSessionUseCase("s-1") }
+        }
+
+    @Test
+    fun `GIVEN a new chat nobody has spoken in WHEN it is refreshed THEN nothing is fetched`() =
+        runTest(testDispatcher) {
+            newChatWithAgents()
+
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(0)) { getSessionUseCase(any()) }
+        }
+
     @Test
     fun `GIVEN a picked agent WHEN the first message is sent THEN the chat is created with that agent`() =
         runTest(testDispatcher) {

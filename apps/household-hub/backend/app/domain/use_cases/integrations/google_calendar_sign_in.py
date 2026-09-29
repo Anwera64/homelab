@@ -8,6 +8,7 @@ from app.domain.repositories.google_oauth_client import IGoogleOAuthClient
 from app.domain.repositories.secret_cipher import ISecretCipher
 from app.domain.repositories.sign_in_state_service import ISignInStateService
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.integrations.mark_calendar_steps_fixed import MarkCalendarStepsFixedUseCase
 
 GOOGLE_PROVIDER = "google_caldav"
 GOOGLE_CALDAV_PREFIX = "https://apidata.googleusercontent.com/caldav/v2/"
@@ -43,6 +44,7 @@ class CompleteGoogleCalendarSignInUseCase:
         cipher: ISecretCipher,
         credential_repo: ICalendarCredentialRepository,
         uow: IUnitOfWork,
+        mark_fixed: Optional[MarkCalendarStepsFixedUseCase] = None,
     ):
         self.states = states
         self.oauth = oauth
@@ -50,6 +52,7 @@ class CompleteGoogleCalendarSignInUseCase:
         self.cipher = cipher
         self.credential_repo = credential_repo
         self.uow = uow
+        self.mark_fixed = mark_fixed
 
     async def execute(self, state: str, code: Optional[str], error: Optional[str] = None) -> CalendarCredential:
         user_id = self.states.verify(state)
@@ -76,5 +79,8 @@ class CompleteGoogleCalendarSignInUseCase:
 
         async with self.uow:
             saved = await self.credential_repo.save(candidate)
+            # The calendar steps that failed for want of one now read as fixed, saved together with it.
+            if self.mark_fixed is not None:
+                await self.mark_fixed.execute(user_id)
             await self.uow.commit()
         return saved

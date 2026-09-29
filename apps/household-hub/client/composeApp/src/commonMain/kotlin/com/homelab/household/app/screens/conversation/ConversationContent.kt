@@ -105,6 +105,7 @@ fun ConversationContent(
     onSelectAgent: (String) -> Unit = {},
     onRetryAgents: () -> Unit = {},
     onDecide: (toolCallId: String, approved: Boolean) -> Unit = { _, _ -> },
+    onConnectCalendar: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -328,8 +329,18 @@ fun ConversationContent(
                 val receipted = message.id == latestQuestionId && message.status == MessageStatus.SENT
 
                 if (message.role == MessageRole.ASSISTANT) {
+                    // A fixed step can ask its question again only while this is the latest answer:
+                    // after a newer message the conversation has moved on (canvas: ToolFixedLater).
+                    val question = askAgainQuestion(state, message.id)
                     // Finished, so its steps fold away and it reads as the answer.
-                    Answer(parts = message.parts, written = message.content, folded = true, onDecide = onDecide)
+                    Answer(
+                        parts = message.parts,
+                        written = message.content,
+                        folded = true,
+                        onDecide = onDecide,
+                        onConnectCalendar = onConnectCalendar,
+                        onAskAgain = question?.let { { onSend(it) } },
+                    )
                 } else {
                     MessageBubble(
                         content = message.content,
@@ -356,6 +367,7 @@ fun ConversationContent(
                         written = state.streamingMessage.orEmpty(),
                         folded = false,
                         onDecide = onDecide,
+                        onConnectCalendar = onConnectCalendar,
                     ) {
                         val tool = state.activeTool
                         when {
@@ -412,6 +424,8 @@ private fun Answer(
     written: String,
     folded: Boolean,
     onDecide: (toolCallId: String, approved: Boolean) -> Unit,
+    onConnectCalendar: () -> Unit,
+    onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)
@@ -429,6 +443,15 @@ private fun Answer(
                         ToolApprovalCard(card = run.card, onDecide = onDecide)
                     }
 
+                    // Nor is a fix: the one thing that gets the agent going again.
+                    is AnswerRun.Fix -> {
+                        ToolFixCard(
+                            fix = run.fix,
+                            onFix = onConnectCalendar,
+                            onAskAgain = onAskAgain.takeIf { run.fix.fixed },
+                        )
+                    }
+
                     is AnswerRun.Steps -> {
                         // A single step isn't folded: it is shown as it is (#40).
                         val label = if (folded) stepsLabel(run.steps) else null
@@ -437,7 +460,9 @@ private fun Answer(
                                 Steps(run.steps)
                             }
                         } else {
-                            Steps(run.steps)
+                            // Out in the open, a step with a fix card after it would say twice what broke.
+                            val shown = run.steps.filterNot { it is AnswerPart.ToolFailed && toolFix(it) != null }
+                            if (shown.isNotEmpty()) Steps(shown)
                         }
                     }
                 }
@@ -465,11 +490,31 @@ private sealed interface AnswerRun {
     data class Card(
         val card: AnswerPart.Proposal,
     ) : AnswerRun
+
+    data class Fix(
+        val fix: ToolFix,
+    ) : AnswerRun
+}
+
+/**
+ * The question an answer was for, when it can still be asked again: the answer is the latest thing
+ * in the chat, no turn is under way, and the member's own message sits just above it.
+ */
+private fun askAgainQuestion(
+    state: ChatSessionUiState,
+    answerId: String,
+): String? {
+    val messages = state.messages
+    if (state.streamingMessage != null || messages.lastOrNull()?.id != answerId) return null
+    val question = messages.getOrNull(messages.lastIndex - 1)
+    return question?.takeIf { it.role == MessageRole.USER }?.content
 }
 
 /**
  * The parts grouped into stretches. With no words among them, [written] stands in for the words:
  * a message saved before parts were kept, or a live answer whose parts are all steps so far.
+ *
+ * A failed step the member can fix stays with its run and ends it, the fix card straight after.
  */
 private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
     val runs = mutableListOf<AnswerRun>()
@@ -486,6 +531,16 @@ private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
                 if (steps.isNotEmpty()) runs += AnswerRun.Steps(steps)
                 steps = mutableListOf()
                 runs += AnswerRun.Card(part)
+            }
+
+            is AnswerPart.ToolFailed -> {
+                steps += part
+                val fix = toolFix(part)
+                if (fix != null) {
+                    runs += AnswerRun.Steps(steps)
+                    steps = mutableListOf()
+                    runs += AnswerRun.Fix(fix)
+                }
             }
 
             else -> {

@@ -75,6 +75,11 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         "Three things, in order of how much they'll bite. The panel review is tomorrow at 14:30 — " +
             "that's the one to protect. The print shop closes at 18:00 the same day, so if the boards aren't"
 
+    private val reconnectAnswer = "Once it’s reconnected, ask again and I’ll add it straight away."
+
+    private val refusedAdd =
+        ToolSummary(action = ToolAction.Create, reason = ToolFailureReason.CalendarRejected)
+
     /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
     private val longAnswer =
         (1..40).joinToString(" ") { "Sentence $it of an answer that keeps going well past the fold." }
@@ -365,6 +370,82 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                         AnswerPart.Text("Dinner's in. I left the flowers out, as you asked."),
                                     ),
                             ),
+                        ),
+                ),
+            // Canvas: ToolFailed. The calendar refused the sign-in, so the answer offers the fix.
+            "A tool that failed" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // The same, after other steps: the red step waits in the fold, the card stays out.
+            "A tool that failed, among other steps" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Thought(2),
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Canvas: ToolFixedCard. A calendar connected since the step failed, and this is still
+            // the latest answer, so its question can be asked again from the card.
+            "A fixed tool, the latest answer" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                        ),
+                ),
+            // Canvas: ToolFixedLater. The same, once a newer message has been sent: no Ask again.
+            "A fixed tool, a newer message after it" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Put the print shop cutoff in my calendar", MessageRole.USER),
+                            said(
+                                "m-2",
+                                reconnectAnswer,
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolFailed("calendar_write", refusedAdd.copy(fixed = true)),
+                                        AnswerPart.Text(reconnectAnswer),
+                                    ),
+                            ),
+                            said("m-3", "What else is on Friday?", MessageRole.USER),
+                            said("m-4", "Just the dentist at 10:00.", MessageRole.ASSISTANT),
                         ),
                 ),
             // Send was pressed while a card waits: the words stay, and the line says why.

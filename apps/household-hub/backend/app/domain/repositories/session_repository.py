@@ -28,6 +28,11 @@ class ISessionRepository(Protocol):
         """Rewrites a saved message's content and metadata: a paused answer carrying on in place."""
         ...
 
+    async def list_assistant_messages_mentioning(self, user_id: str, needles: List[str]) -> List[ChatMessage]:
+        """The member's answers whose saved metadata mentions any of [needles]: a narrowing by text,
+        which the caller checks part by part."""
+        ...
+
     async def list_ids_by_agent_id(self, agent_id: str) -> List[str]:
         """The ids of every chat with this agent, archived or not."""
         ...
