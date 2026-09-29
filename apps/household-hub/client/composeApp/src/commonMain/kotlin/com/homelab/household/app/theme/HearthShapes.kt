@@ -24,6 +24,9 @@ object HearthShapes {
      */
     val skeleton = RoundedCornerShape(4.dp)
 
+    /** A checkbox's box: square enough to read as a box and not a radio button. */
+    val checkbox = RoundedCornerShape(6.dp)
+
     /** Chips, pills and badges. */
     val pill = RoundedCornerShape(percent = 50)
 

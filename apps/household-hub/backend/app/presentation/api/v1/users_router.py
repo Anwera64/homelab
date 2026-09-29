@@ -6,9 +6,12 @@ from app.presentation.schemas.account_schemas import ChangePinRequest, LeaveHous
 from app.presentation.schemas.pin_reset_schemas import PinResetApprove, PinResetRead
 from app.presentation.schemas.auth_schemas import Token
 from app.presentation.schemas.user_schemas import UserRead, UserUpdate
+from app.presentation.schemas.tool_approval_schemas import ToolApprovalRead, ToolApprovalUpdate
 from app.presentation.mappers.auth_presentation_mapper import AuthPresentationMapper
 from app.presentation.mappers.pin_reset_presentation_mapper import PinResetPresentationMapper
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
+from app.presentation.mappers.tool_approval_presentation_mapper import ToolApprovalPresentationMapper
+from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
@@ -26,6 +29,8 @@ from app.presentation.api.deps import (
     get_member_use_case,
     get_update_profile_use_case,
     get_remove_member_use_case,
+    get_list_tool_approvals_use_case,
+    get_set_tool_approval_use_case,
 )
 
 router = APIRouter(prefix="/users", tags=["Household Members"])
@@ -72,6 +77,31 @@ async def change_my_pin(
         new_pin=payload.new_pin,
     )
     return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.get("/me/tool-approvals", response_model=List[ToolApprovalRead])
+async def list_my_tool_approvals(
+    use_case: ListToolApprovalsUseCase = Depends(get_list_tool_approvals_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Every write agents can do, and whether they do it for you without asking."""
+    approvals = await use_case.execute(current_user)
+    return [ToolApprovalPresentationMapper.to_response(a) for a in approvals]
+
+
+@router.put("/me/tool-approvals", response_model=List[ToolApprovalRead])
+async def set_my_tool_approval(
+    payload: ToolApprovalUpdate,
+    use_case: SetToolApprovalUseCase = Depends(get_set_tool_approval_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Let agents do one write for you without asking, or ask again: a card's checkbox, its Undo, or
+    the settings screen. Answers the whole list. Removing an event and replacing a note always ask:
+    turning them on answers 400 `always_asks`.
+    """
+    approvals = await use_case.execute(current_user, payload.tool, payload.action, payload.auto)
+    return [ToolApprovalPresentationMapper.to_response(a) for a in approvals]
 
 
 @router.delete("/me")

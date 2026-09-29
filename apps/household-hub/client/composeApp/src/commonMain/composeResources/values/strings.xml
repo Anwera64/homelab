@@ -570,6 +570,17 @@
     <string name="tool_fix_calendar_fixed_remove">Ask again and I’ll remove it.</string>
     <string name="tool_fix_calendar_fixed_check">Ask again and I’ll check it.</string>
     <string name="tool_fix_ask_again">Ask again</string>
+    <!-- Auto-approve from the card (slice 4, PR 5): the box on a card, and what is said once it is ticked. -->
+    <string name="tool_calendar_add_automatic_ask">Auto-approve adding events from now on</string>
+    <string name="tool_calendar_change_automatic_ask">Auto-approve changing events from now on</string>
+    <string name="tool_note_create_automatic_ask">Auto-approve creating notes from now on</string>
+    <string name="tool_note_append_automatic_ask">Auto-approve adding to notes from now on</string>
+    <string name="tool_calendar_add_now_automatic">Adding events is now automatic</string>
+    <string name="tool_calendar_change_now_automatic">Changing events is now automatic</string>
+    <string name="tool_note_create_now_automatic">Creating notes is now automatic</string>
+    <string name="tool_note_append_now_automatic">Adding to notes is now automatic</string>
+    <string name="tool_automatic_undo">Undo</string>
+    <string name="tool_step_automatic">%1$s · automatic</string>
     <string name="tool_card_when">%1$s %2$d %3$s, %4$s</string>
     <string name="tool_card_when_all_day">%1$s %2$d %3$s · all day</string>
     <string name="tool_card_day_mon">Mon</string>

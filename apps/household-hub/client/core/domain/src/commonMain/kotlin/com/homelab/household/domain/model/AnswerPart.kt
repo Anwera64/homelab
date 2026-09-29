@@ -19,10 +19,14 @@ sealed interface AnswerPart {
         val seconds: Int,
     ) : AnswerPart
 
-    /** [summary] is what the step shows about itself; null from a hub that did not send one. */
+    /**
+     * [summary] is what the step shows about itself; null from a hub that did not send one.
+     * [automatic] is a write that ran without a card, because the member made it automatic.
+     */
     data class ToolDone(
         val tool: String,
         val summary: ToolSummary? = null,
+        val automatic: Boolean = false,
     ) : AnswerPart
 
     data class ToolFailed(
