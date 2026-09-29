@@ -292,8 +292,15 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       path.join(ROOT_DIR, 'apps/household-hub/backend/app/domain/use_cases/integrations/list_available_tools.py'), 'utf8');
     const appLabels = fs.readFileSync(
       path.join(ROOT_DIR, 'apps/household-hub/client/composeApp/src/commonMain/kotlin/com/homelab/household/app/screens/conversation/ToolLabel.kt'), 'utf8');
+    // The labels name each tool through HubTool, the one place the app spells the hub's names.
+    const hubToolNames = fs.readFileSync(
+      path.join(ROOT_DIR, 'apps/household-hub/client/core/domain/src/commonMain/kotlin/com/homelab/household/domain/model/HubTool.kt'), 'utf8');
+    const named = Object.fromEntries([...hubToolNames.matchAll(/const val ([A-Z_]+) = "([a-z_]+)"/g)].map((m) => [m[1], m[2]]));
     const offered = [...hubTools.matchAll(/name="([a-z_]+)"/g)].map((m) => m[1]);
-    const labelled = new Set([...appLabels.matchAll(/^\s*"([a-z_]+)" to$/gm)].map((m) => m[1]));
+    const labelled = new Set([
+      ...[...appLabels.matchAll(/^\s*"([a-z_]+)" to$/gm)].map((m) => m[1]),
+      ...[...appLabels.matchAll(/^\s*HubTool\.([A-Z_]+) to$/gm)].map((m) => named[m[1]]),
+    ]);
     assert.ok(offered.length >= 7, 'the hub tool list should be readable');
     const missing = offered.filter((tool) => !labelled.has(tool));
     assert.deepEqual(missing, [], `these hub tools have no label in ToolLabel.kt: ${missing.join(', ')}`);

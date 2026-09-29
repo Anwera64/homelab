@@ -50,7 +50,7 @@ sealed interface ChatStreamEvent {
         val toolCallId: String,
         val tool: String,
         val action: ToolAction? = null,
-        val arguments: Map<String, Any?> = emptyMap(),
+        val details: ProposalDetails = ProposalDetails.Other,
     ) : ChatStreamEvent
 
     /** A write the member declined, told to the model instead of run. */

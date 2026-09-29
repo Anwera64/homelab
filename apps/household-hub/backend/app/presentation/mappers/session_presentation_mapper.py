@@ -1,6 +1,6 @@
 from typing import List
 from app.domain.entities.session import ConversationSession, ChatMessage
-from app.domain.use_cases.chat.tool_approval import PAUSED_TURN, is_awaiting_approval
+from app.domain.use_cases.chat.tool_approval import is_awaiting_approval
 from app.presentation.schemas.session_schemas import SessionRead, SessionDetailRead, ChatMessageRead
 
 
@@ -28,8 +28,7 @@ class SessionPresentationMapper:
             session_id=entity.session_id,
             role=entity.role,
             content=entity.content,
-            # What a paused turn keeps to carry on is the model's, never the phone's.
-            metadata_json={k: v for k, v in (entity.metadata_json or {}).items() if k != PAUSED_TURN},
+            metadata_json=entity.metadata_for_member(),
             created_at=entity.created_at,
         )
 

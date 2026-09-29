@@ -12,6 +12,7 @@ import com.homelab.household.app.resources.tool_reason_throttled
 import com.homelab.household.app.resources.tool_reason_too_large
 import com.homelab.household.app.resources.tool_reason_unreadable
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -99,7 +100,7 @@ private fun toolStep(
     if (!succeeded) {
         val reason = summary?.reason?.let { reasonWords(tool, it) }
         val words =
-            if (tool == READ_PAGE && page != null) {
+            if (tool == HubTool.READ_PAGE && page != null) {
                 StepWords.CouldNotRead(hostOf(page.url), reason)
             } else {
                 StepWords.Failed(label.failed, reason)
@@ -108,12 +109,12 @@ private fun toolStep(
     }
     val query = summary?.query
     return when {
-        tool == SEARCH && query != null -> {
+        tool == HubTool.WEB_SEARCH && query != null -> {
             val results = summary.sources
             ToolStep(label.icon, failed = false, StepWords.Searched(query, summary.count ?: results.size), results)
         }
 
-        tool == READ_PAGE && page != null -> {
+        tool == HubTool.READ_PAGE && page != null -> {
             val host = hostOf(page.url)
             ToolStep(label.icon, failed = false, StepWords.Read(page.title.ifBlank { host }, host, page.url))
         }
@@ -138,7 +139,13 @@ private fun reasonWords(
 ): StringResource? =
     when (reason) {
         ToolFailureReason.ServiceUnavailable -> {
-            if (tool == SEARCH) Res.string.tool_reason_search_unavailable else Res.string.tool_reason_site_unavailable
+            if (tool ==
+                HubTool.WEB_SEARCH
+            ) {
+                Res.string.tool_reason_search_unavailable
+            } else {
+                Res.string.tool_reason_site_unavailable
+            }
         }
 
         ToolFailureReason.Throttled -> {
@@ -182,6 +189,3 @@ fun hostOf(url: String): String {
     val host = authority.substringAfterLast('@').substringBefore(':').lowercase()
     return host.removePrefix("www.").ifBlank { url }
 }
-
-private const val SEARCH = "searxng_search"
-private const val READ_PAGE = "read_page"

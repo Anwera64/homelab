@@ -7,6 +7,7 @@ import com.homelab.household.domain.exception.ApprovalPendingException
 import com.homelab.household.domain.exception.SessionConflictException
 import com.homelab.household.domain.model.ChatStreamEvent
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Everything the hub is asked about conversations, including the streamed turn.
@@ -39,12 +40,13 @@ interface SessionRemoteDataSource {
 
     /**
      * The member's answer to one card, and the rest of the paused turn, streamed like [openChatStream].
+     * [modifiedArguments] are the details changed on the card, already in the hub's argument names.
      */
     fun openDecisionStream(
         sessionId: String,
         toolCallId: String,
         approved: Boolean,
-        modifiedArguments: Map<String, Any?>? = null,
+        modifiedArguments: JsonObject? = null,
     ): Flow<ChatStreamEvent>
 
     /**

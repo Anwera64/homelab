@@ -4,15 +4,12 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ProposalStatus
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 
 /**
  * Turns the hub's `parts` array into [AnswerPart]s.
@@ -58,7 +55,7 @@ object AnswerPartDataMapper {
                             (part["action"] as? JsonPrimitive)?.contentOrNull?.let(
                                 ToolSummaryDataMapper::actionFromCode,
                             ),
-                        arguments = argumentsFromJson(part["arguments"]),
+                        details = ProposalDetailsDataMapper.fromJson(tool, part["arguments"]),
                         status = statusFromCode((part["status"] as? JsonPrimitive)?.contentOrNull),
                     )
                 } else {
@@ -76,35 +73,6 @@ object AnswerPartDataMapper {
                 null
             }
         }
-
-    /**
-     * A write's details as the model asked for them. Only plain values are kept, since a card shows
-     * words, times and yes-or-no: anything nested is left out rather than guessed at.
-     */
-    fun argumentsFromJson(element: JsonElement?): Map<String, Any?> =
-        (element as? JsonObject)
-            .orEmpty()
-            .mapNotNull { (key, value) ->
-                when {
-                    value is JsonNull -> key to null
-                    value !is JsonPrimitive -> null
-                    value.isString -> key to value.content
-                    else -> key to (value.booleanOrNull ?: value.longOrNull ?: value.doubleOrNull)
-                }
-            }.toMap()
-
-    /** The other way, for details changed on a card: the same plain values, as JSON. */
-    fun argumentsToJson(arguments: Map<String, Any?>): JsonObject =
-        JsonObject(
-            arguments.mapValues { (_, value) ->
-                when (value) {
-                    null -> JsonNull
-                    is Boolean -> JsonPrimitive(value)
-                    is Number -> JsonPrimitive(value)
-                    else -> JsonPrimitive(value.toString())
-                }
-            },
-        )
 
     /** A card this phone can't place is shown as waiting: asking again is safer than assuming. */
     private fun statusFromCode(code: String?): ProposalStatus =

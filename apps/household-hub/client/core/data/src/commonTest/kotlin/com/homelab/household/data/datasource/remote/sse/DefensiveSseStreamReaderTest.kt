@@ -2,6 +2,8 @@ package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
+import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolSource
@@ -439,10 +441,15 @@ class DefensiveSseStreamReaderTest {
             assertEquals("c1", proposal.toolCallId)
             assertEquals("calendar_write", proposal.tool)
             assertEquals(ToolAction.Delete, proposal.action)
-            assertEquals("Print shop cutoff", proposal.arguments["title"])
-            assertEquals("2026-09-11T18:00:00", proposal.arguments["start_time"])
-            assertEquals(false, proposal.arguments["is_all_day"])
-            assertEquals(15L, proposal.arguments["reminder"])
+            assertEquals(
+                ProposalDetails.CalendarEvent(
+                    title = "Print shop cutoff",
+                    start = EventMoment(2026, 9, 11, hour = 18, minute = 0),
+                    end = null,
+                    allDay = false,
+                ),
+                proposal.details,
+            )
         }
 
     @Test
@@ -466,7 +473,7 @@ class DefensiveSseStreamReaderTest {
                         toolCallId = "c1",
                         tool = "calendar_write",
                         action = ToolAction.Create,
-                        arguments = mapOf("title" to "Dinner together"),
+                        details = ProposalDetails.CalendarEvent("Dinner together", null, null, allDay = false),
                         status = ProposalStatus.Pending,
                     ),
                 ),

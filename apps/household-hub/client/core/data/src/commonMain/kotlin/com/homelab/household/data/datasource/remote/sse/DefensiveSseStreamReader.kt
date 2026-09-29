@@ -1,6 +1,7 @@
 package com.homelab.household.data.datasource.remote.sse
 
 import com.homelab.household.data.mapper.AnswerPartDataMapper
+import com.homelab.household.data.mapper.ProposalDetailsDataMapper
 import com.homelab.household.data.mapper.ToolSummaryDataMapper
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatStreamEvent
@@ -134,14 +135,15 @@ class DefensiveSseStreamReader(
             "tool_approval_proposal" -> {
                 // A card with no call id could never be answered, so it is not a card at all.
                 val toolCallId = (element["tool_call_id"] as? JsonPrimitive)?.contentOrNull ?: return null
+                val tool = element["tool"]?.jsonPrimitive?.content ?: ""
                 ChatStreamEvent.ToolApprovalProposal(
                     toolCallId = toolCallId,
-                    tool = element["tool"]?.jsonPrimitive?.content ?: "",
+                    tool = tool,
                     action =
                         (element["action"] as? JsonPrimitive)?.contentOrNull?.let(
                             ToolSummaryDataMapper::actionFromCode,
                         ),
-                    arguments = AnswerPartDataMapper.argumentsFromJson(element["arguments"]),
+                    details = ProposalDetailsDataMapper.fromJson(tool, element["arguments"]),
                 )
             }
 

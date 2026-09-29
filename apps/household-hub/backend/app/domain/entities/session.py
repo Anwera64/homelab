@@ -8,6 +8,13 @@ def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# What a paused answer keeps beside its parts so the turn can carry on after the member decides:
+# the model's side of the turn so far, which round it paused in, and what it was asked. It lives on
+# the answer's own metadata, so it is saved and deleted with the chat and follows the secret-chat
+# rules without a table of its own. The phone is never sent it.
+PAUSED_TURN = "paused_turn"
+
+
 @dataclass
 class ChatMessage:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -16,6 +23,10 @@ class ChatMessage:
     content: str = ""
     metadata_json: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=get_utc_now)
+
+    def metadata_for_member(self) -> Dict[str, Any]:
+        """The metadata the member's phone is sent: all of it but what a paused turn keeps to carry on."""
+        return {key: value for key, value in (self.metadata_json or {}).items() if key != PAUSED_TURN}
 
 
 @dataclass

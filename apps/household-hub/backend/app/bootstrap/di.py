@@ -166,6 +166,7 @@ from app.domain.use_cases.gossip.manage_gossip_milestones import (
 )
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.tool_approval import DropPendingProposalsUseCase
+from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
@@ -535,6 +536,8 @@ def get_container(session: AsyncSession):
         # Sessions
         pres_deps.get_list_user_sessions_use_case: ListUserSessionsUseCase(session_repo),
         pres_deps.get_session_use_case: GetSessionUseCase(session_repo),
+        pres_deps.get_prepare_chat_turn_use_case: PrepareChatTurnUseCase(GetSessionUseCase(session_repo)),
+        pres_deps.get_prepare_tool_decision_use_case: PrepareToolDecisionUseCase(GetSessionUseCase(session_repo)),
         pres_deps.get_create_session_use_case: CreateSessionUseCase(session_repo, agent_repo, uow),
         pres_deps.get_toggle_secret_mode_use_case: ToggleSecretModeUseCase(session_repo, uow),
         pres_deps.get_archive_session_use_case: ArchiveSessionUseCase(session_repo, uow),
@@ -653,6 +656,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_purge_trash_agent_use_case,
         pres_deps.get_list_user_sessions_use_case,
         pres_deps.get_session_use_case,
+        pres_deps.get_prepare_chat_turn_use_case,
+        pres_deps.get_prepare_tool_decision_use_case,
         pres_deps.get_create_session_use_case,
         pres_deps.get_toggle_secret_mode_use_case,
         pres_deps.get_archive_session_use_case,

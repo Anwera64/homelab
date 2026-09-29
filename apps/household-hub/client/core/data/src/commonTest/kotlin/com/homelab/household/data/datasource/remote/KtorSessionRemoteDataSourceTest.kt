@@ -23,6 +23,8 @@ import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -240,7 +242,11 @@ class KtorSessionRemoteDataSourceTest {
                         "s-1",
                         "tc-1",
                         approved = true,
-                        modifiedArguments = mapOf("start_time" to "2026-10-03T21:00:00", "is_all_day" to false),
+                        modifiedArguments =
+                            buildJsonObject {
+                                put("start_time", "2026-10-03T21:00:00")
+                                put("is_all_day", false)
+                            },
                     ).toList()
 
             // THEN
@@ -267,6 +273,24 @@ class KtorSessionRemoteDataSourceTest {
 
             // WHEN / THEN
             assertFailsWith<ApprovalPendingException> {
+                dataSource(engine).openChatStream("s-1", "Also lunch?", autoApproveWrites = false).toList()
+            }
+        }
+
+    @Test
+    fun `GIVEN a busy hub whose refusal only mentions a card WHEN a message is sent THEN it reads the code and not the words`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine {
+                    respondJson(
+                        """{"detail": "Not approval_pending: another message is still being answered."}""",
+                        HttpStatusCode.Conflict,
+                    )
+                }
+
+            // WHEN / THEN
+            assertFailsWith<SessionConflictException> {
                 dataSource(engine).openChatStream("s-1", "Also lunch?", autoApproveWrites = false).toList()
             }
         }

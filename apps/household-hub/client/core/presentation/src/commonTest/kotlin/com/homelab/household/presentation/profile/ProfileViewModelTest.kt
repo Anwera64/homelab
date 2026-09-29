@@ -57,7 +57,7 @@ class ProfileViewModelTest {
             account = "emma@icloud.com",
             server = "https://caldav.icloud.com",
             calendarName = "Default",
-            connectedAt = "2026-09-26T20:04:00",
+            connectedAt = "2026-09-26T20:04:00Z",
         )
 
     private val emma = User(id = "emma", fullName = "Emma", isAdmin = true, isActive = true)
