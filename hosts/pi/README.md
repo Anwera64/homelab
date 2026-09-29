@@ -34,6 +34,20 @@ sudo tailscale up                   # open the printed URL to log in
 4. In the Tailscale admin console: disable key expiry for `lemonpi`. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
 5. In the router, set the DHCP DNS server to `192.168.1.35` only. Do not add a public fallback, or devices will bypass Pi-hole.
 
+## DHCP (Pi-hole replaces the Livebox's)
+
+The Livebox 7 won't let you change the DNS it hands out, so Pi-hole serves DHCP instead. It uses the same range (.10–.150), the Livebox (.1) as the gateway, and 24h leases. The Pi gives itself a fixed 192.168.1.35 and uses 1.1.1.1/9.9.9.9 for its own lookups, so it never depends on its own Pi-hole.
+
+Static leases live only in `hosts/pi/.env` (`PIHOLE_DHCP_HOSTS`, `;`-separated `MAC,IP,name`), because MACs don't belong in a public repo. They're read-only in the web UI: to add one, edit `.env` and rerun bootstrap.
+
+Switching over:
+1. Put the Livebox reservations into `PIHOLE_DHCP_HOSTS`.
+2. Livebox → advanced settings → network configuration → DHCP → **deactivate** → save.
+3. Straight away, set `PIHOLE_DHCP_ACTIVE=true` in `.env` and run `sudo hosts/pi/bootstrap.sh`.
+4. Reconnect a device and check it got DNS 192.168.1.35. The rest move over as their leases renew.
+
+Rollback, which also works if the Pi is dead: activate DHCP on the Livebox again, then set `PIHOLE_DHCP_ACTIVE=false` and rerun.
+
 ## Updating
 
 ```sh

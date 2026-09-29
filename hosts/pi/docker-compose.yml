@@ -37,6 +37,17 @@ services:
       # SD card wear: write the query database hourly, keep 30 days.
       FTLCONF_database_DBinterval: '3600'
       FTLCONF_database_maxDBdays: '30'
+      # DHCP: the Livebox 7 won't let us change the DNS it hands out, so Pi-hole
+      # replaces its DHCP server (same range, so devices keep their IPs).
+      FTLCONF_dhcp_active: ${PIHOLE_DHCP_ACTIVE:-false}
+      FTLCONF_dhcp_start: '192.168.1.10'
+      FTLCONF_dhcp_end: '192.168.1.150'
+      FTLCONF_dhcp_router: '192.168.1.1'
+      FTLCONF_dhcp_netmask: '255.255.255.0'
+      FTLCONF_dhcp_leaseTime: '24h'
+      FTLCONF_dhcp_hosts: ${PIHOLE_DHCP_HOSTS:-}
+    cap_add:
+      - NET_ADMIN
     volumes:
       - ./data/pihole:/etc/pihole
     tmpfs:
