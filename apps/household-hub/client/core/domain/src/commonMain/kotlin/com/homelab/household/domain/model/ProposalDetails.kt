@@ -7,12 +7,18 @@ package com.homelab.household.domain.model
  * is null rather than guessed at.
  */
 sealed interface ProposalDetails {
-    /** An event on the member's calendar. [start] and [end] have no time when it is [allDay]. */
+    /**
+     * An event on the member's calendar. [start] and [end] have no time when it is [allDay]. [repeat]
+     * is how it repeats, when it does. [scope] is which of its dates a change or removal is for, when
+     * it is about one date of a repeating event, and null otherwise.
+     */
     data class CalendarEvent(
         val title: String?,
         val start: EventMoment?,
         val end: EventMoment?,
         val allDay: Boolean,
+        val repeat: EventRepeat? = null,
+        val scope: EventScope? = null,
     ) : ProposalDetails
 
     /** A note: its [title], and the [content] it is given or gains. */
@@ -24,6 +30,23 @@ sealed interface ProposalDetails {
     /** A write this phone has no card words for yet. */
     data object Other : ProposalDetails
 }
+
+/**
+ * How an event repeats: [every] [interval] days, weeks, months or years, on [weekdays] of the week (0
+ * for Monday) when it repeats weekly, and until the day [until] or for [count] times, or for good.
+ */
+data class EventRepeat(
+    val every: RepeatEvery,
+    val interval: Int = 1,
+    val weekdays: List<Int> = emptyList(),
+    val until: EventMoment? = null,
+    val count: Int? = null,
+)
+
+enum class RepeatEvery { Day, Week, Month, Year }
+
+/** Which dates of a repeating event a change is for: the one date, or it and every one after it. */
+enum class EventScope { OnlyThis, ThisAndFollowing }
 
 /**
  * A moment as the model wrote it, in the member's own time: 18:00 on the 11th is 18:00 whatever the
