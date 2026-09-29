@@ -19,6 +19,7 @@ config/open-webui/*
 !config/open-webui/filters/**
 !config/open-webui/register_filter.py
 /data/
+hosts/pi/data/
 
 # Logs
 *.log

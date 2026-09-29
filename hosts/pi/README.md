@@ -1,0 +1,57 @@
+# lemonpi: the house DNS
+
+A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), wired on `eth0` at the reserved IP `192.168.1.35`. It answers DNS for every device on the LAN and the tailnet.
+
+## What runs here
+
+| Piece | What it does |
+| --- | --- |
+| Pi-hole v6 (Docker) | DNS and ad blocking. Admin page: http://192.168.1.35/admin |
+| Unbound (Docker) | Pi-hole's only upstream, on `127.0.0.1:5335`. Recursive from the root servers, DNSSEC on. |
+| Tailscale (native) | Reaches the Pi from anywhere, so phones keep the blocking away from home. |
+| log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
+| unattended-upgrades | Installs Debian security updates by itself. |
+
+Wi-Fi and Bluetooth are disabled (the Pi is wired). To save the SD card, Pi-hole writes its query database hourly and keeps 30 days, its logs live in tmpfs, and Docker logs go to journald, which sits under log2ram.
+
+## Fresh card setup
+
+1. Flash Raspberry Pi OS Lite (64-bit) with Raspberry Pi Imager. Set hostname `lemonpi`, user `anwera97`, and SSH with your public key. No Wi-Fi needed.
+2. In the router, reserve `192.168.1.35` for the Pi's `eth0` MAC address.
+3. On the Pi (the repo is public and only this folder is checked out):
+
+```sh
+sudo apt-get update && sudo apt-get install -y git
+git clone --depth 1 --filter=blob:none --sparse https://github.com/Anwera64/homelab.git ~/homelab
+cd ~/homelab && git sparse-checkout set hosts/pi
+sudo hosts/pi/bootstrap.sh          # first run creates hosts/pi/.env and stops
+openssl rand -base64 18             # put this in PIHOLE_PASSWORD in hosts/pi/.env
+sudo hosts/pi/bootstrap.sh
+sudo reboot
+sudo tailscale up                   # open the printed URL to log in
+```
+
+4. In the Tailscale admin console: disable key expiry for `lemonpi`. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
+5. In the router, set the DHCP DNS server to `192.168.1.35` only. Do not add a public fallback, or devices will bypass Pi-hole.
+
+## Updating
+
+```sh
+cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh
+```
+
+The script is safe to rerun. Image versions are pinned in `docker-compose.yml`; bump them in a PR.
+
+## Checks
+
+```sh
+dig @127.0.0.1 -p 5335 example.com      # Unbound answers
+dig @192.168.1.35 doubleclick.net       # 0.0.0.0 (blocked)
+dig @192.168.1.35 dnssec-failed.org     # SERVFAIL (DNSSEC works)
+docker compose --project-directory ~/homelab/hosts/pi ps   # both healthy
+```
+
+## Backups
+
+- After changing lists, export from Pi-hole: Settings, Teleporter.
+- `hosts/pi/data/` and `hosts/pi/.env` are not in git. Keep the Teleporter export and the password somewhere safe.
