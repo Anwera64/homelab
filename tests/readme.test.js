@@ -1,0 +1,73 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+const read = (file) => fs.readFileSync(path.join(ROOT_DIR, file), 'utf8').replace(/\r\n/g, '\n');
+
+// Paths from the "Repository Structure" tree: each line's entry, joined onto its parent folders by indent.
+function treePaths(readme) {
+  const tree = readme.match(/## 📁 Repository Structure[\s\S]*?```\n([\s\S]*?)```/);
+  assert.ok(tree, 'README must have a Repository Structure tree');
+  const stack = [];
+  const paths = [];
+  for (const line of tree[1].split('\n')) {
+    const match = line.match(/^((?:│   |    )*)(?:├── |└── )([^\s#]+)/);
+    if (!match) continue;
+    const depth = match[1].length / 4;
+    const name = match[2].replace(/\/$/, '');
+    stack.length = depth;
+    stack.push(name);
+    paths.push(stack.join('/'));
+  }
+  return paths;
+}
+
+test('Root README matches the repository', async (t) => {
+  const readme = read('README.md');
+
+  await t.test('every path in the repository tree exists', () => {
+    const paths = treePaths(readme);
+    assert.ok(paths.length > 20, 'the tree should list the main files');
+    for (const p of paths) {
+      assert.ok(fs.existsSync(path.join(ROOT_DIR, p)), `README lists ${p}, which does not exist`);
+    }
+  });
+
+  await t.test('points to the Pi README and not to removed pieces', () => {
+    assert.ok(readme.includes('hosts/pi/README.md'));
+    assert.ok(!readme.includes('config/caddy'), 'config/caddy was removed');
+    assert.ok(!readme.includes('-DisableAI'), 'startup_homelab.ps1 has no -DisableAI flag');
+  });
+
+  await t.test('every startup_homelab.ps1 flag it mentions is real', () => {
+    const script = read('startup_homelab.ps1');
+    const params = new Set([...script.matchAll(/\[switch\]\$(\w+)/g)].map((m) => m[1]));
+    const used = [...readme.matchAll(/startup_homelab\.ps1 -(\w+)/g)].map((m) => m[1]);
+    assert.ok(used.length > 0);
+    for (const flag of used) {
+      assert.ok(params.has(flag), `-${flag} is not a parameter of startup_homelab.ps1`);
+    }
+  });
+
+  await t.test('badges are live status badges of workflows that exist', () => {
+    const badges = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
+    assert.ok(badges.length >= 1);
+    for (const badge of badges) {
+      const workflow = badge.match(/^https:\/\/github\.com\/Anwera64\/homelab\/actions\/workflows\/([\w.-]+\.yml)\/badge\.svg$/);
+      assert.ok(workflow, `${badge} is not a GitHub Actions status badge`);
+      assert.ok(fs.existsSync(path.join(ROOT_DIR, '.github/workflows', workflow[1])), `${workflow[1]} does not exist`);
+    }
+  });
+
+  await t.test('host IPs appear only in the Hosts table', () => {
+    const hosts = readme.match(/## 🖥️ Hosts\n[\s\S]*?(?=\n## )/);
+    assert.ok(hosts, 'README must have a Hosts section');
+    assert.match(hosts[0], /192\.168\.1\.35/);
+    assert.match(hosts[0], /192\.168\.1\.20/);
+    const rest = readme.replace(hosts[0], '');
+    const stray = rest.match(/192\.168\.1\.\d+(?!\/\d)/g) || [];
+    assert.deepEqual(stray, [], 'use lemonpi.lan / desktop-kujo8mp.lan outside the Hosts table');
+  });
+});
