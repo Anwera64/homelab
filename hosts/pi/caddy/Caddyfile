@@ -80,6 +80,11 @@
         reverse_proxy 192.168.1.20:8080
     }
 
+    @cleanuparr host cleanuparr.spicy-llama.duckdns.org
+    handle @cleanuparr {
+        reverse_proxy 192.168.1.20:11011
+    }
+
     @flaresolverr host flaresolverr.spicy-llama.duckdns.org
     handle @flaresolverr {
         reverse_proxy 192.168.1.20:8191

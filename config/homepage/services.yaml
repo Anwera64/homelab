@@ -117,6 +117,12 @@
               label: Queued Seasons
               format: number
 
+    - Cleanuparr:
+        icon: cleanuparr.png
+        href: https://cleanuparr.spicy-llama.duckdns.org
+        description: Download Queue Cleanup (Fakes, Failed Imports, Seeding Limits)
+        siteMonitor: http://192.168.1.20:11011
+
 - Downloads & VPN Network:
     - qBittorrent:
         icon: qbittorrent.png

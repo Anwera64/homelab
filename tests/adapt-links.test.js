@@ -60,6 +60,10 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
       'https://maintainerr.spicy-llama.duckdns.org/'
     );
     assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:11011', duckdnsOrigin),
+      'https://cleanuparr.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
       adaptServiceUrl('http://desktop-kujo8mp:8191', duckdnsOrigin),
       'https://flaresolverr.spicy-llama.duckdns.org/'
     );

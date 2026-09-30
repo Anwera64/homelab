@@ -40,7 +40,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const expected = {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
-      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'],
+      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
     };
     for (const [service, mappings] of Object.entries(expected)) {
       const ports = composePorts(service);
@@ -54,6 +54,25 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       assert.ok(published.includes(port), `port ${port} must be published by its service`);
     }
   });
+  await t.test('Cleanuparr cleans the download queue and sees the torrents at qBittorrent\'s own path', () => {
+    const block = dockerComposeContent.match(/^  cleanuparr:\r?\n([\s\S]*?)(?=^  [a-z0-9_-]+:\r?\n|^[a-z]|(?![\s\S]))/m);
+    assert.ok(block, 'docker-compose.yml must define cleanuparr');
+    const svc = block[1];
+    assert.match(svc, /image:\s*ghcr\.io\/cleanuparr\/cleanuparr:/);
+    assert.match(svc, /-\s*\$\{CONFIG_PATH\}\/cleanuparr:\/config/);
+    // Hardlink detection needs the same path qBittorrent downloads to.
+    assert.match(svc, /-\s*\$\{MEDIA_ROOT\}:\/data/);
+    assert.match(svc, /-\s*PORT=11011/);
+    assert.match(svc, /-\s*PUID=1000/);
+    assert.match(svc, /-\s*PGID=1000/);
+    assert.match(svc, /-\s*TZ=\$\{TZ/);
+    assert.match(svc, /com\.centurylinklabs\.watchtower\.enable=true/);
+    assert.match(svc, /restart:\s*unless-stopped/);
+    for (const dep of ['sonarr', 'radarr', 'qbittorrent']) {
+      assert.match(svc, new RegExp(`depends_on:[\\s\\S]*-\\s*${dep}\\b`), `cleanuparr must start after ${dep}`);
+    }
+  });
+
   await t.test('The desktop runs no Tailscale: the Pi is the subnet router', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*tailscale:\s*$/m, 'no tailscale service');
     assert.doesNotMatch(dockerComposeContent, /network_mode:\s*"?service:tailscale/, 'nothing may borrow a tailscale network');
@@ -79,7 +98,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.deepEqual(containers, ['caddy', 'pihole', 'unbound']);
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
-      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191,
+      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Cleanuparr: 11011,
     };
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
