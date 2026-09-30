@@ -19,6 +19,13 @@
 *.spicy-llama.duckdns.org, spicy-llama.duckdns.org {
     import security_headers
 
+    log {
+        output file /data/access.log {
+            roll_size 10MiB
+            roll_keep 5
+        }
+    }
+
     tls {
         dns duckdns {$DUCKDNS_TOKEN}
         resolvers 1.1.1.1 9.9.9.9

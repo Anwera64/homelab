@@ -63,6 +63,10 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.ok(caddyfile.includes('dns duckdns {$DUCKDNS_TOKEN}'));
   });
 
+  await t.test('proxied requests are logged to a rotated file on the data volume', () => {
+    assert.match(caddyfile, /\{\s*\n\s*import security_headers\s*\n\s*\n\s*log \{\s*\n\s*output file \/data\/access\.log \{[^}]*roll_size \d+MiB[^}]*roll_keep \d+[^}]*\}\s*\n\s*\}/);
+  });
+
   await t.test('Pi-local names are served from the Pi', () => {
     assert.match(caddyfile, /@pihole host pihole\.spicy-llama\.duckdns\.org\s*\n\s*handle @pihole \{\s*\n\s*reverse_proxy 127\.0\.0\.1:8081/);
     assert.match(caddyfile, /# Default[^\n]*\n\s*handle \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3000/);
