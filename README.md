@@ -13,7 +13,7 @@ A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house netwo
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
+| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
 
 Both addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names, which Pi-hole resolves for every DHCP client.
 
@@ -56,6 +56,7 @@ graph TD
             BAZ[📝 Bazarr] --> RAD & SON
             RECYC[♻️ Recyclarr] --> RAD & SON
             MAINT[🧹 Maintainerr] --> RAD & SON
+            CLEAN[🧽 Cleanuparr] --> RAD & SON & QBIT
         end
 
         subgraph MediaStorage [Unified /data - atomic hardlinks]
@@ -94,6 +95,7 @@ graph TD
 | **Prowlarr** | Desktop | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:9696` | Indexer proxy |
 | **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6767` | Subtitles |
 | **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6246` | Media lifecycle & cleanup |
+| **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:11011` | Download queue cleanup: fakes, failed imports, seeding limits |
 | **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8191` | Cloudflare challenge solver |
 | **Household Hub** | Desktop (AI profile) | `https://hub.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3051` (`/docs` on the PC: `http://127.0.0.1:3050`) | Family assistant backend |
 | **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |

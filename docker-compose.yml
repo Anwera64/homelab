@@ -252,6 +252,34 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
+  # 7b. Download Queue Cleanup (Cleanuparr)
+  # Removes fake, failed and stalled downloads (blocklisting them and searching
+  # again) and torrents past their seeding limit. Settings live in its web UI.
+  # /data matches qBittorrent's path so it can tell which torrents are hardlinked.
+  # ==============================================================================
+  cleanuparr:
+    image: ghcr.io/cleanuparr/cleanuparr:latest
+    container_name: cleanuparr
+    ports:
+      - 11011:11011
+    environment:
+      - PORT=11011
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
+      - TZ=${TZ:-America/Mexico_City}
+    volumes:
+      - ${CONFIG_PATH}/cleanuparr:/config
+      - ${MEDIA_ROOT}:/data
+    depends_on:
+      - sonarr
+      - radarr
+      - qbittorrent
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    restart: unless-stopped
+
+  # ==============================================================================
   # 8. TRaSH Guides Automation (Recyclarr)
   # ==============================================================================
   recyclarr:
