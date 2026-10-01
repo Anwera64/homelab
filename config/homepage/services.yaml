@@ -122,6 +122,22 @@
         href: https://cleanuparr.spicy-llama.duckdns.org
         description: Download Queue Cleanup (Fakes, Failed Imports, Seeding Limits)
         siteMonitor: http://192.168.1.20:11011
+        widget:
+          type: customapi
+          url: http://192.168.1.20:11011/api/v2/stats
+          mappings:
+            - field: strikes.total
+              label: Strikes
+              format: number
+            - field: removals.total
+              label: Removed
+              format: number
+            - field: cleaned.total
+              label: Cleaned
+              format: number
+            - field: searches.grabbed
+              label: Grabbed
+              format: number
 
 - Downloads & VPN Network:
     - qBittorrent:
