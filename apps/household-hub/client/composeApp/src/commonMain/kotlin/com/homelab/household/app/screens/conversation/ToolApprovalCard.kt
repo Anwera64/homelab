@@ -188,6 +188,21 @@ private fun PendingCard(
     val fields = remember(card) { editableFields(card) }
     var editing by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     var scope by rememberSaveable(card.toolCallId) { mutableStateOf(details.scope) }
+    // Shown on the card and in its Edit view alike: the pick is the same either way.
+    val whichDates: @Composable () -> Unit = {
+        scope?.let { chosen ->
+            ScopeSwitch(chosen = chosen, onChoose = { scope = it })
+            if (ask == CardAsk.Remove) {
+                val note =
+                    if (chosen == EventScope.OnlyThis) {
+                        Res.string.tool_card_scope_this_remove_note
+                    } else {
+                        Res.string.tool_card_scope_following_remove_note
+                    }
+                Text(text = stringResource(note), style = HearthTheme.typography.caption, color = colors.textMuted)
+            }
+        }
+    }
 
     ActionCard(modifier = modifier) {
         CardTitle(label = label, tint = tint)
@@ -197,6 +212,7 @@ private fun PendingCard(
                 fields = fields,
                 onCancel = { editing = false },
                 onApprove = { edited -> onDecide(card.toolCallId, true, decidedEdit(card, edited, scope)) },
+                whichDates = whichDates,
             )
         } else {
             // Under the title's words rather than its icon, as the canvas lines them up.
@@ -211,18 +227,7 @@ private fun PendingCard(
                 }
                 details.repeat?.let { RepeatLine(it) }
             }
-            scope?.let { chosen ->
-                ScopeSwitch(chosen = chosen, onChoose = { scope = it })
-                if (ask == CardAsk.Remove) {
-                    val note =
-                        if (chosen == EventScope.OnlyThis) {
-                            Res.string.tool_card_scope_this_remove_note
-                        } else {
-                            Res.string.tool_card_scope_following_remove_note
-                        }
-                    Text(text = stringResource(note), style = HearthTheme.typography.caption, color = colors.textMuted)
-                }
-            }
+            whichDates()
             val edited = decidedEdit(card, edit = null, chosen = scope)
             val automaticAsk = label.automaticAsk
             if (automaticAsk != null && ask == CardAsk.Approve) {
@@ -318,6 +323,7 @@ private fun EditingCard(
     fields: List<EditField>,
     onCancel: () -> Unit,
     onApprove: (edited: ProposalDetails?) -> Unit,
+    whichDates: @Composable () -> Unit = {},
 ) {
     val proposed = remember(card) { proposedValues(card) }
     // Each null until the member changes it; primitives, so they can be saved.
@@ -410,6 +416,7 @@ private fun EditingCard(
             onDismiss = { picking = null },
         )
     }
+    whichDates()
     CardButtonRow {
         SecondaryButton(
             text = stringResource(Res.string.tool_card_cancel),

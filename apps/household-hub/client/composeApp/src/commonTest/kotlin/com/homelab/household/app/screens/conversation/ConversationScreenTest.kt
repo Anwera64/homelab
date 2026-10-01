@@ -1192,4 +1192,26 @@ class ConversationScreenTest {
             assertEquals("Swim", sent.title)
             assertEquals(EventScope.OnlyThis, sent.scope)
         }
+
+    @Test
+    fun `GIVEN one date of a series being edited WHEN drawn THEN the switch is there with the pick and changing it there is what is sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).assertIsSelected()
+
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            assertEquals(EventScope.OnlyThis, (decided.single() as ProposalDetails.CalendarEvent).scope)
+        }
 }
