@@ -5,7 +5,6 @@ const path = require('node:path');
 const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const CADDYFILE_PATH = path.join(ROOT_DIR, 'config/caddy/Caddyfile');
 const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
@@ -14,99 +13,121 @@ const SEARXNG_SETTINGS_PATH = path.join(ROOT_DIR, 'config/searxng/settings.yml')
 const OLLAMA_MODELS_DIR = path.join(ROOT_DIR, 'config/ollama-models');
 
 test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
-  const caddyfileContent = fs.readFileSync(CADDYFILE_PATH, 'utf8');
   const dockerComposeContent = fs.readFileSync(DOCKER_COMPOSE_PATH, 'utf8');
   const servicesYamlContent = fs.readFileSync(SERVICES_YAML_PATH, 'utf8');
   const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
   const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
 
-  await t.test('Caddyfile contains DuckDNS wildcard TLS block with dns duckdns plugin', () => {
-    assert.ok(
-      caddyfileContent.includes('*.spicy-llama.duckdns.org, spicy-llama.duckdns.org'),
-      'Caddyfile must contain wildcard entry for spicy-llama.duckdns.org'
-    );
-    assert.ok(
-      caddyfileContent.includes('dns duckdns {$DUCKDNS_TOKEN}'),
-      'Caddyfile must configure tls with dns duckdns {$DUCKDNS_TOKEN}'
-    );
-  });
+  // Ports block of one root compose service.
+  const composePorts = (name) => {
+    const block = dockerComposeContent.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z])`, 'm'));
+    assert.ok(block, `docker-compose.yml must define ${name}`);
+    const ports = block[1].match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
+    return ports ? ports[1] : '';
+  };
 
-  await t.test('Caddyfile contains reverse proxy handlers for all core homelab services', () => {
-    const requiredServices = ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'bazarr', 'maintainerr', 'flaresolverr'];
-    for (const service of requiredServices) {
-      const handlerPattern = new RegExp(`@${service}\\s+host\\s+${service}\\.spicy-llama\\.duckdns\\.org`, 'm');
-      assert.ok(
-        handlerPattern.test(caddyfileContent),
-        `Caddyfile must contain a named host matcher for @${service}`
-      );
+  await t.test('The desktop runs no Caddy: the Pi terminates HTTPS and the containers publish their own ports', () => {
+    assert.doesNotMatch(dockerComposeContent, /^\s*caddy:\s*$/m, 'no caddy service on the desktop');
+    assert.ok(!fs.existsSync(path.join(ROOT_DIR, 'config/caddy/Caddyfile')), 'config/caddy/Caddyfile must be gone');
+    assert.doesNotMatch(dockerComposeContent, /DUCKDNS_TOKEN/, 'only the Pi needs the DuckDNS token');
+    for (const port of ['80', '443', '3000', '3080', '3001']) {
+      assert.doesNotMatch(dockerComposeContent, new RegExp(`^\\s+-\\s*${port}:`, 'm'), `nothing on the desktop publishes ${port} any more`);
     }
   });
 
-  await t.test('Caddyfile contains local direct HTTP port proxy blocks', () => {
+  await t.test('Each desktop service publishes its own LAN port, the ones the Pi and Homepage use', () => {
+    const expected = {
+      jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
+      sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
+      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
+    };
+    for (const [service, mappings] of Object.entries(expected)) {
+      const ports = composePorts(service);
+      for (const mapping of mappings) {
+        assert.match(ports, new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
+      }
+    }
+    // Every port the link adapter knows is covered by the table above.
+    const published = Object.values(expected).flat().map((m) => m.split(':')[0]);
     for (const port of Object.keys(PORT_TO_SERVICE)) {
-      const httpPattern = new RegExp(`http://:${port}\\s*\\{`, 'm');
-      assert.ok(
-        httpPattern.test(caddyfileContent),
-        `Caddyfile must contain an HTTP reverse proxy block for local port :${port}`
-      );
+      assert.ok(published.includes(port), `port ${port} must be published by its service`);
+    }
+  });
+  await t.test('Cleanuparr cleans the download queue and sees the torrents at qBittorrent\'s own path', () => {
+    const block = dockerComposeContent.match(/^  cleanuparr:\r?\n([\s\S]*?)(?=^  [a-z0-9_-]+:\r?\n|^[a-z]|(?![\s\S]))/m);
+    assert.ok(block, 'docker-compose.yml must define cleanuparr');
+    const svc = block[1];
+    assert.match(svc, /image:\s*ghcr\.io\/cleanuparr\/cleanuparr:/);
+    assert.match(svc, /-\s*\$\{CONFIG_PATH\}\/cleanuparr:\/config/);
+    // Hardlink detection needs the same path qBittorrent downloads to.
+    assert.match(svc, /-\s*\$\{MEDIA_ROOT\}:\/data/);
+    assert.match(svc, /-\s*PORT=11011/);
+    assert.match(svc, /-\s*PUID=1000/);
+    assert.match(svc, /-\s*PGID=1000/);
+    assert.match(svc, /-\s*TZ=\$\{TZ/);
+    assert.match(svc, /com\.centurylinklabs\.watchtower\.enable=true/);
+    assert.match(svc, /restart:\s*unless-stopped/);
+    for (const dep of ['sonarr', 'radarr', 'qbittorrent']) {
+      assert.match(svc, new RegExp(`depends_on:[\\s\\S]*-\\s*${dep}\\b`), `cleanuparr must start after ${dep}`);
     }
   });
 
-  await t.test('Tailscale container exposes standard ingress and local service ports in docker-compose.yml', () => {
-    const tailscaleMatch = dockerComposeContent.match(/container_name:\s*tailscale[\s\S]*?ports:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*restart:|$)/);
-    assert.ok(tailscaleMatch, 'docker-compose.yml must contain a tailscale service with a ports section');
+  await t.test('The desktop runs no Tailscale: the Pi is the subnet router', () => {
+    assert.doesNotMatch(dockerComposeContent, /^\s*tailscale:\s*$/m, 'no tailscale service');
+    assert.doesNotMatch(dockerComposeContent, /network_mode:\s*"?service:tailscale/, 'nothing may borrow a tailscale network');
+    assert.doesNotMatch(dockerComposeContent, /tailscale_sock/, 'no tailscale socket volume');
+    assert.doesNotMatch(dockerComposeContent, /\$\{TS_[A-Z_]+/, 'no TS_* variables');
+    assert.doesNotMatch(envExampleContent, /^TS_[A-Z_]+=/m, '.env.example must not document TS_* variables');
+  });
 
-    const tailscalePortsSection = tailscaleMatch[1];
-    const exposedPorts = new Set();
-    const portRegex = /-\s*(\d+):/g;
-    let match;
-    while ((match = portRegex.exec(tailscalePortsSection)) !== null) {
-      exposedPorts.add(match[1]);
-    }
-
-    assert.ok(exposedPorts.has('80'), 'Tailscale must expose port 80');
-    assert.ok(exposedPorts.has('443'), 'Tailscale must expose port 443');
-    assert.ok(exposedPorts.has('3000'), 'Tailscale must expose port 3000');
-
-    for (const port of Object.keys(PORT_TO_SERVICE)) {
-      assert.ok(
-        exposedPorts.has(port),
-        `Tailscale service in docker-compose.yml must expose local port ${port}`
-      );
+  await t.test('Homepage (on the Pi) reaches desktop services by LAN IP, never by container name', () => {
+    const urls = [...servicesYamlContent.matchAll(/^\s*(?:url|ping|siteMonitor):\s*(\S+)/gm)].map((m) => m[1]);
+    assert.ok(urls.length > 0, 'services.yaml should declare service URLs');
+    for (const url of urls) {
+      const host = new URL(url).hostname;
+      assert.ok(host.includes('.') || host === 'localhost', `${url} uses a bare container name the Pi can't resolve`);
     }
   });
 
-  await t.test('Caddy service in docker-compose.yml builds custom image and injects DUCKDNS_TOKEN', () => {
-    assert.ok(
-      dockerComposeContent.includes('context: ./config/caddy'),
-      'Caddy service must configure build context as ./config/caddy'
-    );
-    assert.ok(
-      dockerComposeContent.includes('DUCKDNS_TOKEN=${DUCKDNS_TOKEN}'),
-      'Caddy service must receive DUCKDNS_TOKEN environment variable'
-    );
-  });
-
-  await t.test('Homepage service.yaml {{HOMEPAGE_VAR_*}} tokens are mapped in docker-compose.yml', () => {
-    const varPattern = /\{\{HOMEPAGE_VAR_([A-Z0-9_]+)\}\}/g;
-    const requiredVars = new Set();
-    let match;
-    while ((match = varPattern.exec(servicesYamlContent)) !== null) {
-      requiredVars.add(`HOMEPAGE_VAR_${match[1]}`);
-    }
-
-    assert.ok(requiredVars.size > 0, 'Should find HOMEPAGE_VAR_* variables in services.yaml');
-
-    for (const varName of requiredVars) {
-      const composeEnvPattern = new RegExp(`-\\s*${varName}=`);
-      assert.ok(
-        composeEnvPattern.test(dockerComposeContent),
-        `docker-compose.yml homepage container must define environment variable ${varName}`
-      );
+  await t.test('Desktop services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
+    const caddyCard = servicesYamlContent.match(/- Caddy[^:]*:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(caddyCard, 'services.yaml must list the Pi Caddy');
+    assert.match(caddyCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*caddy/);
+    const containers = [...servicesYamlContent.matchAll(/^\s*container:\s*(\S+)/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(containers, ['caddy', 'pihole', 'unbound']);
+    const expectedMonitors = {
+      Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
+      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Cleanuparr: 11011,
+    };
+    for (const [name, port] of Object.entries(expectedMonitors)) {
+      const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
+      assert.ok(block, `services.yaml must list ${name}`);
+      const monitor = `http://192.168.1.20:${port}`;
+      assert.match(block[1], new RegExp(`siteMonitor:\\s*${monitor.replace(/\./g, '\\.')}/?\\s*$`, 'm'), `${name} must be monitored at ${monitor}`);
     }
   });
 
+  await t.test('The Cleanuparr card shows what it did to the queue, read keyless from its stats API', () => {
+    const card = servicesYamlContent.match(/- Cleanuparr:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(card, 'services.yaml must list Cleanuparr');
+    // Homepage has no native cleanuparr widget, so the card maps /api/v2/stats itself.
+    assert.match(card[1], /type:\s*customapi/);
+    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.20:11011\/api\/v2\/stats\s*$/m);
+    const mappings = {
+      'strikes.total': 'Strikes', 'removals.total': 'Removed', 'cleaned.total': 'Cleaned', 'searches.grabbed': 'Grabbed',
+    };
+    for (const [field, label] of Object.entries(mappings)) {
+      assert.match(card[1], new RegExp(`-\\s*field:\\s*${field.replace('.', '\\.')}\\s*\\r?\\n\\s*label:\\s*${label}\\s*$`, 'm'), `${field} must show as ${label}`);
+    }
+    // Cleanuparr asks for no key on the LAN, so the Pi .env stays untouched.
+    assert.doesNotMatch(card[1], /HOMEPAGE_VAR_/, 'the Cleanuparr widget needs no API key');
+  });
+
+  await t.test('Homepage moved to the Pi: the desktop runs none', () => {
+    assert.doesNotMatch(dockerComposeContent, /^\s*homepage:\s*$/m, 'no homepage service on the desktop');
+    assert.doesNotMatch(dockerComposeContent, /HOMEPAGE_VAR_/, 'HOMEPAGE_VAR_* now live in hosts/pi');
+  });
   await t.test('All environment variables in docker-compose.yml are documented in .env.example', () => {
     const envVarPattern = /\$\{([A-Z0-9_]+)(?::-.*?)?\}/g;
     const composeVars = new Set();
@@ -209,21 +230,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('Caddyfile reverse proxies Seerr on port 5055 and provides /emby/* strip fallback', () => {
-    assert.ok(
-      caddyfileContent.includes('reverse_proxy seerr:5055'),
-      'Caddyfile must reverse proxy port 5055 to seerr:5055'
-    );
-    assert.ok(
-      caddyfileContent.includes('handle_path /emby/*') || caddyfileContent.includes('uri strip_prefix /emby'),
-      'Caddyfile must contain /emby/* strip fallback for Jellyfin 12'
-    );
-  });
-
   await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
     assert.ok(
-      /container:\s*seerr/.test(servicesYamlContent),
-      'Homepage services.yaml must define container: seerr'
+      /url:\s*http:\/\/192\.168\.1\.20:5055/.test(servicesYamlContent),
+      'Homepage services.yaml must point the Seerr widget at the desktop (192.168.1.20:5055)'
     );
     assert.ok(
       /type:\s*seerr/.test(servicesYamlContent),
@@ -331,16 +341,12 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(hub, /profiles:\s*\["ai"\]/, 'household-hub must be in the ai profile so an arr-only start leaves it off');
     assert.match(hub, /context:\s*\.\/apps\/household-hub\/backend/, 'household-hub must build from the backend folder');
     assert.ok(hub.includes('- household_hub_data:/data'), 'household-hub must keep its SQLite database in the household_hub_data volume');
-    assert.ok(hub.includes('- 127.0.0.1:3050:3050'), 'household-hub must publish 3050 on loopback only');
+    assert.ok(hub.includes('- 127.0.0.1:3050:3050'), 'household-hub must keep 3050 on loopback for /docs from the PC');
+    assert.match(hub, /-\s*3051:3050\b/, 'household-hub must publish 3051 on the LAN for the Pi\'s Caddy');
     assert.match(hub, /depends_on:\s*\n\s+- ollama\s*\n\s+- searxng/, 'household-hub must start after ollama and searxng');
     assert.ok(
       /^volumes:\s*\n[\s\S]*?^  household_hub_data:\s*\n\s+name:\s*household_hub_data\s*$/m.test(dockerComposeContent),
       'docker-compose.yml must declare the household_hub_data volume with a fixed name'
     );
-  });
-
-  await t.test('Caddy proxies the hub to the container, not the host', () => {
-    assert.ok(caddyfileContent.includes('reverse_proxy household-hub:3050'), 'the hub route must target the household-hub container');
-    assert.ok(!caddyfileContent.includes('host.docker.internal:3050'), 'the hub route must not reach back to the Windows host');
   });
 });

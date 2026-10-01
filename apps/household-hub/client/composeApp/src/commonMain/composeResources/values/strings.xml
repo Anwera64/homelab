@@ -581,7 +581,22 @@
     <string name="tool_note_append_now_automatic">Adding to notes is now automatic</string>
     <string name="tool_automatic_undo">Undo</string>
     <string name="tool_step_automatic">%1$s · automatic</string>
+    <!-- Edit before approving (slice 4, PR 4, canvas: ToolEdit) -->
+    <string name="tool_card_edit">Edit</string>
+    <string name="tool_card_cancel">Cancel</string>
+    <string name="tool_card_approve_with_changes">Approve with changes</string>
+    <string name="field_changed">%1$s · changed</string>
+    <string name="tool_card_field_what">What</string>
+    <string name="tool_card_field_title">Title</string>
+    <string name="tool_card_field_day">Day</string>
+    <string name="tool_card_field_time">Time</string>
+    <string name="tool_card_field_note">Note</string>
+    <string name="tool_card_field_empty">This can’t be empty</string>
+    <string name="field_picker_ok">OK</string>
+    <string name="field_picker_cancel">Cancel</string>
+    <string name="field_picker_time_title">Pick a time</string>
     <string name="tool_card_when">%1$s %2$d %3$s, %4$s</string>
+    <string name="tool_card_day">%1$s %2$d %3$s</string>
     <string name="tool_card_when_all_day">%1$s %2$d %3$s · all day</string>
     <string name="tool_card_day_mon">Mon</string>
     <string name="tool_card_day_tue">Tue</string>

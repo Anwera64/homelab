@@ -25,6 +25,8 @@ services:
     ports:
       - 6881:6881       # qBittorrent Torrent Protocol (TCP)
       - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
+      - 8080:8080       # qBittorrent WebUI (qbittorrent shares this network)
+      - 8000:8000       # Gluetun control API, for the Pi's Homepage widget
     restart: unless-stopped
 
   # ==============================================================================
@@ -53,6 +55,8 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
+    ports:
+      - 8191:8191
     environment:
       - LOG_LEVEL=info
       - TZ=${TZ:-America/Mexico_City}
@@ -70,6 +74,8 @@ services:
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
+    ports:
+      - 9696:9696
     environment:
       - PUID=1000
       - PGID=1000
@@ -87,6 +93,8 @@ services:
   radarr:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
+    ports:
+      - 7878:7878
     environment:
       - PUID=1000
       - PGID=1000
@@ -105,6 +113,8 @@ services:
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
+    ports:
+      - 8989:8989
     environment:
       - PUID=1000
       - PGID=1000
@@ -123,6 +133,8 @@ services:
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
+    ports:
+      - 6767:6767
     environment:
       - PUID=1000
       - PGID=1000
@@ -144,6 +156,8 @@ services:
   seerr:
     image: ghcr.io/seerr-team/seerr:latest
     container_name: seerr
+    ports:
+      - 5055:5055
     init: true
     environment:
       - LOG_LEVEL=info
@@ -160,6 +174,8 @@ services:
   jellyfin:
     image: jellyfin/jellyfin:12.0
     container_name: jellyfin
+    ports:
+      - 8096:8096
     environment:
       - TZ=${TZ:-America/Mexico_City}
     volumes:
@@ -199,6 +215,8 @@ services:
   jellystat:
     image: cyfershepard/jellystat:latest
     container_name: jellystat
+    ports:
+      - 3005:3000
     environment:
       - POSTGRES_IP=jellystat-db
       - POSTGRES_PORT=5432
@@ -218,6 +236,8 @@ services:
   maintainerr:
     image: ghcr.io/maintainerr/maintainerr:latest
     container_name: maintainerr
+    ports:
+      - 6246:6246
     environment:
       - TZ=${TZ:-America/Mexico_City}
       - NODE_ENV=production
@@ -232,32 +252,35 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 8. Dashboard & Unified Portal (Homepage)
+  # 7b. Download Queue Cleanup (Cleanuparr)
+  # Removes fake, failed and stalled downloads (blocklisting them and searching
+  # again) and torrents past their seeding limit. Settings live in its web UI.
+  # /data matches qBittorrent's path so it can tell which torrents are hardlinked.
   # ==============================================================================
-  homepage:
-    image: ghcr.io/gethomepage/homepage:latest
-    container_name: homepage
+  cleanuparr:
+    image: ghcr.io/cleanuparr/cleanuparr:latest
+    container_name: cleanuparr
+    ports:
+      - 11011:11011
     environment:
+      - PORT=11011
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
       - TZ=${TZ:-America/Mexico_City}
-      - HOMEPAGE_ALLOWED_HOSTS=*
-      - HOMEPAGE_VAR_GLUETUN_API_KEY=${GLUETUN_API_KEY}
-      - HOMEPAGE_VAR_JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
-      - HOMEPAGE_VAR_SEERR_API_KEY=${SEERR_API_KEY:-${JELLYSEERR_API_KEY}}
-      - HOMEPAGE_VAR_JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY:-${SEERR_API_KEY:-}}
-      - HOMEPAGE_VAR_SONARR_API_KEY=${SONARR_API_KEY}
-      - HOMEPAGE_VAR_RADARR_API_KEY=${RADARR_API_KEY}
-      - HOMEPAGE_VAR_PROWLARR_API_KEY=${PROWLARR_API_KEY}
-      - HOMEPAGE_VAR_BAZARR_API_KEY=${BAZARR_API_KEY}
-      - HOMEPAGE_VAR_JELLYSTAT_API_KEY=${JELLYSTAT_API_KEY:-}
     volumes:
-      - ${CONFIG_PATH}/homepage:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${CONFIG_PATH}/cleanuparr:/config
+      - ${MEDIA_ROOT}:/data
+    depends_on:
+      - sonarr
+      - radarr
+      - qbittorrent
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
 
   # ==============================================================================
-  # 9. TRaSH Guides Automation (Recyclarr)
+  # 8. TRaSH Guides Automation (Recyclarr)
   # ==============================================================================
   recyclarr:
     image: ghcr.io/recyclarr/recyclarr:8
@@ -277,72 +300,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 10. Remote Mesh Gateway (Tailscale)
-  # ==============================================================================
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: tailscale
-    hostname: ${TS_HOSTNAME:-homelab}
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      - TS_HOSTNAME=${TS_HOSTNAME:-homelab}
-      - TS_USERSPACE=false
-      - TS_PORT=41641
-      - TS_TAILSCALED_EXTRA_ARGS=--port=41641
-      - TS_ROUTES=${TS_ROUTES:-192.168.1.0/24}
-    volumes:
-      - ${CONFIG_PATH}/tailscale:/var/lib/tailscale
-      - tailscale_sock:/var/run/tailscale
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    ports:
-      # Direct Tailscale WireGuard UDP Port
-      - 41641:41641/udp
-      - 80:80
-      - 443:443
-      - 3000:3000
-      # Local HTTP Service Ports
-      - 8096:8096
-      - 5055:5055
-      - 3005:3005
-      - 6246:6246
-      - 8080:8080
-      - 8989:8989
-      - 7878:7878
-      - 9696:9696
-      - 6767:6767
-      - 8191:8191
-      - 3080:3080
-      - 3001:3001
-    restart: unless-stopped
-
-  # ==============================================================================
-  # 11. Reverse Proxy & Hostname Routing (Caddy)
-  # ==============================================================================
-  caddy:
-    build:
-      context: ./config/caddy
-      dockerfile: Dockerfile
-    container_name: caddy
-    network_mode: "service:tailscale"
-    environment:
-      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
-    volumes:
-      - ${CONFIG_PATH}/caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ${CONFIG_PATH}/caddy/data:/data
-      - ${CONFIG_PATH}/caddy/config:/config
-      - tailscale_sock:/var/run/tailscale
-    depends_on:
-      - tailscale
-      - homepage
-    restart: unless-stopped
-
-  # ==============================================================================
-  # 12. Automated Image Updates & Lifecycle (Watchtower)
+  # 9. Automated Image Updates & Lifecycle (Watchtower)
   # ==============================================================================
   watchtower:
     image: containrrr/watchtower:latest
@@ -359,7 +317,7 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
-  # 13. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
+  # 10. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
   # ==============================================================================
   ollama:
     profiles: ["ai"]
@@ -414,13 +372,13 @@ services:
       # SQLite in WAL mode needs real file locks, which the Windows share does not give it.
       - household_hub_data:/data
     ports:
-      - 127.0.0.1:3050:3050   # host-only: /docs and /health from the PC; phones come in through Caddy
+      - 127.0.0.1:3050:3050   # /docs and /health from the PC
+      - 3051:3050             # LAN, for the Pi's Caddy (hub.spicy-llama.duckdns.org)
     depends_on:
       - ollama
       - searxng
     restart: unless-stopped
 volumes:
-  tailscale_sock:
   ollama_models:
     name: ollama_models
   household_hub_data:

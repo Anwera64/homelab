@@ -12,6 +12,12 @@ from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, write_action
 # What the model reads for a write the member said no to.
 DECLINED = "The member declined this action. It was not done; don't try it again unless they ask."
 
+# What the model reads, beside the result, for a write the member changed on its card.
+MEMBER_EDITED = (
+    "The member changed these details on the card before approving. The action was done with the "
+    "member's values, not the ones you proposed. Use the member's values in your answer."
+)
+
 
 def needs_asking(call: LLMToolCall, auto: FrozenSet[Tuple[str, str]], is_turn_secret: bool) -> bool:
     """
@@ -33,6 +39,18 @@ def proposal_part(call: LLMToolCall) -> Dict[str, Any]:
         "arguments": call.arguments,
         "status": "pending",
     }
+
+
+def member_changes(proposed: Dict[str, Any], modified: Dict[str, Any]) -> Dict[str, Any]:
+    """The details the member really changed: the phone sends back some it left as proposed."""
+    return {key: value for key, value in modified.items() if proposed.get(key) != value}
+
+
+def told_with_edit(result: Any, edited: Dict[str, Any]) -> Dict[str, Any]:
+    """A write's result as the model reads it when the member changed its details first."""
+    told = dict(result) if isinstance(result, dict) else {"result": result}
+    told["member_edited"] = {"changed": edited, "note": MEMBER_EDITED}
+    return told
 
 
 def proposal_event(part: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,0 +1,96 @@
+# ==============================================================================
+# Raspberry Pi 5 (lemonpi): the house DNS
+#   Pi-hole  -> blocks ads/trackers, answers every device on the LAN and tailnet
+#   Unbound  -> Pi-hole's only upstream; resolves from the root servers with DNSSEC
+# Both use host networking: Pi-hole owns :53 and :80/:443, Unbound 127.0.0.1:5335.
+# Run through bootstrap.sh; see README.md.
+# ==============================================================================
+
+services:
+  unbound:
+    image: klutchell/unbound:1.26.1
+    container_name: unbound
+    network_mode: host
+    volumes:
+      - ./unbound/unbound.conf:/etc/unbound/unbound.conf:ro
+    healthcheck:
+      test: ["CMD", "drill-hc", "-p", "5335", "@127.0.0.1", "cloudflare.com"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  pihole:
+    image: pihole/pihole:2026.09.0
+    container_name: pihole
+    network_mode: host
+    depends_on:
+      unbound:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+      FTLCONF_webserver_api_password: ${PIHOLE_PASSWORD:?set PIHOLE_PASSWORD in hosts/pi/.env}
+      FTLCONF_dns_upstreams: '127.0.0.1#5335'
+      # Answer LAN and Tailscale (100.x) clients; the Pi is never port-forwarded.
+      FTLCONF_dns_listeningMode: 'ALL'
+      # SD card wear: write the query database hourly, keep 30 days.
+      FTLCONF_database_DBinterval: '3600'
+      FTLCONF_database_maxDBdays: '30'
+      # Caddy owns 80/443 on the Pi; the admin UI lives on 8081 (and pihole.spicy-llama.duckdns.org).
+      FTLCONF_webserver_port: '8081o'
+      # DHCP: the Livebox 7 won't let us change the DNS it hands out, so Pi-hole
+      # replaces its DHCP server (same range, so devices keep their IPs).
+      FTLCONF_dhcp_active: ${PIHOLE_DHCP_ACTIVE:-false}
+      FTLCONF_dhcp_start: '192.168.1.10'
+      FTLCONF_dhcp_end: '192.168.1.150'
+      FTLCONF_dhcp_router: '192.168.1.1'
+      FTLCONF_dhcp_netmask: '255.255.255.0'
+      FTLCONF_dhcp_leaseTime: '24h'
+      FTLCONF_dhcp_hosts: ${PIHOLE_DHCP_HOSTS:-}
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./data/pihole:/etc/pihole
+    tmpfs:
+      - /var/log/pihole
+    restart: unless-stopped
+
+  # HTTPS entry point for *.spicy-llama.duckdns.org (DuckDNS points at this Pi). Pi-local
+  # services are served here; desktop services go to the desktop Caddy's LAN ports.
+  # The image (Caddy + DuckDNS DNS plugin) is built by .github/workflows/caddy-image.yml.
+  caddy:
+    image: ghcr.io/anwera64/caddy-duckdns:2.11.4
+    container_name: caddy
+    network_mode: host
+    environment:
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in hosts/pi/.env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+    restart: unless-stopped
+
+  # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
+  # the sparse checkout by bootstrap.sh); desktop services are reached on 192.168.1.20.
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v2.4.0
+    container_name: homepage
+    ports:
+      - 3000:3000
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+      HOMEPAGE_ALLOWED_HOSTS: '*'
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      HOMEPAGE_VAR_SEERR_API_KEY: ${SEERR_API_KEY:-}
+      HOMEPAGE_VAR_JELLYSTAT_API_KEY: ${JELLYSTAT_API_KEY:-}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY:-}
+      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY:-}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
+      HOMEPAGE_VAR_GLUETUN_API_KEY: ${GLUETUN_API_KEY:-}
+    volumes:
+      - ../../config/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /app/config/logs
+    restart: unless-stopped

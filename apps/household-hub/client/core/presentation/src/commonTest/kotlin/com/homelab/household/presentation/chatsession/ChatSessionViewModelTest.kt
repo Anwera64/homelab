@@ -353,6 +353,39 @@ class ChatSessionViewModelTest {
         }
 
     @Test
+    fun `GIVEN a card approved with changes WHEN it is sent THEN the edit reaches the hub and the card shows it`() =
+        runTest(testDispatcher) {
+            openPaused(dinner, flowers)
+            val later = EventMoment(2026, 10, 3, hour = 21, minute = 0)
+            val edit =
+                ProposalDetails.CalendarEvent(
+                    title = "Dinner at Nonna's",
+                    start = later,
+                    end = null,
+                    allDay = false,
+                )
+            every { decideToolProposalUseCase("s-1", "c1", true, edit) } returns
+                flow {
+                    emit(ChatStreamEvent.Accepted)
+                    awaitCancellation()
+                }
+
+            viewModel.decide("c1", approved = true, edited = edit)
+            advanceUntilIdle()
+
+            verify { decideToolProposalUseCase("s-1", "c1", true, edit) }
+            val card =
+                viewModel.uiState.value.parts
+                    .filterIsInstance<AnswerPart.Proposal>()
+                    .first()
+            assertEquals(ProposalStatus.Approved, card.status)
+            assertEquals(
+                ProposalDetails.CalendarEvent(title = "Dinner at Nonna's", start = later, end = null, allDay = false),
+                card.details,
+            )
+        }
+
+    @Test
     fun `GIVEN two cards WHEN the first is answered THEN the turn still waits on the second`() =
         runTest(testDispatcher) {
             openPaused(dinner, flowers)

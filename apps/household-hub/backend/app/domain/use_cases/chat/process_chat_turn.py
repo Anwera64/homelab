@@ -26,9 +26,11 @@ from app.domain.use_cases.chat.tool_approval import (
     card_to_decide,
     dump_messages,
     load_messages,
+    member_changes,
     needs_asking,
     proposal_event,
     proposal_part,
+    told_with_edit,
 )
 from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
@@ -695,7 +697,11 @@ class ProcessChatTurnUseCase:
             if part.get("type") == "proposal" and part.get("tool_call_id") == tool_call_id:
                 part["status"] = "approved" if approved else "declined"
                 if approved and modified_arguments:
+                    # Kept with the card, so the model can be told once the last card is answered.
+                    edited = member_changes(part["arguments"], modified_arguments)
                     part["arguments"] = {**part["arguments"], **modified_arguments}
+                    if edited:
+                        part["edited"] = edited
 
         yield {"type": "accepted"}
 
@@ -736,7 +742,14 @@ class ProcessChatTurnUseCase:
                     continue
                 call = LLMToolCall(id=part["tool_call_id"], name=part["tool"], arguments=part["arguments"])
                 if part["status"] == "approved":
-                    async for event in self._run_call(turn, call, current_user.id, at=index):
+                    edited = part.get("edited")
+                    if edited:
+                        # The call the model reads back is the call that ran, not the one it proposed.
+                        for message in turn.llm_messages:
+                            for proposed in message.tool_calls or []:
+                                if proposed.id == call.id:
+                                    proposed.arguments = call.arguments
+                    async for event in self._run_call(turn, call, current_user.id, at=index, edited=edited):
                         yield event
                 else:
                     summary = describe_write(call.name, call.arguments)
@@ -922,9 +935,20 @@ class ProcessChatTurnUseCase:
                 return
 
     async def _run_call(
-        self, turn: "_Turn", tc: LLMToolCall, user_id: str, at: Optional[int] = None, auto: bool = False
+        self,
+        turn: "_Turn",
+        tc: LLMToolCall,
+        user_id: str,
+        at: Optional[int] = None,
+        auto: bool = False,
+        edited: Optional[Dict[str, Any]] = None,
     ):
-        """Runs one call and records it: a step in the answer, and a result for the model to read."""
+        """
+        Runs one call and records it: a step in the answer, and a result for the model to read.
+
+        [edited] are the details the member changed on the card before approving. The model is told
+        beside the result, or it would go on to describe the write as it proposed it.
+        """
         yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
         tool_result = await self._run_tool(
             tc, turn.agent, user_id, turn.is_turn_secret, sources=turn.sources, offered=turn.agent_tools
@@ -944,8 +968,9 @@ class ProcessChatTurnUseCase:
         turn.answer.tool(tc.name, tool_result.success, summary, at=at, auto=auto)
         yield {"type": "tool_result", "data": exec_info}
         # The phone is sent the whole result; the model reads what fits.
+        result = tool_result.data if tool_result.success else {"error": tool_result.error}
         seen, no_room = turn.budget.fit(
-            tool_result.data if tool_result.success else {"error": tool_result.error},
+            told_with_edit(result, edited) if edited else result,
             turn.llm_messages,
             turn.agent_tools,
         )

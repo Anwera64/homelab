@@ -56,6 +56,8 @@ data class HearthSizes(
     val hairline: Dp = 1.dp,
     /** A field's error edge. */
     val emphasis: Dp = 2.dp,
+    /** A field's edge once its value is not the one proposed (canvas: ToolEdit). */
+    val changed: Dp = 1.5.dp,
     /** How wide centred prose is allowed to run before it stops being readable. */
     val readingWidth: Dp = 288.dp,
     /** Launch's indeterminate bar: how wide it runs, and how thick. */

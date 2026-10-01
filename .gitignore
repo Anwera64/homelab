@@ -7,8 +7,6 @@ config/*/**
 !config/homepage/
 !config/homepage/**
 config/homepage/logs/
-!config/caddy/Caddyfile
-!config/caddy/Dockerfile
 config/ollama/
 !config/ollama-models/
 !config/ollama-models/**
@@ -19,6 +17,7 @@ config/open-webui/*
 !config/open-webui/filters/**
 !config/open-webui/register_filter.py
 /data/
+hosts/pi/data/
 
 # Logs
 *.log

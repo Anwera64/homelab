@@ -31,6 +31,14 @@ if command -v docker >/dev/null 2>&1; then
     echo "❌ [Pre-Commit FAILED] docker-compose.yml validation failed! Commit aborted."
     exit 1
   fi
+
+  echo "  [+] Validating hosts/pi/docker-compose.yml configuration..."
+  PIHOLE_PASSWORD=validate DUCKDNS_TOKEN=validate docker compose -f hosts/pi/docker-compose.yml --env-file hosts/pi/.env.example config -q
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "[Pre-Commit FAILED] hosts/pi/docker-compose.yml validation failed! Commit aborted."
+    exit 1
+  fi
 fi
 
 # 3. Validate Clean Architecture Module Boundaries
