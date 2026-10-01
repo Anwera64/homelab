@@ -11,8 +11,10 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -64,6 +66,7 @@ import com.homelab.household.app.resources.tool_calendar_add_automatic_ask
 import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_add_failed
 import com.homelab.household.app.resources.tool_calendar_add_now_automatic
+import com.homelab.household.app.resources.tool_calendar_change_automatic_ask
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_read_failed
 import com.homelab.household.app.resources.tool_calendar_read_running
@@ -79,6 +82,10 @@ import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_card_scope_following
+import com.homelab.household.app.resources.tool_card_scope_following_remove_note
+import com.homelab.household.app.resources.tool_card_scope_this
+import com.homelab.household.app.resources.tool_card_scope_this_remove_note
 import com.homelab.household.app.resources.tool_fix_ask_again
 import com.homelab.household.app.resources.tool_fix_calendar_fixed_title
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
@@ -88,6 +95,7 @@ import com.homelab.household.app.resources.tool_fix_reconnect_calendar
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getPluralString
@@ -123,7 +131,7 @@ class ConversationScreenTest {
         onRetryAgents: () -> Unit = {},
         onDecide: (String, Boolean, ProposalDetails?) -> Unit = { _, _, _ -> },
         onConnectCalendar: () -> Unit = {},
-        onApproveAutomatically: (String) -> Unit = {},
+        onApproveAutomatically: (String, ProposalDetails?) -> Unit = { _, _ -> },
         onUndoAutomatic: () -> Unit = {},
     ): @Composable () -> Unit =
         {
@@ -780,6 +788,80 @@ class ConversationScreenTest {
             assertEquals(listOf("c-1" to true, "c-1" to false), decided)
         }
 
+    /** Canvas: RepeatAdd. How often sits under the first date, and a new event has no dates to choose between. */
+    @Test
+    fun `GIVEN a repeating event to add WHEN drawn THEN the card says how often and asks nothing more`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Approving a repeating event")))
+
+            onNodeWithText("Tue 29 Sep, 07:00").assertIsDisplayed()
+            onNodeWithText("Every Tue and Thu until 24 Dec").assertIsDisplayed()
+            onNodeWithText("Only this date").assertDoesNotExist()
+        }
+
+    /** Canvas: RepeatRemoveA. The switch starts on what the agent understood; Remove sends the member's pick. */
+    @Test
+    fun `GIVEN one date of a series to remove WHEN the member picks this and following THEN Remove sends that`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Removing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+            val only = onNodeWithText(getString(Res.string.tool_card_scope_this))
+            val following = onNodeWithText(getString(Res.string.tool_card_scope_following))
+
+            onNodeWithText("Every Tue and Thu until 24 Dec").assertIsDisplayed()
+            only.assertIsSelected()
+            following.assertIsNotSelected()
+            onNodeWithText(getString(Res.string.tool_card_scope_this_remove_note)).assertIsDisplayed()
+
+            following.performClick()
+            following.assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_scope_following_remove_note)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_remove)).performClick()
+
+            assertEquals(EventScope.ThisAndFollowing, (decided.single() as ProposalDetails.CalendarEvent).scope)
+        }
+
+    @Test
+    fun `GIVEN one date of a series to remove WHEN removed as proposed THEN nothing is sent as edited`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Removing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_remove)).performClick()
+
+            assertEquals(listOf<ProposalDetails?>(null), decided)
+        }
+
+    @Test
+    fun `GIVEN one date of a series to change WHEN the member picks this and following and ticks from now on THEN the pick goes with it`() =
+        runComposeUiTest {
+            val automatic = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onApproveAutomatically = { _, edited ->
+                    automatic +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_calendar_change_automatic_ask)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_approve)).performClick()
+
+            assertEquals(EventScope.ThisAndFollowing, (automatic.single() as ProposalDetails.CalendarEvent).scope)
+        }
+
     @Test
     fun `GIVEN one write approved and one declined WHEN the answer is drawn THEN the fold names both and opens to their record lines`() =
         runComposeUiTest {
@@ -876,7 +958,7 @@ class ConversationScreenTest {
                 conversation(
                     stateNamed("Auto-approving an add"),
                     onDecide = { id, ok, _ -> decided += id to ok },
-                    onApproveAutomatically = { automatic += it },
+                    onApproveAutomatically = { id, _ -> automatic += id },
                 ),
             )
             val box = onNodeWithText(getString(Res.string.tool_calendar_add_automatic_ask))
@@ -899,7 +981,7 @@ class ConversationScreenTest {
                 conversation(
                     stateNamed("Auto-approving an add"),
                     onDecide = { id, ok, _ -> decided += id to ok },
-                    onApproveAutomatically = { automatic += it },
+                    onApproveAutomatically = { id, _ -> automatic += id },
                 ),
             )
 
@@ -1067,5 +1149,69 @@ class ConversationScreenTest {
             setContent(conversation(stateNamed("Approving a removal")))
 
             onNodeWithText(getString(Res.string.tool_card_edit)).assertDoesNotExist()
+        }
+
+    /** Canvas: RepeatChange with Edit. The which-dates pick and the edits go together. */
+    @Test
+    fun `GIVEN this and following picked on one date of a series WHEN it is edited and approved THEN both the edit and the pick are sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            val sent = decided.single() as ProposalDetails.CalendarEvent
+            assertEquals("Swim", sent.title)
+            assertEquals(EventScope.ThisAndFollowing, sent.scope)
+        }
+
+    @Test
+    fun `GIVEN one date of a series WHEN only its title is edited THEN it stays a change to that one date`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            val sent = decided.single() as ProposalDetails.CalendarEvent
+            assertEquals("Swim", sent.title)
+            assertEquals(EventScope.OnlyThis, sent.scope)
+        }
+
+    @Test
+    fun `GIVEN one date of a series being edited WHEN drawn THEN the switch is there with the pick and changing it there is what is sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).assertIsSelected()
+
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            assertEquals(EventScope.OnlyThis, (decided.single() as ProposalDetails.CalendarEvent).scope)
         }
 }

@@ -18,6 +18,8 @@ from app.domain.repositories.secret_cipher import ISecretCipher
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.page_reader import IPageReader
 
+from app.domain.use_cases.integrations import calendar_arguments
+from app.domain.use_cases.integrations.calendar_arguments import CalendarArgumentError
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
@@ -212,6 +214,7 @@ class ExecuteToolUseCase:
                                 "description": e.description,
                                 "location": e.location,
                                 "is_all_day": e.is_all_day,
+                                **_series_fields(e),
                             }
                             for e in events
                         ]
@@ -240,6 +243,7 @@ class ExecuteToolUseCase:
                         description=arguments.get("description", ""),
                         location=arguments.get("location", ""),
                         is_all_day=bool(arguments.get("is_all_day", False)),
+                        repeat=calendar_arguments.repeat(arguments.get("repeat")),
                     )
                     return ToolExecutionResult(
                         tool_name=tool_name,
@@ -277,6 +281,9 @@ class ExecuteToolUseCase:
                         description=arguments.get("description"),
                         location=arguments.get("location"),
                         is_all_day=arguments.get("is_all_day"),
+                        repeat=calendar_arguments.repeat(arguments.get("repeat")),
+                        occurrence_start=calendar_arguments.moment(arguments.get("occurrence_start"), "occurrence_start"),
+                        scope=calendar_arguments.scope(arguments.get("scope")),
                     )
                     return ToolExecutionResult(
                         tool_name=tool_name,
@@ -292,7 +299,12 @@ class ExecuteToolUseCase:
                             success=False,
                             error="'event_id' is required to delete a calendar event.",
                         )
-                    deleted = await self.delete_calendar_event_uc.execute(user_id=user_id, event_id=event_id)
+                    deleted = await self.delete_calendar_event_uc.execute(
+                        user_id=user_id,
+                        event_id=event_id,
+                        occurrence_start=calendar_arguments.moment(arguments.get("occurrence_start"), "occurrence_start"),
+                        scope=calendar_arguments.scope(arguments.get("scope")),
+                    )
                     return ToolExecutionResult(
                         tool_name=tool_name,
                         success=True,
@@ -342,6 +354,8 @@ class ExecuteToolUseCase:
             else:
                 raise ToolNotFoundException(f"Unknown tool '{tool_name}'.")
 
+        except CalendarArgumentError as e:
+            return ToolExecutionResult(tool_name=tool_name, success=False, error=str(e))
         except DomainException as e:
             return ToolExecutionResult(
                 tool_name=tool_name,
@@ -355,3 +369,13 @@ class ExecuteToolUseCase:
                 success=False,
                 error=str(e),
             )
+
+
+def _series_fields(event) -> Dict[str, Any]:
+    """What calendar_read says about a date of a repeating event, for the model to name it back by."""
+    if event.occurrence_start is None:
+        return {}
+    fields: Dict[str, Any] = {"occurrence_start": event.occurrence_start.isoformat()}
+    if event.repeat is not None:
+        fields["repeat"] = event.repeat.to_dict()
+    return fields

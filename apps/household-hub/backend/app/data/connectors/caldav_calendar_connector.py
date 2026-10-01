@@ -1,12 +1,13 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 import caldav
 from caldav.lib.error import AuthorizationError
 from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
-from app.domain.entities.calendar_event import CalendarEvent
+from app.data.connectors import ical_series
+from app.domain.entities.calendar_event import THIS_AND_FOLLOWING, CalendarEvent, Repeat
 from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
@@ -23,6 +24,49 @@ def _replace(component, name: str, value) -> None:
     """
     component.pop(name, None)
     component.add(name, value)
+
+
+def _save(event, cal_obj: ICalendar) -> None:
+    raw_ical = cal_obj.to_ical()
+    event.data = raw_ical.decode("utf-8") if isinstance(raw_ical, (bytes, bytearray)) else str(raw_ical)
+    event.save()
+
+
+def _bump(component) -> None:
+    """Marks [component] as changed, so other calendar apps pick the new version up."""
+    _replace(component, "sequence", int(component.get("sequence", 0)) + 1)
+    _replace(component, "dtstamp", datetime.now(timezone.utc))
+
+
+def _change(component, title, start_time, end_time, description, location) -> None:
+    """
+    Applies a change to one VEVENT of a series. Times keep the form the event has: a whole day stays
+    a date, and an event in a zone stays in it.
+    """
+    if title is not None:
+        _replace(component, "summary", title)
+    if description is not None:
+        _replace(component, "description", description)
+    if location is not None:
+        _replace(component, "location", location)
+    if start_time is not None or end_time is not None:
+        current = component.get("dtstart").dt
+        length = ical_series.duration(component)
+        start = ical_series.like(start_time, current) if start_time is not None else current
+        end = ical_series.like(end_time, current) if end_time is not None else start + length
+        _replace(component, "dtstart", start)
+        component.pop("duration", None)
+        _replace(component, "dtend", end)
+    _bump(component)
+
+
+def _required_occurrence(occurrence_start: Optional[datetime], event_id: str) -> datetime:
+    if occurrence_start is None:
+        raise CalendarIntegrationException(
+            f"Event '{event_id}' repeats. Say which of its dates you mean with occurrence_start, as "
+            "calendar_read gave it, and with scope whether it is for that date only or it and the ones after."
+        )
+    return occurrence_start
 
 
 class CalDavCalendarConnector(ICalendarConnector):
@@ -89,6 +133,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
             raw_events = target_cal.date_search(start=start_time, end=end_time, expand=True)
+            rules = self._sync_series_rules(target_cal, start_time, end_time)
 
             events: List[CalendarEvent] = []
             for item in raw_events[:limit]:
@@ -107,6 +152,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                         evt_end = dtend.dt if dtend else evt_start
 
                         is_all_day = not isinstance(evt_start, datetime)
+                        repeat = rules.get(uid)
+                        of_series = repeat is not None or "recurrence-id" in component
 
                         # Normalize to datetime with timezone
                         if not isinstance(evt_start, datetime):
@@ -129,6 +176,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                                 location=location,
                                 is_all_day=is_all_day,
                                 calendar_name=target_cal.name or credential.calendar_name,
+                                repeat=repeat,
+                                occurrence_start=ical_series.occurrence_of(component) if of_series else None,
                             )
                         )
                 except Exception:
@@ -142,6 +191,27 @@ class CalDavCalendarConnector(ICalendarConnector):
             _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to fetch CalDAV events: {str(e)}")
 
+    def _sync_series_rules(self, target_cal, start_time: datetime, end_time: datetime) -> Dict[str, Repeat]:
+        """
+        How each repeating event in the window repeats, by UID. An expanded search hands back each
+        date without its rule, so the series themselves are asked for once more, unexpanded. Without
+        them the dates still read, just without saying how they repeat.
+        """
+        try:
+            series = target_cal.date_search(start=start_time, end=end_time, expand=False)
+        except Exception:
+            return {}
+        rules: Dict[str, Repeat] = {}
+        for item in series:
+            try:
+                main = ical_series.master(ICalendar.from_ical(item.data))
+                repeat = ical_series.repeat_of(main) if main is not None else None
+                if repeat is not None:
+                    rules[str(main.get("uid"))] = repeat
+            except Exception:
+                continue
+        return rules
+
     def _sync_create_event(
         self,
         credential: CalendarCredential,
@@ -152,6 +222,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         description: str,
         location: str,
         is_all_day: bool,
+        repeat: Optional[Repeat] = None,
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
@@ -171,6 +242,8 @@ class CalDavCalendarConnector(ICalendarConnector):
             if location:
                 event.add("location", location)
             event.add("dtstamp", datetime.now(timezone.utc))
+            if repeat is not None:
+                ical_series.set_repeat(event, repeat)
 
             cal.add_component(event)
             target_cal.add_event(cal.to_ical())
@@ -184,6 +257,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                 location=location,
                 is_all_day=is_all_day,
                 calendar_name=target_cal.name or credential.calendar_name,
+                repeat=repeat,
             )
         except Exception as e:
             _raise_if_refused(e, credential)
@@ -200,6 +274,9 @@ class CalDavCalendarConnector(ICalendarConnector):
         description: Optional[str] = None,
         location: Optional[str] = None,
         is_all_day: Optional[bool] = None,
+        repeat: Optional[Repeat] = None,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
@@ -214,6 +291,12 @@ class CalDavCalendarConnector(ICalendarConnector):
                 raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar.")
 
             cal_obj = ICalendar.from_ical(event.data)
+            if ical_series.repeats(cal_obj):
+                return self._sync_update_series(
+                    target_cal, credential, event, cal_obj, event_id, occurrence_start, scope,
+                    title, start_time, end_time, description, location, repeat,
+                )
+
             updated_title = title
             updated_desc = description
             updated_loc = location
@@ -269,9 +352,10 @@ class CalDavCalendarConnector(ICalendarConnector):
                 _replace(component, "sequence", seq + 1)
                 _replace(component, "dtstamp", datetime.now(timezone.utc))
 
-            raw_ical = cal_obj.to_ical()
-            event.data = raw_ical.decode("utf-8") if isinstance(raw_ical, (bytes, bytearray)) else str(raw_ical)
-            event.save()
+            if repeat is not None:
+                ical_series.set_repeat(ical_series.master(cal_obj), repeat)
+
+            _save(event, cal_obj)
 
             return CalendarEvent(
                 id=event_id,
@@ -282,6 +366,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                 location=updated_loc or "",
                 is_all_day=bool(updated_is_all_day),
                 calendar_name=target_cal.name or credential.calendar_name,
+                repeat=repeat,
             )
         except Exception as e:
             if isinstance(e, CalendarIntegrationException):
@@ -289,18 +374,88 @@ class CalDavCalendarConnector(ICalendarConnector):
             _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to update CalDAV event '{event_id}': {str(e)}")
 
+    def _sync_update_series(
+        self,
+        target_cal,
+        credential: CalendarCredential,
+        event,
+        cal_obj: ICalendar,
+        event_id: str,
+        occurrence_start: Optional[datetime],
+        scope: Optional[str],
+        title: Optional[str],
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
+        description: Optional[str],
+        location: Optional[str],
+        repeat: Optional[Repeat],
+    ) -> CalendarEvent:
+        """
+        Changes one date of a repeating event, or that date and every later one. Changing the whole
+        series from its first date is the "following" case at that date. A later date splits the
+        series: the old one ends the day before, a new one carries on changed.
+        """
+        occurrence = _required_occurrence(occurrence_start, event_id)
+        main = ical_series.master(cal_obj)
+        rest = None
+        if scope != THIS_AND_FOLLOWING:
+            changed = ical_series.override(cal_obj, occurrence)
+        elif ical_series.is_first(cal_obj, occurrence):
+            changed = main
+        else:
+            rest = ical_series.following(cal_obj, occurrence)
+            ical_series.end_before(cal_obj, occurrence)
+            changed = ical_series.master(rest)
+        _change(changed, title, start_time, end_time, description, location)
+        if repeat is not None and scope == THIS_AND_FOLLOWING:
+            ical_series.set_repeat(changed, repeat)
+
+        _save(event, cal_obj)
+        if rest is not None:
+            target_cal.add_event(rest.to_ical())
+
+        start = ical_series.as_moment(changed.get("dtstart").dt)
+        return CalendarEvent(
+            id=str(changed.get("uid")),
+            title=str(changed.get("summary", "")),
+            start_time=start,
+            end_time=start + ical_series.duration(changed),
+            description=str(changed.get("description", "")),
+            location=str(changed.get("location", "")),
+            is_all_day=not isinstance(changed.get("dtstart").dt, datetime),
+            calendar_name=target_cal.name or credential.calendar_name,
+            repeat=ical_series.repeat_of(changed) if scope == THIS_AND_FOLLOWING else None,
+            occurrence_start=occurrence,
+        )
+
     def _sync_delete_event(
         self,
         credential: CalendarCredential,
         secret: str,
         event_id: str,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> bool:
         client = self._sync_get_client(credential, secret)
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
             event = target_cal.event_by_uid(event_id)
-            event.delete()
+            cal_obj = ICalendar.from_ical(event.data)
+            if not ical_series.repeats(cal_obj):
+                event.delete()
+                return True
+
+            occurrence = _required_occurrence(occurrence_start, event_id)
+            if scope != THIS_AND_FOLLOWING:
+                ical_series.skip(cal_obj, occurrence)
+            elif not ical_series.end_before(cal_obj, occurrence):
+                event.delete()
+                return True
+            _bump(ical_series.master(cal_obj))
+            _save(event, cal_obj)
             return True
+        except CalendarIntegrationException:
+            raise
         except Exception as e:
             _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to delete CalDAV event '{event_id}': {str(e)}")
@@ -349,6 +504,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         location: str = "",
         is_all_day: bool = False,
         timeout: float = 10.0,
+        repeat: Optional[Repeat] = None,
     ) -> CalendarEvent:
         try:
             return await asyncio.wait_for(
@@ -362,6 +518,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                     description,
                     location,
                     is_all_day,
+                    repeat,
                 ),
                 timeout=timeout,
             )
@@ -380,6 +537,9 @@ class CalDavCalendarConnector(ICalendarConnector):
         location: Optional[str] = None,
         is_all_day: Optional[bool] = None,
         timeout: float = 10.0,
+        repeat: Optional[Repeat] = None,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> CalendarEvent:
         try:
             return await asyncio.wait_for(
@@ -394,6 +554,9 @@ class CalDavCalendarConnector(ICalendarConnector):
                     description,
                     location,
                     is_all_day,
+                    repeat,
+                    occurrence_start,
+                    scope,
                 ),
                 timeout=timeout,
             )
@@ -406,6 +569,8 @@ class CalDavCalendarConnector(ICalendarConnector):
         secret: str,
         event_id: str,
         timeout: float = 10.0,
+        occurrence_start: Optional[datetime] = None,
+        scope: Optional[str] = None,
     ) -> bool:
         try:
             return await asyncio.wait_for(
@@ -414,6 +579,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                     credential,
                     secret,
                     event_id,
+                    occurrence_start,
+                    scope,
                 ),
                 timeout=timeout,
             )

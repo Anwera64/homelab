@@ -636,18 +636,22 @@ class ChatSessionViewModel(
      * Approve, with the card's "from now on" box ticked: the write is made automatic first, so the
      * hub already knows when the turn carries on, and any more of the same in this answer run
      * without a card. If the setting can't be saved, this card is still approved; the next one asks.
+     * [edited] is what the member changed on the card, sent as [decide] sends it.
      */
-    fun approveAutomatically(toolCallId: String) {
+    fun approveAutomatically(
+        toolCallId: String,
+        edited: ProposalDetails? = null,
+    ) {
         val card = _uiState.value.pendingProposals.firstOrNull { it.toolCallId == toolCallId } ?: return
         val action = card.action
         if (action == null || alwaysAsks(action)) {
-            decide(toolCallId, approved = true)
+            decide(toolCallId, approved = true, edited = edited)
             return
         }
         viewModelScope.launch {
             val saved = runCatchingSafe { setToolApprovalUseCase(card.tool, action, automatic = true) }.isSuccess
             if (saved) _uiState.update { it.copy(madeAutomatic = AutomaticWrite(card.tool, action)) }
-            decide(toolCallId, approved = true)
+            decide(toolCallId, approved = true, edited = edited)
         }
     }
 
