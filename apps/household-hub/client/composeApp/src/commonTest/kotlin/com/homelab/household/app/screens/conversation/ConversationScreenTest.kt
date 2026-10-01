@@ -33,6 +33,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import com.homelab.household.app.components.NOT_SENT_GLYPH_TAG
+import com.homelab.household.app.components.PICKER_CONFIRM_TAG
+import com.homelab.household.app.components.PICKER_DISMISS_TAG
 import com.homelab.household.app.components.RETRY_GLYPH_TAG
 import com.homelab.household.app.components.SENT_GLYPH_TAG
 import com.homelab.household.app.components.THINKING_DOTS_TAG
@@ -71,7 +73,8 @@ import com.homelab.household.app.resources.tool_card_approve_with_changes
 import com.homelab.household.app.resources.tool_card_cancel
 import com.homelab.household.app.resources.tool_card_decline
 import com.homelab.household.app.resources.tool_card_edit
-import com.homelab.household.app.resources.tool_card_field_day_invalid
+import com.homelab.household.app.resources.tool_card_field_day
+import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
@@ -931,17 +934,26 @@ class ConversationScreenTest {
 
     // ---- edit before approving (slice 4, PR 4) -------------------------------
 
-    /** Canvas: ToolEdit. The changed time is marked, and it is what reaches the hub. */
+    private fun editing(decided: MutableList<Triple<String, Boolean, ProposalDetails?>>): @Composable () -> Unit =
+        conversation(
+            stateNamed("Auto-approving an add"),
+            onDecide = { id, ok, edit -> decided += Triple(id, ok, edit) },
+        )
+
+    private fun sent(start: EventMoment) =
+        listOf(
+            Triple<String, Boolean, ProposalDetails?>(
+                "c-1",
+                true,
+                ProposalDetails.CalendarEvent(title = null, start = start, end = null, allDay = false),
+            ),
+        )
+
+    /** Canvas: ToolEdit. The title is typed; the day and the time are picked, never typed. */
     @Test
-    fun `GIVEN an add waiting on the member WHEN its time is edited THEN it is marked and Approve with changes sends it`() =
+    fun `GIVEN an add waiting on the member WHEN Edit is tapped THEN the title is a field and the day and time open pickers`() =
         runComposeUiTest {
-            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
-            setContent(
-                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
-                    decided +=
-                        Triple(id, ok, edit)
-                }),
-            )
+            setContent(editing(mutableListOf()))
 
             val decline = onNodeWithText(getString(Res.string.tool_card_decline)).getUnclippedBoundsInRoot()
             val edit = onNodeWithText(getString(Res.string.tool_card_edit)).getUnclippedBoundsInRoot()
@@ -949,44 +961,86 @@ class ConversationScreenTest {
             assertTrue(decline.right <= edit.left && edit.right <= approve.left, "Decline, Edit, then Approve")
 
             onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+
             onNode(hasSetTextAction() and hasText("Dinner together")).assertIsDisplayed()
-            onNode(hasSetTextAction() and hasText("Sat 3 Oct")).assertIsDisplayed()
-            onNode(hasSetTextAction() and hasText("20:00")).performTextReplacement("20:30")
-
-            val time = getString(Res.string.tool_card_field_time)
-            onNodeWithText(getString(Res.string.field_changed, time)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
-
-            val later = EventMoment(2026, 10, 3, hour = 20, minute = 30)
-            assertEquals(
-                listOf(
-                    Triple<String, Boolean, ProposalDetails?>(
-                        "c-1",
-                        true,
-                        ProposalDetails.CalendarEvent(title = null, start = later, end = null, allDay = false),
-                    ),
-                ),
-                decided,
-            )
+            onNode(hasSetTextAction() and hasText("Sat 3 Oct")).assertDoesNotExist()
+            onNode(hasSetTextAction() and hasText("20:00")).assertDoesNotExist()
+            onNodeWithTag(DAY_FIELD_TAG).assertTextContains("Sat 3 Oct").performClick()
+            onNodeWithTag(PICKER_CONFIRM_TAG).assertIsDisplayed()
+            onNodeWithTag(PICKER_DISMISS_TAG).performClick()
+            onNodeWithTag(TIME_FIELD_TAG).assertTextContains("20:00").performClick()
+            onNodeWithTag(PICKER_CONFIRM_TAG).assertIsDisplayed()
         }
 
     @Test
-    fun `GIVEN a card being edited WHEN a day can't be read THEN Approve says why and sends nothing`() =
+    fun `GIVEN a card being edited WHEN a time is picked THEN it is marked and Approve with changes sends it`() =
         runComposeUiTest {
             val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
-            setContent(
-                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
-                    decided +=
-                        Triple(id, ok, edit)
-                }),
-            )
-
+            setContent(editing(decided))
             onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
-            onNode(hasSetTextAction() and hasText("Sat 3 Oct")).performTextReplacement("someday")
-            onNodeWithText(getString(Res.string.tool_card_field_day_invalid)).assertDoesNotExist()
+
+            onNodeWithTag(TIME_FIELD_TAG).performClick()
+            onNodeWithContentDescription("21 hours").performClick()
+            // A tap on the dial moves on to minutes by itself; a test's click doesn't, so it asks.
+            onNode(hasContentDescription("Select minutes", substring = true)).performClick()
+            onNodeWithContentDescription("30 minutes").performClick()
+            onNodeWithTag(PICKER_CONFIRM_TAG).performClick()
+
+            onNodeWithTag(TIME_FIELD_TAG).assertTextContains("21:30")
+            onNodeWithText(
+                getString(Res.string.field_changed, getString(Res.string.tool_card_field_time)),
+            ).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+            assertEquals(sent(EventMoment(2026, 10, 3, hour = 21, minute = 30)), decided)
+        }
+
+    @Test
+    fun `GIVEN a card being edited WHEN a day is picked THEN it is marked and Approve with changes sends it`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(editing(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+
+            onNodeWithTag(DAY_FIELD_TAG).performClick()
+            // The picker words its days in the machine's locale: "Sunday, 4 October 2026" or "Sunday, October 4, 2026".
+            val fourth = hasText("4 October 2026", substring = true) or hasText("October 4, 2026", substring = true)
+            onNode(hasText("Sunday", substring = true) and fourth).performClick()
+            onNodeWithTag(PICKER_CONFIRM_TAG).performClick()
+
+            onNodeWithTag(DAY_FIELD_TAG).assertTextContains("Sun 4 Oct")
+            onNodeWithText(
+                getString(Res.string.field_changed, getString(Res.string.tool_card_field_day)),
+            ).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+            assertEquals(sent(EventMoment(2026, 10, 4, hour = 20, minute = 0)), decided)
+        }
+
+    @Test
+    fun `GIVEN a picker open WHEN it is dismissed THEN the field stays as proposed`() =
+        runComposeUiTest {
+            setContent(editing(mutableListOf()))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+
+            onNodeWithTag(TIME_FIELD_TAG).performClick()
+            onNodeWithContentDescription("21 hours").performClick()
+            onNodeWithTag(PICKER_DISMISS_TAG).performClick()
+
+            onNodeWithTag(TIME_FIELD_TAG).assertTextContains("20:00")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).assertDoesNotExist()
+        }
+
+    @Test
+    fun `GIVEN a card being edited WHEN the title is emptied THEN Approve says why and sends nothing`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(editing(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+
+            onNode(hasSetTextAction() and hasText("Dinner together")).performTextReplacement("")
+            onNodeWithText(getString(Res.string.tool_card_field_empty)).assertDoesNotExist()
             onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
 
-            onNodeWithText(getString(Res.string.tool_card_field_day_invalid)).assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_field_empty)).assertIsDisplayed()
             assertEquals(emptyList(), decided)
         }
 
@@ -994,17 +1048,13 @@ class ConversationScreenTest {
     fun `GIVEN a card being edited WHEN Cancel is tapped THEN the edits go and plain Approve sends no edit`() =
         runComposeUiTest {
             val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
-            setContent(
-                conversation(stateNamed("Auto-approving an add"), onDecide = { id, ok, edit ->
-                    decided +=
-                        Triple(id, ok, edit)
-                }),
-            )
+            setContent(editing(decided))
 
             onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
-            onNode(hasSetTextAction() and hasText("20:00")).performTextReplacement("21:00")
+            onNode(hasSetTextAction() and hasText("Dinner together")).performTextReplacement("Dinner out")
             onNodeWithText(getString(Res.string.tool_card_cancel)).performClick()
 
+            onNodeWithText("Dinner together").assertIsDisplayed()
             onNodeWithText("Sat 3 Oct, 20:00").assertIsDisplayed()
             onNodeWithText(getString(Res.string.tool_card_approve)).performClick()
 

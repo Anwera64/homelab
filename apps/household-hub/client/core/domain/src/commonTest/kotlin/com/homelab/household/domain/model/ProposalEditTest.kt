@@ -2,13 +2,11 @@ package com.homelab.household.domain.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
- * Editing a card before approving (canvas: ToolEdit): which details open as fields, what the member
- * may type into them, and the edited details that reach the hub when only some of them changed.
+ * Editing a card before approving (canvas: ToolEdit): which details open as fields, what they start
+ * as, and the edited details that reach the hub when only some of them changed.
  */
 class ProposalEditTest {
     private fun card(
@@ -36,6 +34,7 @@ class ProposalEditTest {
                 end = EventMoment(2026, 9, 13, hour = 22, minute = 0, offset = "+02:00"),
             ),
         )
+    private val asProposed = proposedValues(dinner)
 
     @Test
     fun `GIVEN an event with a time WHEN edited THEN its title day and time open as fields`() {
@@ -63,38 +62,26 @@ class ProposalEditTest {
     }
 
     @Test
-    fun `GIVEN a day as the card writes it or as people type it WHEN read THEN it is that day and month`() {
-        assertEquals(CardDay(13, 9), parseDay("Sat 13 Sep"))
-        assertEquals(CardDay(13, 9), parseDay("13 september"))
-        assertEquals(CardDay(3, 10), parseDay("Oct 3"))
-        assertEquals(CardDay(3, 10), parseDay("3/10"))
-        assertEquals(CardDay(3, 10), parseDay("2026-10-03"))
-        assertNull(parseDay("Saturday"))
-        assertNull(parseDay("31 Sep"))
-        assertNull(parseDay("13 Smarch"))
+    fun `GIVEN a proposal WHEN its fields open THEN they start as what was proposed`() {
+        assertEquals(
+            EditValues(title = "Dinner together", words = "", day = EventDate(2026, 9, 13), time = TimeOfDay(20, 0)),
+            asProposed,
+        )
+        assertEquals(EditValues(title = "Groceries", words = "Milk", day = null, time = null), proposedValues(note()))
     }
 
     @Test
-    fun `GIVEN a time as people type it WHEN read THEN it is hours and minutes`() {
-        assertEquals(TimeOfDay(20, 30), parseTime("20:30"))
-        assertEquals(TimeOfDay(8, 30), parseTime("8.30"))
-        assertEquals(TimeOfDay(20, 0), parseTime("20"))
-        assertEquals(TimeOfDay(7, 5), parseTime("0705"))
-        assertNull(parseTime("25:00"))
-        assertNull(parseTime("20:61"))
-        assertNull(parseTime("soon"))
-    }
-
-    @Test
-    fun `GIVEN a proposal WHEN its fields open THEN the time reads as hours and minutes and the words as given`() {
-        assertEquals("20:00", proposedText(dinner, EditField.Time))
-        assertEquals("Dinner together", proposedText(dinner, EditField.What))
-        assertEquals("Milk", proposedText(note(), EditField.Words))
+    fun `GIVEN dates across leap years and year ends WHEN counted in days and back THEN they are the same date`() {
+        assertEquals(0L, EventDate(1970, 1, 1).toEpochDay())
+        assertEquals(20_727L, EventDate(2026, 10, 1).toEpochDay())
+        listOf(EventDate(2024, 2, 29), EventDate(2026, 12, 31), EventDate(2027, 1, 1), EventDate(2000, 3, 1)).forEach {
+            assertEquals(it, EventDate.fromEpochDay(it.toEpochDay()))
+        }
     }
 
     @Test
     fun `GIVEN only the time changed WHEN approved THEN the start moves and the end keeps the length and zone`() {
-        val edit = editProposal(dinner, mapOf(EditField.Time to "20:30"))
+        val edit = editProposal(dinner, asProposed.copy(time = TimeOfDay(20, 30)))
 
         assertEquals(
             event(
@@ -104,6 +91,7 @@ class ProposalEditTest {
             ),
             edit.edited,
         )
+        assertEquals(setOf(EditField.Time), edit.changed)
         assertEquals(emptySet(), edit.invalid)
     }
 
@@ -118,7 +106,7 @@ class ProposalEditTest {
                 ),
             )
 
-        val edit = editProposal(party, mapOf(EditField.Day to "30 Sep"))
+        val edit = editProposal(party, proposedValues(party).copy(day = EventDate(2026, 9, 30)))
 
         assertEquals(
             event(
@@ -131,10 +119,10 @@ class ProposalEditTest {
     }
 
     @Test
-    fun `GIVEN a day in early January for a December event WHEN approved THEN it is the next year`() {
+    fun `GIVEN a day in the next year WHEN approved THEN the start is in that year`() {
         val nye = card(event(start = EventMoment(2026, 12, 31, hour = 20, minute = 0), title = "Party"))
 
-        val edit = editProposal(nye, mapOf(EditField.Day to "2 Jan"))
+        val edit = editProposal(nye, proposedValues(nye).copy(day = EventDate(2027, 1, 2)))
 
         assertEquals(
             EventMoment(2027, 1, 2, hour = 20, minute = 0),
@@ -146,46 +134,35 @@ class ProposalEditTest {
     fun `GIVEN an all-day event moved WHEN approved THEN it stays a whole day`() {
         val trip = card(event(start = EventMoment(2026, 10, 3), allDay = true, title = "Trip"))
 
-        val edit = editProposal(trip, mapOf(EditField.Day to "Sun 4 Oct"))
+        val edit = editProposal(trip, proposedValues(trip).copy(day = EventDate(2026, 10, 4)))
 
         assertEquals(event(title = null, start = EventMoment(2026, 10, 4), allDay = true), edit.edited)
     }
 
     @Test
     fun `GIVEN nothing changed WHEN approved THEN there is no edit`() {
-        val edit =
-            editProposal(
-                dinner,
-                mapOf(EditField.What to " Dinner together ", EditField.Day to "Sun 13 Sep", EditField.Time to "20:00"),
-            )
+        val edit = editProposal(dinner, asProposed.copy(title = " Dinner together "))
 
         assertNull(edit.edited)
+        assertEquals(emptySet(), edit.changed)
         assertEquals(emptySet(), edit.invalid)
     }
 
     @Test
     fun `GIVEN a title and words changed on a note WHEN approved THEN both are sent as typed`() {
-        val edit = editProposal(note(), mapOf(EditField.What to "Shopping", EditField.Words to "Milk\nEggs"))
+        val edit = editProposal(note(), proposedValues(note()).copy(title = "Shopping", words = "Milk\nEggs"))
 
         assertEquals(ProposalDetails.Note("Shopping", "Milk\nEggs"), edit.edited)
+        assertEquals(setOf(EditField.What, EditField.Words), edit.changed)
     }
 
     @Test
-    fun `GIVEN a field left empty or a day or time that can't be read WHEN approved THEN it is marked and there is no edit`() {
-        val edit =
-            editProposal(dinner, mapOf(EditField.What to " ", EditField.Day to "someday", EditField.Time to "late"))
+    fun `GIVEN a title left empty WHEN approved THEN it is marked and there is no edit`() {
+        val edit = editProposal(dinner, asProposed.copy(title = " ", time = TimeOfDay(21, 0)))
 
-        assertEquals(setOf(EditField.What, EditField.Day, EditField.Time), edit.invalid)
+        assertEquals(setOf(EditField.What), edit.invalid)
+        assertEquals(setOf(EditField.What, EditField.Time), edit.changed)
         assertNull(edit.edited)
-    }
-
-    @Test
-    fun `GIVEN a field WHEN typed back to what was proposed THEN it no longer reads as changed`() {
-        assertFalse(isChanged(dinner, EditField.Time, "20:00"))
-        assertFalse(isChanged(dinner, EditField.Day, "13 Sep"))
-        assertFalse(isChanged(dinner, EditField.What, "Dinner together "))
-        assertTrue(isChanged(dinner, EditField.Time, "20:30"))
-        assertTrue(isChanged(dinner, EditField.Day, "14 Sep"))
     }
 
     @Test

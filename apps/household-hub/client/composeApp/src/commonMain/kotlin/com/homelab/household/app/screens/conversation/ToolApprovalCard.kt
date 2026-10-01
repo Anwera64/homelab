@@ -18,7 +18,10 @@ import com.homelab.household.app.components.ActionCard
 import com.homelab.household.app.components.CardButtonRow
 import com.homelab.household.app.components.DestructiveButton
 import com.homelab.household.app.components.HearthCheckboxRow
+import com.homelab.household.app.components.HearthDatePickerDialog
+import com.homelab.household.app.components.HearthPickerField
 import com.homelab.household.app.components.HearthTextField
+import com.homelab.household.app.components.HearthTimePickerDialog
 import com.homelab.household.app.components.PrimaryButton
 import com.homelab.household.app.components.SecondaryButton
 import com.homelab.household.app.components.ToolRecordLine
@@ -40,11 +43,9 @@ import com.homelab.household.app.resources.tool_card_day_wed
 import com.homelab.household.app.resources.tool_card_decline
 import com.homelab.household.app.resources.tool_card_edit
 import com.homelab.household.app.resources.tool_card_field_day
-import com.homelab.household.app.resources.tool_card_field_day_invalid
 import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_note
 import com.homelab.household.app.resources.tool_card_field_time
-import com.homelab.household.app.resources.tool_card_field_time_invalid
 import com.homelab.household.app.resources.tool_card_field_title
 import com.homelab.household.app.resources.tool_card_field_what
 import com.homelab.household.app.resources.tool_card_keep
@@ -68,12 +69,15 @@ import com.homelab.household.app.resources.tool_card_when_all_day
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.EditField
+import com.homelab.household.domain.model.EditValues
+import com.homelab.household.domain.model.EventDate
+import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
+import com.homelab.household.domain.model.TimeOfDay
 import com.homelab.household.domain.model.editProposal
 import com.homelab.household.domain.model.editableFields
-import com.homelab.household.domain.model.isChanged
-import com.homelab.household.domain.model.proposedText
+import com.homelab.household.domain.model.proposedValues
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -90,7 +94,7 @@ import org.jetbrains.compose.resources.stringResource
  * An add or a change also offers Edit between them (canvas: ToolEdit): the details open as fields
  * in place, each one changed is marked, and Approve becomes "Approve with changes", which hands
  * [onDecide] only the details that changed. Cancel puts the proposal back as it was. The edit rules
- * are the domain's ([editProposal]); the card only words days and draws the fields.
+ * are the domain's ([editProposal]); the card only words days and draws the fields and pickers.
  *
  * Once answered while the step's other cards still wait, it shrinks to its record line, so what is
  * left to answer stands out; when the last one is answered the turn carries on and the hub turns
@@ -154,7 +158,6 @@ private fun PendingCard(
             EditingCard(
                 card = card,
                 fields = fields,
-                proposedDay = details.whenAt?.let { dayText(it) }.orEmpty(),
                 onCancel = { editing = false },
                 onApprove = { edited -> onDecide(card.toolCallId, true, edited) },
             )
@@ -253,69 +256,118 @@ private fun CardTitle(
 }
 
 /**
- * The card's details as fields (canvas: ToolEdit), Day and Time side by side. What is typed survives
- * a rotation. A field says what's wrong with it once Approve was tapped, not while it is being typed.
+ * The card's details as fields (canvas: ToolEdit), Day and Time side by side. The title and a note's
+ * words are typed; the day and the time are picked from Material's date picker and clock, so they
+ * can't be written wrong. What is entered survives a rotation. A typed field says what's wrong with
+ * it once Approve was tapped, not while it is being typed.
  */
 @Composable
 private fun EditingCard(
     card: AnswerPart.Proposal,
     fields: List<EditField>,
-    proposedDay: String,
     onCancel: () -> Unit,
     onApprove: (edited: ProposalDetails?) -> Unit,
 ) {
-    // Keyed by field name, so the map can be saved.
-    var texts by rememberSaveable(card.toolCallId) { mutableStateOf(mapOf<String, String>()) }
+    val proposed = remember(card) { proposedValues(card) }
+    // Each null until the member changes it; primitives, so they can be saved.
+    var title by rememberSaveable(card.toolCallId) { mutableStateOf<String?>(null) }
+    var words by rememberSaveable(card.toolCallId) { mutableStateOf<String?>(null) }
+    var epochDay by rememberSaveable(card.toolCallId) { mutableStateOf<Long?>(null) }
+    var minuteOfDay by rememberSaveable(card.toolCallId) { mutableStateOf<Int?>(null) }
     var tried by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
-    val typed =
-        fields.associateWith { field ->
-            texts[field.name] ?: if (field == EditField.Day) proposedDay else proposedText(card, field)
-        }
-    val edit = editProposal(card, typed)
+    var picking by rememberSaveable(card.toolCallId) { mutableStateOf<EditField?>(null) }
+    val values =
+        EditValues(
+            title = title ?: proposed.title,
+            words = words ?: proposed.words,
+            day = epochDay?.let(EventDate::fromEpochDay) ?: proposed.day,
+            time = minuteOfDay?.let { TimeOfDay(it / MINUTES_PER_HOUR, it % MINUTES_PER_HOUR) } ?: proposed.time,
+        )
+    val edit = editProposal(card, values)
     val invalid = if (tried) edit.invalid else emptySet()
 
-    @Composable
-    fun Field(
-        field: EditField,
-        modifier: Modifier = Modifier,
-    ) {
-        val text = typed.getValue(field)
-        HearthTextField(
-            value = text,
-            onValueChange = { texts = texts + (field.name to it) },
-            label = stringResource(fieldLabel(card, field)),
-            modifier = modifier,
-            error = if (field in invalid) stringResource(fieldProblem(field)) else null,
-            singleLine = field != EditField.Words,
-            minLines = if (field == EditField.Words) WORDS_LINES else 1,
-            textStyle = HearthTheme.typography.body,
-            changed = isChanged(card, field, text),
-        )
-    }
-
     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
-        fields.filter { it != EditField.Day && it != EditField.Time }.forEach { Field(it) }
-        val day = EditField.Day in fields
-        val time = EditField.Time in fields
-        if (day || time) {
+        if (EditField.What in fields) {
+            HearthTextField(
+                value = values.title,
+                onValueChange = { title = it },
+                label = stringResource(fieldLabel(card, EditField.What)),
+                error = if (EditField.What in invalid) stringResource(Res.string.tool_card_field_empty) else null,
+                textStyle = HearthTheme.typography.body,
+                changed = EditField.What in edit.changed,
+            )
+        }
+        if (EditField.Words in fields) {
+            HearthTextField(
+                value = values.words,
+                onValueChange = { words = it },
+                label = stringResource(fieldLabel(card, EditField.Words)),
+                error = if (EditField.Words in invalid) stringResource(Res.string.tool_card_field_empty) else null,
+                singleLine = false,
+                minLines = WORDS_LINES,
+                textStyle = HearthTheme.typography.body,
+                changed = EditField.Words in edit.changed,
+            )
+        }
+        val day = values.day.takeIf { EditField.Day in fields }
+        val time = values.time.takeIf { EditField.Time in fields }
+        if (day != null || time != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                if (day) Field(EditField.Day, Modifier.weight(1f))
-                if (time) Field(EditField.Time, Modifier.weight(1f))
+                if (day != null) {
+                    HearthPickerField(
+                        value = dayText(day),
+                        label = stringResource(Res.string.tool_card_field_day),
+                        onClick = { picking = EditField.Day },
+                        tag = DAY_FIELD_TAG,
+                        modifier = Modifier.weight(1f),
+                        changed = EditField.Day in edit.changed,
+                    )
+                }
+                if (time != null) {
+                    HearthPickerField(
+                        value = "${time.hour.pad()}:${time.minute.pad()}",
+                        label = stringResource(Res.string.tool_card_field_time),
+                        onClick = { picking = EditField.Time },
+                        tag = TIME_FIELD_TAG,
+                        modifier = Modifier.weight(1f),
+                        changed = EditField.Time in edit.changed,
+                    )
+                }
             }
         }
+    }
+    val day = values.day
+    val time = values.time
+    if (picking == EditField.Day && day != null) {
+        HearthDatePickerDialog(
+            initialEpochDay = day.toEpochDay(),
+            onPick = {
+                epochDay = it
+                picking = null
+            },
+            onDismiss = { picking = null },
+        )
+    }
+    if (picking == EditField.Time && time != null) {
+        HearthTimePickerDialog(
+            initialHour = time.hour,
+            initialMinute = time.minute,
+            onPick = { hour, minute ->
+                minuteOfDay = hour * MINUTES_PER_HOUR + minute
+                picking = null
+            },
+            onDismiss = { picking = null },
+        )
     }
     CardButtonRow {
         SecondaryButton(
             text = stringResource(Res.string.tool_card_cancel),
-            onClick = {
-                texts = emptyMap()
-                tried = false
-                onCancel()
-            },
+            // The entered values are this composable's, so leaving the edit view forgets them.
+            onClick = onCancel,
             // Hugging its word, so "Approve with changes" keeps to one line beside it.
             compact = true,
         )
-        val anyChanged = typed.any { (field, text) -> isChanged(card, field, text) }
+        val anyChanged = edit.changed.isNotEmpty()
         val approve = if (anyChanged) Res.string.tool_card_approve_with_changes else Res.string.tool_card_approve
         PrimaryButton(
             text = stringResource(approve),
@@ -353,22 +405,17 @@ private fun fieldLabel(
         }
     }
 
-private fun fieldProblem(field: EditField): StringResource =
-    when (field) {
-        EditField.What, EditField.Words -> Res.string.tool_card_field_empty
-        EditField.Day -> Res.string.tool_card_field_day_invalid
-        EditField.Time -> Res.string.tool_card_field_time_invalid
-    }
-
-/** "Sat 3 Oct": the day as the card writes it, which is also how the Day field starts. */
+/** "Sat 3 Oct": the day as the card writes it, which is also what the Day field shows. */
 @Composable
-private fun dayText(moment: CardWhen): String =
+private fun dayText(date: EventDate): String =
     stringResource(
         Res.string.tool_card_day,
-        stringResource(WEEKDAYS[moment.weekday]),
-        moment.day,
-        stringResource(MONTHS[moment.month - 1]),
+        stringResource(WEEKDAYS[EventMoment(date.year, date.month, date.day).weekday]),
+        date.day,
+        stringResource(MONTHS[date.month - 1]),
     )
+
+private fun Int.pad() = toString().padStart(2, '0')
 
 @Composable
 private fun whenText(moment: CardWhen): String {
@@ -409,3 +456,7 @@ private const val SEPARATOR = " · "
 
 /** How tall a note's words start, so a few lines of it show without scrolling. */
 private const val WORDS_LINES = 3
+private const val MINUTES_PER_HOUR = 60
+
+const val DAY_FIELD_TAG = "approval_card_day"
+const val TIME_FIELD_TAG = "approval_card_time"
