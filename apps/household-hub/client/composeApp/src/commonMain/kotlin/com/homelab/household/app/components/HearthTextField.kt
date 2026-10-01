@@ -23,12 +23,19 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
+import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.field_changed
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Labelled field whose error sits directly under it, with a red edge on the field.
  * It is stateless and never touches [value]: nothing typed is ever cleared (design notes §2).
+ *
+ * A [changed] field holds something other than what it was offered with, as on an approval card
+ * being edited (canvas: ToolEdit): its label says so in green and its edge turns green. An error
+ * still wins over it.
  */
 @Composable
 fun HearthTextField(
@@ -46,6 +53,7 @@ fun HearthTextField(
     textStyle: TextStyle? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    changed: Boolean = false,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -55,7 +63,11 @@ fun HearthTextField(
         // A search bar has no label: the placeholder and the magnifier already say what it is,
         // and a heading above it would be a second voice saying the same thing.
         if (label != null) {
-            Text(label, style = type.labelStrong, color = colors.textMuted)
+            Text(
+                text = if (changed) stringResource(Res.string.field_changed, label) else label,
+                style = type.labelStrong,
+                color = if (changed && error == null) colors.primary else colors.textMuted,
+            )
         }
 
         BasicTextField(
@@ -81,8 +93,18 @@ fun HearthTextField(
                             .heightIn(min = HearthTheme.size.touchTarget)
                             .background(colors.surface, HearthShapes.item)
                             .border(
-                                width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
-                                color = if (error != null) colors.error else colors.outline,
+                                width =
+                                    when {
+                                        error != null -> HearthTheme.size.emphasis
+                                        changed -> HearthTheme.size.changed
+                                        else -> HearthTheme.size.hairline
+                                    },
+                                color =
+                                    when {
+                                        error != null -> colors.error
+                                        changed -> colors.primary
+                                        else -> colors.outline
+                                    },
                                 shape = HearthShapes.item,
                             ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     contentAlignment = Alignment.CenterStart,

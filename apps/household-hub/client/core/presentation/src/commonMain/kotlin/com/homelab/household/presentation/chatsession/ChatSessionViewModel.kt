@@ -15,6 +15,7 @@ import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolSummary
 import com.homelab.household.domain.model.alwaysAsks
+import com.homelab.household.domain.model.withEdit
 import com.homelab.household.domain.usecase.CreateSessionUseCase
 import com.homelab.household.domain.usecase.DecideToolProposalUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
@@ -606,7 +607,13 @@ class ChatSessionViewModel(
         val decided = if (approved) ProposalStatus.Approved else ProposalStatus.Declined
         val parts =
             paused.parts.map { part ->
-                if (part is AnswerPart.Proposal && part.toolCallId == toolCallId) part.copy(status = decided) else part
+                if (part is AnswerPart.Proposal && part.toolCallId == toolCallId) {
+                    // Approved with changes: the card shows what the member changed it to.
+                    val details = if (approved && edited != null) part.details.withEdit(edited) else part.details
+                    part.copy(status = decided, details = details)
+                } else {
+                    part
+                }
             }
         _uiState.update {
             it.startingTurn().copy(

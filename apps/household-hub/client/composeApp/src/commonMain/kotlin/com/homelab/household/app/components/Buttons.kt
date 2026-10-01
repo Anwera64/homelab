@@ -77,10 +77,17 @@ private val buttonMinHeight: Dp
     @ReadOnlyComposable
     get() = HearthTheme.size.control
 
-private val buttonPadding: PaddingValues
-    @Composable
-    @ReadOnlyComposable
-    get() = PaddingValues(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.lg)
+/**
+ * A [compact] button gives less room to its sides: three sharing a card's width (Decline, Edit,
+ * Approve) only keep their words on one line that way.
+ */
+@Composable
+@ReadOnlyComposable
+private fun buttonPadding(compact: Boolean): PaddingValues =
+    PaddingValues(
+        horizontal = if (compact) HearthTheme.spacing.md else HearthTheme.spacing.xxl,
+        vertical = HearthTheme.spacing.lg,
+    )
 
 /**
  * [lifted] is off for a button inside a card: the card already lifts it, and a shadow on a shadow
@@ -95,6 +102,7 @@ fun PrimaryButton(
     busy: Boolean = false,
     busyDescription: String? = null,
     lifted: Boolean = true,
+    compact: Boolean = false,
 ) {
     val colors = HearthTheme.colors
     WithBusyBar(modifier = modifier, busy = busy, busyBar = BusyBar.filled(colors)) {
@@ -115,7 +123,7 @@ fun PrimaryButton(
                     containerColor = colors.primary,
                     contentColor = colors.onPrimary,
                 ),
-            contentPadding = buttonPadding,
+            contentPadding = buttonPadding(compact),
         ) {
             ButtonContent(text, icon)
         }
@@ -130,6 +138,7 @@ fun SecondaryButton(
     icon: HearthIcon? = null,
     busy: Boolean = false,
     busyDescription: String? = null,
+    compact: Boolean = false,
 ) {
     val colors = HearthTheme.colors
     OutlinedActionButton(
@@ -141,6 +150,7 @@ fun SecondaryButton(
         borderColor = colors.outline,
         contentColor = colors.textMuted,
         busyBar = BusyBar.outlined(colors),
+        compact = compact,
         modifier = modifier,
     )
 }
@@ -180,6 +190,7 @@ private fun OutlinedActionButton(
     contentColor: Color,
     busyBar: BusyBar,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     WithBusyBar(modifier = modifier, busy = busy, busyBar = busyBar) {
         OutlinedButton(
@@ -191,7 +202,7 @@ private fun OutlinedActionButton(
             shape = HearthShapes.button,
             border = BorderStroke(HearthTheme.size.hairline, borderColor),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-            contentPadding = buttonPadding,
+            contentPadding = buttonPadding(compact),
         ) {
             ButtonContent(text, icon)
         }
