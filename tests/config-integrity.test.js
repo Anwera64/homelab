@@ -108,6 +108,22 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
+  await t.test('The Cleanuparr card shows what it did to the queue, read keyless from its stats API', () => {
+    const card = servicesYamlContent.match(/- Cleanuparr:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(card, 'services.yaml must list Cleanuparr');
+    // Homepage has no native cleanuparr widget, so the card maps /api/v2/stats itself.
+    assert.match(card[1], /type:\s*customapi/);
+    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.20:11011\/api\/v2\/stats\s*$/m);
+    const mappings = {
+      'strikes.total': 'Strikes', 'removals.total': 'Removed', 'cleaned.total': 'Cleaned', 'searches.grabbed': 'Grabbed',
+    };
+    for (const [field, label] of Object.entries(mappings)) {
+      assert.match(card[1], new RegExp(`-\\s*field:\\s*${field.replace('.', '\\.')}\\s*\\r?\\n\\s*label:\\s*${label}\\s*$`, 'm'), `${field} must show as ${label}`);
+    }
+    // Cleanuparr asks for no key on the LAN, so the Pi .env stays untouched.
+    assert.doesNotMatch(card[1], /HOMEPAGE_VAR_/, 'the Cleanuparr widget needs no API key');
+  });
+
   await t.test('Homepage moved to the Pi: the desktop runs none', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*homepage:\s*$/m, 'no homepage service on the desktop');
     assert.doesNotMatch(dockerComposeContent, /HOMEPAGE_VAR_/, 'HOMEPAGE_VAR_* now live in hosts/pi');
