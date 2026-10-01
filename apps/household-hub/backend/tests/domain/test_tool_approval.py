@@ -18,6 +18,7 @@ from app.domain.entities.user import User
 from app.domain.exceptions import EntityNotFoundException, InvalidOperationException
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.tool_approval import (
+    MEMBER_EDITED,
     PAUSED_TURN,
     DropPendingProposalsUseCase,
     is_awaiting_approval,
@@ -277,6 +278,42 @@ async def test_GIVEN_changed_details_WHEN_approved_THEN_the_write_runs_with_them
     await _decide(use_case, "c1", approved=True, modified_arguments={"start_time": "2026-10-03T21:00:00"})
 
     assert tool_executor.executed_calls[0]["args"] == {**DINNER.arguments, "start_time": "2026-10-03T21:00:00"}
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_changed_details_WHEN_approved_THEN_the_model_is_told_what_the_member_changed():
+    use_case, _, llm_client, _ = _setup(
+        [[LLMResponseChunk(tool_calls=[DINNER])], [LLMResponseChunk(delta_content="Done.")]]
+    )
+    await _ask(use_case)
+
+    # The phone sends back details it did not change too; only the start really differs.
+    await _decide(
+        use_case, "c1", approved=True, modified_arguments={"start_time": "2026-10-03T21:00:00", "action": "create"}
+    )
+
+    resumed = llm_client.stream_calls[1]["messages"]
+    # The call the model reads is the call that ran.
+    assert resumed[-2].tool_calls[0].arguments == {**DINNER.arguments, "start_time": "2026-10-03T21:00:00"}
+    told = json.loads(resumed[-1].content)
+    assert told["result"] == "ok"
+    assert told["member_edited"] == {"changed": {"start_time": "2026-10-03T21:00:00"}, "note": MEMBER_EDITED}
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_two_writes_WHEN_the_first_is_approved_with_changes_THEN_the_model_is_told_after_the_last_decision():
+    use_case, _, llm_client, _ = _setup(
+        [[LLMResponseChunk(tool_calls=[DINNER, FLOWERS])], [LLMResponseChunk(delta_content="Both added.")]]
+    )
+    await _ask(use_case)
+
+    await _decide(use_case, "c1", approved=True, modified_arguments={"title": "Dinner at Nonna's"})
+    await _decide(use_case, "c2", approved=True)
+
+    resumed = llm_client.stream_calls[1]["messages"]
+    results = {m.tool_call_id: json.loads(m.content) for m in resumed if m.role == "tool"}
+    assert results["c1"]["member_edited"]["changed"] == {"title": "Dinner at Nonna's"}
+    assert results["c2"] == {"result": "ok"}
 
 
 @pytest.mark.asyncio
