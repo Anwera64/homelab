@@ -196,7 +196,7 @@ private fun PendingCard(
                 card = card,
                 fields = fields,
                 onCancel = { editing = false },
-                onApprove = { edited -> onDecide(card.toolCallId, true, edited) },
+                onApprove = { edited -> onDecide(card.toolCallId, true, decidedEdit(card, edited, scope)) },
             )
         } else {
             // Under the title's words rather than its icon, as the canvas lines them up.
@@ -223,7 +223,7 @@ private fun PendingCard(
                     Text(text = stringResource(note), style = HearthTheme.typography.caption, color = colors.textMuted)
                 }
             }
-            val edited = scopeEdit(card, scope)
+            val edited = decidedEdit(card, edit = null, chosen = scope)
             val automaticAsk = label.automaticAsk
             if (automaticAsk != null && ask == CardAsk.Approve) {
                 HearthCheckboxRow(

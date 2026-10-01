@@ -1150,4 +1150,46 @@ class ConversationScreenTest {
 
             onNodeWithText(getString(Res.string.tool_card_edit)).assertDoesNotExist()
         }
+
+    /** Canvas: RepeatChange with Edit. The which-dates pick and the edits go together. */
+    @Test
+    fun `GIVEN this and following picked on one date of a series WHEN it is edited and approved THEN both the edit and the pick are sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            val sent = decided.single() as ProposalDetails.CalendarEvent
+            assertEquals("Swim", sent.title)
+            assertEquals(EventScope.ThisAndFollowing, sent.scope)
+        }
+
+    @Test
+    fun `GIVEN one date of a series WHEN only its title is edited THEN it stays a change to that one date`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(
+                conversation(stateNamed("Changing one date of a series"), onDecide = { _, _, edited ->
+                    decided +=
+                        edited
+                }),
+            )
+
+            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+
+            val sent = decided.single() as ProposalDetails.CalendarEvent
+            assertEquals("Swim", sent.title)
+            assertEquals(EventScope.OnlyThis, sent.scope)
+        }
 }

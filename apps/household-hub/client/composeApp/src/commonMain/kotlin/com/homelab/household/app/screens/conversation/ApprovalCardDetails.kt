@@ -73,15 +73,18 @@ fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
     }
 
 /**
- * What the card sends as edited when the member answers with [chosen] dates: the write's details
- * with that pick, or null when it is what the agent proposed, so an unchanged card sends nothing.
+ * What the card sends as edited: the member's [edit] from the Edit view, if any, with the [chosen]
+ * dates of a repeating event folded in. Null when neither differs from what the agent proposed, so an
+ * unchanged card sends nothing.
  */
-fun scopeEdit(
+fun decidedEdit(
     card: AnswerPart.Proposal,
+    edit: ProposalDetails?,
     chosen: EventScope?,
 ): ProposalDetails? {
-    val details = card.details as? ProposalDetails.CalendarEvent ?: return null
-    return if (chosen == null || chosen == details.scope) null else details.copy(scope = chosen)
+    val details = card.details as? ProposalDetails.CalendarEvent ?: return edit
+    if (edit is ProposalDetails.CalendarEvent) return if (chosen == null) edit else edit.copy(scope = chosen)
+    return if (chosen == null || chosen == details.scope) edit else details.copy(scope = chosen)
 }
 
 /** A moment as the card says it; a whole day, or any moment of an all-day event, has no time. */
