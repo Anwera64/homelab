@@ -45,21 +45,26 @@ from app.domain.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-# How much of a failed call's arguments the log keeps: enough to see what was asked, not a whole note.
+# How much of a call's arguments the log keeps: enough to see what was asked, not a whole note.
 LOGGED_ARGUMENTS = 500
 
 
-def _log_failed(tc: LLMToolCall, result: ToolExecutionResult, is_turn_secret: bool) -> None:
+def _log_call(tc: LLMToolCall, result: ToolExecutionResult, is_turn_secret: bool) -> None:
     """
-    Says in the hub's log why a tool step failed. The phone is only shown that it did, so without
-    this a failure can't be read back afterwards. A secret turn leaves out what was asked: its
-    content must not outlive it in a log.
+    Says in the hub's log what a tool was asked, and why it failed if it did. The phone is only shown
+    that a step ran, so without this neither a failure nor a step that did the wrong thing can be
+    read back afterwards. What the tool gave back is not logged: a calendar read is the member's
+    week. A secret turn leaves out what was asked too: its content must not outlive it in a log.
     """
-    reason = getattr(result, "reason", None)
+    name = " ".join(tc.name.split())[:60]
     asked = "left out (secret turn)" if is_turn_secret else json.dumps(tc.arguments, default=str)[:LOGGED_ARGUMENTS]
+    if result.success:
+        logger.info("Tool %s ok | arguments: %s", name, asked)
+        return
+    reason = getattr(result, "reason", None)
     logger.warning(
         "Tool %s failed: %s | reason: %s | arguments: %s",
-        " ".join(tc.name.split())[:60],
+        name,
         result.error,
         getattr(reason, "value", reason) or "none",
         asked,
@@ -672,8 +677,7 @@ class ProcessChatTurnUseCase:
                 success=False,
                 error=f"There is no tool '{shown}'. Your tools are: {names}.",
             )
-        if not result.success:
-            _log_failed(tc, result, is_turn_secret)
+        _log_call(tc, result, is_turn_secret)
         return result
 
     @staticmethod

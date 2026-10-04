@@ -1,4 +1,4 @@
-"""A tool step that fails says why in the hub's log, so a failure can be read back afterwards."""
+"""Every tool step says in the hub's log what it was asked, and why it failed if it did, so it can be read back afterwards."""
 
 import logging
 from unittest.mock import MagicMock
@@ -99,11 +99,36 @@ async def test_GIVEN_a_tool_the_agent_does_not_have_WHEN_it_is_called_THEN_that_
     assert "There is no tool 'calendar_write'" in caplog.records[0].getMessage()
 
 
+DONE = ToolExecutionResult(tool_name="calendar_write", success=True, data={"action": "deleted"})
+
+
 @pytest.mark.asyncio
-async def test_GIVEN_a_tool_step_succeeds_WHEN_it_runs_THEN_nothing_is_logged(caplog):
-    done = ToolExecutionResult(tool_name="calendar_write", success=True, data={"action": "deleted"})
+async def test_GIVEN_a_tool_step_succeeds_WHEN_it_runs_THEN_the_log_says_which_tool_and_what_it_was_asked(caplog):
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        await _run(_Executor(DONE))
 
-    with caplog.at_level(logging.WARNING, logger=LOGGER):
-        await _run(_Executor(done))
+    (record,) = caplog.records
+    assert record.levelno == logging.INFO
+    assert "calendar_write ok" in record.getMessage()
+    assert "2026-10-12T08:00:00+02:00" in record.getMessage() and "gym-1" in record.getMessage()
+    assert "deleted" not in record.getMessage(), "what a tool gave back is not logged, only what it was asked"
 
-    assert caplog.records == []
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_secret_turn_WHEN_a_tool_step_succeeds_THEN_the_log_leaves_out_what_it_was_asked(caplog):
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        await _run(_Executor(DONE), secret=True)
+
+    (line,) = [record.getMessage() for record in caplog.records]
+    assert "calendar_write ok" in line
+    assert "gym-1" not in line and "2026-10-12" not in line
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_long_arguments_WHEN_a_tool_step_succeeds_THEN_the_log_keeps_only_their_start(caplog):
+    note = LLMToolCall(id="call-2", name="document_writer", arguments={"title": "Diary", "content": "x" * 5000})
+
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        await _run(_Executor(DONE), call=note)
+
+    assert len(caplog.records[0].getMessage()) < 1000
