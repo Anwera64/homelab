@@ -29,8 +29,10 @@ import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.deviceTimeZoneId
 import com.homelab.household.data.network.installBearerAuth
+import com.homelab.household.data.network.logFailedRequests
 import com.homelab.household.data.network.sendDeviceTimeZone
 import com.homelab.household.data.network.signOutOnUnauthorized
+import com.homelab.household.data.network.telemetryHttpClient
 import com.homelab.household.data.repository.AgentRepositoryImpl
 import com.homelab.household.data.repository.AuthRepositoryImpl
 import com.homelab.household.data.repository.CalendarRepositoryImpl
@@ -41,6 +43,10 @@ import com.homelab.household.data.repository.ServerStatusRepositoryImpl
 import com.homelab.household.data.repository.SessionRepositoryImpl
 import com.homelab.household.data.repository.SpaceRepositoryImpl
 import com.homelab.household.data.repository.ToolApprovalRepositoryImpl
+import com.homelab.household.data.telemetry.Telemetry
+import com.homelab.household.data.telemetry.TelemetryConfig
+import com.homelab.household.data.telemetry.createTelemetryLogWriter
+import com.homelab.household.data.telemetry.telemetryHeaders
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.CalendarRepository
@@ -57,11 +63,18 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
+import io.opentelemetry.kotlin.ExperimentalApi
+import io.opentelemetry.kotlin.logging.export.batchLogRecordProcessor
+import io.opentelemetry.kotlin.logging.export.otlpHttpLogRecordExporter
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
 const val DEFAULT_BASE_URL = BuildConfig.BASE_URL
 
+/** Where the app's logs go, from `telemetry.baseUrl`; empty turns telemetry off. */
+const val DEFAULT_TELEMETRY_URL = BuildConfig.TELEMETRY_URL
+
+@OptIn(ExperimentalApi::class)
 val dataModule =
     module {
         single {
@@ -91,9 +104,29 @@ val dataModule =
                 }
                 installBearerAuth(storage)
                 sendDeviceTimeZone(::deviceTimeZoneId)
+                logFailedRequests()
                 val events: AuthEventsLocalDataSource = get()
                 signOutOnUnauthorized(storage) { events.raiseSignedOut() }
             }
+        }
+
+        // The app's logs on their way off the phone. Posted through a client of their own built
+        // from the same engine — never the HttpClient above, which signs the member out on a 401,
+        // and a 401 is what the log endpoint answers to an expired token. With no endpoint
+        // configured nothing in the lambda runs: no SDK, no client, no writer.
+        single {
+            val config: TelemetryConfig = get()
+            val storage: StoredSessionLocalDataSource = get()
+            Telemetry(
+                createTelemetryLogWriter(config) {
+                    batchLogRecordProcessor(
+                        otlpHttpLogRecordExporter {
+                            endpoint = config.endpoint
+                            httpClient = telemetryHttpClient(get<HttpClientEngine>()) { telemetryHeaders(storage) }
+                        },
+                    )
+                },
+            )
         }
         single { AuthEventsLocalDataSource() }
         single { SessionCacheLocalDataSource() }

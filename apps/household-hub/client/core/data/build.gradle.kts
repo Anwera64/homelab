@@ -14,8 +14,15 @@ val generateBuildConfig =
                 ?: throw GradleException(
                     "hub.baseUrl is not set; add it to gradle.properties or pass -Phub.baseUrl=...",
                 )
+        val telemetryUrl =
+            providers.gradleProperty("telemetry.baseUrl").orNull
+                ?: throw GradleException(
+                    "telemetry.baseUrl is not set; add it to gradle.properties or pass -Ptelemetry.baseUrl=... " +
+                        "(an empty value turns telemetry off)",
+                )
         val outputDir = layout.buildDirectory.dir("generated/source/buildConfig/commonMain/kotlin")
         inputs.property("baseUrl", baseUrl)
+        inputs.property("telemetryUrl", telemetryUrl)
         outputs.dir(outputDir)
         doLast {
             val file = outputDir.get().file("com/homelab/household/data/BuildConfig.kt").asFile
@@ -26,6 +33,7 @@ val generateBuildConfig =
 
                 object BuildConfig {
                     const val BASE_URL: String = "$baseUrl"
+                    const val TELEMETRY_URL: String = "$telemetryUrl"
                 }
                 """.trimIndent(),
             )
@@ -72,6 +80,12 @@ kotlin {
                 implementation(libs.kermit)
                 implementation(libs.ktor.client.auth)
                 implementation(libs.koin.core)
+                // Logs only, over OTLP/HTTP. The exporter posts through a client of its own, which
+                // is what ktor-client-encoding is for: the SDK gzips what it sends.
+                implementation(libs.opentelemetry.kotlin.core)
+                implementation(libs.opentelemetry.kotlin.implementation)
+                implementation(libs.opentelemetry.kotlin.exporters.otlp)
+                implementation(libs.ktor.client.encoding)
             }
         }
         commonTest.dependencies {

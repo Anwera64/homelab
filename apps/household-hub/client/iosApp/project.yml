@@ -18,9 +18,12 @@ options:
   # RecommendedDeploymentTarget 15.0 and SwiftConcurrencyMinimumDeploymentTarget 15.0 (below that,
   # Swift Concurrency has to be back-deployed into the app). The SDK still accepts 12.0, and
   # neither Compose Multiplatform 1.12 nor Kotlin/Native asks for more than that, so nothing here
-  # forces a higher number — 15.0 is the toolchain's own recommendation, taken as-is.
+  # forces a higher number — 15.0 is the toolchain's own recommendation.
+  #
+  # It is 16.0 all the same, because of one dependency: the OpenTelemetry Kotlin SDK the app sends
+  # its logs with (io.opentelemetry.kotlin 0.8.0, used by :core:data) requires iOS 16.0.
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
 
 settings:
   base:
