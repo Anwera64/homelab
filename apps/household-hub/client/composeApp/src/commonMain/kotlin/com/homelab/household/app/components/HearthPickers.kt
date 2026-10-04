@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.field_changed
 import com.homelab.household.app.resources.field_picker_cancel
 import com.homelab.household.app.resources.field_picker_ok
 import com.homelab.household.app.resources.field_picker_time_title
@@ -51,11 +50,7 @@ fun HearthPickerField(
     val type = HearthTheme.typography
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-        Text(
-            text = if (changed) stringResource(Res.string.field_changed, label) else label,
-            style = type.labelStrong,
-            color = if (changed) colors.primary else colors.textMuted,
-        )
+        HearthFieldLabel(label = label, changed = changed)
         Box(
             modifier =
                 Modifier

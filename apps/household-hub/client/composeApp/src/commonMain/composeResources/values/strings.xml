@@ -594,6 +594,43 @@
     <string name="tool_card_field_repeat">Repeat</string>
     <string name="tool_card_field_ends">Ends</string>
     <string name="tool_card_field_empty">This can’t be empty</string>
+    <!-- The Repeat and Ends fields in a card's Edit view (canvas: RepeatEdit, RepeatEndsPicker, RepeatEndsAfter). -->
+    <string name="tool_card_repeat_none">None</string>
+    <string name="tool_card_repeat_daily">Daily</string>
+    <string name="tool_card_repeat_weekly">Weekly</string>
+    <string name="tool_card_repeat_monthly">Monthly</string>
+    <string name="tool_card_field_days">On these days</string>
+    <string name="tool_card_chip_mon">M</string>
+    <string name="tool_card_chip_tue">T</string>
+    <string name="tool_card_chip_wed">W</string>
+    <string name="tool_card_chip_thu">T</string>
+    <string name="tool_card_chip_fri">F</string>
+    <string name="tool_card_chip_sat">S</string>
+    <string name="tool_card_chip_sun">S</string>
+    <string name="tool_card_weekday_mon">Monday</string>
+    <string name="tool_card_weekday_tue">Tuesday</string>
+    <string name="tool_card_weekday_wed">Wednesday</string>
+    <string name="tool_card_weekday_thu">Thursday</string>
+    <string name="tool_card_weekday_fri">Friday</string>
+    <string name="tool_card_weekday_sat">Saturday</string>
+    <string name="tool_card_weekday_sun">Sunday</string>
+    <string name="tool_card_ends_never">Never</string>
+    <string name="tool_card_ends_on_date">On a date</string>
+    <string name="tool_card_ends_after">After</string>
+    <string name="tool_card_field_last_date">Last date</string>
+    <string name="tool_card_times_fewer">One fewer</string>
+    <string name="tool_card_times_more">One more</string>
+    <plurals name="tool_card_times">
+        <item quantity="one">%1$d time</item>
+        <item quantity="other">%1$d times</item>
+    </plurals>
+    <plurals name="tool_card_repeat_sessions">
+        <item quantity="one">%1$d session, the last on %2$s.</item>
+        <item quantity="other">%1$d sessions, the last on %2$s.</item>
+    </plurals>
+    <string name="tool_card_repeat_last">The last one lands on %1$s.</string>
+    <string name="tool_card_repeat_no_days">Pick at least one day</string>
+    <string name="tool_card_ends_before_start">The last date can’t be before the first</string>
     <string name="field_picker_ok">OK</string>
     <string name="field_picker_cancel">Cancel</string>
     <string name="field_picker_time_title">Pick a time</string>

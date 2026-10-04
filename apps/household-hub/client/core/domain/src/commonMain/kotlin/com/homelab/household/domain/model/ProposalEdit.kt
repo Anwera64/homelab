@@ -69,9 +69,16 @@ data class EditValues(
         return copy(repeat = every, weekdays = days)
     }
 
-    /** Ends set to [kind]; After with no count yet starts at [DEFAULT_TIMES], as the canvas shows it. */
+    /**
+     * Ends set to [kind]. After with no count yet starts at [DEFAULT_TIMES], as the canvas shows it,
+     * and On a date with no last date yet starts on the first date, for the member to move on.
+     */
     fun pickEnds(kind: RepeatEnd): EditValues =
-        copy(ends = kind, times = if (kind == RepeatEnd.After) times ?: DEFAULT_TIMES else times)
+        copy(
+            ends = kind,
+            times = if (kind == RepeatEnd.After) times ?: DEFAULT_TIMES else times,
+            lastDate = if (kind == RepeatEnd.OnDate) lastDate ?: day else lastDate,
+        )
 
     companion object {
         const val DEFAULT_TIMES = 10

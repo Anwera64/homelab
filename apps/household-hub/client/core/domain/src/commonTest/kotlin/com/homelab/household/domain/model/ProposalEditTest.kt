@@ -381,6 +381,14 @@ class ProposalEditTest {
     }
 
     @Test
+    fun `GIVEN On a date picked with no last date yet WHEN picked THEN it starts on the first date`() {
+        val start = asProposed.day
+        assertEquals(RepeatEnd.OnDate to start, asProposed.pickEnds(RepeatEnd.OnDate).let { it.ends to it.lastDate })
+        val later = EventDate(2026, 12, 24)
+        assertEquals(later, asProposed.copy(lastDate = later).pickEnds(RepeatEnd.OnDate).lastDate)
+    }
+
+    @Test
     fun `GIVEN Tue and Thu from 29 Sep WHEN it ends on 24 Dec or after ten times THEN the caption counts 26 or lands on 29 Oct`() {
         val asIs = proposedValues(gym(ToolAction.Create))
 

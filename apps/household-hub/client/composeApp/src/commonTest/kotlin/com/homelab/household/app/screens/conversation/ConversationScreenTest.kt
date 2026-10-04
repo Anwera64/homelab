@@ -28,6 +28,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -76,16 +77,27 @@ import com.homelab.household.app.resources.tool_card_approve_with_changes
 import com.homelab.household.app.resources.tool_card_cancel
 import com.homelab.household.app.resources.tool_card_decline
 import com.homelab.household.app.resources.tool_card_edit
+import com.homelab.household.app.resources.tool_card_ends_after
+import com.homelab.household.app.resources.tool_card_ends_never
+import com.homelab.household.app.resources.tool_card_ends_on_date
 import com.homelab.household.app.resources.tool_card_field_day
 import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
 import com.homelab.household.app.resources.tool_card_remove
+import com.homelab.household.app.resources.tool_card_repeat_daily
+import com.homelab.household.app.resources.tool_card_repeat_last
+import com.homelab.household.app.resources.tool_card_repeat_no_days
+import com.homelab.household.app.resources.tool_card_repeat_none
+import com.homelab.household.app.resources.tool_card_repeat_sessions
+import com.homelab.household.app.resources.tool_card_repeat_weekly
 import com.homelab.household.app.resources.tool_card_scope_following
 import com.homelab.household.app.resources.tool_card_scope_following_remove_note
 import com.homelab.household.app.resources.tool_card_scope_this
 import com.homelab.household.app.resources.tool_card_scope_this_remove_note
+import com.homelab.household.app.resources.tool_card_times
+import com.homelab.household.app.resources.tool_card_times_more
 import com.homelab.household.app.resources.tool_fix_ask_again
 import com.homelab.household.app.resources.tool_fix_calendar_fixed_title
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
@@ -95,8 +107,11 @@ import com.homelab.household.app.resources.tool_fix_reconnect_calendar
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.RepeatChange
+import com.homelab.household.domain.model.RepeatEvery
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
@@ -1163,10 +1178,10 @@ class ConversationScreenTest {
                 }),
             )
 
-            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
-            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performScrollTo().performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
             onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
-            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
 
             val sent = decided.single() as ProposalDetails.CalendarEvent
             assertEquals("Swim", sent.title)
@@ -1184,9 +1199,9 @@ class ConversationScreenTest {
                 }),
             )
 
-            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
             onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
-            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
 
             val sent = decided.single() as ProposalDetails.CalendarEvent
             assertEquals("Swim", sent.title)
@@ -1204,14 +1219,129 @@ class ConversationScreenTest {
                 }),
             )
 
-            onNodeWithText(getString(Res.string.tool_card_scope_following)).performClick()
-            onNodeWithText(getString(Res.string.tool_card_edit)).performClick()
-            onNodeWithText(getString(Res.string.tool_card_scope_following)).assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performScrollTo().performClick()
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performScrollTo().assertIsSelected()
 
-            onNodeWithText(getString(Res.string.tool_card_scope_this)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_scope_this)).performScrollTo().performClick()
             onNode(hasSetTextAction() and hasText("Gym")).performTextReplacement("Swim")
-            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performClick()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
 
             assertEquals(EventScope.OnlyThis, (decided.single() as ProposalDetails.CalendarEvent).scope)
+        }
+
+    // ---- Repeat and Ends in the Edit view (slice 4) ---------------------------
+
+    private fun repeating(decided: MutableList<ProposalDetails?>): @Composable () -> Unit =
+        conversation(stateNamed("Approving a repeating event"), onDecide = { _, _, edited -> decided += edited })
+
+    private fun repeatSent(decided: List<ProposalDetails?>): RepeatChange? =
+        (decided.single() as ProposalDetails.CalendarEvent).repeatChange
+
+    /** Canvas: RepeatEdit and RepeatEndsPicker. The fields start on the rule as proposed, counted out underneath. */
+    @Test
+    fun `GIVEN a repeating event to add WHEN Edit is tapped THEN Repeat and Ends show the rule and the caption counts it`() =
+        runComposeUiTest {
+            setContent(repeating(mutableListOf()))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_repeat_weekly)).performScrollTo().assertIsSelected()
+            onNodeWithContentDescription("Tuesday").assertIsOn()
+            onNodeWithContentDescription("Thursday").assertIsOn()
+            onNodeWithContentDescription("Wednesday").assertIsOff()
+            onNodeWithText(getString(Res.string.tool_card_ends_on_date)).performScrollTo().assertIsSelected()
+            onNodeWithTag(LAST_DATE_FIELD_TAG).assertTextContains("Thu 24 Dec")
+            onNodeWithText(getPluralString(Res.plurals.tool_card_repeat_sessions, 26, 26, "Thu 24 Dec"))
+                .performScrollTo()
+                .assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).assertDoesNotExist()
+        }
+
+    /** Canvas: RepeatEndsAfter. After starts at ten; one more makes eleven, and that is what is sent. */
+    @Test
+    fun `GIVEN a repeating event being edited WHEN Ends is set to After and stepped up THEN the count is sent`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(repeating(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_ends_after)).performScrollTo().performClick()
+            onNodeWithText(getPluralString(Res.plurals.tool_card_times, 10, 10)).performScrollTo().assertIsDisplayed()
+            onNodeWithText(
+                getString(Res.string.tool_card_repeat_last, "Thu 29 Oct"),
+            ).performScrollTo().assertIsDisplayed()
+            onNodeWithContentDescription(getString(Res.string.tool_card_times_more)).performScrollTo().performClick()
+            onNodeWithText(getPluralString(Res.plurals.tool_card_times, 11, 11)).performScrollTo().assertIsDisplayed()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
+
+            val rule = EventRepeat(every = RepeatEvery.Week, weekdays = listOf(1, 3), count = 11)
+            assertEquals(RepeatChange.To(rule), repeatSent(decided))
+        }
+
+    @Test
+    fun `GIVEN a weekly event being edited WHEN a day chip is ticked THEN the days sent include it`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(repeating(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithContentDescription("Wednesday").performScrollTo().performClick()
+            onNodeWithContentDescription("Wednesday").assertIsOn()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
+
+            val rule =
+                EventRepeat(
+                    every = RepeatEvery.Week,
+                    weekdays = listOf(1, 2, 3),
+                    until = EventMoment(2026, 12, 24),
+                )
+            assertEquals(RepeatChange.To(rule), repeatSent(decided))
+        }
+
+    @Test
+    fun `GIVEN a weekly event being edited WHEN every day is unticked THEN Approve says why and sends nothing`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            setContent(repeating(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithContentDescription("Tuesday").performScrollTo().performClick()
+            onNodeWithContentDescription("Thursday").performScrollTo().performClick()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_repeat_no_days)).performScrollTo().assertIsDisplayed()
+            assertEquals(emptyList(), decided)
+        }
+
+    /** A one-off add starts on None; picking Daily makes it repeat, forever until an end is picked. */
+    @Test
+    fun `GIVEN a one-off add being edited WHEN Daily is picked THEN it is sent as repeating every day`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            setContent(editing(decided))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_repeat_none)).performScrollTo().assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_ends_never)).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.tool_card_repeat_daily)).performScrollTo().performClick()
+            onNodeWithText(getString(Res.string.tool_card_ends_never)).performScrollTo().assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_approve_with_changes)).performScrollTo().performClick()
+
+            val sent = decided.single().third as ProposalDetails.CalendarEvent
+            assertEquals(RepeatChange.To(EventRepeat(every = RepeatEvery.Day)), sent.repeatChange)
+        }
+
+    /** One date can't have a rule of its own; switching to this and following opens the fields, with no None. */
+    @Test
+    fun `GIVEN one date of a series being edited WHEN this and following is picked THEN Repeat shows without None`() =
+        runComposeUiTest {
+            setContent(conversation(stateNamed("Changing one date of a series")))
+            onNodeWithText(getString(Res.string.tool_card_edit)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_repeat_weekly)).assertDoesNotExist()
+            onNodeWithText(getString(Res.string.tool_card_scope_following)).performScrollTo().performClick()
+
+            onNodeWithText(getString(Res.string.tool_card_repeat_weekly)).performScrollTo().assertIsSelected()
+            onNodeWithText(getString(Res.string.tool_card_repeat_none)).assertDoesNotExist()
         }
 }

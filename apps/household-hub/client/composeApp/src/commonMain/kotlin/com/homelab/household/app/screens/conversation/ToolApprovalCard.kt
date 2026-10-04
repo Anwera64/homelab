@@ -2,6 +2,7 @@ package com.homelab.household.app.screens.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.homelab.household.app.components.ActionCard
@@ -30,7 +34,9 @@ import com.homelab.household.app.components.CardButtonRow
 import com.homelab.household.app.components.DestructiveButton
 import com.homelab.household.app.components.HearthCheckboxRow
 import com.homelab.household.app.components.HearthDatePickerDialog
+import com.homelab.household.app.components.HearthFieldLabel
 import com.homelab.household.app.components.HearthPickerField
+import com.homelab.household.app.components.HearthSegmented
 import com.homelab.household.app.components.HearthTextField
 import com.homelab.household.app.components.HearthTimePickerDialog
 import com.homelab.household.app.components.PrimaryButton
@@ -43,6 +49,13 @@ import com.homelab.household.app.resources.tool_card_approve
 import com.homelab.household.app.resources.tool_card_approve_with_changes
 import com.homelab.household.app.resources.tool_card_approved
 import com.homelab.household.app.resources.tool_card_cancel
+import com.homelab.household.app.resources.tool_card_chip_fri
+import com.homelab.household.app.resources.tool_card_chip_mon
+import com.homelab.household.app.resources.tool_card_chip_sat
+import com.homelab.household.app.resources.tool_card_chip_sun
+import com.homelab.household.app.resources.tool_card_chip_thu
+import com.homelab.household.app.resources.tool_card_chip_tue
+import com.homelab.household.app.resources.tool_card_chip_wed
 import com.homelab.household.app.resources.tool_card_day
 import com.homelab.household.app.resources.tool_card_day_fri
 import com.homelab.household.app.resources.tool_card_day_mon
@@ -53,9 +66,15 @@ import com.homelab.household.app.resources.tool_card_day_tue
 import com.homelab.household.app.resources.tool_card_day_wed
 import com.homelab.household.app.resources.tool_card_decline
 import com.homelab.household.app.resources.tool_card_edit
+import com.homelab.household.app.resources.tool_card_ends_after
+import com.homelab.household.app.resources.tool_card_ends_before_start
+import com.homelab.household.app.resources.tool_card_ends_never
+import com.homelab.household.app.resources.tool_card_ends_on_date
 import com.homelab.household.app.resources.tool_card_field_day
+import com.homelab.household.app.resources.tool_card_field_days
 import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_ends
+import com.homelab.household.app.resources.tool_card_field_last_date
 import com.homelab.household.app.resources.tool_card_field_note
 import com.homelab.household.app.resources.tool_card_field_repeat
 import com.homelab.household.app.resources.tool_card_field_time
@@ -76,14 +95,21 @@ import com.homelab.household.app.resources.tool_card_month_oct
 import com.homelab.household.app.resources.tool_card_month_sep
 import com.homelab.household.app.resources.tool_card_remove
 import com.homelab.household.app.resources.tool_card_repeat_and
+import com.homelab.household.app.resources.tool_card_repeat_daily
 import com.homelab.household.app.resources.tool_card_repeat_day
 import com.homelab.household.app.resources.tool_card_repeat_days
+import com.homelab.household.app.resources.tool_card_repeat_last
 import com.homelab.household.app.resources.tool_card_repeat_month
+import com.homelab.household.app.resources.tool_card_repeat_monthly
 import com.homelab.household.app.resources.tool_card_repeat_months
+import com.homelab.household.app.resources.tool_card_repeat_no_days
+import com.homelab.household.app.resources.tool_card_repeat_none
+import com.homelab.household.app.resources.tool_card_repeat_sessions
 import com.homelab.household.app.resources.tool_card_repeat_times
 import com.homelab.household.app.resources.tool_card_repeat_until
 import com.homelab.household.app.resources.tool_card_repeat_week
 import com.homelab.household.app.resources.tool_card_repeat_week_on
+import com.homelab.household.app.resources.tool_card_repeat_weekly
 import com.homelab.household.app.resources.tool_card_repeat_weeks
 import com.homelab.household.app.resources.tool_card_repeat_weeks_on
 import com.homelab.household.app.resources.tool_card_repeat_year
@@ -94,7 +120,17 @@ import com.homelab.household.app.resources.tool_card_scope_following
 import com.homelab.household.app.resources.tool_card_scope_following_remove_note
 import com.homelab.household.app.resources.tool_card_scope_this
 import com.homelab.household.app.resources.tool_card_scope_this_remove_note
+import com.homelab.household.app.resources.tool_card_times
+import com.homelab.household.app.resources.tool_card_times_fewer
+import com.homelab.household.app.resources.tool_card_times_more
 import com.homelab.household.app.resources.tool_card_untitled
+import com.homelab.household.app.resources.tool_card_weekday_fri
+import com.homelab.household.app.resources.tool_card_weekday_mon
+import com.homelab.household.app.resources.tool_card_weekday_sat
+import com.homelab.household.app.resources.tool_card_weekday_sun
+import com.homelab.household.app.resources.tool_card_weekday_thu
+import com.homelab.household.app.resources.tool_card_weekday_tue
+import com.homelab.household.app.resources.tool_card_weekday_wed
 import com.homelab.household.app.resources.tool_card_when
 import com.homelab.household.app.resources.tool_card_when_all_day
 import com.homelab.household.app.theme.HearthShapes
@@ -108,12 +144,16 @@ import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
+import com.homelab.household.domain.model.RepeatEnd
 import com.homelab.household.domain.model.RepeatEvery
 import com.homelab.household.domain.model.TimeOfDay
 import com.homelab.household.domain.model.editProposal
 import com.homelab.household.domain.model.editableFields
+import com.homelab.household.domain.model.offersNoRepeat
 import com.homelab.household.domain.model.proposedValues
+import com.homelab.household.domain.model.repeatSummary
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -187,9 +227,10 @@ private fun PendingCard(
     val ask = cardAsk(card.action)
     var automatic by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     val tint = if (ask == CardAsk.Approve) colors.textPrimary else colors.error
-    val fields = remember(card) { editableFields(card) }
     var editing by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     var scope by rememberSaveable(card.toolCallId) { mutableStateOf(details.scope) }
+    // This and following can take a new rule where one date can't, so the pick decides the fields.
+    val fields = remember(card, scope) { editableFields(card, scope) }
     // Shown on the card and in its Edit view alike: the pick is the same either way.
     val whichDates: @Composable () -> Unit = {
         scope?.let { chosen ->
@@ -212,6 +253,7 @@ private fun PendingCard(
             EditingCard(
                 card = card,
                 fields = fields,
+                scope = scope,
                 onCancel = { editing = false },
                 onApprove = { edited -> onDecide(card.toolCallId, true, decidedEdit(card, edited, scope)) },
                 whichDates = whichDates,
@@ -323,6 +365,7 @@ private fun CardTitle(
 private fun EditingCard(
     card: AnswerPart.Proposal,
     fields: List<EditField>,
+    scope: EventScope?,
     onCancel: () -> Unit,
     onApprove: (edited: ProposalDetails?) -> Unit,
     whichDates: @Composable () -> Unit = {},
@@ -335,14 +378,38 @@ private fun EditingCard(
     var minuteOfDay by rememberSaveable(card.toolCallId) { mutableStateOf<Int?>(null) }
     var tried by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     var picking by rememberSaveable(card.toolCallId) { mutableStateOf<EditField?>(null) }
+    // How it repeats: the pick's name, or "" for None; the days as bits, Monday the lowest.
+    var repeatPick by rememberSaveable(card.toolCallId) { mutableStateOf<String?>(null) }
+    var dayBits by rememberSaveable(card.toolCallId) { mutableStateOf<Int?>(null) }
+    var endsPick by rememberSaveable(card.toolCallId) { mutableStateOf<String?>(null) }
+    var lastEpochDay by rememberSaveable(card.toolCallId) { mutableStateOf<Long?>(null) }
+    var times by rememberSaveable(card.toolCallId) { mutableStateOf<Int?>(null) }
     val values =
         EditValues(
             title = title ?: proposed.title,
             words = words ?: proposed.words,
             day = epochDay?.let(EventDate::fromEpochDay) ?: proposed.day,
             time = minuteOfDay?.let { TimeOfDay(it / MINUTES_PER_HOUR, it % MINUTES_PER_HOUR) } ?: proposed.time,
+            repeat =
+                when (val pick = repeatPick) {
+                    null -> proposed.repeat
+                    NO_REPEAT -> null
+                    else -> RepeatEvery.valueOf(pick)
+                },
+            weekdays = dayBits?.let(::daysOf) ?: proposed.weekdays,
+            ends = endsPick?.let(RepeatEnd::valueOf) ?: proposed.ends,
+            lastDate = lastEpochDay?.let(EventDate::fromEpochDay) ?: proposed.lastDate,
+            times = times ?: proposed.times,
         )
-    val edit = editProposal(card, values)
+    // A pick can carry others with it (Weekly ticks the start's day), so every part is kept.
+    val keep: (EditValues) -> Unit = { next ->
+        repeatPick = next.repeat?.name ?: NO_REPEAT
+        dayBits = bitsOf(next.weekdays)
+        endsPick = next.ends.name
+        lastEpochDay = next.lastDate?.toEpochDay()
+        times = next.times
+    }
+    val edit = editProposal(card, values, scope)
     val invalid = if (tried) edit.invalid else emptySet()
 
     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
@@ -395,8 +462,30 @@ private fun EditingCard(
             }
         }
     }
+    whichDates()
+    if (EditField.Repeat in fields) {
+        RepeatFields(
+            values = values,
+            offersNone = offersNoRepeat(card),
+            changed = edit.changed,
+            invalid = invalid,
+            onChange = keep,
+            onPickLastDate = { picking = EditField.Ends },
+        )
+    }
     val day = values.day
     val time = values.time
+    val lastDate = values.lastDate
+    if (picking == EditField.Ends && lastDate != null) {
+        HearthDatePickerDialog(
+            initialEpochDay = lastDate.toEpochDay(),
+            onPick = {
+                lastEpochDay = it
+                picking = null
+            },
+            onDismiss = { picking = null },
+        )
+    }
     if (picking == EditField.Day && day != null) {
         HearthDatePickerDialog(
             initialEpochDay = day.toEpochDay(),
@@ -418,7 +507,6 @@ private fun EditingCard(
             onDismiss = { picking = null },
         )
     }
-    whichDates()
     CardButtonRow {
         SecondaryButton(
             text = stringResource(Res.string.tool_card_cancel),
@@ -441,6 +529,220 @@ private fun EditingCard(
         )
     }
 }
+
+/**
+ * How the event repeats and when that ends (canvas: RepeatEdit, RepeatEndsPicker, RepeatEndsAfter):
+ * Repeat, the days for Weekly, Ends with its last date or count, and a caption counting it out.
+ * [onChange] gets the fields as they are after a pick; the domain's picks fill in what goes with it.
+ */
+@Composable
+private fun RepeatFields(
+    values: EditValues,
+    offersNone: Boolean,
+    changed: Set<EditField>,
+    invalid: Set<EditField>,
+    onChange: (EditValues) -> Unit,
+    onPickLastDate: () -> Unit,
+) {
+    val colors = HearthTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+        val repeatLabel = stringResource(Res.string.tool_card_field_repeat)
+        Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+            HearthFieldLabel(label = repeatLabel, changed = EditField.Repeat in changed)
+            val options =
+                buildList {
+                    if (offersNone) add(null to stringResource(Res.string.tool_card_repeat_none))
+                    add(RepeatEvery.Day to stringResource(Res.string.tool_card_repeat_daily))
+                    add(RepeatEvery.Week to stringResource(Res.string.tool_card_repeat_weekly))
+                    add(RepeatEvery.Month to stringResource(Res.string.tool_card_repeat_monthly))
+                }
+            HearthSegmented(
+                options = options,
+                chosen = values.repeat,
+                onChoose = { onChange(values.pickRepeat(it)) },
+                label = repeatLabel,
+            )
+        }
+        if (values.repeat == RepeatEvery.Week) {
+            Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                val daysLabel = stringResource(Res.string.tool_card_field_days)
+                HearthFieldLabel(label = daysLabel)
+                DayChips(
+                    ticked = values.weekdays,
+                    onToggle = { day ->
+                        val days = if (day in values.weekdays) values.weekdays - day else values.weekdays + day
+                        onChange(values.copy(weekdays = days))
+                    },
+                    label = daysLabel,
+                )
+                if (EditField.Repeat in invalid) {
+                    Text(
+                        text = stringResource(Res.string.tool_card_repeat_no_days),
+                        style = HearthTheme.typography.caption,
+                        color = colors.error,
+                    )
+                }
+            }
+        }
+        if (values.repeat == null) return@Column
+        val endsLabel = stringResource(Res.string.tool_card_field_ends)
+        Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+            HearthFieldLabel(label = endsLabel, changed = EditField.Ends in changed)
+            HearthSegmented(
+                options =
+                    listOf(
+                        RepeatEnd.Never to stringResource(Res.string.tool_card_ends_never),
+                        RepeatEnd.OnDate to stringResource(Res.string.tool_card_ends_on_date),
+                        RepeatEnd.After to stringResource(Res.string.tool_card_ends_after),
+                    ),
+                chosen = values.ends,
+                onChoose = { onChange(values.pickEnds(it)) },
+                label = endsLabel,
+            )
+        }
+        val lastDate = values.lastDate
+        if (values.ends == RepeatEnd.OnDate && lastDate != null) {
+            HearthPickerField(
+                value = dayText(lastDate),
+                label = stringResource(Res.string.tool_card_field_last_date),
+                onClick = onPickLastDate,
+                tag = LAST_DATE_FIELD_TAG,
+            )
+        }
+        if (values.ends == RepeatEnd.After) {
+            TimesStepper(
+                times = values.times ?: EditValues.DEFAULT_TIMES,
+                onStep = { onChange(values.copy(times = it)) },
+            )
+        }
+        if (EditField.Ends in invalid) {
+            Text(
+                text = stringResource(Res.string.tool_card_ends_before_start),
+                style = HearthTheme.typography.caption,
+                color = colors.error,
+            )
+        }
+        repeatSummary(values)?.let { summary ->
+            val last = dayText(summary.last)
+            val caption =
+                if (values.ends == RepeatEnd.After) {
+                    stringResource(Res.string.tool_card_repeat_last, last)
+                } else {
+                    pluralStringResource(
+                        Res.plurals.tool_card_repeat_sessions,
+                        summary.sessions,
+                        summary.sessions,
+                        last,
+                    )
+                }
+            Text(text = caption, style = HearthTheme.typography.caption, color = colors.textMuted)
+        }
+    }
+}
+
+/** M to S, each ticked or not; a screen reader hears the whole day's name. */
+@Composable
+private fun DayChips(
+    ticked: Set<Int>,
+    onToggle: (Int) -> Unit,
+    label: String,
+) {
+    val colors = HearthTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        DAY_CHIPS.forEachIndexed { day, (letter, name) ->
+            val on = day in ticked
+            val spoken = stringResource(name)
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = HearthTheme.spacing.xxs)
+                        .heightIn(min = HearthTheme.size.touchTarget)
+                        .clip(HearthShapes.button)
+                        .background(if (on) colors.primary else colors.surface)
+                        .border(
+                            HearthTheme.size.hairline,
+                            if (on) colors.primary else colors.outline,
+                            HearthShapes.button,
+                        ).toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(day) })
+                        .semantics { contentDescription = spoken },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(letter),
+                    style = HearthTheme.typography.labelStrong,
+                    color = if (on) colors.onPrimary else colors.textMuted,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
+            }
+        }
+    }
+}
+
+/** "10 times" between One fewer and One more, kept to what a rule can count. */
+@Composable
+private fun TimesStepper(
+    times: Int,
+    onStep: (Int) -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StepButton(
+            glyph = "\u2212",
+            spoken = stringResource(Res.string.tool_card_times_fewer),
+            enabled = times > EditValues.TIMES.first,
+            onClick = { onStep(times - 1) },
+        )
+        Text(
+            text = pluralStringResource(Res.plurals.tool_card_times, times, times),
+            style = HearthTheme.typography.bodyStrong,
+            color = HearthTheme.colors.textPrimary,
+        )
+        StepButton(
+            glyph = "+",
+            spoken = stringResource(Res.string.tool_card_times_more),
+            enabled = times < EditValues.TIMES.last,
+            onClick = { onStep(times + 1) },
+        )
+    }
+}
+
+@Composable
+private fun StepButton(
+    glyph: String,
+    spoken: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = HearthTheme.colors
+    Box(
+        modifier =
+            Modifier
+                .size(HearthTheme.size.touchTarget)
+                .clip(HearthShapes.item)
+                .background(colors.surface)
+                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .semantics { contentDescription = spoken },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = glyph,
+            style = HearthTheme.typography.bodyStrong,
+            color = if (enabled) colors.textPrimary else colors.outline,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+    }
+}
+
+private fun daysOf(bits: Int): Set<Int> = (0 until DAYS_IN_WEEK).filter { bits shr it and 1 == 1 }.toSet()
+
+private fun bitsOf(days: Set<Int>): Int = days.fold(0) { bits, day -> bits or (1 shl day) }
 
 private fun fieldLabel(
     card: AnswerPart.Proposal,
@@ -562,43 +864,16 @@ private fun ScopeSwitch(
     chosen: EventScope,
     onChoose: (EventScope) -> Unit,
 ) {
-    val colors = HearthTheme.colors
-    val label = stringResource(Res.string.tool_card_scope)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(HearthShapes.item)
-                .background(colors.canvas)
-                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
-                .padding(HearthTheme.spacing.xs)
-                .semantics { contentDescription = label }
-                .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-    ) {
-        listOf(
-            EventScope.OnlyThis to Res.string.tool_card_scope_this,
-            EventScope.ThisAndFollowing to Res.string.tool_card_scope_following,
-        ).forEach { (option, words) ->
-            val selected = option == chosen
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = HearthTheme.size.touchTarget - HearthTheme.spacing.xs)
-                        .clip(HearthShapes.button)
-                        .background(if (selected) colors.surface else colors.canvas)
-                        .selectable(selected = selected, role = Role.RadioButton, onClick = { onChoose(option) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(words),
-                    style = HearthTheme.typography.label,
-                    color = if (selected) colors.textPrimary else colors.textMuted,
-                )
-            }
-        }
-    }
+    HearthSegmented(
+        options =
+            listOf(
+                EventScope.OnlyThis to stringResource(Res.string.tool_card_scope_this),
+                EventScope.ThisAndFollowing to stringResource(Res.string.tool_card_scope_following),
+            ),
+        chosen = chosen,
+        onChoose = onChoose,
+        label = stringResource(Res.string.tool_card_scope),
+    )
 }
 
 @Composable
@@ -636,7 +911,22 @@ private val MONTHS =
         Res.string.tool_card_month_dec,
     )
 
+private val DAY_CHIPS =
+    listOf(
+        Res.string.tool_card_chip_mon to Res.string.tool_card_weekday_mon,
+        Res.string.tool_card_chip_tue to Res.string.tool_card_weekday_tue,
+        Res.string.tool_card_chip_wed to Res.string.tool_card_weekday_wed,
+        Res.string.tool_card_chip_thu to Res.string.tool_card_weekday_thu,
+        Res.string.tool_card_chip_fri to Res.string.tool_card_weekday_fri,
+        Res.string.tool_card_chip_sat to Res.string.tool_card_weekday_sat,
+        Res.string.tool_card_chip_sun to Res.string.tool_card_weekday_sun,
+    )
+
 private const val SEPARATOR = " · "
+
+/** What Repeat's None is saved as, since a null pick means "as proposed". */
+private const val NO_REPEAT = ""
+private const val DAYS_IN_WEEK = 7
 
 /** How tall a note's words start, so a few lines of it show without scrolling. */
 private const val WORDS_LINES = 3
@@ -644,3 +934,4 @@ private const val MINUTES_PER_HOUR = 60
 
 const val DAY_FIELD_TAG = "approval_card_day"
 const val TIME_FIELD_TAG = "approval_card_time"
+const val LAST_DATE_FIELD_TAG = "approval_card_last_date"
