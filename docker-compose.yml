@@ -1,3 +1,10 @@
+# Docker's own copy of each container's log, capped: Loki holds the history (section 11).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # ==============================================================================
   # 1. Network & VPN Gateway (Gluetun)
@@ -28,6 +35,7 @@ services:
       - 8080:8080       # qBittorrent WebUI (qbittorrent shares this network)
       - 8000:8000       # Gluetun control API, for the Pi's Homepage widget
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 2. Download Clients & Solvers (Routed strictly through VPN)
@@ -51,6 +59,7 @@ services:
         condition: service_healthy
     stop_grace_period: 30s
     restart: unless-stopped
+    logging: *default-logging
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -67,6 +76,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
@@ -89,6 +99,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -109,6 +120,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
@@ -129,6 +141,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
@@ -149,6 +162,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 4. Request UI & Discovery (Seerr)
@@ -167,6 +181,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 5. Media Server (Jellyfin with RTX 5080 NVENC Transcoding)
@@ -192,6 +207,7 @@ services:
               count: all
               capabilities: [gpu]
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 6. Media Analytics & Telemetry (Jellystat)
@@ -211,6 +227,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *default-logging
 
   jellystat:
     image: cyfershepard/jellystat:latest
@@ -229,6 +246,7 @@ services:
       jellystat-db:
         condition: service_healthy
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 7. Automated Media Lifecycle & Cleanup (Maintainerr)
@@ -250,6 +268,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 7b. Download Queue Cleanup (Cleanuparr)
@@ -278,6 +297,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 8. TRaSH Guides Automation (Recyclarr)
@@ -298,6 +318,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 9. Automated Image Updates & Lifecycle (Watchtower)
@@ -315,6 +336,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+    logging: *default-logging
 
   # ==============================================================================
   # 10. Local AI & LLM Inference (Optional Module: profiles: ["ai"])
@@ -343,6 +365,7 @@ services:
     ports:
       - 127.0.0.1:11434:11434
     restart: unless-stopped
+    logging: *default-logging
 
   searxng:
     profiles: ["ai"]
@@ -356,6 +379,7 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
+    logging: *default-logging
 
   household-hub:
     profiles: ["ai"]
@@ -378,9 +402,68 @@ services:
       - ollama
       - searxng
     restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 11. Logs (Loki + Alloy + Grafana)
+  # A container's log dies with the container. Alloy reads every container's
+  # output through the Docker socket (label a container logs=off to leave it out),
+  # Loki keeps it for 30 days, Grafana searches it. Versions are pinned.
+  # ==============================================================================
+  loki:
+    image: grafana/loki:3.7.8
+    container_name: loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      # Chunks and index stay inside Docker's own disk, off the Windows share.
+      - loki_data:/loki
+    restart: unless-stopped
+    logging: *default-logging
+
+  alloy:
+    image: grafana/alloy:v1.20.1
+    container_name: alloy
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    volumes:
+      - ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Read positions, so a restart neither re-sends nor skips lines.
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    restart: unless-stopped
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: grafana
+    ports:
+      - 3002:3000   # LAN, for the Pi's Caddy (grafana.spicy-llama.duckdns.org)
+    environment:
+      - TZ=${TZ:-America/Mexico_City}
+      # Only read on the first start of grafana_data; admin/admin forces a change at first login.
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN_NAME:-spicy-llama.duckdns.org}
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - ${CONFIG_PATH}/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
   ollama_models:
     name: ollama_models
   household_hub_data:
     name: household_hub_data
+  loki_data:
+    name: loki_data
+  alloy_data:
+    name: alloy_data
+  grafana_data:
+    name: grafana_data
 

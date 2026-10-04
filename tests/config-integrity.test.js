@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -19,13 +20,28 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
   const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
 
+  // A tracked config file; a missing one reads as empty so its case fails with its own message.
+  const readConfig = (file) => {
+    const full = path.join(ROOT_DIR, file);
+    return fs.existsSync(full) ? fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n') : '';
+  };
+
+  // Body of one root compose service.
+  const composeService = (name) => {
+    const block = dockerComposeContent.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z]|(?![\\s\\S]))`, 'm'));
+    assert.ok(block, `docker-compose.yml must define ${name}`);
+    return block[1];
+  };
+
   // Ports block of one root compose service.
   const composePorts = (name) => {
-    const block = dockerComposeContent.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z])`, 'm'));
-    assert.ok(block, `docker-compose.yml must define ${name}`);
-    const ports = block[1].match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
+    const ports = composeService(name).match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
     return ports ? ports[1] : '';
   };
+
+  // A named volume declared at the root with a fixed name.
+  const declaresVolume = (name) =>
+    new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${name}:\\s*\\n\\s+name:\\s*${name}\\s*$`, 'm').test(dockerComposeContent);
 
   await t.test('The desktop runs no Caddy: the Pi terminates HTTPS and the containers publish their own ports', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*caddy:\s*$/m, 'no caddy service on the desktop');
@@ -41,6 +57,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
       flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
+      grafana: ['3002:3000'],
     };
     for (const [service, mappings] of Object.entries(expected)) {
       const ports = composePorts(service);
@@ -73,6 +90,121 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
+  await t.test('Logs outlive their containers: Loki, Alloy and Grafana run beside the stack', () => {
+    const loki = composeService('loki');
+    const alloy = composeService('alloy');
+    const grafana = composeService('grafana');
+
+    // Pinned to a release and bumped in a PR, so Watchtower leaves them alone.
+    assert.match(loki, /image:\s*grafana\/loki:\d+\.\d+\.\d+\s*$/m);
+    assert.match(alloy, /image:\s*grafana\/alloy:v\d+\.\d+\.\d+\s*$/m);
+    assert.match(grafana, /image:\s*grafana\/grafana:\d+\.\d+\.\d+\s*$/m);
+    for (const [name, svc] of Object.entries({ loki, alloy, grafana })) {
+      assert.doesNotMatch(svc, /watchtower\.enable/, `${name} is pinned; Watchtower must not update it`);
+      // Logs are collected whatever is started: -NoAI and -ArrOnly included.
+      assert.doesNotMatch(svc, /profiles:/, `${name} must be in the default profile`);
+      assert.match(svc, new RegExp(`container_name:\\s*${name}\\s*$`, 'm'));
+      assert.match(svc, /restart:\s*unless-stopped/);
+    }
+
+    assert.match(loki, /command:\s*-config\.file=\/etc\/loki\/loki-config\.yaml/);
+    assert.ok(loki.includes('- ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro'));
+    assert.ok(loki.includes('- loki_data:/loki'), 'Loki must keep its logs in the loki_data volume');
+
+    assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
+    assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
+    assert.ok(alloy.includes('- /var/run/docker.sock:/var/run/docker.sock:ro'), 'Alloy only reads the Docker socket');
+    // Read positions: a restart of Alloy neither re-sends nor skips lines.
+    assert.ok(alloy.includes('- alloy_data:/var/lib/alloy/data'));
+    assert.match(alloy, /depends_on:\s*\n\s+- loki\b/);
+
+    // Only the data sources folder: mounting all of provisioning/ hides the image's other
+    // folders and Grafana logs an error for each one at every start.
+    assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro'));
+    assert.ok(grafana.includes('- grafana_data:/var/lib/grafana'));
+    assert.ok(grafana.includes('- GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}'));
+    assert.ok(grafana.includes('- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}'));
+    assert.ok(grafana.includes('- GF_SERVER_ROOT_URL=https://grafana.${DOMAIN_NAME:-spicy-llama.duckdns.org}'));
+    assert.ok(grafana.includes('- GF_ANALYTICS_REPORTING_ENABLED=false'));
+    assert.match(grafana, /-\s*TZ=\$\{TZ/);
+    assert.match(grafana, /depends_on:\s*\n\s+- loki\b/);
+
+    // Only Grafana is reachable, and it asks for a login; Loki has none of its own.
+    assert.equal(composePorts('loki'), '', 'Loki must not publish a port');
+    assert.equal(composePorts('alloy'), '', 'Alloy must not publish a port');
+
+    for (const volume of ['loki_data', 'alloy_data', 'grafana_data']) {
+      assert.ok(declaresVolume(volume), `docker-compose.yml must declare the ${volume} volume with a fixed name`);
+    }
+  });
+
+  await t.test('Loki keeps 30 days on its volume and drops a runaway stream instead of filling the disk', () => {
+    const loki = readConfig('config/loki/loki-config.yaml');
+    assert.match(loki, /^auth_enabled:\s*false\s*$/m);
+    assert.match(loki, /path_prefix:\s*\/loki\s*$/m);
+    assert.match(loki, /chunks_directory:\s*\/loki\/chunks\s*$/m);
+    assert.match(loki, /store:\s*inmemory/);
+    // Retention needs the tsdb index in 24h periods.
+    assert.match(loki, /store:\s*tsdb/);
+    assert.match(loki, /object_store:\s*filesystem/);
+    assert.match(loki, /period:\s*24h/);
+    const compactor = loki.match(/^compactor:\s*\n((?:  .*\n)+)/m);
+    assert.ok(compactor, 'loki-config.yaml must configure the compactor');
+    assert.match(compactor[1], /retention_enabled:\s*true/);
+    assert.match(compactor[1], /delete_request_store:\s*filesystem/);
+    assert.match(compactor[1], /working_directory:\s*\/loki\//);
+    const limits = loki.match(/^limits_config:\s*\n((?:  .*\n)+)/m);
+    assert.ok(limits, 'loki-config.yaml must set limits_config');
+    assert.match(limits[1], /retention_period:\s*720h/);
+    assert.match(limits[1], /per_stream_rate_limit:\s*1MB/);
+    assert.match(limits[1], /per_stream_rate_limit_burst:\s*5MB/);
+    assert.match(limits[1], /ingestion_rate_mb:\s*4\s*$/m);
+    assert.match(loki, /^analytics:\s*\n\s+reporting_enabled:\s*false/m);
+  });
+
+  await t.test('Alloy ships every container\'s output to Loki, except those labelled logs=off', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    assert.match(alloy, /discovery\.docker "[a-z_]+" \{\s*\n\s*host\s*=\s*"unix:\/\/\/var\/run\/docker\.sock"/);
+    // The default is a minute: a container that crashes at start would be gone before Alloy saw it.
+    assert.match(alloy, /refresh_interval\s*=\s*"5s"/);
+    assert.match(alloy, /loki\.source\.docker "[a-z_]+" \{/);
+    // The container's name without Docker's leading slash is the label to search by.
+    assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_name"\]\s*\n\s*regex\s*=\s*"\/\(\.\*\)"\s*\n\s*target_label\s*=\s*"container"/);
+    assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_label_logs"\]\s*\n\s*regex\s*=\s*"off"\s*\n\s*action\s*=\s*"drop"/);
+    assert.match(alloy, /url\s*=\s*"http:\/\/loki:3100\/loki\/api\/v1\/push"/);
+    // The Pi's logs slot in later under their own host.
+    assert.match(alloy, /host\s*=\s*"desktop"/);
+  });
+
+  await t.test('Grafana gets Loki as its data source from the repo, and no password is tracked', () => {
+    const datasource = readConfig('config/grafana/provisioning/datasources/loki.yaml');
+    assert.match(datasource, /^apiVersion:\s*1\s*$/m);
+    assert.match(datasource, /type:\s*loki\s*$/m);
+    assert.match(datasource, /url:\s*http:\/\/loki:3100\s*$/m);
+    assert.match(datasource, /isDefault:\s*true/);
+    for (const file of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
+      assert.doesNotMatch(readConfig(file), /password|secret|token/i, `${file} must hold no credentials`);
+      // config/*/** is ignored by default; these three must be let through.
+      const ignored = spawnSync('git', ['check-ignore', '-q', file], { cwd: ROOT_DIR }).status === 0;
+      assert.ok(!ignored, `${file} must not be git-ignored`);
+    }
+  });
+
+  await t.test('Docker keeps a capped local log for every service, now that Loki holds the history', () => {
+    const anchor = dockerComposeContent.match(/^x-logging:\s*&default-logging\s*\n([\s\S]*?)(?=^[a-z])/m);
+    assert.ok(anchor, 'docker-compose.yml must define x-logging: &default-logging');
+    assert.match(anchor[1], /driver:\s*json-file/);
+    assert.match(anchor[1], /max-size:\s*"10m"/);
+    assert.match(anchor[1], /max-file:\s*"3"/);
+
+    const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
+    const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]);
+    assert.ok(names.length >= 20, 'the service list should be readable');
+    for (const name of names) {
+      assert.match(composeService(name), /^    logging:\s*\*default-logging\s*$/m, `${name} must use the capped logging block`);
+    }
+  });
+
   await t.test('The desktop runs no Tailscale: the Pi is the subnet router', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*tailscale:\s*$/m, 'no tailscale service');
     assert.doesNotMatch(dockerComposeContent, /network_mode:\s*"?service:tailscale/, 'nothing may borrow a tailscale network');
@@ -99,6 +231,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
       Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Cleanuparr: 11011,
+      Grafana: 3002,
     };
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
@@ -122,6 +255,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
     // Cleanuparr asks for no key on the LAN, so the Pi .env stays untouched.
     assert.doesNotMatch(card[1], /HOMEPAGE_VAR_/, 'the Cleanuparr widget needs no API key');
+  });
+
+  await t.test('The Grafana card opens the log search and holds no credentials', () => {
+    const card = servicesYamlContent.match(/- Grafana:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(card, 'services.yaml must list Grafana');
+    assert.match(card[1], /icon:\s*grafana\.png/);
+    assert.match(card[1], /href:\s*https:\/\/grafana\.spicy-llama\.duckdns\.org\s*$/m);
+    assert.match(card[1], /description:\s*Container Logs \(Loki, 30 days\)\s*$/m);
+    // A Grafana widget would put the admin password on the Pi; the HTTP check is enough.
+    assert.doesNotMatch(card[1], /widget:|HOMEPAGE_VAR_/, 'the Grafana card must stay a link with an HTTP check');
   });
 
   await t.test('Homepage moved to the Pi: the desktop runs none', () => {

@@ -13,7 +13,7 @@ A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house netwo
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
+| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, Loki + Alloy + Grafana (container logs), and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
 
 Both addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names, which Pi-hole resolves for every DHCP client.
 
@@ -72,10 +72,15 @@ graph TD
             HUB[🏠 Household Hub] --> OLLAMA[🦙 Ollama · RTX 5080]
             HUB --> SEARX[🔍 SearXNG]
         end
+
+        subgraph Logs [Logs - kept 30 days]
+            ALLOY[🚚 Alloy] --> LOKI[🗄️ Loki · 30 days] --> GRAFANA[📈 Grafana]
+        end
     end
 
-    CADDY -->|published LAN ports| JELLY & SEERR & ArrSuite & QBIT & JSTAT & HUB
+    CADDY -->|published LAN ports| JELLY & SEERR & ArrSuite & QBIT & JSTAT & HUB & GRAFANA
     HOMEPAGE -.->|HTTP checks + widgets| Desktop
+    Desktop -.->|Docker socket| ALLOY
 ```
 
 ---
@@ -98,9 +103,12 @@ graph TD
 | **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:11011` | Download queue cleanup: fakes, failed imports, seeding limits |
 | **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8191` | Cloudflare challenge solver |
 | **Household Hub** | Desktop (AI profile) | `https://hub.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3051` (`/docs` on the PC: `http://127.0.0.1:3050`) | Family assistant backend |
+| **Grafana** | Desktop | `https://grafana.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3002` | Log search (sign-in required) |
 | **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |
 | **SearXNG** | Desktop (AI profile) | — | internal `http://searxng:8080` | Private search for the hub |
 | **Ollama** | Desktop (AI profile) | — | `http://127.0.0.1:11434` (PC only) | Local LLM inference |
+| **Loki** | Desktop | — | internal `http://loki:3100` | Log store, 30 days |
+| **Alloy** | Desktop | — | — | Ships every container's output to Loki |
 | **Recyclarr** | Desktop | — | — | TRaSH Guides sync, daily 3 AM |
 | **Watchtower** | Desktop | — | — | Image updates, daily 4 AM |
 
@@ -149,8 +157,16 @@ graph TD
 │   │   ├── bookmarks.yaml           # Bookmarks
 │   │   └── docker.yaml              # Docker socket (the Pi's own containers)
 │   ├── ollama-models/               # Tracked Modelfiles and the model manifest
-│   └── searxng/
-│       └── settings.yml             # SearXNG engines and JSON API
+│   ├── searxng/
+│   │   └── settings.yml             # SearXNG engines and JSON API
+│   ├── loki/
+│   │   └── loki-config.yaml         # Loki: filesystem storage, 30-day retention, rate limits
+│   ├── alloy/
+│   │   └── config.alloy             # Alloy: Docker socket -> Loki, logs=off opt-out
+│   └── grafana/
+│       └── provisioning/
+│           └── datasources/
+│               └── loki.yaml        # Loki as Grafana's data source
 └── tests/
     ├── adapt-links.test.js          # Link adapter
     ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
@@ -195,7 +211,7 @@ Then start it with `.\startup_homelab.ps1`.
 
 The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the published ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
 ```powershell
-Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696
 ```
 
 ---
@@ -210,7 +226,12 @@ Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3005,3051
 * **Ollama models:** they live in the `ollama_models` Docker volume. Keys stay in `config/ollama`, and the tracked Modelfiles in `config/ollama-models`.
 * **Switching the chat model:** add it to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the hub, and restart both.
 * **Reclaim disk after removing models or images** (admin): `.\compact_docker_disk.ps1`
-* **Logs:** `docker compose logs -f <service>`
+* **Logs:** every container's output is kept for 30 days in Loki and survives a rebuild.
+* **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org` or `http://desktop-kujo8mp.lan:3002`. Try `{container="household-hub"}`, or `{container="household-hub"} |= "tool"` to filter by text.
+* **Grafana sign-in:** admin / admin on first start (Grafana asks for a new password), or `GRAFANA_ADMIN_PASSWORD` in `.env`.
+* **Leave a container out:** label it `logs=off`.
+* **Recent lines:** `docker compose logs -f <service>` still works. Docker's own copy is capped at 10 MB x 3 files per container.
+* **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki itself publishes no port.
 
 **lemonpi**
 * **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; bump them in a PR.
@@ -234,7 +255,7 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 🧪 Quality Gate
 
-* **Tests (`node --test`):** about 100 checks across seven suites (see `tests/` above). They keep the desktop compose file, the Pi compose file and Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
+* **Tests (`node --test`):** about 115 checks across seven suites (see `tests/` above). They keep the desktop compose file, the Pi compose file and Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
 * **Pre-commit hook (`.githooks/pre-commit`):**
   * the test suite
   * `docker compose config` for both the desktop and Pi stacks
@@ -249,4 +270,4 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 📄 Acknowledgments
 
-[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/)
+[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/) · [Grafana](https://grafana.com/) · [Loki](https://grafana.com/oss/loki/) · [Alloy](https://grafana.com/oss/alloy-opentelemetry-collector/)
