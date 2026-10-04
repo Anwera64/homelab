@@ -45,6 +45,26 @@ from app.domain.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+# How much of a failed call's arguments the log keeps: enough to see what was asked, not a whole note.
+LOGGED_ARGUMENTS = 500
+
+
+def _log_failed(tc: LLMToolCall, result: ToolExecutionResult, is_turn_secret: bool) -> None:
+    """
+    Says in the hub's log why a tool step failed. The phone is only shown that it did, so without
+    this a failure can't be read back afterwards. A secret turn leaves out what was asked: its
+    content must not outlive it in a log.
+    """
+    reason = getattr(result, "reason", None)
+    asked = "left out (secret turn)" if is_turn_secret else json.dumps(tc.arguments, default=str)[:LOGGED_ARGUMENTS]
+    logger.warning(
+        "Tool %s failed: %s | reason: %s | arguments: %s",
+        " ".join(tc.name.split())[:60],
+        result.error,
+        getattr(reason, "value", reason) or "none",
+        asked,
+    )
+
 
 @dataclass
 class ChatTurnResult:
@@ -636,7 +656,7 @@ class ProcessChatTurnUseCase:
         to raise past the loop and end the whole turn, and the model never learnt why.
         """
         try:
-            return await self.tool_executor.execute(
+            result = await self.tool_executor.execute(
                 tool_name=tc.name,
                 arguments=tc.arguments,
                 user_id=user_id,
@@ -647,11 +667,14 @@ class ProcessChatTurnUseCase:
         except ToolPermissionDeniedException:
             shown = " ".join(tc.name.split())[:60]
             names = ", ".join(tool["function"]["name"] for tool in offered)
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tc.name,
                 success=False,
                 error=f"There is no tool '{shown}'. Your tools are: {names}.",
             )
+        if not result.success:
+            _log_failed(tc, result, is_turn_secret)
+        return result
 
     @staticmethod
     def _answer_now(question: str) -> str:
