@@ -216,6 +216,31 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(!filter.test(line('GET /api/v1/users', '200 OK')));
   });
 
+  await t.test('Grafana can draw a dashboard as an image, with a renderer that only runs when asked for', () => {
+    const renderer = composeService('grafana-renderer');
+    const grafana = composeService('grafana');
+
+    assert.match(renderer, /image:\s*grafana\/grafana-image-renderer:v\d+\.\d+\.\d+\s*$/m, 'the renderer must be pinned to a release');
+    assert.doesNotMatch(renderer, /watchtower\.enable/, 'pinned; Watchtower must not update it');
+    // A headless browser: too heavy to keep running beside Ollama, so it is started on demand.
+    assert.match(renderer, /profiles:\s*\["render"\]/);
+    assert.match(renderer, /mem_limit:\s*2g\s*$/m);
+    assert.ok(renderer.includes('- GOMEMLIMIT=256MiB'), 'Go must stay well under the container limit');
+    assert.equal(composePorts('grafana-renderer'), '', 'only Grafana talks to the renderer');
+    assert.match(renderer, /container_name:\s*grafana-renderer\s*$/m);
+    assert.match(renderer, /restart:\s*unless-stopped/);
+
+    // The renderer refuses requests without the secret Grafana sends; both read it from one place.
+    const secret = '${GRAFANA_RENDERER_TOKEN:-homelab-renderer}';
+    assert.ok(renderer.includes(`- AUTH_TOKEN=${secret}`));
+    assert.ok(grafana.includes(`- GF_RENDERING_RENDERER_TOKEN=${secret}`));
+    assert.ok(grafana.includes('- GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render'));
+    // The renderer loads the page from Grafana inside the compose network, not through the Pi.
+    assert.ok(grafana.includes('- GF_RENDERING_CALLBACK_URL=http://grafana:3000/'));
+    // Grafana must start without it.
+    assert.doesNotMatch(grafana, /depends_on:\s*\n(?:\s+- [\w-]+\s*\n)*?\s+- grafana-renderer\b/);
+  });
+
   await t.test('Grafana gets Loki as its data source from the repo, and no password is tracked', () => {
     const datasource = readConfig('config/grafana/provisioning/datasources/loki.yaml');
     assert.match(datasource, /^apiVersion:\s*1\s*$/m);
