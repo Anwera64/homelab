@@ -671,3 +671,69 @@ async def test_GIVEN_the_server_refuses_the_password_WHEN_an_event_is_changed_or
                 await connector.update_event(_icloud_credential(), "revoked", "event-123", title="Dentist")
             else:
                 await connector.delete_event(_icloud_credential(), "revoked", "event-123")
+
+
+# A remove or change card names the event it is about, so the hub has to read one event by its ID (#63).
+def _calendar_holding(ical: str) -> MagicMock:
+    event = MagicMock()
+    event.data = ical
+    calendar = MagicMock()
+    calendar.name = "Default"
+    calendar.event_by_uid.return_value = event
+    return calendar
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_timed_event_WHEN_it_is_read_by_its_id_THEN_its_title_and_times_come_back():
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    calendar = _calendar_holding(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+        "BEGIN:VEVENT\r\nUID:e9f57d50\r\nDTSTAMP:20260901T000000Z\r\n"
+        "DTSTART:20260930T090000Z\r\nDTEND:20260930T093000Z\r\nSUMMARY:Test Event\r\n"
+        "END:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        event = await connector.get_event(_icloud_credential(), "secret", "e9f57d50")
+
+    calendar.event_by_uid.assert_called_once_with("e9f57d50")
+    assert event.id == "e9f57d50"
+    assert event.title == "Test Event"
+    assert event.start_time == datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)
+    assert event.end_time == datetime(2026, 9, 30, 9, 30, tzinfo=timezone.utc)
+    assert event.is_all_day is False
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_all_day_event_WHEN_it_is_read_by_its_id_THEN_it_says_so():
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    calendar = _calendar_holding(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+        "BEGIN:VEVENT\r\nUID:holiday\r\nDTSTAMP:20260901T000000Z\r\n"
+        "DTSTART;VALUE=DATE:20261012\r\nDTEND;VALUE=DATE:20261013\r\nSUMMARY:Holiday\r\n"
+        "END:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        event = await connector.get_event(_icloud_credential(), "secret", "holiday")
+
+    assert event.title == "Holiday"
+    assert event.is_all_day is True
+    assert event.start_time.date().isoformat() == "2026-10-12"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_event_with_that_id_WHEN_it_is_read_THEN_there_is_none():
+    from caldav.lib.error import NotFoundError
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    calendar = MagicMock()
+    calendar.event_by_uid.side_effect = NotFoundError("test-event-1")
+
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        assert await connector.get_event(_icloud_credential(), "secret", "test-event-1") is None

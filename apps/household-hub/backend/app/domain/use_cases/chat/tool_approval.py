@@ -1,10 +1,13 @@
+from datetime import datetime, tzinfo
 from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
+from app.domain.entities.calendar_event import ALL, CalendarEvent
 from app.domain.entities.llm_message import LLMMessage, LLMToolCall
 from app.domain.entities.session import PAUSED_TURN, ChatMessage
 from app.domain.exceptions import AlreadyDecidedException, ApprovalPendingException, EntityNotFoundException
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.chat.current_date_line import zone_of
 from app.domain.use_cases.chat.tool_approval_settings import can_run_without_asking
 from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, write_action
 
@@ -75,6 +78,63 @@ def pending_proposals(message: Optional[ChatMessage]) -> List[Dict[str, Any]]:
         for part in metadata.get("parts") or []
         if part.get("type") == "proposal" and part.get("status") == "pending"
     ]
+
+
+# A change's time on its card: shown as a set, so a moved start never sits beside the old end.
+TIME_DETAILS = ("start_time", "end_time", "is_all_day")
+
+
+def event_on_card(
+    action: Optional[str], arguments: Dict[str, Any], event: CalendarEvent, timezone_name: Optional[str]
+) -> Dict[str, Any]:
+    """
+    The details of the event a remove or change card is about, in the names the phone reads (#63).
+
+    A remove shows the event as it is, whatever the model wrote: the card must show what will go. A
+    change keeps what the model is changing and adds only what it left out. Times are in the
+    member's zone, or the calendar's own offset when the hub can't use theirs.
+
+    [event] is the date of a repeating event the call names, or the series when it names none. A
+    call naming a date the series doesn't have gets no date at all, rather than another one's.
+    """
+    if action not in ("delete", "update"):
+        return {}
+    actual: Dict[str, Any] = {"title": event.title}
+    names_a_date = bool(arguments.get("occurrence_start")) and arguments.get("scope") != ALL
+    if not (event.repeat and names_a_date and event.occurrence_start is None):
+        zone = zone_of(timezone_name)
+        actual["start_time"] = _on_card(event.start_time, event.is_all_day, zone)
+        actual["end_time"] = _on_card(event.end_time, event.is_all_day, zone)
+        actual["is_all_day"] = event.is_all_day
+    if event.repeat:
+        actual["repeat"] = event.repeat.to_dict()
+    if action == "delete":
+        return actual
+
+    shown: Dict[str, Any] = {}
+    if not arguments.get("title"):
+        shown["title"] = actual["title"]
+    if not any(key in arguments for key in TIME_DETAILS):
+        shown.update({key: actual[key] for key in TIME_DETAILS if key in actual})
+    if "repeat" in actual and not arguments.get("repeat"):
+        shown["repeat"] = actual["repeat"]
+    return shown
+
+
+def _on_card(when: datetime, is_all_day: bool, zone: Optional[tzinfo]) -> str:
+    """
+    A time as the card carries it: a whole day is its date, anything else is to the minute. The phone
+    sends a card's times back to the minute, and one that came back different would read as the
+    member's own change.
+    """
+    if is_all_day:
+        return when.date().isoformat()
+    return (when.astimezone(zone) if zone else when).replace(second=0, microsecond=0).isoformat()
+
+
+def as_proposed(arguments: Dict[str, Any], looked_up: Dict[str, Any]) -> Dict[str, Any]:
+    """A card's arguments as the write runs them: what was only shown goes, unless the member changed it."""
+    return {key: value for key, value in arguments.items() if key not in looked_up or looked_up[key] != value}
 
 
 def find_proposal(message: Optional[ChatMessage], tool_call_id: str) -> Optional[Dict[str, Any]]:
