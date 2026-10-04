@@ -78,7 +78,6 @@ test('Root README matches the repository', async (t) => {
 
     assert.match(readme, /^\| \*\*Grafana\*\* \| Desktop \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:3002` \|/m);
     assert.match(readme, /^\| \*\*Loki\*\* \| Desktop \| — \| internal `http:\/\/loki:3100` \|/m);
-    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| — \| — \|/m);
 
     const paths = treePaths(readme);
     for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
@@ -94,6 +93,15 @@ test('Root README matches the repository', async (t) => {
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
     assert.ok(firewall, 'README must show the firewall rule');
     assert.ok(firewall[1].split(',').includes('3002'), 'the firewall rule must admit 3002');
+  });
+
+  await t.test('the telemetry route is in the endpoints, the graph and the firewall rule', () => {
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:4318` \|/m);
+    const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
+    assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
+    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
+    assert.ok(firewall[1].split(',').includes('4318'), 'the firewall rule must admit 4318');
+    assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
   });
 
   await t.test('host IPs appear only in the Hosts table', () => {

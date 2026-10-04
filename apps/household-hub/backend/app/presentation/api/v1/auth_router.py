@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.domain.entities.user import User
 from app.presentation.schemas.auth_schemas import AuthStatus, FirstRunRegister, LoginRequest, MemberProfile, Token
@@ -85,6 +85,15 @@ async def refresh(
     """
     token_dict = await use_case.execute(current_user)
     return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.get("/verify", status_code=status.HTTP_204_NO_CONTENT)
+async def verify(current_user: User = Depends(get_current_user)):
+    """
+    Whether the token sent is still accepted, and whose it is (`X-Member-Id`). The Pi's Caddy
+    asks this before it lets the app's telemetry through; it never sees the telemetry itself.
+    """
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"X-Member-Id": current_user.id})
 
 
 @router.post("/pin-resets/{code}/redeem", response_model=Token)

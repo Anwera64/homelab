@@ -83,6 +83,26 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.match(caddyfile, /@hub host hub\.spicy-llama\.duckdns\.org\s*\n\s*handle @hub \{\s*\n\s*reverse_proxy 192\.168\.1\.20:3051/);
   });
 
+  await t.test('telemetry goes to Alloy only after the hub accepts the sender\'s token', () => {
+    const block = caddyfile.match(/@telemetry host telemetry\.spicy-llama\.duckdns\.org\s*\n\s*handle @telemetry \{\n([\s\S]*?)\n    \}/);
+    assert.ok(block, 'the Caddyfile must route telemetry.spicy-llama.duckdns.org');
+    const body = block[1];
+    // Only log batches: nothing stores traces or metrics, and nothing else of Alloy is exposed.
+    assert.match(body, /@logs \{\s*\n\s*method POST\s*\n\s*path \/v1\/logs\s*\n\s*\}/);
+    // `route` keeps the written order. Without it Caddy runs request_header after forward_auth
+    // and removes the member the hub just named.
+    const guarded = body.match(/handle @logs \{\n(?:\s*#[^\n]*\n)?\s*route \{\n([\s\S]*?)\n            \}\n        \}/);
+    assert.ok(guarded, 'log batches must be handled by an ordered route');
+    const steps = guarded[1];
+    // A sender cannot name the member itself: the header is removed, then set from the hub's answer.
+    const strip = steps.indexOf('request_header -X-Member-Id');
+    const auth = steps.search(/forward_auth 192\.168\.1\.20:3051 \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
+    const proxy = steps.indexOf('reverse_proxy 192.168.1.20:4318');
+    assert.ok(strip >= 0 && auth >= 0 && proxy >= 0, 'strip, forward_auth and reverse_proxy must all be present');
+    assert.ok(strip < auth && auth < proxy, 'strip the header, then ask the hub, then pass to Alloy');
+    assert.match(body, /handle \{\s*\n\s*respond 404\s*\n\s*\}/, 'anything else on this name is refused');
+  });
+
   await t.test('plain HTTP on the Pi shows Homepage', () => {
     assert.match(caddyfile, /http:\/\/192\.168\.1\.35, http:\/\/lemonpi[^{]*\{[^}]*reverse_proxy 127\.0\.0\.1:3000/);
   });
