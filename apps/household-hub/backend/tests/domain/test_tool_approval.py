@@ -8,11 +8,11 @@ from what was saved. The hub keeps nothing in memory while it waits.
 """
 import json
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.domain.entities.calendar_event import CalendarEvent
-
+from app.domain.entities.calendar_event import CalendarEvent, Repeat
 from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.llm_message import LLMResponseChunk, LLMToolCall
 from app.domain.entities.session import ChatMessage, ConversationSession
@@ -383,9 +383,11 @@ class FakeEventLookup:
         self.events = {event.id: event for event in events}
         self.fails = fails
         self.asked = []
+        self.dates = []
 
-    async def execute(self, user_id, event_id, timeout=5.0):
+    async def execute(self, user_id, event_id, occurrence_start=None, timeout=5.0):
         self.asked.append((user_id, event_id))
+        self.dates.append(occurrence_start)
         if self.fails:
             raise CalendarUnreachableException("calendar.example.com did not answer")
         return self.events.get(event_id)
@@ -508,3 +510,72 @@ async def test_GIVEN_a_named_remove_WHEN_declined_THEN_the_declined_step_names_t
 
     [declined] = [ev for ev in events if ev["type"] == "tool_declined"]
     assert declined["summary"] == {"action": "delete", "title": "Test Event"}
+
+
+# One date of a repeating event: the card is about that date, not the series' first one (#63).
+def _remove_of_series(**arguments):
+    return LLMToolCall(id="s1", name="calendar_write", arguments={"action": "delete", "event_id": "series-1", **arguments})
+
+
+def _second_date():
+    start = datetime(2026, 10, 13, 8, 0, tzinfo=timezone.utc)
+    return CalendarEvent(
+        id="series-1",
+        title="Series test",
+        start_time=start,
+        end_time=datetime(2026, 10, 13, 8, 30, tzinfo=timezone.utc),
+        repeat=Repeat(frequency="weekly", count=4),
+        occurrence_start=start,
+    )
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_remove_of_one_date_of_a_series_WHEN_its_card_is_shown_THEN_it_is_about_that_date():
+    # The model writes the member's clock time and calls it UTC; the hub reads it as their clock time.
+    remove = _remove_of_series(occurrence_start="2026-10-13T10:00:00Z", scope="this")
+    lookup = FakeEventLookup([_second_date()])
+    use_case, _, _, tool_executor = _setup(
+        [[LLMResponseChunk(tool_calls=[remove])], [LLMResponseChunk(delta_content="Removed.")]], event_lookup=lookup
+    )
+
+    events = await _ask_from(use_case, "Europe/Madrid")
+
+    assert lookup.dates == [datetime(2026, 10, 13, 10, 0, tzinfo=ZoneInfo("Europe/Madrid"))]
+    [proposal] = [ev for ev in events if ev["type"] == "tool_approval_proposal"]
+    assert proposal["arguments"] == {
+        **remove.arguments,
+        "title": "Series test",
+        "start_time": "2026-10-13T10:00:00+02:00",
+        "end_time": "2026-10-13T10:30:00+02:00",
+        "is_all_day": False,
+        "repeat": {"frequency": "weekly", "interval": 1, "count": 4},
+    }
+
+    await _decide(use_case, "s1", approved=True)
+
+    assert tool_executor.executed_calls[0]["args"] == remove.arguments
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_remove_of_a_whole_series_WHEN_its_card_is_shown_THEN_no_one_date_is_looked_up():
+    remove = _remove_of_series(occurrence_start="2026-10-13T10:00:00", scope="all")
+    lookup = FakeEventLookup([_second_date()])
+    use_case, _, _, _ = _setup([[LLMResponseChunk(tool_calls=[remove])]], event_lookup=lookup)
+
+    await _ask_from(use_case, "Europe/Madrid")
+
+    assert lookup.dates == [None]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_date_that_is_not_a_time_WHEN_its_card_is_shown_THEN_it_is_the_card_as_proposed():
+    remove = _remove_of_series(occurrence_start="the second one", scope="this")
+    lookup = FakeEventLookup([_second_date()])
+    use_case, _, _, _ = _setup([[LLMResponseChunk(tool_calls=[remove])]], event_lookup=lookup)
+
+    events = await _ask_from(use_case, "Europe/Madrid")
+
+    [proposal] = [ev for ev in events if ev["type"] == "tool_approval_proposal"]
+    assert proposal["arguments"] == remove.arguments
+    assert events[-1]["type"] == "awaiting_approval"
+    assert lookup.asked == []

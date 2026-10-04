@@ -65,9 +65,13 @@ class ICalendarConnector(Protocol):
         credential: CalendarCredential,
         secret: str,
         event_id: str,
+        occurrence_start: datetime | None = None,
         timeout: float = 10.0,
     ) -> Optional[CalendarEvent]:
-        """The event with that ID, or None when the calendar has none."""
+        """
+        The event with that ID, or None when the calendar has none. For a repeating event,
+        [occurrence_start] picks the date meant; the event then names it as its occurrence_start.
+        """
         ...
 
     async def delete_event(

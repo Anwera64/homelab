@@ -248,8 +248,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                         repeat = rules.get(uid)
                         of_series = repeat is not None or "recurrence-id" in component
 
-                        evt_start = _aware(evt_start)
-                        evt_end = _aware(evt_end)
+                        evt_start = ical_series.as_moment(evt_start)
+                        evt_end = ical_series.as_moment(evt_end)
 
                         events.append(
                             CalendarEvent(
@@ -535,7 +535,13 @@ class CalDavCalendarConnector(ICalendarConnector):
         credential: CalendarCredential,
         secret: str,
         event_id: str,
+        occurrence_start: Optional[datetime] = None,
     ) -> Optional[CalendarEvent]:
+        """
+        The event as a member sees it. For a repeating one, [occurrence_start] picks the date meant:
+        the entry it was changed to on its own, else the series at that date. Without it, or with a
+        date the series doesn't have, it is the series from its first date, naming no date.
+        """
         client = self._sync_get_client(credential, secret)
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
@@ -543,20 +549,33 @@ class CalDavCalendarConnector(ICalendarConnector):
                 item = target_cal.event_by_uid(event_id)
             except NotFoundError:
                 return None
-            for component in ICalendar.from_ical(item.data).walk("VEVENT"):
-                start = _aware(component.get("dtstart").dt)
-                end = _aware(component.get("dtend").dt) if component.get("dtend") else start
-                return CalendarEvent(
-                    id=event_id,
-                    title=str(component.get("summary", "Untitled Event")),
-                    start_time=start,
-                    end_time=end,
-                    description=str(component.get("description", "")),
-                    location=str(component.get("location", "")),
-                    is_all_day=not isinstance(component.get("dtstart").dt, datetime),
-                    calendar_name=target_cal.name or credential.calendar_name,
-                )
-            return None
+            cal_obj = ICalendar.from_ical(item.data)
+            main = ical_series.master(cal_obj)
+            if main is None:
+                return None
+
+            entry, start, occurrence = main, ical_series.as_moment(main.get("dtstart").dt), None
+            found = None
+            if occurrence_start is not None and ical_series.repeats(cal_obj):
+                found = ical_series.occurrence_at(cal_obj, occurrence_start)
+            if found is not None:
+                occurrence = start = ical_series.as_moment(found)
+                changed = next((c for c in cal_obj.walk("VEVENT") if ical_series.same_occurrence(c, occurrence)), None)
+                if changed is not None:
+                    entry, start = changed, ical_series.as_moment(changed.get("dtstart").dt)
+
+            return CalendarEvent(
+                id=event_id,
+                title=str(entry.get("summary", "Untitled Event")),
+                start_time=start,
+                end_time=start + ical_series.duration(entry),
+                description=str(entry.get("description", "")),
+                location=str(entry.get("location", "")),
+                is_all_day=not isinstance(entry.get("dtstart").dt, datetime),
+                calendar_name=target_cal.name or credential.calendar_name,
+                repeat=ical_series.repeat_of(main),
+                occurrence_start=occurrence,
+            )
         except Exception as e:
             if isinstance(e, CalendarIntegrationException):
                 raise
@@ -710,11 +729,12 @@ class CalDavCalendarConnector(ICalendarConnector):
         credential: CalendarCredential,
         secret: str,
         event_id: str,
+        occurrence_start: Optional[datetime] = None,
         timeout: float = 10.0,
     ) -> Optional[CalendarEvent]:
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(self._sync_get_event, credential, secret, event_id),
+                asyncio.to_thread(self._sync_get_event, credential, secret, event_id, occurrence_start),
                 timeout=timeout,
             )
         except asyncio.TimeoutError:
@@ -743,13 +763,6 @@ class CalDavCalendarConnector(ICalendarConnector):
             )
         except asyncio.TimeoutError:
             raise CalendarIntegrationException(f"CalDAV event deletion timed out after {timeout:.1f}s.")
-
-
-def _aware(moment) -> datetime:
-    """A start or end as a datetime with a zone: a whole day is its midnight, a floating time is UTC."""
-    if not isinstance(moment, datetime):
-        return datetime.combine(moment, datetime.min.time(), tzinfo=timezone.utc)
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
 
 
 def _raise_if_refused(error: Exception, credential: CalendarCredential) -> None:

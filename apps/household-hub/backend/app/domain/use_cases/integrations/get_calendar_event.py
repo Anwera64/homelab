@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
@@ -21,7 +22,14 @@ class GetCalendarEventUseCase:
         self.connector = connector
         self.secrets = secrets
 
-    async def execute(self, user_id: str, event_id: str, timeout: float = 5.0) -> Optional[CalendarEvent]:
+    async def execute(
+        self,
+        user_id: str,
+        event_id: str,
+        occurrence_start: Optional[datetime] = None,
+        timeout: float = 5.0,
+    ) -> Optional[CalendarEvent]:
+        """[occurrence_start] picks one date of a repeating event; without it, it is the series."""
         credential = await self.credential_repo.get_by_user_id(user_id)
         if not credential or not credential.is_active:
             return None
@@ -31,5 +39,6 @@ class GetCalendarEventUseCase:
             credential=credential,
             secret=secret,
             event_id=event_id,
+            occurrence_start=occurrence_start,
             timeout=timeout,
         )

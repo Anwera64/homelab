@@ -16,6 +16,8 @@ from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.tool_approval_repository import IToolApprovalRepository
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
+from app.domain.entities.calendar_event import ALL
+from app.domain.use_cases.integrations import calendar_arguments
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
 from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
@@ -1052,7 +1054,15 @@ class ProcessChatTurnUseCase:
         if not isinstance(event_id, str) or not event_id:
             return {}
         try:
-            event = await self.event_lookup.execute(user_id=user_id, event_id=event_id)
+            # The date of a repeating event the call names, read as the write itself will read it.
+            occurrence_start = None
+            if tc.arguments.get("scope") != ALL:
+                occurrence_start = calendar_arguments.moment(
+                    tc.arguments.get("occurrence_start"), "occurrence_start", calendar_arguments.zone_of(timezone_name)
+                )
+            event = await self.event_lookup.execute(
+                user_id=user_id, event_id=event_id, occurrence_start=occurrence_start
+            )
         except Exception:
             logger.warning("Could not look up event %s for its card", event_id, exc_info=True)
             return {}
