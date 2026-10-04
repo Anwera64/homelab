@@ -339,6 +339,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                 ical_series.set_repeat(event, repeat)
 
             cal.add_component(event)
+            # An event in a named zone carries that zone's clock changes with it, as the standard asks.
+            cal.add_missing_timezones()
             target_cal.add_event(cal.to_ical())
             _confirm_written(target_cal, cal)
 
@@ -516,6 +518,7 @@ class CalDavCalendarConnector(ICalendarConnector):
 
         _save(event, cal_obj)
         if rest is not None:
+            rest.add_missing_timezones()
             target_cal.add_event(rest.to_ical())
         _confirm_written(target_cal, cal_obj, around=occurrence)
         if rest is not None:

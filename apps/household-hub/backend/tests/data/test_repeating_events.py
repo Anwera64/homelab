@@ -780,3 +780,62 @@ async def test_removing_the_last_dates_is_done_on_a_calendar_that_drops_an_event
 
     assert await _delete(calendar, occurrence_start=_wed(14, 14), scope="following") is True
     assert calendar.events == {}
+
+# --- A new event is stored in the member's zone, not at a fixed offset -----------------------
+
+
+@pytest.mark.asyncio
+async def test_a_new_event_is_stored_in_a_named_zone_with_its_definition():
+    calendar = FakeCalendar()
+
+    await _create(
+        calendar,
+        title="Zone check",
+        start_time=datetime(2026, 10, 9, 9, 0, tzinfo=MADRID),
+        end_time=datetime(2026, 10, 9, 9, 30, tzinfo=MADRID),
+        repeat=Repeat(frequency="weekly", days=["FR"]),
+    )
+
+    written = calendar.add_event.call_args[0][0].decode()
+    assert "DTSTART;TZID=Europe/Madrid:20261009T090000" in written
+    assert "BEGIN:VTIMEZONE" in written and "TZID:Europe/Madrid" in written
+
+
+@pytest.mark.asyncio
+async def test_a_series_in_a_named_zone_keeps_its_hour_when_the_clocks_change():
+    calendar = FakeCalendar()
+    created = await _create(
+        calendar,
+        title="Zone check",
+        start_time=datetime(2026, 10, 9, 9, 0, tzinfo=MADRID),
+        end_time=datetime(2026, 10, 9, 9, 30, tzinfo=MADRID),
+        repeat=Repeat(frequency="weekly", days=["FR"]),
+    )
+
+    stored = ICalendar.from_ical(calendar.events[created.id].data)
+    before, after = ical_series.dates(stored, datetime(2026, 10, 23, tzinfo=MADRID), 2)
+
+    assert (before.astimezone(MADRID).hour, after.astimezone(MADRID).hour) == (9, 9)
+    assert after.astimezone(timezone.utc).hour == 8, "09:00 in Madrid is 08:00 UTC once the clocks go back"
+
+
+def test_a_series_at_a_fixed_offset_drifts_an_hour_when_the_clocks_change():
+    # What the hub stored until 4 Oct 2026, and Google filed under Africa/Maputo.
+    fixed = _shop(SHOP.replace("TZID=Europe/Madrid", "TZID=Africa/Maputo"))
+
+    _, after = ical_series.dates(fixed, datetime(2026, 10, 22, tzinfo=MADRID), 2)
+
+    assert after.astimezone(MADRID).hour == 16, "17:30 becomes 16:30 in Madrid from 25 Oct"
+
+
+def test_the_tool_tells_the_model_to_write_the_members_clock_time():
+    from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+
+    tools = {tool.name: tool.parameters_schema["properties"] for tool in ListAvailableToolsUseCase().execute()}
+
+    for tool in ("calendar_read", "calendar_write"):
+        for field in ("start_time", "end_time"):
+            said = tools[tool][field]["description"]
+            assert "local" in said, f"{tool}.{field}: {said}"
+            assert not re.search(r"\d{2}:\d{2}:\d{2}Z", said), f"{tool}.{field} shows a UTC example: {said}"
+    assert "local" in tools["calendar_write"]["occurrence_start"]["description"]
