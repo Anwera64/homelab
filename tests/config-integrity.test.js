@@ -420,7 +420,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
     assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
     const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
-    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 28672']) {
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 40960']) {
       assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
     }
 
@@ -473,6 +473,20 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(
       /^volumes:\s*\n[\s\S]*?^  ollama_models:\s*\n\s+name:\s*ollama_models\s*$/m.test(dockerComposeContent),
       'docker-compose.yml must declare the ollama_models volume with a fixed name'
+    );
+  });
+
+  await t.test('Ollama keeps the KV cache at q8_0, half the f16 size', () => {
+    // At f16 the chat model's 28k cache took 1,792 MiB and left the RTX 5080 nearly full (#82).
+    assert.ok(
+      composeService('ollama').includes('- OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}'),
+      'ollama must default OLLAMA_KV_CACHE_TYPE to q8_0'
+    );
+    assert.match(envExampleContent, /^OLLAMA_KV_CACHE_TYPE=q8_0$/m, '.env.example must set OLLAMA_KV_CACHE_TYPE=q8_0');
+    assert.match(
+      envExampleContent,
+      /^#[^\n]*\bf16\b[^\n]*\nOLLAMA_KV_CACHE_TYPE=/m,
+      '.env.example must name f16 as the way back, just above OLLAMA_KV_CACHE_TYPE'
     );
   });
 
