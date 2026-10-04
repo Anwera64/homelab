@@ -131,7 +131,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
     // Only Grafana is reachable, and it asks for a login; Loki has none of its own.
     assert.equal(composePorts('loki'), '', 'Loki must not publish a port');
-    assert.equal(composePorts('alloy'), '', 'Alloy must not publish a port');
+    // Alloy publishes only the OTLP receiver, for the app's telemetry through the Pi's Caddy.
+    assert.match(composePorts('alloy'), /^\s+-\s*4318:4318\b[^\n]*\n$/, 'Alloy must publish 4318 and nothing else');
 
     for (const volume of ['loki_data', 'alloy_data', 'grafana_data']) {
       assert.ok(declaresVolume(volume), `docker-compose.yml must declare the ${volume} volume with a fixed name`);
@@ -174,6 +175,45 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(alloy, /url\s*=\s*"http:\/\/loki:3100\/loki\/api\/v1\/push"/);
     // The Pi's logs slot in later under their own host.
     assert.match(alloy, /host\s*=\s*"desktop"/);
+  });
+
+  await t.test('Alloy receives the app\'s logs over OTLP and stores them with the member Caddy vouched for', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    const receiver = alloy.match(/otelcol\.receiver\.otlp "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(receiver, 'config.alloy must have an otelcol.receiver.otlp');
+    assert.match(receiver[1], /http \{[\s\S]*?endpoint\s*=\s*"0\.0\.0\.0:4318"/);
+    // The member ID arrives as a request header set by Caddy; without this it is thrown away.
+    assert.match(receiver[1], /include_metadata\s*=\s*true/);
+    assert.match(receiver[1], /output \{\s*\n\s*logs\s*=/);
+    // Logs only: nothing stores traces or metrics yet.
+    assert.doesNotMatch(receiver[1], /\b(traces|metrics)\s*=/);
+    assert.doesNotMatch(receiver[1], /grpc\s*\{/, 'only OTLP over HTTP is published');
+    assert.match(alloy, /key\s*=\s*"member\.id"\s*\n\s*action\s*=\s*"upsert"\s*\n\s*from_context\s*=\s*"metadata\.x-member-id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.attribute\.labels"[\s\S]*?value\s*=\s*"member\.id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.resource\.labels"[\s\S]*?value\s*=\s*"service\.name"/);
+    assert.match(alloy, /otelcol\.exporter\.loki "[a-z_]+" \{\s*\n\s*forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+  });
+
+  await t.test('Alloy drops the hub lines that only say a probe was answered', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    // Docker's health check and Caddy's token check for each telemetry batch would drown the rest.
+    assert.match(alloy, /loki\.source\.docker "[a-z_]+" \{[\s\S]*?forward_to\s*=\s*\[loki\.process\.[a-z_]+\.receiver\]/);
+    const process = alloy.match(/loki\.process "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(process, 'config.alloy must have a loki.process stage');
+    assert.match(process[1], /forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+    const selector = process[1].match(/selector\s*=\s*"((?:[^"\\]|\\.)*)"/);
+    assert.ok(selector, 'the drop must be a stage.match with a selector');
+    assert.match(process[1], /action\s*=\s*"drop"/);
+    const logql = JSON.parse('"' + selector[1] + '"');
+    assert.match(logql, /^\{container="household-hub"\} \|~ /, 'only the hub is filtered');
+    const filter = new RegExp(JSON.parse(logql.replace(/^\{[^}]*\} \|~ /, '')));
+    const line = (request, status) => `INFO:     127.0.0.1:41642 - "${request} HTTP/1.1" ${status}`;
+    assert.ok(filter.test(line('GET /api/v1/health', '200 OK')), 'an answered health check is dropped');
+    assert.ok(filter.test(line('GET /api/v1/auth/verify', '204 No Content')), 'an accepted token check is dropped');
+    // The failures are the lines worth keeping.
+    assert.ok(!filter.test(line('GET /api/v1/health', '500 Internal Server Error')));
+    assert.ok(!filter.test(line('GET /api/v1/auth/verify', '401 Unauthorized')));
+    assert.ok(!filter.test(line('GET /api/v1/users', '200 OK')));
   });
 
   await t.test('Grafana gets Loki as its data source from the repo, and no password is tracked', () => {
