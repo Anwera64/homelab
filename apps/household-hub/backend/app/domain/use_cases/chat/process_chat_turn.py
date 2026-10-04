@@ -45,6 +45,31 @@ from app.domain.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+# How much of a call's arguments the log keeps: enough to see what was asked, not a whole note.
+LOGGED_ARGUMENTS = 500
+
+
+def _log_call(tc: LLMToolCall, result: ToolExecutionResult, is_turn_secret: bool) -> None:
+    """
+    Says in the hub's log what a tool was asked, and why it failed if it did. The phone is only shown
+    that a step ran, so without this neither a failure nor a step that did the wrong thing can be
+    read back afterwards. What the tool gave back is not logged: a calendar read is the member's
+    week. A secret turn leaves out what was asked too: its content must not outlive it in a log.
+    """
+    name = " ".join(tc.name.split())[:60]
+    asked = "left out (secret turn)" if is_turn_secret else json.dumps(tc.arguments, default=str)[:LOGGED_ARGUMENTS]
+    if result.success:
+        logger.info("Tool %s ok | arguments: %s", name, asked)
+        return
+    reason = getattr(result, "reason", None)
+    logger.warning(
+        "Tool %s failed: %s | reason: %s | arguments: %s",
+        name,
+        result.error,
+        getattr(reason, "value", reason) or "none",
+        asked,
+    )
+
 
 @dataclass
 class ChatTurnResult:
@@ -636,7 +661,7 @@ class ProcessChatTurnUseCase:
         to raise past the loop and end the whole turn, and the model never learnt why.
         """
         try:
-            return await self.tool_executor.execute(
+            result = await self.tool_executor.execute(
                 tool_name=tc.name,
                 arguments=tc.arguments,
                 user_id=user_id,
@@ -647,11 +672,13 @@ class ProcessChatTurnUseCase:
         except ToolPermissionDeniedException:
             shown = " ".join(tc.name.split())[:60]
             names = ", ".join(tool["function"]["name"] for tool in offered)
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tc.name,
                 success=False,
                 error=f"There is no tool '{shown}'. Your tools are: {names}.",
             )
+        _log_call(tc, result, is_turn_secret)
+        return result
 
     @staticmethod
     def _answer_now(question: str) -> str:

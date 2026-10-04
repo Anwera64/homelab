@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Protocol
-from app.domain.entities.calendar_event import CalendarEvent
+from typing import List, Optional, Protocol
+from app.domain.entities.calendar_event import CalendarEvent, Repeat
 from app.domain.entities.integration_credential import CalendarCredential
 
 
@@ -34,6 +34,7 @@ class ICalendarConnector(Protocol):
         location: str = "",
         is_all_day: bool = False,
         timeout: float = 10.0,
+        repeat: Optional[Repeat] = None,
     ) -> CalendarEvent:
         ...
 
@@ -49,7 +50,14 @@ class ICalendarConnector(Protocol):
         location: str | None = None,
         is_all_day: bool | None = None,
         timeout: float = 10.0,
+        repeat: Optional[Repeat] = None,
+        occurrence_start: datetime | None = None,
+        scope: str | None = None,
     ) -> CalendarEvent:
+        """
+        On a repeating event, [occurrence_start] names the date meant and [scope] whether the change
+        is for that date only or it and every later one; [repeat] then sets how the latter repeat.
+        """
         ...
 
     async def delete_event(
@@ -58,5 +66,8 @@ class ICalendarConnector(Protocol):
         secret: str,
         event_id: str,
         timeout: float = 10.0,
+        occurrence_start: datetime | None = None,
+        scope: str | None = None,
     ) -> bool:
+        """On a repeating event, removes the date [occurrence_start] only, or it and every later one."""
         ...

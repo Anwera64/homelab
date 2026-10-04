@@ -18,6 +18,24 @@ from app import __version__
 logger = logging.getLogger("household_hub.bootstrap")
 
 
+def _configure_logging() -> None:
+    """
+    Prints the hub's own log lines from info up. Left alone, Python prints only warnings, so what
+    the hub notes about a tool call that worked would never reach `docker logs`. One handler, however
+    often the app is created.
+    """
+    hub = logging.getLogger("app")
+    hub.setLevel(logging.INFO)
+    if not any(handler.get_name() == HUB_LOG_HANDLER for handler in hub.handlers):
+        handler = logging.StreamHandler()
+        handler.set_name(HUB_LOG_HANDLER)
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        hub.addHandler(handler)
+
+
+HUB_LOG_HANDLER = "household-hub"
+
+
 async def periodic_trash_purger(interval_seconds: int = 3600):
     """Autonomous background task to periodically purge expired trash models and archive their sessions."""
     while True:
@@ -64,6 +82,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    _configure_logging()
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=__version__,

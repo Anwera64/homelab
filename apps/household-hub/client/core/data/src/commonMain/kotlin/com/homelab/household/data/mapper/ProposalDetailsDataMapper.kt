@@ -1,14 +1,19 @@
 package com.homelab.household.data.mapper
 
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventRepeat
+import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.RepeatEvery
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -30,6 +35,8 @@ object ProposalDetailsDataMapper {
                     start = arguments.text(START_TIME)?.let { momentOf(it, allDay) },
                     end = arguments.text(END_TIME)?.let { momentOf(it, allDay) },
                     allDay = allDay,
+                    repeat = (arguments[REPEAT] as? JsonObject)?.let(::repeatOf),
+                    scope = scopeOf(arguments),
                 )
             }
 
@@ -55,6 +62,7 @@ object ProposalDetailsDataMapper {
                     details.start?.let { put(START_TIME, isoOf(it, details.allDay)) }
                     details.end?.let { put(END_TIME, isoOf(it, details.allDay)) }
                     put(IS_ALL_DAY, details.allDay)
+                    details.scope?.let { put(SCOPE, if (it == EventScope.ThisAndFollowing) FOLLOWING else ONLY_THIS) }
                 }
 
                 is ProposalDetails.Note -> {
@@ -93,6 +101,40 @@ object ProposalDetailsDataMapper {
         )
     }
 
+    /**
+     * How an event repeats, from the hub's `repeat` object. A rule the card has no words for (hourly,
+     * a day it can't read, no interval) is read as not repeating rather than shown wrong.
+     */
+    private fun repeatOf(repeat: JsonObject): EventRepeat? {
+        val every = FREQUENCIES[repeat.text(FREQUENCY)?.lowercase()] ?: return null
+        val interval = repeat.int(INTERVAL) ?: 1
+        if (interval < 1) return null
+        val weekdays =
+            (repeat[DAYS] as? JsonArray).orEmpty().map { day ->
+                val code = (day as? JsonPrimitive)?.takeIf { it.isString }?.content?.uppercase()
+                WEEKDAYS.indexOf(code).takeIf { it >= 0 } ?: return null
+            }
+        return EventRepeat(
+            every = every,
+            interval = interval,
+            weekdays = weekdays,
+            until = repeat.text(UNTIL)?.let { momentOf(it, allDay = true) },
+            count = repeat.int(COUNT)?.takeIf { it > 0 },
+        )
+    }
+
+    /**
+     * Which dates a change is for: only a write naming one date of a series (`occurrence_start`) has
+     * a choice, and the hub takes it to be that one date unless it says `following`. A write for the
+     * whole series (`all`) has no choice either, even when the model names a date beside it: the hub
+     * would change all of it whatever the card's switch said.
+     */
+    private fun scopeOf(arguments: JsonObject): EventScope? {
+        val scope = arguments.text(SCOPE)
+        if (scope == ALL || arguments.text(OCCURRENCE_START).isNullOrBlank()) return null
+        return if (scope == FOLLOWING) EventScope.ThisAndFollowing else EventScope.OnlyThis
+    }
+
     private fun isoOf(
         moment: EventMoment,
         allDay: Boolean,
@@ -109,6 +151,8 @@ object ProposalDetailsDataMapper {
     private fun JsonObject.text(key: String): String? =
         (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
 
+    private fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
+
     private fun JsonObject.boolean(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull
 
     private const val TITLE = "title"
@@ -116,6 +160,25 @@ object ProposalDetailsDataMapper {
     private const val START_TIME = "start_time"
     private const val END_TIME = "end_time"
     private const val IS_ALL_DAY = "is_all_day"
+    private const val REPEAT = "repeat"
+    private const val OCCURRENCE_START = "occurrence_start"
+    private const val SCOPE = "scope"
+    private const val FOLLOWING = "following"
+    private const val ALL = "all"
+    private const val ONLY_THIS = "this"
+    private const val FREQUENCY = "frequency"
+    private const val INTERVAL = "interval"
+    private const val DAYS = "days"
+    private const val UNTIL = "until"
+    private const val COUNT = "count"
+    private val FREQUENCIES =
+        mapOf(
+            "daily" to RepeatEvery.Day,
+            "weekly" to RepeatEvery.Week,
+            "monthly" to RepeatEvery.Month,
+            "yearly" to RepeatEvery.Year,
+        )
+    private val WEEKDAYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     private const val MONTHS = 12
     private const val MAX_DAY = 31
     private const val YEAR_DIGITS = 4

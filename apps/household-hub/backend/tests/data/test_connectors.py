@@ -155,8 +155,8 @@ async def test_caldav_update_event_atomic_in_place():
             )
 
             # Assert atomic in-place behavior:
-            # 1. Event was retrieved by UID
-            mock_cal.event_by_uid.assert_called_once_with("event-123")
+            # 1. Event was retrieved by UID: once to change it, once more to confirm the change landed
+            assert [call.args for call in mock_cal.event_by_uid.call_args_list] == [("event-123",)] * 2
             # 2. Delete was NEVER called (preserving data safety)
             mock_event.delete.assert_not_called()
             # 3. Save was called

@@ -1,12 +1,16 @@
 package com.homelab.household.data.mapper
 
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventRepeat
+import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.RepeatEvery
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * A write's details, read from the arguments the model asked with into what the phone shows on the
@@ -122,5 +126,132 @@ class ProposalDetailsDataMapperTest {
             ProposalDetailsDataMapper.toArguments(ProposalDetails.Note("Shopping", "Milk")),
         )
         assertEquals(JsonObject(emptyMap()), ProposalDetailsDataMapper.toArguments(ProposalDetails.Other))
+    }
+
+    @Test
+    fun `GIVEN a weekly event WHEN read THEN it keeps its days and the date it ends`() {
+        val details =
+            ProposalDetailsDataMapper.fromJson(
+                "calendar_write",
+                json(
+                    """{"title": "Gym", "start_time": "2026-09-29T07:00:00Z", "repeat": {"frequency": "weekly", "days": ["TU", "th"], "until": "2026-12-24"}}""",
+                ),
+            ) as ProposalDetails.CalendarEvent
+
+        assertEquals(
+            EventRepeat(RepeatEvery.Week, weekdays = listOf(1, 3), until = EventMoment(2026, 12, 24)),
+            details.repeat,
+        )
+    }
+
+    @Test
+    fun `GIVEN a monthly event every other month WHEN read THEN it keeps how often and how many times`() {
+        val details =
+            ProposalDetailsDataMapper.fromJson(
+                "calendar_write",
+                json("""{"repeat": {"frequency": "MONTHLY", "interval": 2, "count": 6}}"""),
+            ) as ProposalDetails.CalendarEvent
+
+        assertEquals(EventRepeat(RepeatEvery.Month, interval = 2, count = 6), details.repeat)
+    }
+
+    @Test
+    fun `GIVEN a repeat the card has no words for WHEN read THEN the event is read as not repeating`() {
+        listOf(
+            """{"repeat": {"frequency": "hourly"}}""",
+            """{"repeat": {"frequency": "weekly", "days": ["XX"]}}""",
+            """{"repeat": {"frequency": "daily", "interval": 0}}""",
+            """{"repeat": "weekly"}""",
+            """{"repeat": {"frequency": "none"}}""",
+        ).forEach { arguments ->
+            val details =
+                ProposalDetailsDataMapper.fromJson(
+                    "calendar_write",
+                    json(arguments),
+                ) as ProposalDetails.CalendarEvent
+            assertNull(details.repeat, arguments)
+        }
+    }
+
+    @Test
+    fun `GIVEN a change to one date of a repeating event WHEN read THEN it is for that date unless it says the following ones`() {
+        fun scopeOf(arguments: String) =
+            (
+                ProposalDetailsDataMapper.fromJson(
+                    "calendar_write",
+                    json(arguments),
+                ) as ProposalDetails.CalendarEvent
+            ).scope
+
+        assertEquals(
+            EventScope.OnlyThis,
+            scopeOf("""{"action": "delete", "event_id": "gym", "occurrence_start": "2026-10-01T07:00:00Z"}"""),
+        )
+        assertEquals(
+            EventScope.ThisAndFollowing,
+            scopeOf(
+                """{"action": "update", "event_id": "gym", "occurrence_start": "2026-10-06T07:00:00Z", "scope": "following"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun `GIVEN a write that is not about one date of a series WHEN read THEN it has no which-dates`() {
+        fun scopeOf(arguments: String) =
+            (
+                ProposalDetailsDataMapper.fromJson(
+                    "calendar_write",
+                    json(arguments),
+                ) as ProposalDetails.CalendarEvent
+            ).scope
+
+        assertNull(scopeOf("""{"action": "create", "title": "Gym", "repeat": {"frequency": "weekly"}}"""))
+        assertNull(scopeOf("""{"action": "delete", "event_id": "dentist"}"""))
+    }
+
+    @Test
+    fun `GIVEN a write for the whole series WHEN read THEN it has no which-dates even when it names a date`() {
+        fun scopeOf(arguments: String) =
+            (
+                ProposalDetailsDataMapper.fromJson(
+                    "calendar_write",
+                    json(arguments),
+                ) as ProposalDetails.CalendarEvent
+            ).scope
+
+        assertNull(scopeOf("""{"action": "delete", "event_id": "gym", "scope": "all"}"""))
+        assertNull(
+            scopeOf(
+                """{"action": "delete", "event_id": "gym", "occurrence_start": "2026-10-14T14:00:00+02:00", "scope": "all"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun `GIVEN the member picked this and following on the card WHEN written back THEN the hub is told which dates`() {
+        val picked =
+            ProposalDetails.CalendarEvent(
+                title = null,
+                start = null,
+                end = null,
+                allDay = false,
+                scope = EventScope.ThisAndFollowing,
+            )
+
+        assertEquals(json("\"following\""), ProposalDetailsDataMapper.toArguments(picked)["scope"])
+        assertEquals(
+            json("\"this\""),
+            ProposalDetailsDataMapper.toArguments(picked.copy(scope = EventScope.OnlyThis))["scope"],
+        )
+    }
+
+    @Test
+    fun `GIVEN an event with a repeat but no which-dates WHEN written back THEN neither is sent and the hub keeps what the model asked`() {
+        val arguments =
+            ProposalDetailsDataMapper.toArguments(
+                ProposalDetails.CalendarEvent(null, null, null, false, repeat = EventRepeat(RepeatEvery.Day)),
+            )
+
+        assertEquals(json("""{"is_all_day": false}"""), arguments)
     }
 }

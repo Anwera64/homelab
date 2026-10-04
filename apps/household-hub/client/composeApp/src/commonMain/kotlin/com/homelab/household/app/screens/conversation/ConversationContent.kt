@@ -110,7 +110,10 @@ fun ConversationContent(
     onRetryAgents: () -> Unit = {},
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit = { _, _, _ -> },
     onConnectCalendar: () -> Unit = {},
-    onApproveAutomatically: (toolCallId: String) -> Unit = { onDecide(it, true, null) },
+    onApproveAutomatically: (
+        toolCallId: String,
+        edited: ProposalDetails?,
+    ) -> Unit = { id, edited -> onDecide(id, true, edited) },
     onUndoAutomatic: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
@@ -441,7 +444,7 @@ private fun Answer(
     folded: Boolean,
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onConnectCalendar: () -> Unit,
-    onApproveAutomatically: (toolCallId: String) -> Unit,
+    onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
     onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {

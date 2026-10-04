@@ -9,6 +9,7 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
+import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -1661,5 +1662,53 @@ class ChatSessionViewModelTest {
             assertFalse(state.agentsFailed)
             assertEquals(3, state.agents.size)
             assertEquals("agent-coord", state.selectedAgentId)
+        }
+
+    // ---- which dates of a repeating event (repeating events) ---------------
+
+    private val gymMove =
+        dinner.copy(
+            toolCallId = "c4",
+            action = ToolAction.Update,
+            details =
+                ProposalDetails.CalendarEvent(
+                    title = "Gym",
+                    start = EventMoment(2026, 10, 6, hour = 8, minute = 0),
+                    end = null,
+                    allDay = false,
+                    scope = EventScope.OnlyThis,
+                ),
+        )
+    private val gymMoveOnwards =
+        (gymMove.details as ProposalDetails.CalendarEvent).copy(
+            scope = EventScope.ThisAndFollowing,
+        )
+
+    @Test
+    fun `GIVEN the member picked this and following WHEN the card is approved THEN the hub gets the pick`() =
+        runTest(testDispatcher) {
+            openPaused(gymMove)
+            every { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) } returns
+                flowOf(ChatStreamEvent.Accepted, ChatStreamEvent.Done(messageId = "m-2", assistantContent = "Moved."))
+
+            viewModel.decide("c4", approved = true, edited = gymMoveOnwards)
+            advanceUntilIdle()
+
+            verify { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) }
+        }
+
+    @Test
+    fun `GIVEN the member picked this and following WHEN the ticked card is approved THEN the pick goes with it`() =
+        runTest(testDispatcher) {
+            openPaused(gymMove)
+            settingsSave()
+            every { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) } returns
+                flowOf(ChatStreamEvent.Accepted, ChatStreamEvent.Done(messageId = "m-2", assistantContent = "Moved."))
+
+            viewModel.approveAutomatically("c4", edited = gymMoveOnwards)
+            advanceUntilIdle()
+
+            verifySuspend { setToolApprovalUseCase("calendar_write", ToolAction.Update, true) }
+            verify { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) }
         }
 }
