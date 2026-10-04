@@ -10,7 +10,8 @@ sealed interface ProposalDetails {
     /**
      * An event on the member's calendar. [start] and [end] have no time when it is [allDay]. [repeat]
      * is how it repeats, when it does. [scope] is which of its dates a change or removal is for, when
-     * it is about one date of a repeating event, and null otherwise.
+     * it is about one date of a repeating event, and null otherwise. [repeatChange] is only ever set
+     * on details edited on a card: how the member changed the rule, if they did.
      */
     data class CalendarEvent(
         val title: String?,
@@ -19,6 +20,7 @@ sealed interface ProposalDetails {
         val allDay: Boolean,
         val repeat: EventRepeat? = null,
         val scope: EventScope? = null,
+        val repeatChange: RepeatChange? = null,
     ) : ProposalDetails
 
     /** A note: its [title], and the [content] it is given or gains. */
@@ -44,6 +46,15 @@ data class EventRepeat(
 )
 
 enum class RepeatEvery { Day, Week, Month, Year }
+
+/** How the member changed an event's rule on its card: [To] a new one, or [Stop] repeating. */
+sealed interface RepeatChange {
+    data class To(
+        val rule: EventRepeat,
+    ) : RepeatChange
+
+    data object Stop : RepeatChange
+}
 
 /** Which dates of a repeating event a change is for: the one date, or it and every one after it. */
 enum class EventScope { OnlyThis, ThisAndFollowing }

@@ -240,4 +240,105 @@ class ProposalEditTest {
         assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(yearly))
         assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(fortnightly))
     }
+
+    @Test
+    fun `GIVEN a repeating add WHEN its fields open THEN Repeat and Ends start as the rule says`() {
+        val values = proposedValues(gym(ToolAction.Create))
+
+        assertEquals(RepeatEvery.Week, values.repeat)
+        assertEquals(setOf(1, 3), values.weekdays)
+        assertEquals(RepeatEnd.OnDate, values.ends)
+        assertEquals(EventDate(2026, 12, 24), values.lastDate)
+        assertEquals(
+            RepeatEnd.After to 10,
+            proposedValues(gym(ToolAction.Create, repeat = EventRepeat(RepeatEvery.Day, count = 10))).let {
+                it.ends to
+                    it.times
+            },
+        )
+        assertEquals(null to RepeatEnd.Never, proposedValues(dinner).let { it.repeat to it.ends })
+    }
+
+    @Test
+    fun `GIVEN a one-off add WHEN Weekly is picked THEN the start's own weekday is ticked`() {
+        val values = proposedValues(gym(ToolAction.Create, repeat = null)).pickRepeat(RepeatEvery.Week)
+
+        assertEquals(RepeatEvery.Week, values.repeat)
+        assertEquals(setOf(1), values.weekdays)
+    }
+
+    @Test
+    fun `GIVEN a one-off add WHEN made weekly on Tue and Thu until 24 Dec THEN that rule is the repeat change`() {
+        val add = gym(ToolAction.Create, repeat = null)
+        val values =
+            proposedValues(add).copy(
+                repeat = RepeatEvery.Week,
+                weekdays = setOf(3, 1),
+                ends = RepeatEnd.OnDate,
+                lastDate = EventDate(2026, 12, 24),
+            )
+
+        val edit = editProposal(add, values)
+
+        assertEquals(setOf(EditField.Repeat, EditField.Ends), edit.changed)
+        assertEquals(RepeatChange.To(tueThu), (edit.edited as ProposalDetails.CalendarEvent).repeatChange)
+    }
+
+    @Test
+    fun `GIVEN a repeating add WHEN set to end after ten times or made a one-off THEN that is the repeat change`() {
+        val add = gym(ToolAction.Create)
+
+        val tenTimes = editProposal(add, proposedValues(add).copy(ends = RepeatEnd.After, times = 10))
+        val oneOff = editProposal(add, proposedValues(add).copy(repeat = null))
+
+        assertEquals(setOf(EditField.Ends), tenTimes.changed)
+        assertEquals(
+            RepeatChange.To(EventRepeat(RepeatEvery.Week, weekdays = listOf(1, 3), count = 10)),
+            (tenTimes.edited as ProposalDetails.CalendarEvent).repeatChange,
+        )
+        assertEquals(RepeatChange.Stop, (oneOff.edited as ProposalDetails.CalendarEvent).repeatChange)
+    }
+
+    @Test
+    fun `GIVEN a repeating add WHEN only its title is edited THEN no repeat change is sent`() {
+        val add = gym(ToolAction.Create)
+
+        val edit = editProposal(add, proposedValues(add).copy(title = "Swim"))
+
+        assertEquals(setOf(EditField.What), edit.changed)
+        assertNull((edit.edited as ProposalDetails.CalendarEvent).repeatChange)
+    }
+
+    @Test
+    fun `GIVEN a repeat change WHEN laid over the proposal THEN the card shows the new rule`() {
+        val proposal = gym(ToolAction.Create).details
+        val daily = EventRepeat(RepeatEvery.Day)
+
+        assertEquals(
+            daily,
+            (
+                proposal.withEdit(
+                    event(null).copy(repeatChange = RepeatChange.To(daily)),
+                ) as ProposalDetails.CalendarEvent
+            ).repeat,
+        )
+        assertNull(
+            (
+                proposal.withEdit(
+                    event(null).copy(repeatChange = RepeatChange.Stop),
+                ) as ProposalDetails.CalendarEvent
+            ).repeat,
+        )
+    }
+
+    @Test
+    fun `GIVEN one date of a series switched to this and following WHEN its end is changed THEN the change is kept`() {
+        val oneDate = gym(ToolAction.Update, scope = EventScope.OnlyThis)
+        val values = proposedValues(oneDate).copy(ends = RepeatEnd.After, times = 4)
+
+        val edit = editProposal(oneDate, values, scope = EventScope.ThisAndFollowing)
+
+        assertEquals(setOf(EditField.Ends), edit.changed)
+        assertEquals(setOf(), editProposal(oneDate, values).changed)
+    }
 }
