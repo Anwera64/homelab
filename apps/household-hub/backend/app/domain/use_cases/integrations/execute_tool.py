@@ -94,7 +94,10 @@ class ExecuteToolUseCase:
         agent_tool_permissions: List[str],
         is_secret_mode: bool = False,
         sources: Optional[TurnSources] = None,
+        timezone_name: Optional[str] = None,
     ) -> ToolExecutionResult:
+        # The member's zone, as the phone named it. Calendar times are clock time in it.
+        zone = calendar_arguments.zone_of(timezone_name)
         # 1. Verify agent tool permission
         if tool_name not in effective_tool_permissions(agent_tool_permissions):
             raise ToolPermissionDeniedException(
@@ -191,8 +194,8 @@ class ExecuteToolUseCase:
                         success=False,
                         error="Both 'start_time' and 'end_time' are required ISO timestamps for calendar_read.",
                     )
-                start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                start_time = calendar_arguments.moment(start_str, "start_time", zone)
+                end_time = calendar_arguments.moment(end_str, "end_time", zone)
                 limit = int(arguments.get("limit", 50))
 
                 events = await self.get_calendar_events_uc.execute(
@@ -209,12 +212,13 @@ class ExecuteToolUseCase:
                             {
                                 "id": e.id,
                                 "title": e.title,
-                                "start_time": e.start_time.isoformat(),
-                                "end_time": e.end_time.isoformat(),
+                                # A whole day has no clock time to move into a zone: it stays its date.
+                                "start_time": _told(e.start_time, None if e.is_all_day else zone),
+                                "end_time": _told(e.end_time, None if e.is_all_day else zone),
                                 "description": e.description,
                                 "location": e.location,
                                 "is_all_day": e.is_all_day,
-                                **_series_fields(e),
+                                **_series_fields(e, None if e.is_all_day else zone),
                             }
                             for e in events
                         ]
@@ -233,8 +237,8 @@ class ExecuteToolUseCase:
                             success=False,
                             error="'start_time' and 'end_time' are required to create a calendar event.",
                         )
-                    start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                    start_time = calendar_arguments.moment(start_str, "start_time", zone)
+                    end_time = calendar_arguments.moment(end_str, "end_time", zone)
                     created = await self.create_calendar_event_uc.execute(
                         user_id=user_id,
                         title=title,
@@ -252,8 +256,8 @@ class ExecuteToolUseCase:
                             "action": "created",
                             "event_id": created.id,
                             "title": created.title,
-                            "start_time": created.start_time.isoformat(),
-                            "end_time": created.end_time.isoformat(),
+                            "start_time": _told(created.start_time, zone),
+                            "end_time": _told(created.end_time, zone),
                         },
                     )
 
@@ -265,12 +269,8 @@ class ExecuteToolUseCase:
                             success=False,
                             error="'event_id' is required to update a calendar event.",
                         )
-                    start_time = None
-                    if arguments.get("start_time"):
-                        start_time = datetime.fromisoformat(arguments["start_time"].replace("Z", "+00:00"))
-                    end_time = None
-                    if arguments.get("end_time"):
-                        end_time = datetime.fromisoformat(arguments["end_time"].replace("Z", "+00:00"))
+                    start_time = calendar_arguments.moment(arguments.get("start_time"), "start_time", zone)
+                    end_time = calendar_arguments.moment(arguments.get("end_time"), "end_time", zone)
 
                     updated = await self.update_calendar_event_uc.execute(
                         user_id=user_id,
@@ -282,7 +282,9 @@ class ExecuteToolUseCase:
                         location=arguments.get("location"),
                         is_all_day=arguments.get("is_all_day"),
                         repeat=calendar_arguments.repeat(arguments.get("repeat")),
-                        occurrence_start=calendar_arguments.moment(arguments.get("occurrence_start"), "occurrence_start"),
+                        occurrence_start=calendar_arguments.moment(
+                            arguments.get("occurrence_start"), "occurrence_start", zone
+                        ),
                         scope=calendar_arguments.scope(arguments.get("scope")),
                     )
                     return ToolExecutionResult(
@@ -302,7 +304,9 @@ class ExecuteToolUseCase:
                     deleted = await self.delete_calendar_event_uc.execute(
                         user_id=user_id,
                         event_id=event_id,
-                        occurrence_start=calendar_arguments.moment(arguments.get("occurrence_start"), "occurrence_start"),
+                        occurrence_start=calendar_arguments.moment(
+                            arguments.get("occurrence_start"), "occurrence_start", zone
+                        ),
                         scope=calendar_arguments.scope(arguments.get("scope")),
                     )
                     return ToolExecutionResult(
@@ -371,11 +375,21 @@ class ExecuteToolUseCase:
             )
 
 
-def _series_fields(event) -> Dict[str, Any]:
+def _told(when: datetime, zone) -> str:
+    """
+    A time as the model is given it: in the member's zone, so it reads and writes the same clock
+    time the member sees.
+    """
+    if zone is None or when.tzinfo is None:
+        return when.isoformat()
+    return when.astimezone(zone).isoformat()
+
+
+def _series_fields(event, zone=None) -> Dict[str, Any]:
     """What calendar_read says about a date of a repeating event, for the model to name it back by."""
     if event.occurrence_start is None:
         return {}
-    fields: Dict[str, Any] = {"occurrence_start": event.occurrence_start.isoformat()}
+    fields: Dict[str, Any] = {"occurrence_start": _told(event.occurrence_start, zone)}
     if event.repeat is not None:
         fields["repeat"] = event.repeat.to_dict()
     return fields

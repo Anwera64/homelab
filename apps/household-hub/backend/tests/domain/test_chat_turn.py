@@ -132,8 +132,10 @@ class FakeToolExecutor:
     def __init__(self):
         self.executed_calls = []
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
-        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
+    async def execute(
+        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None
+    ):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources, "zone": timezone_name})
         return ToolExecutionResult(tool_name=tool_name, success=True, data={"result": "ok"})
 
 
@@ -827,7 +829,7 @@ class SteppedClock:
 
 
 class FailingToolExecutor(FakeToolExecutor):
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, **_):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         return ToolExecutionResult(tool_name=tool_name, success=False, error="unreachable")
 
@@ -1146,8 +1148,10 @@ async def test_GIVEN_tools_in_two_rounds_WHEN_answered_THEN_every_call_shares_on
 class PassagesToolExecutor(FakeToolExecutor):
     """Looks up three passages of 900 characters each: about 950 tokens by the hub's estimate."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
-        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources})
+    async def execute(
+        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None
+    ):
+        self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources, "zone": timezone_name})
         return ToolExecutionResult(
             tool_name=tool_name,
             success=True,
@@ -1292,7 +1296,7 @@ async def test_GIVEN_a_chat_with_a_summary_WHEN_streamed_THEN_the_model_gets_the
 class StrictToolExecutor(FakeToolExecutor):
     """Refuses a tool the agent wasn't given, the way ExecuteToolUseCase does: by raising."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, **_):
         from app.domain.exceptions import ToolPermissionDeniedException
 
         if tool_name not in agent_tool_permissions:
@@ -1380,7 +1384,7 @@ async def test_GIVEN_a_misspelled_tool_WHEN_answered_without_streaming_THEN_the_
 class ResearchToolExecutor(FakeToolExecutor):
     """A search, a page that reads and one that is blocked, as the real tools answer them."""
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, **_):
         self.executed_calls.append({"tool": tool_name, "args": arguments})
         if tool_name == "searxng_search":
             return ToolExecutionResult(

@@ -15,11 +15,17 @@ class ListAvailableToolsUseCase:
                     "properties": {
                         "start_time": {
                             "type": "string",
-                            "description": "ISO 8601 start timestamp (e.g. 2026-09-08T00:00:00Z)",
+                            "description": (
+                                "Start of the window, in the member's local clock time "
+                                "(e.g. 2026-09-08T00:00:00). Any time zone written is ignored."
+                            ),
                         },
                         "end_time": {
                             "type": "string",
-                            "description": "ISO 8601 end timestamp (e.g. 2026-09-15T23:59:59Z)",
+                            "description": (
+                                "End of the window, in the member's local clock time "
+                                "(e.g. 2026-09-15T23:59:59). Any time zone written is ignored."
+                            ),
                         },
                         "limit": {
                             "type": "integer",
@@ -48,11 +54,17 @@ class ListAvailableToolsUseCase:
                         },
                         "start_time": {
                             "type": "string",
-                            "description": "ISO 8601 event start time",
+                            "description": (
+                                "Event start, in the member's local clock time (e.g. 2026-09-08T18:00:00). "
+                                "Any time zone written is ignored: 18:00 means 18:00 where the member is."
+                            ),
                         },
                         "end_time": {
                             "type": "string",
-                            "description": "ISO 8601 event end time",
+                            "description": (
+                                "Event end, in the member's local clock time (e.g. 2026-09-08T19:00:00). "
+                                "Any time zone written is ignored."
+                            ),
                         },
                         "description": {
                             "type": "string",
@@ -100,8 +112,8 @@ class ListAvailableToolsUseCase:
                             "type": "string",
                             "description": (
                                 "For a repeating event (one calendar_read gave an occurrence_start for) with "
-                                "scope 'this' or 'following': the occurrence_start of the date meant. "
-                                "Not needed with scope 'all'."
+                                "scope 'this' or 'following': the occurrence_start of the date meant, in the "
+                                "member's local clock time as calendar_read gave it. Not needed with scope 'all'."
                             ),
                         },
                         "scope": {

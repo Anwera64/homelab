@@ -23,7 +23,7 @@ class _Executor:
     def __init__(self, result=None, raises=None):
         self.result, self.raises = result, raises
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, **_):
         if self.raises:
             raise self.raises
         return self.result
