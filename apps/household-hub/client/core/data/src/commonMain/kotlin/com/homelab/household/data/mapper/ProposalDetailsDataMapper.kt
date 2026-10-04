@@ -125,11 +125,14 @@ object ProposalDetailsDataMapper {
 
     /**
      * Which dates a change is for: only a write naming one date of a series (`occurrence_start`) has
-     * a choice, and the hub takes it to be that one date unless it says `following`.
+     * a choice, and the hub takes it to be that one date unless it says `following`. A write for the
+     * whole series (`all`) has no choice either, even when the model names a date beside it: the hub
+     * would change all of it whatever the card's switch said.
      */
     private fun scopeOf(arguments: JsonObject): EventScope? {
-        if (arguments.text(OCCURRENCE_START).isNullOrBlank()) return null
-        return if (arguments.text(SCOPE) == FOLLOWING) EventScope.ThisAndFollowing else EventScope.OnlyThis
+        val scope = arguments.text(SCOPE)
+        if (scope == ALL || arguments.text(OCCURRENCE_START).isNullOrBlank()) return null
+        return if (scope == FOLLOWING) EventScope.ThisAndFollowing else EventScope.OnlyThis
     }
 
     private fun isoOf(
@@ -161,6 +164,7 @@ object ProposalDetailsDataMapper {
     private const val OCCURRENCE_START = "occurrence_start"
     private const val SCOPE = "scope"
     private const val FOLLOWING = "following"
+    private const val ALL = "all"
     private const val ONLY_THIS = "this"
     private const val FREQUENCY = "frequency"
     private const val INTERVAL = "interval"

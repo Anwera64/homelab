@@ -210,6 +210,24 @@ class ProposalDetailsDataMapperTest {
     }
 
     @Test
+    fun `GIVEN a write for the whole series WHEN read THEN it has no which-dates even when it names a date`() {
+        fun scopeOf(arguments: String) =
+            (
+                ProposalDetailsDataMapper.fromJson(
+                    "calendar_write",
+                    json(arguments),
+                ) as ProposalDetails.CalendarEvent
+            ).scope
+
+        assertNull(scopeOf("""{"action": "delete", "event_id": "gym", "scope": "all"}"""))
+        assertNull(
+            scopeOf(
+                """{"action": "delete", "event_id": "gym", "occurrence_start": "2026-10-14T14:00:00+02:00", "scope": "all"}""",
+            ),
+        )
+    }
+
+    @Test
     fun `GIVEN the member picked this and following on the card WHEN written back THEN the hub is told which dates`() {
         val picked =
             ProposalDetails.CalendarEvent(
