@@ -68,6 +68,15 @@ data class EditValues(
         val days = if (every == RepeatEvery.Week && weekdays.isEmpty()) setOfNotNull(startDay) else weekdays
         return copy(repeat = every, weekdays = days)
     }
+
+    /** Ends set to [kind]; After with no count yet starts at [DEFAULT_TIMES], as the canvas shows it. */
+    fun pickEnds(kind: RepeatEnd): EditValues =
+        copy(ends = kind, times = if (kind == RepeatEnd.After) times ?: DEFAULT_TIMES else times)
+
+    companion object {
+        const val DEFAULT_TIMES = 10
+        val TIMES = 1..99
+    }
 }
 
 /** When a repeating event stops: never, on [OnDate] its last date, or [After] so many times. */
@@ -172,6 +181,12 @@ fun editProposal(
         buildSet {
             if (EditField.What in fields && values.title.isBlank()) add(EditField.What)
             if (EditField.Words in fields && values.words.isBlank()) add(EditField.Words)
+            if (values.repeat != null) {
+                if (EditField.Repeat in fields && values.repeat == RepeatEvery.Week && values.weekdays.isEmpty()) {
+                    add(EditField.Repeat)
+                }
+                if (EditField.Ends in fields && !endsAfterStart(values)) add(EditField.Ends)
+            }
         }
     if (invalid.isNotEmpty() ||
         changed.isEmpty()
@@ -241,6 +256,24 @@ fun ProposalDetails.withEdit(edit: ProposalDetails): ProposalDetails =
 
         else -> {
             this
+        }
+    }
+
+/** Whether the end the fields give is one a rule can have: a last date from the start on, or 1 to 99 times. */
+private fun endsAfterStart(values: EditValues): Boolean =
+    when (values.ends) {
+        RepeatEnd.Never -> {
+            true
+        }
+
+        RepeatEnd.OnDate -> {
+            val last = values.lastDate
+            val start = values.day
+            last != null && (start == null || last.toEpochDay() >= start.toEpochDay())
+        }
+
+        RepeatEnd.After -> {
+            values.times in EditValues.TIMES
         }
     }
 

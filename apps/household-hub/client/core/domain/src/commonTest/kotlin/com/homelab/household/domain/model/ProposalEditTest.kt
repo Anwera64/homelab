@@ -341,4 +341,42 @@ class ProposalEditTest {
         assertEquals(setOf(EditField.Ends), edit.changed)
         assertEquals(setOf(), editProposal(oneDate, values).changed)
     }
+
+    @Test
+    fun `GIVEN Weekly with no day ticked WHEN approved THEN Repeat is invalid and nothing is sent`() {
+        val add = gym(ToolAction.Create)
+
+        val edit = editProposal(add, proposedValues(add).copy(weekdays = emptySet()))
+
+        assertEquals(setOf(EditField.Repeat), edit.invalid)
+        assertNull(edit.edited)
+    }
+
+    @Test
+    fun `GIVEN an end before the start or no date or a count out of range WHEN approved THEN Ends is invalid`() {
+        val add = gym(ToolAction.Create)
+        val asIs = proposedValues(add)
+
+        listOf(
+            asIs.copy(lastDate = EventDate(2026, 9, 28)),
+            asIs.copy(lastDate = null),
+            asIs.copy(ends = RepeatEnd.After, times = 0),
+            asIs.copy(ends = RepeatEnd.After, times = 100),
+            asIs.copy(ends = RepeatEnd.After, times = null),
+        ).forEach {
+            assertEquals(setOf(EditField.Ends), editProposal(add, it).invalid, it.toString())
+        }
+        assertEquals(setOf(), editProposal(add, asIs.copy(lastDate = EventDate(2026, 9, 29))).invalid)
+    }
+
+    @Test
+    fun `GIVEN a one-off WHEN Ends is left as it was THEN Repeat None needs no end`() {
+        assertEquals(setOf(), editProposal(dinner, asProposed.copy(ends = RepeatEnd.OnDate)).invalid)
+    }
+
+    @Test
+    fun `GIVEN After picked with no count yet WHEN picked THEN it starts at ten times`() {
+        assertEquals(RepeatEnd.After to 10, asProposed.pickEnds(RepeatEnd.After).let { it.ends to it.times })
+        assertEquals(4, asProposed.copy(times = 4).pickEnds(RepeatEnd.After).times)
+    }
 }
