@@ -5,6 +5,7 @@ import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.RepeatChange
 import com.homelab.household.domain.model.RepeatEvery
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -63,6 +64,7 @@ object ProposalDetailsDataMapper {
                     details.end?.let { put(END_TIME, isoOf(it, details.allDay)) }
                     put(IS_ALL_DAY, details.allDay)
                     details.scope?.let { put(SCOPE, if (it == EventScope.ThisAndFollowing) FOLLOWING else ONLY_THIS) }
+                    details.repeatChange?.let { put(REPEAT, repeatJson(it)) }
                 }
 
                 is ProposalDetails.Note -> {
@@ -135,6 +137,30 @@ object ProposalDetailsDataMapper {
         return if (scope == FOLLOWING) EventScope.ThisAndFollowing else EventScope.OnlyThis
     }
 
+    /** The member's new rule as the hub's `repeat`: the whole of it, or `none` to stop repeating. */
+    private fun repeatJson(change: RepeatChange): JsonObject =
+        buildJsonObject {
+            when (change) {
+                RepeatChange.Stop -> {
+                    put(FREQUENCY, NONE)
+                }
+
+                is RepeatChange.To -> {
+                    val rule = change.rule
+                    put(FREQUENCY, FREQUENCIES.entries.first { it.value == rule.every }.key)
+                    put(INTERVAL, rule.interval)
+                    if (rule.weekdays.isNotEmpty()) {
+                        put(
+                            DAYS,
+                            JsonArray(rule.weekdays.map { JsonPrimitive(WEEKDAYS[it]) }),
+                        )
+                    }
+                    rule.until?.let { put(UNTIL, isoOf(it, allDay = true)) }
+                    rule.count?.let { put(COUNT, it) }
+                }
+            }
+        }
+
     private fun isoOf(
         moment: EventMoment,
         allDay: Boolean,
@@ -178,6 +204,7 @@ object ProposalDetailsDataMapper {
             "monthly" to RepeatEvery.Month,
             "yearly" to RepeatEvery.Year,
         )
+    private const val NONE = "none"
     private val WEEKDAYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     private const val MONTHS = 12
     private const val MAX_DAY = 31
