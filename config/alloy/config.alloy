@@ -1,6 +1,7 @@
 // =============================================================================
 // Alloy - reads every container's output through the Docker socket and ships
-// it to Loki. Label a container logs=off to leave it out.
+// it to Loki. Label a container logs=off to leave it out. It also receives the
+// app's logs over OTLP (port 4318, reached through the Pi's Caddy).
 // =============================================================================
 
 discovery.docker "containers" {
@@ -38,6 +39,65 @@ loki.source.docker "containers" {
   labels     = {
     host = "desktop",
   }
+  forward_to = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Docker's health check and Caddy's sign-in check before each telemetry batch: the
+  // answered ones say nothing and would drown the rest. Failures are kept.
+  stage.match {
+    selector            = "{container=\"household-hub\"} |~ \"\\\"GET /api/v1/(health|auth/verify)[^\\\"]*\\\" 20[04]\""
+    action              = "drop"
+    drop_counter_reason = "hub_probe_answered"
+  }
+}
+
+// The app's logs. Caddy has already asked the hub who is signed in and set X-Member-Id.
+otelcol.receiver.otlp "app" {
+  http {
+    endpoint         = "0.0.0.0:4318"
+    include_metadata = true
+  }
+
+  output {
+    logs = [otelcol.processor.attributes.app.input]
+  }
+}
+
+otelcol.processor.attributes "app" {
+  action {
+    key          = "member.id"
+    action       = "upsert"
+    from_context = "metadata.x-member-id"
+  }
+
+  // Loki labels: {service_name="household-hub-app", member_id="..."}.
+  action {
+    key    = "loki.attribute.labels"
+    action = "insert"
+    value  = "member.id"
+  }
+
+  action {
+    key    = "loki.resource.labels"
+    action = "insert"
+    value  = "service.name"
+  }
+
+  output {
+    logs = [otelcol.processor.batch.app.input]
+  }
+}
+
+otelcol.processor.batch "app" {
+  output {
+    logs = [otelcol.exporter.loki.app.input]
+  }
+}
+
+otelcol.exporter.loki "app" {
   forward_to = [loki.write.loki.receiver]
 }
 

@@ -3,8 +3,11 @@ package com.homelab.household
 import androidx.compose.ui.window.ComposeUIViewController
 import com.homelab.household.app.App
 import com.homelab.household.data.di.DEFAULT_BASE_URL
+import com.homelab.household.data.di.DEFAULT_TELEMETRY_URL
 import com.homelab.household.data.network.HubConfig
+import com.homelab.household.data.telemetry.TelemetryConfig
 import com.homelab.household.sdk.HouseholdHubSdk
+import platform.Foundation.NSBundle
 import platform.UIKit.UIViewController
 import kotlin.experimental.ExperimentalNativeApi
 
@@ -20,7 +23,8 @@ import kotlin.experimental.ExperimentalNativeApi
  *
  * The hub address comes from the default in [HouseholdHubSdk.init] — the same constant the
  * `BuildConfig.BASE_URL` on the Android side is generated from — with debug logging determined
- * by [Platform.isDebugBinary].
+ * by [Platform.isDebugBinary]. Where logs are sent is passed the same way Android passes it; the
+ * SDK's own default is off, so that nothing but a real app ever sends any.
  */
 @OptIn(ExperimentalNativeApi::class)
 private val koin by lazy {
@@ -29,6 +33,13 @@ private val koin by lazy {
             HubConfig(
                 baseUrl = DEFAULT_BASE_URL,
                 isDebug = Platform.isDebugBinary,
+            ),
+        telemetryConfig =
+            TelemetryConfig(
+                endpoint = DEFAULT_TELEMETRY_URL,
+                appVersion =
+                    NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String
+                        ?: "unknown",
             ),
     )
 }

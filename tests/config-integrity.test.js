@@ -131,7 +131,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
     // Only Grafana is reachable, and it asks for a login; Loki has none of its own.
     assert.equal(composePorts('loki'), '', 'Loki must not publish a port');
-    assert.equal(composePorts('alloy'), '', 'Alloy must not publish a port');
+    // Alloy publishes only the OTLP receiver, for the app's telemetry through the Pi's Caddy.
+    assert.match(composePorts('alloy'), /^\s+-\s*4318:4318\b[^\n]*\n$/, 'Alloy must publish 4318 and nothing else');
 
     for (const volume of ['loki_data', 'alloy_data', 'grafana_data']) {
       assert.ok(declaresVolume(volume), `docker-compose.yml must declare the ${volume} volume with a fixed name`);
@@ -174,6 +175,70 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(alloy, /url\s*=\s*"http:\/\/loki:3100\/loki\/api\/v1\/push"/);
     // The Pi's logs slot in later under their own host.
     assert.match(alloy, /host\s*=\s*"desktop"/);
+  });
+
+  await t.test('Alloy receives the app\'s logs over OTLP and stores them with the member Caddy vouched for', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    const receiver = alloy.match(/otelcol\.receiver\.otlp "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(receiver, 'config.alloy must have an otelcol.receiver.otlp');
+    assert.match(receiver[1], /http \{[\s\S]*?endpoint\s*=\s*"0\.0\.0\.0:4318"/);
+    // The member ID arrives as a request header set by Caddy; without this it is thrown away.
+    assert.match(receiver[1], /include_metadata\s*=\s*true/);
+    assert.match(receiver[1], /output \{\s*\n\s*logs\s*=/);
+    // Logs only: nothing stores traces or metrics yet.
+    assert.doesNotMatch(receiver[1], /\b(traces|metrics)\s*=/);
+    assert.doesNotMatch(receiver[1], /grpc\s*\{/, 'only OTLP over HTTP is published');
+    assert.match(alloy, /key\s*=\s*"member\.id"\s*\n\s*action\s*=\s*"upsert"\s*\n\s*from_context\s*=\s*"metadata\.x-member-id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.attribute\.labels"[\s\S]*?value\s*=\s*"member\.id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.resource\.labels"[\s\S]*?value\s*=\s*"service\.name"/);
+    assert.match(alloy, /otelcol\.exporter\.loki "[a-z_]+" \{\s*\n\s*forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+  });
+
+  await t.test('Alloy drops the hub lines that only say a probe was answered', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    // Docker's health check and Caddy's token check for each telemetry batch would drown the rest.
+    assert.match(alloy, /loki\.source\.docker "[a-z_]+" \{[\s\S]*?forward_to\s*=\s*\[loki\.process\.[a-z_]+\.receiver\]/);
+    const process = alloy.match(/loki\.process "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(process, 'config.alloy must have a loki.process stage');
+    assert.match(process[1], /forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+    const selector = process[1].match(/selector\s*=\s*"((?:[^"\\]|\\.)*)"/);
+    assert.ok(selector, 'the drop must be a stage.match with a selector');
+    assert.match(process[1], /action\s*=\s*"drop"/);
+    const logql = JSON.parse('"' + selector[1] + '"');
+    assert.match(logql, /^\{container="household-hub"\} \|~ /, 'only the hub is filtered');
+    const filter = new RegExp(JSON.parse(logql.replace(/^\{[^}]*\} \|~ /, '')));
+    const line = (request, status) => `INFO:     127.0.0.1:41642 - "${request} HTTP/1.1" ${status}`;
+    assert.ok(filter.test(line('GET /api/v1/health', '200 OK')), 'an answered health check is dropped');
+    assert.ok(filter.test(line('GET /api/v1/auth/verify', '204 No Content')), 'an accepted token check is dropped');
+    // The failures are the lines worth keeping.
+    assert.ok(!filter.test(line('GET /api/v1/health', '500 Internal Server Error')));
+    assert.ok(!filter.test(line('GET /api/v1/auth/verify', '401 Unauthorized')));
+    assert.ok(!filter.test(line('GET /api/v1/users', '200 OK')));
+  });
+
+  await t.test('Grafana can draw a dashboard as an image, with a renderer that only runs when asked for', () => {
+    const renderer = composeService('grafana-renderer');
+    const grafana = composeService('grafana');
+
+    assert.match(renderer, /image:\s*grafana\/grafana-image-renderer:v\d+\.\d+\.\d+\s*$/m, 'the renderer must be pinned to a release');
+    assert.doesNotMatch(renderer, /watchtower\.enable/, 'pinned; Watchtower must not update it');
+    // A headless browser: too heavy to keep running beside Ollama, so it is started on demand.
+    assert.match(renderer, /profiles:\s*\["render"\]/);
+    assert.match(renderer, /mem_limit:\s*2g\s*$/m);
+    assert.ok(renderer.includes('- GOMEMLIMIT=256MiB'), 'Go must stay well under the container limit');
+    assert.equal(composePorts('grafana-renderer'), '', 'only Grafana talks to the renderer');
+    assert.match(renderer, /container_name:\s*grafana-renderer\s*$/m);
+    assert.match(renderer, /restart:\s*unless-stopped/);
+
+    // The renderer refuses requests without the secret Grafana sends; both read it from one place.
+    const secret = '${GRAFANA_RENDERER_TOKEN:-homelab-renderer}';
+    assert.ok(renderer.includes(`- AUTH_TOKEN=${secret}`));
+    assert.ok(grafana.includes(`- GF_RENDERING_RENDERER_TOKEN=${secret}`));
+    assert.ok(grafana.includes('- GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render'));
+    // The renderer loads the page from Grafana inside the compose network, not through the Pi.
+    assert.ok(grafana.includes('- GF_RENDERING_CALLBACK_URL=http://grafana:3000/'));
+    // Grafana must start without it.
+    assert.doesNotMatch(grafana, /depends_on:\s*\n(?:\s+- [\w-]+\s*\n)*?\s+- grafana-renderer\b/);
   });
 
   await t.test('Grafana gets Loki as its data source from the repo, and no password is tracked', () => {
@@ -420,7 +485,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
     assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
     const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
-    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 28672']) {
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 40960']) {
       assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
     }
 
@@ -473,6 +538,20 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(
       /^volumes:\s*\n[\s\S]*?^  ollama_models:\s*\n\s+name:\s*ollama_models\s*$/m.test(dockerComposeContent),
       'docker-compose.yml must declare the ollama_models volume with a fixed name'
+    );
+  });
+
+  await t.test('Ollama keeps the KV cache at q8_0, half the f16 size', () => {
+    // At f16 the chat model's 28k cache took 1,792 MiB and left the RTX 5080 nearly full (#82).
+    assert.ok(
+      composeService('ollama').includes('- OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}'),
+      'ollama must default OLLAMA_KV_CACHE_TYPE to q8_0'
+    );
+    assert.match(envExampleContent, /^OLLAMA_KV_CACHE_TYPE=q8_0$/m, '.env.example must set OLLAMA_KV_CACHE_TYPE=q8_0');
+    assert.match(
+      envExampleContent,
+      /^#[^\n]*\bf16\b[^\n]*\nOLLAMA_KV_CACHE_TYPE=/m,
+      '.env.example must name f16 as the way back, just above OLLAMA_KV_CACHE_TYPE'
     );
   });
 

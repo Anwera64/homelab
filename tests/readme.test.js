@@ -79,12 +79,18 @@ test('Root README matches the repository', async (t) => {
 
     assert.match(readme, /^\| \*\*Grafana\*\* \| Desktop \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:3002` \|/m);
     assert.match(readme, /^\| \*\*Loki\*\* \| Desktop \| — \| internal `http:\/\/loki:3100` \|/m);
-    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| — \| — \|/m);
 
     const paths = treePaths(readme);
     for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
+  });
+
+  await t.test('says how to start the dashboard image renderer, which does not run by itself', () => {
+    assert.ok(readme.includes('docker compose --profile render up -d grafana-renderer'), 'README must show how to start the renderer');
+    assert.ok(readme.includes('docker compose --profile render stop grafana-renderer'), 'README must show how to stop it');
+    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m)[0];
+    assert.match(desktopRow, /image renderer \(on demand\)/, 'the Desktop row must list the renderer as on demand');
   });
 
   await t.test('says how to search the logs, what is kept and how to open the port', () => {
@@ -97,14 +103,24 @@ test('Root README matches the repository', async (t) => {
     assert.ok(firewall[1].split(',').includes('3002'), 'the firewall rule must admit 3002');
   });
 
+  await t.test('the telemetry route is in the endpoints, the graph and the firewall rule', () => {
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:4318` \|/m);
+    const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
+    assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
+    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
+    assert.ok(firewall[1].split(',').includes('4318'), 'the firewall rule must admit 4318');
+    assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
+  });
+
   await t.test('the firewall rule admits every port the Pi proxies to', () => {
     // -LocalPort replaces the whole list, so a port missing here is closed by copying the command
     // (Cleanuparr's 11011 was, and its HTTPS name answered 502).
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
     assert.ok(firewall, 'README must show the firewall rule');
     const admitted = firewall[1].split(',');
-    // The hub (3051) and the Gluetun API (8000) are reached from the Pi without being in the link adapter.
-    for (const port of [...Object.keys(PORT_TO_SERVICE), '3051', '8000']) {
+    // The hub (3051), Alloy's OTLP receiver (4318) and the Gluetun API (8000) are reached from the Pi
+    // without being in the link adapter.
+    for (const port of [...Object.keys(PORT_TO_SERVICE), '3051', '4318', '8000']) {
       assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
     }
   });

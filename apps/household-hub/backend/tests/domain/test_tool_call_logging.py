@@ -23,7 +23,7 @@ class _Executor:
     def __init__(self, result=None, raises=None):
         self.result, self.raises = result, raises
 
-    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None):
+    async def execute(self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, **_):
         if self.raises:
             raise self.raises
         return self.result
@@ -132,3 +132,75 @@ async def test_GIVEN_long_arguments_WHEN_a_tool_step_succeeds_THEN_the_log_keeps
         await _run(_Executor(DONE), call=note)
 
     assert len(caplog.records[0].getMessage()) < 1000
+
+# --- Who and which conversation: so the hub's lines can be matched with the app's in Loki ---
+
+async def _run_in_session(executor, secret=False):
+    agent = AgentPersonality(id="a1", name="Assistant", tool_permissions=["calendar_write"])
+    return await _turns(executor)._run_tool(REMOVE_GYM, agent, "u1", secret, sources=None, offered=[], session_id="s1")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_tool_step_works_WHEN_it_runs_THEN_the_log_names_the_member_and_the_session(caplog):
+    ok = ToolExecutionResult(tool_name="calendar_write", success=True)
+
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        await _run_in_session(_Executor(ok))
+
+    (line,) = [record.getMessage() for record in caplog.records]
+    assert line.startswith("Tool calendar_write ok")
+    assert "member=u1" in line and "session=s1" in line
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_tool_step_fails_WHEN_it_runs_THEN_the_log_names_the_member_and_the_session(caplog):
+    with caplog.at_level(logging.WARNING, logger=LOGGER):
+        await _run_in_session(_Executor(_failed()))
+
+    line = caplog.records[0].getMessage()
+    assert "member=u1" in line and "session=s1" in line
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_secret_turn_WHEN_a_tool_step_runs_THEN_the_log_names_who_but_still_not_what(caplog):
+    with caplog.at_level(logging.WARNING, logger=LOGGER):
+        await _run_in_session(_Executor(_failed(error="No calendar configured for user.")), secret=True)
+
+    line = caplog.records[0].getMessage()
+    assert "member=u1" in line and "session=s1" in line
+    assert "gym-1" not in line and "2026-10-12" not in line
+
+
+def _turns_with_session(owner: str) -> ProcessChatTurnUseCase:
+    from unittest.mock import AsyncMock
+
+    turns = _turns(MagicMock())
+    session = MagicMock(user_id=owner, is_archived=False, agent_id="a1", is_secret=False)
+    turns.session_repo.get_by_id = AsyncMock(return_value=session)
+    turns.agent_repo.get_by_id = AsyncMock(return_value=MagicMock(id="a1"))
+    return turns
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_member_in_their_own_session_WHEN_a_turn_opens_THEN_the_log_says_who_and_where(caplog):
+    turns = _turns_with_session(owner="u1")
+
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        try:
+            await turns._open_turn("s1", MagicMock(id="u1"))
+        except Exception:
+            pass  # only the line matters here; what a turn needs after it is covered elsewhere
+
+    started = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Turn started")]
+    assert started == ["Turn started | member=u1 session=s1"]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_someone_elses_session_WHEN_a_turn_is_tried_THEN_no_turn_is_logged_as_started(caplog):
+    turns = _turns_with_session(owner="u2")
+
+    with caplog.at_level(logging.INFO, logger=LOGGER):
+        with pytest.raises(Exception):
+            await turns._open_turn("s1", MagicMock(id="u1"))
+
+    assert not [r for r in caplog.records if r.getMessage().startswith("Turn started")]

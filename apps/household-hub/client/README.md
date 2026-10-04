@@ -161,7 +161,7 @@ simply the better test for a screen wired to the real graph.
 | Koin | 4.2.2 |
 | Lifecycle | 2.11.0 |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 26 |
-| iOS deployment target | 15.0 (the simulator SDK's own `RecommendedDeploymentTarget`) |
+| iOS deployment target | 16.0 (required by the OpenTelemetry Kotlin SDK; the simulator SDK itself recommends 15.0) |
 | Xcode / XcodeGen | 26.6 / 2.46.0 |
 | Mocking | Mokkery 3.5.0 (compiler plugin; works on Native) |
 

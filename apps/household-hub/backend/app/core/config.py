@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Model calls an agent gets per turn. Every one but the last may call tools; the last is made to answer.
     MAX_TOOL_CALL_ITERATIONS: int = 8
     # The chat model's window. Must match num_ctx in config/ollama-models/<model>.Modelfile.
-    LLM_CONTEXT_TOKENS: int = 28672
+    LLM_CONTEXT_TOKENS: int = 40960
     # Kept free in every turn for thinking and the answer, so research can never crowd it out.
     ANSWER_RESERVE_TOKENS: int = 4096
     # A chat's newest messages, word for word; older ones live in its summary of this size.

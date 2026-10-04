@@ -347,6 +347,7 @@ services:
     container_name: ollama
     environment:
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-15m}
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
       - OLLAMA_ORIGINS=*
       - TZ=${TZ:-America/Mexico_City}
     volumes:
@@ -424,6 +425,8 @@ services:
   alloy:
     image: grafana/alloy:v1.20.1
     container_name: alloy
+    ports:
+      - 4318:4318   # OTLP over HTTP: the app's logs, through the Pi's Caddy (telemetry.spicy-llama.duckdns.org)
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     volumes:
       - ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro
@@ -447,11 +450,30 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN_NAME:-spicy-llama.duckdns.org}
       - GF_ANALYTICS_REPORTING_ENABLED=false
+      # Dashboards as images, when grafana-renderer is running. The renderer loads the page
+      # from Grafana inside this network, so the callback is not the public name.
+      - GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_RENDERING_RENDERER_TOKEN=${GRAFANA_RENDERER_TOKEN:-homelab-renderer}
     volumes:
       - ${CONFIG_PATH}/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - grafana_data:/var/lib/grafana
     depends_on:
       - loki
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Draws a dashboard or a panel as a PNG for Grafana. A headless browser, too heavy to keep
+  # running beside Ollama, so it only starts when asked:
+  #   docker compose --profile render up -d grafana-renderer
+  grafana-renderer:
+    profiles: ["render"]
+    image: grafana/grafana-image-renderer:v5.12.5
+    container_name: grafana-renderer
+    environment:
+      - AUTH_TOKEN=${GRAFANA_RENDERER_TOKEN:-homelab-renderer}
+      - GOMEMLIMIT=256MiB
+    mem_limit: 2g
     restart: unless-stopped
     logging: *default-logging
 

@@ -248,16 +248,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                         repeat = rules.get(uid)
                         of_series = repeat is not None or "recurrence-id" in component
 
-                        # Normalize to datetime with timezone
-                        if not isinstance(evt_start, datetime):
-                            evt_start = datetime.combine(evt_start, datetime.min.time(), tzinfo=timezone.utc)
-                        elif evt_start.tzinfo is None:
-                            evt_start = evt_start.replace(tzinfo=timezone.utc)
-
-                        if not isinstance(evt_end, datetime):
-                            evt_end = datetime.combine(evt_end, datetime.min.time(), tzinfo=timezone.utc)
-                        elif evt_end.tzinfo is None:
-                            evt_end = evt_end.replace(tzinfo=timezone.utc)
+                        evt_start = ical_series.as_moment(evt_start)
+                        evt_end = ical_series.as_moment(evt_end)
 
                         events.append(
                             CalendarEvent(
@@ -339,6 +331,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                 ical_series.set_repeat(event, repeat)
 
             cal.add_component(event)
+            # An event in a named zone carries that zone's clock changes with it, as the standard asks.
+            cal.add_missing_timezones()
             target_cal.add_event(cal.to_ical())
             _confirm_written(target_cal, cal)
 
@@ -516,6 +510,7 @@ class CalDavCalendarConnector(ICalendarConnector):
 
         _save(event, cal_obj)
         if rest is not None:
+            rest.add_missing_timezones()
             target_cal.add_event(rest.to_ical())
         _confirm_written(target_cal, cal_obj, around=occurrence)
         if rest is not None:
@@ -534,6 +529,58 @@ class CalDavCalendarConnector(ICalendarConnector):
             repeat=ical_series.repeat_of(changed) if scope in (THIS_AND_FOLLOWING, ALL) else None,
             occurrence_start=occurrence,
         )
+
+    def _sync_get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        occurrence_start: Optional[datetime] = None,
+    ) -> Optional[CalendarEvent]:
+        """
+        The event as a member sees it. For a repeating one, [occurrence_start] picks the date meant:
+        the entry it was changed to on its own, else the series at that date. Without it, or with a
+        date the series doesn't have, it is the series from its first date, naming no date.
+        """
+        client = self._sync_get_client(credential, secret)
+        try:
+            target_cal = self._sync_get_target_calendar(client, credential)
+            try:
+                item = target_cal.event_by_uid(event_id)
+            except NotFoundError:
+                return None
+            cal_obj = ICalendar.from_ical(item.data)
+            main = ical_series.master(cal_obj)
+            if main is None:
+                return None
+
+            entry, start, occurrence = main, ical_series.as_moment(main.get("dtstart").dt), None
+            found = None
+            if occurrence_start is not None and ical_series.repeats(cal_obj):
+                found = ical_series.occurrence_at(cal_obj, occurrence_start)
+            if found is not None:
+                occurrence = start = ical_series.as_moment(found)
+                changed = next((c for c in cal_obj.walk("VEVENT") if ical_series.same_occurrence(c, occurrence)), None)
+                if changed is not None:
+                    entry, start = changed, ical_series.as_moment(changed.get("dtstart").dt)
+
+            return CalendarEvent(
+                id=event_id,
+                title=str(entry.get("summary", "Untitled Event")),
+                start_time=start,
+                end_time=start + ical_series.duration(entry),
+                description=str(entry.get("description", "")),
+                location=str(entry.get("location", "")),
+                is_all_day=not isinstance(entry.get("dtstart").dt, datetime),
+                calendar_name=target_cal.name or credential.calendar_name,
+                repeat=ical_series.repeat_of(main),
+                occurrence_start=occurrence,
+            )
+        except Exception as e:
+            if isinstance(e, CalendarIntegrationException):
+                raise
+            _raise_if_refused(e, credential)
+            raise CalendarIntegrationException(f"Failed to read CalDAV event '{event_id}': {str(e)}")
 
     def _sync_delete_event(
         self,
@@ -676,6 +723,22 @@ class CalDavCalendarConnector(ICalendarConnector):
             )
         except asyncio.TimeoutError:
             raise CalendarIntegrationException(f"CalDAV event update timed out after {timeout:.1f}s.")
+
+    async def get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        occurrence_start: Optional[datetime] = None,
+        timeout: float = 10.0,
+    ) -> Optional[CalendarEvent]:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._sync_get_event, credential, secret, event_id, occurrence_start),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise CalendarIntegrationException(f"CalDAV event read timed out after {timeout:.1f}s.")
 
     async def delete_event(
         self,

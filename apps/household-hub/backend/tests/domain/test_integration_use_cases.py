@@ -27,6 +27,7 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
 from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
 from app.domain.use_cases.integrations.manage_documents import (
@@ -170,6 +171,17 @@ class MockCalendarConnector:
                     evt.is_all_day = is_all_day
                 return evt
         raise CalendarIntegrationException(f"Event {event_id} not found")
+
+    async def get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        occurrence_start: Optional[datetime] = None,
+        timeout: float = 10.0,
+    ) -> Optional[CalendarEvent]:
+        self.looked_up_occurrence = occurrence_start
+        return next((evt for evt in self.events if evt.id == event_id), None)
 
     async def delete_event(
         self,
@@ -449,6 +461,46 @@ async def test_calendar_event_lifecycle():
     delete_blocked_uc = DeleteCalendarEventUseCase(repo, connector, secrets, allow_agent_delete=False)
     with pytest.raises(ToolPermissionDeniedException):
         await delete_blocked_uc.execute(user_id="u1", event_id="evt-2")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_event_WHEN_it_is_looked_up_by_its_id_THEN_it_comes_back_and_an_unknown_id_is_none():
+    repo = MockCalendarCredentialRepository()
+    connector = MockCalendarConnector()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+    await repo.save(
+        CalendarCredential(user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1", encrypted_secret="ENC:pass")
+    )
+    now = datetime.now(timezone.utc)
+    created = await CreateCalendarEventUseCase(repo, connector, secrets).execute(user_id="u1", title="Dentist", start_time=now, end_time=now)
+
+    lookup = GetCalendarEventUseCase(repo, connector, secrets)
+
+    assert (await lookup.execute(user_id="u1", event_id=created.id)).title == "Dentist"
+    assert await lookup.execute(user_id="u1", event_id="test-event-1") is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_calendar_connected_WHEN_an_event_is_looked_up_THEN_there_is_none():
+    repo = MockCalendarCredentialRepository()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+
+    assert await GetCalendarEventUseCase(repo, MockCalendarConnector(), secrets).execute(user_id="u1", event_id="evt-1") is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_one_date_of_a_repeating_event_WHEN_looked_up_THEN_the_calendar_is_asked_for_that_date():
+    repo = MockCalendarCredentialRepository()
+    connector = MockCalendarConnector()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+    await repo.save(
+        CalendarCredential(user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1", encrypted_secret="ENC:pass")
+    )
+    second = datetime(2026, 10, 13, 8, 0, tzinfo=timezone.utc)
+
+    await GetCalendarEventUseCase(repo, connector, secrets).execute(user_id="u1", event_id="evt-1", occurrence_start=second)
+
+    assert connector.looked_up_occurrence == second
 
 
 # Tests for SearXNG Use Case
@@ -924,3 +976,124 @@ async def test_GIVEN_the_whole_series_is_meant_WHEN_calendar_write_removes_it_TH
     assert result.success, result.error
     (removed,) = connector.series_calls
     assert removed["scope"] == "all" and removed["occurrence_start"] is None
+
+
+# Calendar times are clock time in the member's zone, whatever zone the model attached.
+MEMBER_ZONE = "Europe/Madrid"
+
+
+def _madrid(day, hour, minute=0):
+    from zoneinfo import ZoneInfo
+
+    return datetime(2026, 10, day, hour, minute, tzinfo=ZoneInfo(MEMBER_ZONE))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_write_adds_an_event_THEN_its_times_are_that_clock_time_there():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={"action": "create", "title": "Gym", "start_time": "2026-10-09T09:00:00Z", "end_time": "2026-10-09T09:30:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    assert result.success, result.error
+    (created,) = connector.events
+    assert created.start_time == _madrid(9, 9) and created.end_time == _madrid(9, 9, 30)
+    assert str(created.start_time.tzinfo) == MEMBER_ZONE
+    assert result.data["start_time"] == "2026-10-09T09:00:00+02:00"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_write_moves_a_date_THEN_the_new_time_and_the_date_named_are_clock_time_there():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(CalendarEvent(id="gym-1", title="Gym", start_time=_madrid(9, 9), end_time=_madrid(9, 9, 30)))
+
+    await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={
+            "action": "update",
+            "event_id": "gym-1",
+            "occurrence_start": "2026-10-09T09:00:00Z",
+            "start_time": "2026-10-09T15:00:00Z",
+            "end_time": "2026-10-09T15:30:00+00:00",
+        },
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    (moved,) = connector.events
+    assert moved.start_time == _madrid(9, 15) and moved.end_time == _madrid(9, 15, 30)
+    assert connector.series_calls[0]["occurrence_start"] == _madrid(9, 9)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_read_runs_THEN_the_agent_is_given_times_in_that_zone():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(
+        CalendarEvent(
+            id="gym-1",
+            title="Gym",
+            start_time=datetime(2026, 10, 9, 7, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 10, 9, 7, 30, tzinfo=timezone.utc),
+            occurrence_start=datetime(2026, 10, 9, 7, 0, tzinfo=timezone.utc),
+        )
+    )
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_read",
+        arguments={"start_time": "2026-10-09T00:00:00Z", "end_time": "2026-10-09T23:59:59Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_read"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    (event,) = result.data["events"]
+    assert event["start_time"] == "2026-10-09T09:00:00+02:00"
+    assert event["end_time"] == "2026-10-09T09:30:00+02:00"
+    assert event["occurrence_start"] == "2026-10-09T09:00:00+02:00"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_zone_from_the_phone_WHEN_a_calendar_tool_runs_THEN_times_are_taken_as_written():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+
+    await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={"action": "create", "title": "Gym", "start_time": "2026-10-09T09:00:00Z", "end_time": "2026-10-09T09:30:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    assert connector.events[0].start_time == datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_whole_day_event_WHEN_calendar_read_runs_THEN_its_day_is_not_moved_into_the_zone():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(
+        CalendarEvent(
+            id="bins",
+            title="Bins out",
+            start_time=datetime(2026, 10, 9, tzinfo=timezone.utc),
+            end_time=datetime(2026, 10, 10, tzinfo=timezone.utc),
+            is_all_day=True,
+            occurrence_start=datetime(2026, 10, 9, tzinfo=timezone.utc),
+        )
+    )
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_read",
+        arguments={"start_time": "2026-10-09T00:00:00", "end_time": "2026-10-09T23:59:59"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_read"],
+        timezone_name="America/New_York",
+    )
+
+    (event,) = result.data["events"]
+    assert event["start_time"].startswith("2026-10-09T00:00:00")
+    assert event["occurrence_start"].startswith("2026-10-09T00:00:00")

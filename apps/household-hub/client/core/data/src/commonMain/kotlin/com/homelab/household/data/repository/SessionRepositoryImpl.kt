@@ -1,5 +1,6 @@
 package com.homelab.household.data.repository
 
+import co.touchlab.kermit.Logger
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.mapper.ChatMessageDataMapper
@@ -35,6 +36,7 @@ class SessionRepositoryImpl(
     private val remote: SessionRemoteDataSource,
     private val cache: SessionCacheLocalDataSource,
     private val pollDelayMs: Long = 1000L,
+    private val log: Logger = Logger.withTag("Chat"),
 ) : SessionRepository {
     override suspend fun listSessions(): List<ConversationSession> =
         remote.listSessions().map { SessionDataMapper.toDomain(it).withLockState() }
@@ -158,6 +160,7 @@ class SessionRepositoryImpl(
                     // A conflict is a turn this stream never heard a word of, so there is nothing of
                     // it to resume; only the conversation can say how it went.
                     val resumable = cause !is SessionConflictException
+                    if (resumable) logDropped()
                     emitAll(recoverReply(sessionId, afterAssistantMessageId, resumable))
                     ended = true
                 }.collect { event ->
@@ -193,8 +196,18 @@ class SessionRepositoryImpl(
             // refusing every later message, since a turn it believes is running blocks one. Nothing
             // here knows what happened, so it goes and asks — and comes back with one of the three
             // endings, every one of which is something a person can read.
-            if (!ended) emitAll(recoverReply(sessionId, afterAssistantMessageId, resumable = true))
+            if (!ended) {
+                logDropped()
+                emitAll(recoverReply(sessionId, afterAssistantMessageId, resumable = true))
+            }
         }
+
+    /**
+     * A stream this phone was hearing stopped before the turn ended. The line is sent off the phone,
+     * so it says only that — no conversation, no words, and not the failure, whose message is where
+     * an address would be.
+     */
+    private fun logDropped() = log.w { "Chat stream dropped" }
 
     /**
      * Get the rest of a turn this phone stopped hearing, and say which kind of ending it had.
@@ -287,6 +300,7 @@ class SessionRepositoryImpl(
                     else -> throw cause
                 }
             }.collect { event ->
+                if (!heard) log.i { "Chat stream resumed" }
                 heard = true
                 when (event) {
                     is ChatStreamEvent.StreamError -> {

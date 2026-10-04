@@ -1,20 +1,30 @@
-from datetime import date, datetime
+from datetime import date, datetime, tzinfo
 from typing import Any, Optional
 
 from app.domain.entities.calendar_event import FREQUENCIES, ONLY_THIS, SCOPES, WEEKDAYS, Repeat
+from app.domain.use_cases.chat.current_date_line import zone_of
+
+__all__ = ["CalendarArgumentError", "moment", "repeat", "scope", "zone_of"]
 
 
 class CalendarArgumentError(ValueError):
     """An argument calendar_write can't use. Its message is written for the model, to fix and retry."""
 
 
-def moment(value: Any, name: str) -> Optional[datetime]:
+def moment(value: Any, name: str, zone: Optional[tzinfo] = None) -> Optional[datetime]:
+    """
+    A time the model wrote. With the member's [zone] it is that clock time in the zone, whatever
+    offset the model attached: a model writes "15:00Z" meaning 15:00, the approval card shows 15:00,
+    and the member approves 15:00. The zone is a named one, so a repeating event follows its clock
+    changes. Without a zone the time is taken as written.
+    """
     if not value:
         return None
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        written = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         raise CalendarArgumentError(f"'{name}' must be an ISO 8601 timestamp, not {value!r}.")
+    return written if zone is None else written.replace(tzinfo=zone)
 
 
 def scope(value: Any) -> str:

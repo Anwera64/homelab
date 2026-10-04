@@ -13,7 +13,7 @@ A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house netwo
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, Loki + Alloy + Grafana (container logs), and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
+| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, Loki + Alloy + Grafana (container logs), Grafana's image renderer (on demand), and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
 
 Both addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names, which Pi-hole resolves for every DHCP client.
 
@@ -81,6 +81,7 @@ graph TD
     CADDY -->|published LAN ports| JELLY & SEERR & ArrSuite & QBIT & JSTAT & HUB & GRAFANA
     HOMEPAGE -.->|HTTP checks + widgets| Desktop
     Desktop -.->|Docker socket| ALLOY
+    CADDY -->|telemetry, token checked by the hub| ALLOY
 ```
 
 ---
@@ -108,7 +109,7 @@ graph TD
 | **SearXNG** | Desktop (AI profile) | — | internal `http://searxng:8080` | Private search for the hub |
 | **Ollama** | Desktop (AI profile) | — | `http://127.0.0.1:11434` (PC only) | Local LLM inference |
 | **Loki** | Desktop | — | internal `http://loki:3100` | Log store, 30 days |
-| **Alloy** | Desktop | — | — | Ships every container's output to Loki |
+| **Alloy** | Desktop | `https://telemetry.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:4318` | Ships every container's output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
 | **Recyclarr** | Desktop | — | — | TRaSH Guides sync, daily 3 AM |
 | **Watchtower** | Desktop | — | — | Image updates, daily 4 AM |
 
@@ -211,7 +212,7 @@ Then start it with `.\startup_homelab.ps1`.
 
 The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the published ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
 ```powershell
-Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696,11011
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,4318,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696,11011
 ```
 `-LocalPort` replaces the whole list, so always pass every port, not only the new one.
 
@@ -231,6 +232,8 @@ Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005
 * **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org` or `http://desktop-kujo8mp.lan:3002`. Try `{container="household-hub"}`, or `{container="household-hub"} |= "tool"` to filter by text.
 * **Grafana sign-in:** admin / admin on first start (Grafana asks for a new password), or `GRAFANA_ADMIN_PASSWORD` in `.env`.
 * **Leave a container out:** label it `logs=off`.
+* **Dashboards as images:** Grafana can draw a dashboard or a panel as a PNG, which is how a dashboard change gets checked without a browser. The renderer is a headless browser and does not run by itself. Start it with `docker compose --profile render up -d grafana-renderer` and stop it with `docker compose --profile render stop grafana-renderer`.
+* **The app's logs:** `{service_name="household-hub-app"}`, or add `member_id="..."` for one member. The app posts them to `https://telemetry.spicy-llama.duckdns.org/v1/logs` with its sign-in token; Caddy asks the hub whose token it is before passing them to Alloy.
 * **Recent lines:** `docker compose logs -f <service>` still works. Docker's own copy is capped at 10 MB x 3 files per container.
 * **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki itself publishes no port.
 
