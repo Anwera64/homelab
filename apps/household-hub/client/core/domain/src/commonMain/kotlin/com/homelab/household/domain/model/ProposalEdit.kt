@@ -79,6 +79,64 @@ data class EditValues(
     }
 }
 
+/** What a rule in the fields comes to: how many [sessions], and the [last] of them. */
+data class RepeatSummary(
+    val sessions: Int,
+    val last: EventDate,
+)
+
+/**
+ * The caption under Ends: how many times the rule in [values] puts the event on the calendar and the
+ * last date, counted day by day from the start the way a calendar does (a monthly 31st skips the
+ * months without one). Null when there is nothing to count: no repeat, no end, no start or no days.
+ */
+fun repeatSummary(values: EditValues): RepeatSummary? {
+    val every = values.repeat ?: return null
+    val start = values.day ?: return null
+    if (every == RepeatEvery.Week && values.weekdays.isEmpty()) return null
+    val first = start.toEpochDay()
+    val lastDay =
+        when (values.ends) {
+            RepeatEnd.Never -> return null
+            RepeatEnd.OnDate -> values.lastDate?.toEpochDay() ?: return null
+            RepeatEnd.After -> Long.MAX_VALUE
+        }
+    val limit = if (values.ends == RepeatEnd.After) values.times ?: return null else Int.MAX_VALUE
+    var sessions = 0
+    var last: Long? = null
+    var day = first
+    while (day <= lastDay && sessions < limit && day - first <= MAX_DAYS_COUNTED) {
+        if (falls(every, values.weekdays, start, day)) {
+            sessions++
+            last = day
+        }
+        day++
+    }
+    return last?.let { RepeatSummary(sessions, EventDate.fromEpochDay(it)) }
+}
+
+/** Whether the rule puts the event on [day] (days since 1970-01-01). */
+private fun falls(
+    every: RepeatEvery,
+    weekdays: Set<Int>,
+    start: EventDate,
+    day: Long,
+): Boolean =
+    when (every) {
+        RepeatEvery.Day -> true
+
+        // 1970-01-01 was a Thursday: 3, counting Monday as 0.
+        RepeatEvery.Week -> (day + THURSDAY).mod(DAYS_IN_WEEK) in weekdays
+
+        RepeatEvery.Month -> EventDate.fromEpochDay(day).day == start.day
+
+        RepeatEvery.Year -> EventDate.fromEpochDay(day).let { it.day == start.day && it.month == start.month }
+    }
+
+private const val THURSDAY = 3L
+private const val DAYS_IN_WEEK = 7
+private const val MAX_DAYS_COUNTED = 20 * 366L
+
 /** When a repeating event stops: never, on [OnDate] its last date, or [After] so many times. */
 enum class RepeatEnd { Never, OnDate, After }
 

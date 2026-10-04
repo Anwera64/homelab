@@ -379,4 +379,44 @@ class ProposalEditTest {
         assertEquals(RepeatEnd.After to 10, asProposed.pickEnds(RepeatEnd.After).let { it.ends to it.times })
         assertEquals(4, asProposed.copy(times = 4).pickEnds(RepeatEnd.After).times)
     }
+
+    @Test
+    fun `GIVEN Tue and Thu from 29 Sep WHEN it ends on 24 Dec or after ten times THEN the caption counts 26 or lands on 29 Oct`() {
+        val asIs = proposedValues(gym(ToolAction.Create))
+
+        assertEquals(RepeatSummary(26, EventDate(2026, 12, 24)), repeatSummary(asIs))
+        assertEquals(RepeatSummary(10, EventDate(2026, 10, 29)), repeatSummary(asIs.pickEnds(RepeatEnd.After)))
+    }
+
+    @Test
+    fun `GIVEN daily and monthly rules WHEN counted THEN a monthly 31st skips the months without one`() {
+        val asIs = proposedValues(gym(ToolAction.Create, repeat = null))
+
+        assertEquals(
+            RepeatSummary(7, EventDate(2026, 10, 5)),
+            repeatSummary(asIs.copy(repeat = RepeatEvery.Day, ends = RepeatEnd.After, times = 7)),
+        )
+        val thirtyFirst =
+            asIs.copy(
+                day = EventDate(2026, 10, 31),
+                repeat = RepeatEvery.Month,
+                ends = RepeatEnd.After,
+                times = 3,
+            )
+        assertEquals(RepeatSummary(3, EventDate(2027, 1, 31)), repeatSummary(thirtyFirst))
+        assertEquals(
+            RepeatSummary(2, EventDate(2026, 12, 31)),
+            repeatSummary(thirtyFirst.copy(ends = RepeatEnd.OnDate, lastDate = EventDate(2027, 1, 30))),
+        )
+    }
+
+    @Test
+    fun `GIVEN no repeat or no end or no start WHEN counted THEN there is no caption`() {
+        val asIs = proposedValues(gym(ToolAction.Create))
+
+        assertNull(repeatSummary(asIs.copy(repeat = null)))
+        assertNull(repeatSummary(asIs.copy(ends = RepeatEnd.Never)))
+        assertNull(repeatSummary(asIs.copy(day = null)))
+        assertNull(repeatSummary(asIs.copy(weekdays = emptySet())))
+    }
 }
