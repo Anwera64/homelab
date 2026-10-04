@@ -211,8 +211,9 @@ Then start it with `.\startup_homelab.ps1`.
 
 The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the published ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
 ```powershell
-Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696,11011
 ```
+`-LocalPort` replaces the whole list, so always pass every port, not only the new one.
 
 ---
 
