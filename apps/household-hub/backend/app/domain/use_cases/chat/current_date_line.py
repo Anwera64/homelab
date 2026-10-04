@@ -13,7 +13,8 @@ _MONTHS = (
 _MAX_TIMEZONE_NAME = 64
 
 
-def _zone(timezone_name: Optional[str]) -> Optional[tzinfo]:
+def zone_of(timezone_name: Optional[str]) -> Optional[tzinfo]:
+    """The zone the phone named, or None when it named none the hub knows."""
     if not timezone_name or len(timezone_name) > _MAX_TIMEZONE_NAME:
         return None
     try:
@@ -24,12 +25,12 @@ def _zone(timezone_name: Optional[str]) -> Optional[tzinfo]:
 
 def timezone_label(timezone_name: Optional[str]) -> str:
     """The zone times are shown in: the phone's, or UTC when it can't be used."""
-    return timezone_name if _zone(timezone_name) else "UTC"
+    return timezone_name if zone_of(timezone_name) else "UTC"
 
 
 def _local(when: datetime, timezone_name: Optional[str]) -> Tuple[datetime, str]:
     """[when] in the phone's zone, and the name to show for it: UTC when the zone can't be used."""
-    zone = _zone(timezone_name)
+    zone = zone_of(timezone_name)
     # SQLite gives times back without their zone; they were all written in UTC.
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)

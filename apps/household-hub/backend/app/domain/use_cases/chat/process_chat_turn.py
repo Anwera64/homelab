@@ -419,7 +419,13 @@ class ProcessChatTurnUseCase:
                 else:
                     # Execute tool
                     tool_result = await self._run_tool(
-                        tc, agent, current_user.id, is_turn_secret, sources=None, offered=agent_tools
+                        tc,
+                        agent,
+                        current_user.id,
+                        is_turn_secret,
+                        sources=None,
+                        offered=agent_tools,
+                        timezone_name=timezone_name,
                     )
                     exec_info = {
                         "tool": tc.name,
@@ -654,6 +660,7 @@ class ProcessChatTurnUseCase:
         is_turn_secret: bool,
         sources: Optional[TurnSources],
         offered: List[Dict[str, Any]],
+        timezone_name: Optional[str] = None,
     ) -> ToolExecutionResult:
         """
         Runs one tool call. A name the agent can't use - misspelled, or garbled with tool-call markup,
@@ -668,6 +675,7 @@ class ProcessChatTurnUseCase:
                 agent_tool_permissions=agent.tool_permissions,
                 is_secret_mode=is_turn_secret,
                 sources=sources,
+                timezone_name=timezone_name,
             )
         except ToolPermissionDeniedException:
             shown = " ".join(tc.name.split())[:60]
@@ -893,6 +901,7 @@ class ProcessChatTurnUseCase:
                 else None
             ),
             budget=_ContextBudget(self.context_window_tokens, self.answer_reserve_tokens),
+            timezone_name=timezone_name,
         )
 
     async def _rounds(self, turn: "_Turn", current_user: User):
@@ -978,7 +987,13 @@ class ProcessChatTurnUseCase:
         """
         yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
         tool_result = await self._run_tool(
-            tc, turn.agent, user_id, turn.is_turn_secret, sources=turn.sources, offered=turn.agent_tools
+            tc,
+            turn.agent,
+            user_id,
+            turn.is_turn_secret,
+            sources=turn.sources,
+            offered=turn.agent_tools,
+            timezone_name=turn.timezone_name,
         )
         summary = summarize_tool(tc.name, tc.arguments, tool_result)
         exec_info = {
@@ -1119,3 +1134,5 @@ class _Turn:
     paused_in_round: Optional[int] = None
     # The saved answer this turn carries on, once there is one.
     message: Optional[ChatMessage] = None
+    # The zone the phone named for this turn: tools read calendar times as clock time in it.
+    timezone_name: Optional[str] = None

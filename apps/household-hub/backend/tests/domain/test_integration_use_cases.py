@@ -924,3 +924,124 @@ async def test_GIVEN_the_whole_series_is_meant_WHEN_calendar_write_removes_it_TH
     assert result.success, result.error
     (removed,) = connector.series_calls
     assert removed["scope"] == "all" and removed["occurrence_start"] is None
+
+
+# Calendar times are clock time in the member's zone, whatever zone the model attached.
+MEMBER_ZONE = "Europe/Madrid"
+
+
+def _madrid(day, hour, minute=0):
+    from zoneinfo import ZoneInfo
+
+    return datetime(2026, 10, day, hour, minute, tzinfo=ZoneInfo(MEMBER_ZONE))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_write_adds_an_event_THEN_its_times_are_that_clock_time_there():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={"action": "create", "title": "Gym", "start_time": "2026-10-09T09:00:00Z", "end_time": "2026-10-09T09:30:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    assert result.success, result.error
+    (created,) = connector.events
+    assert created.start_time == _madrid(9, 9) and created.end_time == _madrid(9, 9, 30)
+    assert str(created.start_time.tzinfo) == MEMBER_ZONE
+    assert result.data["start_time"] == "2026-10-09T09:00:00+02:00"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_write_moves_a_date_THEN_the_new_time_and_the_date_named_are_clock_time_there():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(CalendarEvent(id="gym-1", title="Gym", start_time=_madrid(9, 9), end_time=_madrid(9, 9, 30)))
+
+    await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={
+            "action": "update",
+            "event_id": "gym-1",
+            "occurrence_start": "2026-10-09T09:00:00Z",
+            "start_time": "2026-10-09T15:00:00Z",
+            "end_time": "2026-10-09T15:30:00+00:00",
+        },
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    (moved,) = connector.events
+    assert moved.start_time == _madrid(9, 15) and moved.end_time == _madrid(9, 15, 30)
+    assert connector.series_calls[0]["occurrence_start"] == _madrid(9, 9)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_members_zone_WHEN_calendar_read_runs_THEN_the_agent_is_given_times_in_that_zone():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(
+        CalendarEvent(
+            id="gym-1",
+            title="Gym",
+            start_time=datetime(2026, 10, 9, 7, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 10, 9, 7, 30, tzinfo=timezone.utc),
+            occurrence_start=datetime(2026, 10, 9, 7, 0, tzinfo=timezone.utc),
+        )
+    )
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_read",
+        arguments={"start_time": "2026-10-09T00:00:00Z", "end_time": "2026-10-09T23:59:59Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_read"],
+        timezone_name=MEMBER_ZONE,
+    )
+
+    (event,) = result.data["events"]
+    assert event["start_time"] == "2026-10-09T09:00:00+02:00"
+    assert event["end_time"] == "2026-10-09T09:30:00+02:00"
+    assert event["occurrence_start"] == "2026-10-09T09:00:00+02:00"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_zone_from_the_phone_WHEN_a_calendar_tool_runs_THEN_times_are_taken_as_written():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+
+    await _execute_tool(repo, connector).execute(
+        tool_name="calendar_write",
+        arguments={"action": "create", "title": "Gym", "start_time": "2026-10-09T09:00:00Z", "end_time": "2026-10-09T09:30:00Z"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    assert connector.events[0].start_time == datetime(2026, 10, 9, 9, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_whole_day_event_WHEN_calendar_read_runs_THEN_its_day_is_not_moved_into_the_zone():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(
+        CalendarEvent(
+            id="bins",
+            title="Bins out",
+            start_time=datetime(2026, 10, 9, tzinfo=timezone.utc),
+            end_time=datetime(2026, 10, 10, tzinfo=timezone.utc),
+            is_all_day=True,
+            occurrence_start=datetime(2026, 10, 9, tzinfo=timezone.utc),
+        )
+    )
+
+    result = await _execute_tool(repo, connector).execute(
+        tool_name="calendar_read",
+        arguments={"start_time": "2026-10-09T00:00:00", "end_time": "2026-10-09T23:59:59"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_read"],
+        timezone_name="America/New_York",
+    )
+
+    (event,) = result.data["events"]
+    assert event["start_time"].startswith("2026-10-09T00:00:00")
+    assert event["occurrence_start"].startswith("2026-10-09T00:00:00")
