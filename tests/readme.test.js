@@ -85,6 +85,13 @@ test('Root README matches the repository', async (t) => {
     }
   });
 
+  await t.test('says how to start the dashboard image renderer, which does not run by itself', () => {
+    assert.ok(readme.includes('docker compose --profile render up -d grafana-renderer'), 'README must show how to start the renderer');
+    assert.ok(readme.includes('docker compose --profile render stop grafana-renderer'), 'README must show how to stop it');
+    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m)[0];
+    assert.match(desktopRow, /image renderer \(on demand\)/, 'the Desktop row must list the renderer as on demand');
+  });
+
   await t.test('says how to search the logs, what is kept and how to open the port', () => {
     assert.ok(readme.includes('{container="household-hub"}'), 'README must show a LogQL query by container');
     assert.match(readme, /30 days/);
