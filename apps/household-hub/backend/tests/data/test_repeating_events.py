@@ -51,7 +51,11 @@ class _StoredEvent:
         self.delete = MagicMock(side_effect=self._delete)
 
     def _save(self):
-        self.data = self.calendar.keeps(self.data)
+        kept = self.calendar.keeps(self.data)
+        if kept is None:
+            self.calendar.events.pop(self.uid, None)
+        else:
+            self.data = kept
 
     def _delete(self):
         if not self.calendar.keeps_deleted:
@@ -708,3 +712,71 @@ async def test_giving_the_whole_series_a_new_length_sets_it_from_the_new_times()
 
     main, _ = _events(event.data)
     assert main["dtstart"].dt == _wed(7, 16) and main["dtend"].dt == _wed(7, 17)
+
+
+# --- A date moved on its own is the same date by either time ----------------------------------
+
+
+def test_a_moved_date_is_found_by_its_own_time_or_the_time_it_was_moved_to():
+    stretch = ICalendar.from_ical(STRETCH)
+
+    assert ical_series.occurrence_at(stretch, _wed(14, 14)) == _wed(14, 14)
+    assert ical_series.occurrence_at(stretch, _wed(14, 15)) == _wed(14, 14)
+    assert ical_series.occurrence_at(stretch, datetime(2026, 10, 14, 15, 0)) == _wed(14, 14)
+    assert ical_series.occurrence_at(stretch, _wed(21, 15)) is None
+
+
+@pytest.mark.asyncio
+async def test_removing_a_moved_date_named_by_its_new_time_removes_that_date():
+    event, calendar = _stored(STRETCH)
+
+    await _delete(calendar, occurrence_start=datetime(2026, 10, 14, 15, 0), scope="this")
+
+    (main,) = _events(event.data)
+    assert ical_series.dates(ICalendar.from_ical(event.data), _wed(1, 0), 1) == [_wed(21, 14)]
+
+
+# --- Removing the last dates of a series removes the event ------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_removing_from_the_first_date_still_there_removes_the_event():
+    event, calendar = _stored(STRETCH)
+
+    await _delete(calendar, occurrence_start=_wed(14, 14), scope="following")
+
+    event.delete.assert_called_once()
+    event.save.assert_not_called()
+    assert calendar.events == {}
+
+
+@pytest.mark.asyncio
+async def test_removing_the_only_date_left_removes_the_event():
+    two = STRETCH.replace("RRULE:FREQ=WEEKLY;BYDAY=WE", "RRULE:FREQ=WEEKLY;BYDAY=WE;COUNT=2")
+    event, calendar = _stored(two)
+
+    await _delete(calendar, occurrence_start=_wed(14, 14), scope="this")
+
+    event.delete.assert_called_once()
+    event.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_removing_the_following_dates_keeps_an_event_that_still_has_one():
+    kept_first = STRETCH.replace("EXDATE;TZID=Europe/Madrid:20261007T140000\r\n", "")
+    event, calendar = _stored(kept_first)
+
+    await _delete(calendar, occurrence_start=_wed(14, 14), scope="following")
+
+    event.delete.assert_not_called()
+    assert ical_series.dates(ICalendar.from_ical(event.data), _wed(1, 0), 3) == [_wed(7, 14)]
+
+
+@pytest.mark.asyncio
+async def test_removing_the_last_dates_is_done_on_a_calendar_that_drops_an_event_with_no_dates():
+    # Google keeps no event without dates. On 4 Oct 2026 this came back as "does not have it after writing".
+    event, calendar = _stored(STRETCH)
+    calendar.keeps = lambda data: data if ical_series.dates(ICalendar.from_ical(data), _wed(1, 0), 1) else None
+
+    assert await _delete(calendar, occurrence_start=_wed(14, 14), scope="following") is True
+    assert calendar.events == {}

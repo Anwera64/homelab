@@ -273,7 +273,8 @@ def occurrence_at(calendar: ICalendar, moment: datetime) -> Optional[Any]:
     """
     The date of the series that [moment] means, in DTSTART's form, or None when it is none of them.
     The same instant is tried first, then the same time of day in the event's own zone: a model
-    often writes the local time and calls it UTC. A date already skipped is none of them.
+    often writes the local time and calls it UTC. A date moved on its own is also found by the time
+    it was moved to, which is the time a member sees. A date already skipped is none of them.
     """
     first = master(calendar).get("dtstart").dt
     exact = like(moment, first)
@@ -283,7 +284,25 @@ def occurrence_at(calendar: ICalendar, moment: datetime) -> Optional[Any]:
         local = moment.replace(tzinfo=first.tzinfo)
         if dates(calendar, local, 1) == [local]:
             return local
+    for changed in calendar.walk("VEVENT"):
+        if "recurrence-id" in changed and _starts_at(changed, moment):
+            named = like(as_moment(changed["recurrence-id"].dt), first)
+            if dates(calendar, named, 1) == [named]:
+                return named
     return None
+
+
+def _starts_at(component: IEvent, moment: datetime) -> bool:
+    """Whether [component] starts at [moment], as an instant or as the same time of day in its zone."""
+    start = component.get("dtstart").dt
+    if as_moment(like(moment, start)) == as_moment(start):
+        return True
+    return isinstance(start, datetime) and start.tzinfo is not None and moment.replace(tzinfo=start.tzinfo) == start
+
+
+def has_dates(calendar: ICalendar) -> bool:
+    """Whether the series still has a date at all. One with none is not an event any more."""
+    return bool(dates(calendar, master(calendar).get("dtstart").dt, 1))
 
 
 def nearby(calendar: ICalendar, moment: datetime, count: int = 3) -> List[Any]:

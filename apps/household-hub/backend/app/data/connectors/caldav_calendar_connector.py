@@ -134,6 +134,12 @@ def _confirm_gone(target_cal, uid: str) -> None:
         raise CalendarWriteNotConfirmedException(f"The calendar still has event '{uid}' after removing it.")
 
 
+def _remove_whole(target_cal, event, uid: str) -> bool:
+    event.delete()
+    _confirm_gone(target_cal, uid)
+    return True
+
+
 def _entry_like(stored: ICalendar, wrote: IEvent) -> Optional[IEvent]:
     """The entry of [stored] for the same date of the series as [wrote]: the series itself, or one changed date."""
     if "recurrence-id" not in wrote:
@@ -547,17 +553,17 @@ class CalDavCalendarConnector(ICalendarConnector):
                 raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
             cal_obj = ICalendar.from_ical(event.data)
             if scope == ALL or not ical_series.repeats(cal_obj):
-                event.delete()
-                _confirm_gone(target_cal, event_id)
-                return True
+                return _remove_whole(target_cal, event, event_id)
 
             occurrence = _real_occurrence(cal_obj, occurrence_start, event_id)
             if scope != THIS_AND_FOLLOWING:
                 ical_series.skip(cal_obj, occurrence)
             elif not ical_series.end_before(cal_obj, occurrence):
-                event.delete()
-                _confirm_gone(target_cal, event_id)
-                return True
+                return _remove_whole(target_cal, event, event_id)
+            # A series left with no dates is not saved: a calendar keeps no such event, so removing
+            # the last of them is removing the event.
+            if not ical_series.has_dates(cal_obj):
+                return _remove_whole(target_cal, event, event_id)
             _bump(ical_series.master(cal_obj))
             _save(event, cal_obj)
             _confirm_written(target_cal, cal_obj, around=occurrence)
