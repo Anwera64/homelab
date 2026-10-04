@@ -196,6 +196,48 @@ def following(calendar: ICalendar, occurrence: datetime) -> ICalendar:
     return series
 
 
+def shift_series(calendar: ICalendar, start_time: Optional[datetime], end_time: Optional[datetime]) -> None:
+    """
+    Gives the whole series a new time of day and length. It keeps its first day: [start_time] says
+    the hour, on whichever date the model had in mind. The dates skipped and the dates changed on
+    their own are named by when the series would have had them, so those names move with it, or a
+    strict calendar app would bring the skipped ones back.
+    """
+    main = master(calendar)
+    first = main.get("dtstart").dt
+    length = duration(main)
+    start = first
+    if start_time is not None and isinstance(first, datetime):
+        to = like(start_time, first)
+        start = first.replace(hour=to.hour, minute=to.minute, second=to.second)
+    if end_time is not None:
+        asked = like(end_time, first) - (like(start_time, first) if start_time is not None else start)
+        length = asked if asked > timedelta(0) else length
+    moved = start - first
+
+    for name in ("dtstart", "dtend", "duration"):
+        main.pop(name, None)
+    main.add("dtstart", start)
+    main.add("dtend", start + length)
+    if not moved:
+        return
+    skipped = [entry.dt for group in _groups(main.get("exdate")) for entry in group.dts]
+    main.pop("exdate", None)
+    for when in skipped:
+        main.add("exdate", when + moved)
+    for changed in calendar.walk("VEVENT"):
+        if "recurrence-id" in changed:
+            named = changed.pop("recurrence-id").dt
+            changed.add("recurrence-id", named + moved)
+
+
+def _groups(exdates) -> list:
+    """A VEVENT's EXDATE lines: icalendar hands back one, a list of them, or nothing."""
+    if not exdates:
+        return []
+    return exdates if isinstance(exdates, list) else [exdates]
+
+
 def duration(component: IEvent) -> timedelta:
     start = component.get("dtstart").dt
     end = component.get("dtend")
@@ -268,8 +310,7 @@ def _in_rule(value, first) -> datetime:
 
 def _skipped(main: IEvent) -> set:
     first = main.get("dtstart").dt
-    exdates = main.get("exdate") or []
-    return {_in_rule(entry.dt, first) for group in (exdates if isinstance(exdates, list) else [exdates]) for entry in group.dts}
+    return {_in_rule(entry.dt, first) for group in _groups(main.get("exdate")) for entry in group.dts}
 
 
 def _dates_before(main: IEvent, at) -> int:

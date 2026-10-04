@@ -380,7 +380,21 @@ def test_the_tool_refuses_a_repeat_it_cannot_write(repeat):
 
 def test_the_tool_refuses_a_scope_it_does_not_have():
     with pytest.raises(CalendarArgumentError):
-        calendar_arguments.scope("all")
+        calendar_arguments.scope("everything")
+
+
+def test_the_tool_takes_the_whole_series_as_a_scope():
+    assert calendar_arguments.scope("all") == "all"
+
+
+def test_the_tool_tells_the_model_it_can_mean_the_whole_series():
+    from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
+
+    tools = ListAvailableToolsUseCase().execute()
+    write = next(tool for tool in tools if tool.name == "calendar_write").parameters_schema["properties"]
+
+    assert write["scope"]["enum"] == ["this", "following", "all"]
+    assert "whole" in write["scope"]["description"] and "occurrence_start" in write["scope"]["description"]
 
 # --- The hub checks the agent's dates against the series itself -------------------------------
 
@@ -618,3 +632,79 @@ async def test_a_split_whose_new_half_the_calendar_dropped_is_not_reported_as_do
         await _update(
             calendar, title="Big shop", occurrence_start=datetime(2026, 10, 15, 17, 30, tzinfo=MADRID), scope="following"
         )
+
+
+# --- The whole series, whatever was done to it before ---------------------------------------
+
+# Stretch on Wednesdays at 14:00 Madrid time from 7 Oct 2026, as the manual test left it: the first
+# date removed, and the second moved an hour later.
+STRETCH = (
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+    "BEGIN:VEVENT\r\nUID:gym-1\r\nDTSTAMP:20261004T000000Z\r\n"
+    "DTSTART;TZID=Europe/Madrid:20261007T140000\r\nDTEND;TZID=Europe/Madrid:20261007T143000\r\n"
+    "SUMMARY:Stretch\r\nRRULE:FREQ=WEEKLY;BYDAY=WE\r\nEXDATE;TZID=Europe/Madrid:20261007T140000\r\n"
+    "END:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nUID:gym-1\r\nDTSTAMP:20261004T000000Z\r\n"
+    "RECURRENCE-ID;TZID=Europe/Madrid:20261014T140000\r\n"
+    "DTSTART;TZID=Europe/Madrid:20261014T150000\r\nDTEND;TZID=Europe/Madrid:20261014T153000\r\n"
+    "SUMMARY:Stretch\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+)
+
+
+def _wed(day, hour, minute=0):
+    return datetime(2026, 10, day, hour, minute, tzinfo=MADRID)
+
+
+@pytest.mark.asyncio
+async def test_removing_the_whole_series_needs_no_date_and_removes_the_event():
+    event, calendar = _stored(STRETCH)
+
+    await _delete(calendar, scope="all")
+
+    event.delete.assert_called_once()
+    event.save.assert_not_called()
+    assert calendar.events == {}
+
+
+@pytest.mark.asyncio
+async def test_a_repeating_event_named_without_a_date_is_told_it_can_mean_the_whole_series():
+    event, calendar = _stored(STRETCH)
+
+    with pytest.raises(CalendarIntegrationException, match="'all'"):
+        await _delete(calendar)
+
+
+@pytest.mark.asyncio
+async def test_renaming_the_whole_series_renames_the_dates_changed_on_their_own_too():
+    event, calendar = _stored(STRETCH)
+
+    updated = await _update(calendar, title="Yoga", scope="all")
+
+    assert [str(entry["summary"]) for entry in _events(event.data)] == ["Yoga", "Yoga"]
+    assert updated.id == "gym-1" and updated.title == "Yoga"
+    calendar.add_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_moving_the_whole_series_to_another_hour_keeps_what_was_skipped_and_what_was_moved():
+    event, calendar = _stored(STRETCH)
+
+    # The model names the new hour on whichever date it has in mind; the series keeps its own first day.
+    await _update(calendar, start_time=_wed(21, 16), scope="all")
+
+    main, moved = _events(event.data)
+    assert main["dtstart"].dt == _wed(7, 16) and main["dtend"].dt == _wed(7, 16, 30)
+    assert ical_series.dates(ICalendar.from_ical(event.data), _wed(1, 0), 2) == [_wed(14, 16), _wed(21, 16)]
+    assert moved["recurrence-id"].dt == _wed(14, 16)
+    assert moved["dtstart"].dt == _wed(14, 15)
+    calendar.add_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_giving_the_whole_series_a_new_length_sets_it_from_the_new_times():
+    event, calendar = _stored(STRETCH)
+
+    await _update(calendar, start_time=_wed(21, 16), end_time=_wed(21, 17), scope="all")
+
+    main, _ = _events(event.data)
+    assert main["dtstart"].dt == _wed(7, 16) and main["dtend"].dt == _wed(7, 17)

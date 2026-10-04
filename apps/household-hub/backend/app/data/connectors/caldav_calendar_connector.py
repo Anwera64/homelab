@@ -7,7 +7,7 @@ from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
 from app.data.connectors import ical_series
-from app.domain.entities.calendar_event import THIS_AND_FOLLOWING, CalendarEvent, Repeat
+from app.domain.entities.calendar_event import ALL, THIS_AND_FOLLOWING, CalendarEvent, Repeat
 from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
@@ -70,7 +70,8 @@ def _real_occurrence(cal_obj: ICalendar, occurrence_start: Optional[datetime], e
     if occurrence_start is None:
         raise CalendarIntegrationException(
             f"Event '{event_id}' repeats. Say which of its dates you mean with occurrence_start, as "
-            "calendar_read gave it, and with scope whether it is for that date only or it and the ones after."
+            "calendar_read gave it, and with scope whether it is for that date only or it and the ones after. "
+            "For the whole event with all its dates, pass scope 'all' and no occurrence_start."
         )
     found = ical_series.occurrence_at(cal_obj, occurrence_start)
     if found is None:
@@ -481,23 +482,30 @@ class CalDavCalendarConnector(ICalendarConnector):
         repeat: Optional[Repeat],
     ) -> CalendarEvent:
         """
-        Changes one date of a repeating event, or that date and every later one. Changing the whole
-        series from its first date is the "following" case at that date. A later date splits the
-        series: the old one ends the day before, a new one carries on changed.
+        Changes one date of a repeating event, that date and every later one, or all of it. From its
+        first date on is all of it too. A later date splits the series: the old one ends the day
+        before, a new one carries on changed.
         """
-        occurrence = _real_occurrence(cal_obj, occurrence_start, event_id)
+        occurrence = None if scope == ALL else _real_occurrence(cal_obj, occurrence_start, event_id)
         main = ical_series.master(cal_obj)
         rest = None
-        if scope != THIS_AND_FOLLOWING:
-            changed = ical_series.override(cal_obj, occurrence)
-        elif ical_series.is_first(cal_obj, occurrence):
+        whole = scope == ALL or (scope == THIS_AND_FOLLOWING and ical_series.is_first(cal_obj, occurrence))
+        if whole:
+            # The dates changed on their own are still this event: a new name is theirs as well.
+            for entry in cal_obj.walk("VEVENT"):
+                _change(entry, title, None, None, description, location)
+            if start_time is not None or end_time is not None:
+                ical_series.shift_series(cal_obj, start_time, end_time)
             changed = main
+        elif scope != THIS_AND_FOLLOWING:
+            changed = ical_series.override(cal_obj, occurrence)
+            _change(changed, title, start_time, end_time, description, location)
         else:
             rest = ical_series.following(cal_obj, occurrence)
             ical_series.end_before(cal_obj, occurrence)
             changed = ical_series.master(rest)
-        _change(changed, title, start_time, end_time, description, location)
-        if repeat is not None and scope == THIS_AND_FOLLOWING:
+            _change(changed, title, start_time, end_time, description, location)
+        if repeat is not None and scope in (THIS_AND_FOLLOWING, ALL):
             ical_series.set_repeat(changed, repeat)
 
         _save(event, cal_obj)
@@ -517,7 +525,7 @@ class CalDavCalendarConnector(ICalendarConnector):
             location=str(changed.get("location", "")),
             is_all_day=not isinstance(changed.get("dtstart").dt, datetime),
             calendar_name=target_cal.name or credential.calendar_name,
-            repeat=ical_series.repeat_of(changed) if scope == THIS_AND_FOLLOWING else None,
+            repeat=ical_series.repeat_of(changed) if scope in (THIS_AND_FOLLOWING, ALL) else None,
             occurrence_start=occurrence,
         )
 
@@ -538,7 +546,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                 _raise_if_refused(e, credential)
                 raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
             cal_obj = ICalendar.from_ical(event.data)
-            if not ical_series.repeats(cal_obj):
+            if scope == ALL or not ical_series.repeats(cal_obj):
                 event.delete()
                 _confirm_gone(target_cal, event_id)
                 return True

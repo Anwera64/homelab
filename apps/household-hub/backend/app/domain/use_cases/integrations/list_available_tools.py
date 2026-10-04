@@ -99,16 +99,19 @@ class ListAvailableToolsUseCase:
                         "occurrence_start": {
                             "type": "string",
                             "description": (
-                                "Required to update or delete a repeating event (one calendar_read gave an "
-                                "occurrence_start for): the occurrence_start of the date meant."
+                                "For a repeating event (one calendar_read gave an occurrence_start for) with "
+                                "scope 'this' or 'following': the occurrence_start of the date meant. "
+                                "Not needed with scope 'all'."
                             ),
                         },
                         "scope": {
                             "type": "string",
-                            "enum": ["this", "following"],
+                            "enum": ["this", "following", "all"],
                             "description": (
                                 "For a repeating event: 'this' changes or removes only that date (default), "
-                                "'following' that date and every later one."
+                                "'following' that date and every later one, 'all' the whole event with "
+                                "every one of its dates. 'all' needs no occurrence_start: use it when the "
+                                "member means the whole series."
                             ),
                             "default": "this",
                         },

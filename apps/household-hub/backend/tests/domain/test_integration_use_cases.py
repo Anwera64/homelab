@@ -905,3 +905,22 @@ async def test_GIVEN_the_calendar_did_not_keep_a_write_WHEN_calendar_write_runs_
 
     assert result.success is False
     assert "still has event 'gym-1'" in result.error
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_whole_series_is_meant_WHEN_calendar_write_removes_it_THEN_no_date_is_needed():
+    repo, connector = await _connected_repo(), MockCalendarConnector()
+    connector.events.append(
+        CalendarEvent(id="gym-1", title="Gym", start_time=datetime(2026, 9, 29, 7, tzinfo=timezone.utc), end_time=datetime(2026, 9, 29, 8, tzinfo=timezone.utc))
+    )
+
+    result = await _execute_tool(repo, connector, allow_calendar_delete=True).execute(
+        tool_name="calendar_write",
+        arguments={"action": "delete", "event_id": "gym-1", "scope": "all"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    assert result.success, result.error
+    (removed,) = connector.series_calls
+    assert removed["scope"] == "all" and removed["occurrence_start"] is None

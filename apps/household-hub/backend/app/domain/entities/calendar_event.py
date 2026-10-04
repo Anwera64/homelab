@@ -9,7 +9,9 @@ WEEKDAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 # Which dates of a repeating event a change or removal is for.
 ONLY_THIS = "this"
 THIS_AND_FOLLOWING = "following"
-SCOPES = (ONLY_THIS, THIS_AND_FOLLOWING)
+# The whole repeating event, whichever of its dates were changed or skipped before. It names no date.
+ALL = "all"
+SCOPES = (ONLY_THIS, THIS_AND_FOLLOWING, ALL)
 
 
 @dataclass
