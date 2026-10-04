@@ -2,7 +2,9 @@ package com.homelab.household.domain.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Editing a card before approving (canvas: ToolEdit): which details open as fields, what they start
@@ -37,15 +39,18 @@ class ProposalEditTest {
     private val asProposed = proposedValues(dinner)
 
     @Test
-    fun `GIVEN an event with a time WHEN edited THEN its title day and time open as fields`() {
-        assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(dinner))
+    fun `GIVEN an event with a time WHEN edited THEN its title day and time open as fields and then how it repeats`() {
+        assertEquals(
+            listOf(EditField.What, EditField.Day, EditField.Time, EditField.Repeat, EditField.Ends),
+            editableFields(dinner),
+        )
     }
 
     @Test
     fun `GIVEN an all-day event WHEN edited THEN it has no time field`() {
         val trip = card(event(start = EventMoment(2026, 10, 3), allDay = true, title = "Trip"))
 
-        assertEquals(listOf(EditField.What, EditField.Day), editableFields(trip))
+        assertEquals(listOf(EditField.What, EditField.Day, EditField.Repeat, EditField.Ends), editableFields(trip))
     }
 
     @Test
@@ -180,5 +185,59 @@ class ProposalEditTest {
             ProposalDetails.Note("Groceries", "Eggs"),
             note().details.withEdit(ProposalDetails.Note(null, "Eggs")),
         )
+    }
+
+    // ---- Repeat and Ends (canvas: RepeatEdit, RepeatEndsPicker, RepeatEndsAfter) ----
+
+    private val gymStart = EventMoment(2026, 9, 29, hour = 7, minute = 0)
+    private val tueThu = EventRepeat(RepeatEvery.Week, weekdays = listOf(1, 3), until = EventMoment(2026, 12, 24))
+
+    private fun gym(
+        action: ToolAction,
+        repeat: EventRepeat? = tueThu,
+        scope: EventScope? = null,
+    ) = card(ProposalDetails.CalendarEvent("Gym", gymStart, null, false, repeat = repeat, scope = scope), action)
+
+    private val withRepeat = listOf(EditField.What, EditField.Day, EditField.Time, EditField.Repeat, EditField.Ends)
+
+    @Test
+    fun `GIVEN an add or a change to a one-off WHEN edited THEN Repeat and Ends open and None is offered`() {
+        listOf(
+            gym(ToolAction.Create),
+            gym(ToolAction.Create, repeat = null),
+            gym(ToolAction.Update, repeat = null),
+        ).forEach {
+            assertEquals(withRepeat, editableFields(it))
+            assertTrue(offersNoRepeat(it))
+        }
+    }
+
+    @Test
+    fun `GIVEN a change to a whole series or to this and following WHEN edited THEN Repeat and Ends open without None`() {
+        val wholeSeries = gym(ToolAction.Update)
+        val onwards = gym(ToolAction.Update, scope = EventScope.ThisAndFollowing)
+
+        listOf(wholeSeries, onwards).forEach {
+            assertEquals(withRepeat, editableFields(it))
+            assertFalse(offersNoRepeat(it))
+        }
+    }
+
+    @Test
+    fun `GIVEN a change to one date of a series WHEN edited THEN it has no Repeat until the switch says this and following`() {
+        val oneDate = gym(ToolAction.Update, scope = EventScope.OnlyThis)
+
+        assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(oneDate))
+        assertEquals(withRepeat, editableFields(oneDate, scope = EventScope.ThisAndFollowing))
+    }
+
+    @Test
+    fun `GIVEN a rule the fields cannot show WHEN edited THEN Repeat and Ends stay closed`() {
+        val yearly = gym(ToolAction.Create, repeat = EventRepeat(RepeatEvery.Year))
+        val fortnightly =
+            gym(ToolAction.Create, repeat = EventRepeat(RepeatEvery.Week, interval = 2, weekdays = listOf(1)))
+
+        assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(yearly))
+        assertEquals(listOf(EditField.What, EditField.Day, EditField.Time), editableFields(fortnightly))
     }
 }

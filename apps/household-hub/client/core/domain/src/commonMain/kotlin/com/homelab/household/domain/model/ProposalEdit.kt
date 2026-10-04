@@ -2,9 +2,10 @@ package com.homelab.household.domain.model
 
 /**
  * A detail of a write the member can change before approving it (canvas: ToolEdit): an event's
- * [What], [Day] and [Time], or a note's title ([What]) and [Words].
+ * [What], [Day] and [Time], how it [Repeat]s and when that [Ends], or a note's title ([What]) and
+ * [Words].
  */
-enum class EditField { What, Day, Time, Words }
+enum class EditField { What, Day, Time, Words, Repeat, Ends }
 
 /** A calendar day picked on a card. [month] is 1 for January. */
 data class EventDate(
@@ -30,6 +31,23 @@ data class TimeOfDay(
 )
 
 /**
+ * Whether a calendar write's rule can be changed on its card: an add, or a change to a one-off, to
+ * the whole series, or to this date and the ones after it, but not to one date on its own, which
+ * can't have a rule of its own. A rule the fields have no words for (yearly, every other week) stays
+ * as proposed rather than be rewritten.
+ */
+private fun opensRepeat(
+    action: ToolAction?,
+    details: ProposalDetails.CalendarEvent,
+    scope: EventScope?,
+): Boolean {
+    val rule = details.repeat
+    val showable = rule == null || (rule.interval == 1 && rule.every != RepeatEvery.Year)
+    val writes = action == ToolAction.Create || (action == ToolAction.Update && scope != EventScope.OnlyThis)
+    return showable && writes
+}
+
+/**
  * What a card's fields hold while it is edited. [day] and [time] are null where the card has no such
  * field: a note, an event with no start, a whole day.
  */
@@ -51,13 +69,20 @@ data class ProposalEdit(
     val invalid: Set<EditField>,
 )
 
+/** Whether [card]'s Repeat offers None: a series can't be made a one-off again. */
+fun offersNoRepeat(card: AnswerPart.Proposal): Boolean =
+    card.action == ToolAction.Create || (card.details as? ProposalDetails.CalendarEvent)?.repeat == null
+
 /**
  * The fields Edit opens on [card], in the order they are drawn, or none when it can't be edited.
  *
  * A removal and a replacement are never edited: saying yes to losing something should be the whole
  * question. Adding to a note keeps its title, which says which note it goes into.
  */
-fun editableFields(card: AnswerPart.Proposal): List<EditField> {
+fun editableFields(
+    card: AnswerPart.Proposal,
+    scope: EventScope? = (card.details as? ProposalDetails.CalendarEvent)?.scope,
+): List<EditField> {
     if (card.action == ToolAction.Delete || card.action == ToolAction.Replace) return emptyList()
     return when (val details = card.details) {
         is ProposalDetails.CalendarEvent -> {
@@ -65,6 +90,10 @@ fun editableFields(card: AnswerPart.Proposal): List<EditField> {
                 add(EditField.What)
                 if (details.start != null) add(EditField.Day)
                 if (details.start?.isWholeDay == false && !details.allDay) add(EditField.Time)
+                if (opensRepeat(card.action, details, scope)) {
+                    add(EditField.Repeat)
+                    add(EditField.Ends)
+                }
             }
         }
 

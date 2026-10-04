@@ -55,7 +55,9 @@ import com.homelab.household.app.resources.tool_card_decline
 import com.homelab.household.app.resources.tool_card_edit
 import com.homelab.household.app.resources.tool_card_field_day
 import com.homelab.household.app.resources.tool_card_field_empty
+import com.homelab.household.app.resources.tool_card_field_ends
 import com.homelab.household.app.resources.tool_card_field_note
+import com.homelab.household.app.resources.tool_card_field_repeat
 import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_field_title
 import com.homelab.household.app.resources.tool_card_field_what
@@ -460,6 +462,14 @@ private fun fieldLabel(
 
         EditField.Words -> {
             Res.string.tool_card_field_note
+        }
+
+        EditField.Repeat -> {
+            Res.string.tool_card_field_repeat
+        }
+
+        EditField.Ends -> {
+            Res.string.tool_card_field_ends
         }
     }
 
