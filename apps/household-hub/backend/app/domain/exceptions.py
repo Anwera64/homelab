@@ -145,6 +145,11 @@ class CalendarUnreachableException(CalendarIntegrationException):
     pass
 
 
+class CalendarWriteNotConfirmedException(CalendarIntegrationException):
+    """The calendar answered a write, but reading it back does not show the change."""
+    pass
+
+
 class CalendarSignInExpiredException(CalendarIntegrationException):
     """A sign-in came back with a state the hub did not issue, or issued too long ago."""
     pass

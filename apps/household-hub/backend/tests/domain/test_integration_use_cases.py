@@ -886,3 +886,22 @@ async def test_calendar_write_tells_the_model_what_is_wrong_with_a_repeat():
 
     assert result.success is False and "repeat.frequency" in result.error
     assert connector.events == []
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_calendar_did_not_keep_a_write_WHEN_calendar_write_runs_THEN_the_step_fails_and_says_what_the_calendar_has():
+    from app.domain.exceptions import CalendarWriteNotConfirmedException
+
+    class ForgetfulCalendarConnector(MockCalendarConnector):
+        async def delete_event(self, *args, **kwargs):
+            raise CalendarWriteNotConfirmedException("The calendar still has event 'gym-1' after removing it.")
+
+    result = await _execute_tool(await _connected_repo(), ForgetfulCalendarConnector(), allow_calendar_delete=True).execute(
+        tool_name="calendar_write",
+        arguments={"action": "delete", "event_id": "gym-1"},
+        user_id="u1",
+        agent_tool_permissions=["calendar_write"],
+    )
+
+    assert result.success is False
+    assert "still has event 'gym-1'" in result.error

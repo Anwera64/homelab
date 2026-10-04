@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import caldav
-from caldav.lib.error import AuthorizationError
+from caldav.lib.error import AuthorizationError, NotFoundError
 from icalendar import Calendar as ICalendar, Event as IEvent
 import uuid
 
@@ -13,6 +13,7 @@ from app.domain.exceptions import (
     CalendarAuthException,
     CalendarIntegrationException,
     CalendarUnreachableException,
+    CalendarWriteNotConfirmedException,
 )
 from app.domain.repositories.calendar_connector import ICalendarConnector
 
@@ -79,6 +80,79 @@ def _real_occurrence(cal_obj: ICalendar, occurrence_start: Optional[datetime], e
             f"Its dates around then: {real or 'none'}. Use one of those as occurrence_start."
         )
     return ical_series.as_moment(found)
+
+
+def _read_back(target_cal, uid: str) -> Optional[ICalendar]:
+    """The event as the calendar holds it now, or None when it has none by that id."""
+    try:
+        return ICalendar.from_ical(target_cal.event_by_uid(uid).data)
+    except NotFoundError:
+        return None
+    except Exception as e:
+        raise CalendarWriteNotConfirmedException(
+            f"The calendar took the write but could not be read back to confirm it: {e}"
+        )
+
+
+def _confirm_written(target_cal, written: ICalendar, around: Optional[datetime] = None) -> None:
+    """
+    Reads an event back after writing it and checks the calendar holds what was written: each of its
+    entries by title and time, and, for a repeating event, the same dates from [around] on. A server
+    answering "saved" is not taken as proof, and neither is the model saying so afterwards. Times
+    are compared as moments, since servers rename zones and keep the moment.
+    """
+    main = ical_series.master(written)
+    name = str(main.get("summary", main.get("uid")))
+    stored = _read_back(target_cal, str(main.get("uid")))
+    if stored is None:
+        raise CalendarWriteNotConfirmedException(f"The calendar does not have '{name}' after writing it.")
+
+    for wrote in written.walk("VEVENT"):
+        kept = _entry_like(stored, wrote)
+        if kept is None:
+            raise CalendarWriteNotConfirmedException(f"The calendar did not keep the change to '{name}'.")
+        if _shown(kept) != _shown(wrote):
+            title, start, _ = _shown(kept)
+            raise CalendarWriteNotConfirmedException(
+                f"The calendar did not keep the change: it has '{title}' at {start.isoformat()}."
+            )
+
+    if not ical_series.repeats(written) and not ical_series.repeats(stored):
+        return
+    start = around or ical_series.as_moment(main.get("dtstart").dt)
+    has = _dates(stored, start) if ical_series.repeats(stored) else None
+    if not ical_series.repeats(written) or has != _dates(written, start):
+        shows = "it does not repeat" if has is None else ", ".join(when.isoformat() for when in has) or "none"
+        raise CalendarWriteNotConfirmedException(
+            f"The calendar did not keep the change to '{name}'. Its dates from {start.isoformat()} are: {shows}."
+        )
+
+
+def _confirm_gone(target_cal, uid: str) -> None:
+    if _read_back(target_cal, uid) is not None:
+        raise CalendarWriteNotConfirmedException(f"The calendar still has event '{uid}' after removing it.")
+
+
+def _entry_like(stored: ICalendar, wrote: IEvent) -> Optional[IEvent]:
+    """The entry of [stored] for the same date of the series as [wrote]: the series itself, or one changed date."""
+    if "recurrence-id" not in wrote:
+        return ical_series.master(stored)
+    occurrence = ical_series.as_moment(wrote["recurrence-id"].dt)
+    return next((c for c in stored.walk("VEVENT") if ical_series.same_occurrence(c, occurrence)), None)
+
+
+def _shown(component: IEvent):
+    """What a member sees of an entry: its title, and when it starts and ends."""
+    start = ical_series.as_moment(component.get("dtstart").dt)
+    return str(component.get("summary", "")), start, start + ical_series.duration(component)
+
+
+def _dates(calendar: ICalendar, start: datetime) -> List[datetime]:
+    return [ical_series.as_moment(when) for when in ical_series.dates(calendar, start, CONFIRMED_DATES)]
+
+
+# How many of a series' dates are compared after a write: enough to show a skip, a move or an end.
+CONFIRMED_DATES = 5
 
 
 class CalDavCalendarConnector(ICalendarConnector):
@@ -259,6 +333,7 @@ class CalDavCalendarConnector(ICalendarConnector):
 
             cal.add_component(event)
             target_cal.add_event(cal.to_ical())
+            _confirm_written(target_cal, cal)
 
             return CalendarEvent(
                 id=uid,
@@ -271,6 +346,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                 calendar_name=target_cal.name or credential.calendar_name,
                 repeat=repeat,
             )
+        except CalendarIntegrationException:
+            raise
         except Exception as e:
             _raise_if_refused(e, credential)
             raise CalendarIntegrationException(f"Failed to create CalDAV event: {str(e)}")
@@ -368,6 +445,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                 ical_series.set_repeat(ical_series.master(cal_obj), repeat)
 
             _save(event, cal_obj)
+            _confirm_written(target_cal, cal_obj)
 
             return CalendarEvent(
                 id=event_id,
@@ -425,6 +503,9 @@ class CalDavCalendarConnector(ICalendarConnector):
         _save(event, cal_obj)
         if rest is not None:
             target_cal.add_event(rest.to_ical())
+        _confirm_written(target_cal, cal_obj, around=occurrence)
+        if rest is not None:
+            _confirm_written(target_cal, rest)
 
         start = ical_series.as_moment(changed.get("dtstart").dt)
         return CalendarEvent(
@@ -459,6 +540,7 @@ class CalDavCalendarConnector(ICalendarConnector):
             cal_obj = ICalendar.from_ical(event.data)
             if not ical_series.repeats(cal_obj):
                 event.delete()
+                _confirm_gone(target_cal, event_id)
                 return True
 
             occurrence = _real_occurrence(cal_obj, occurrence_start, event_id)
@@ -466,9 +548,11 @@ class CalDavCalendarConnector(ICalendarConnector):
                 ical_series.skip(cal_obj, occurrence)
             elif not ical_series.end_before(cal_obj, occurrence):
                 event.delete()
+                _confirm_gone(target_cal, event_id)
                 return True
             _bump(ical_series.master(cal_obj))
             _save(event, cal_obj)
+            _confirm_written(target_cal, cal_obj, around=occurrence)
             return True
         except CalendarIntegrationException:
             raise

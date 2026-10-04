@@ -6,12 +6,13 @@ from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from caldav.lib.error import NotFoundError
 from icalendar import Calendar as ICalendar
 
 from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
 from app.domain.entities.calendar_event import Repeat
 from app.domain.entities.integration_credential import CalendarCredential
-from app.domain.exceptions import CalendarIntegrationException
+from app.domain.exceptions import CalendarIntegrationException, CalendarWriteNotConfirmedException
 from app.domain.use_cases.integrations import calendar_arguments
 from app.domain.use_cases.integrations.calendar_arguments import CalendarArgumentError
 
@@ -41,13 +42,57 @@ def _credential():
     )
 
 
+class _StoredEvent:
+    """One event on the fake calendar, with the calls a test counts."""
+
+    def __init__(self, calendar, uid, data):
+        self.calendar, self.uid, self.data = calendar, uid, data
+        self.save = MagicMock(side_effect=self._save)
+        self.delete = MagicMock(side_effect=self._delete)
+
+    def _save(self):
+        self.data = self.calendar.keeps(self.data)
+
+    def _delete(self):
+        if not self.calendar.keeps_deleted:
+            self.calendar.events.pop(self.uid, None)
+
+
+class FakeCalendar:
+    """
+    A calendar that holds what is written to it, so reading an event back shows what a real server
+    would. `keeps` is what the server makes of each write (None: it drops a new event), and
+    `keeps_deleted` a server that answers a removal without removing.
+    """
+
+    name = "Home"
+
+    def __init__(self):
+        self.events = {}
+        self.keeps = lambda data: data
+        self.keeps_deleted = False
+        self.add_event = MagicMock(side_effect=self._add)
+        self.event_by_uid = MagicMock(side_effect=self._find)
+
+    def put(self, data):
+        uid = str(next(iter(ICalendar.from_ical(data).walk("VEVENT")))["uid"])
+        self.events[uid] = _StoredEvent(self, uid, data)
+        return self.events[uid]
+
+    def _add(self, ical):
+        kept = self.keeps(ical.decode() if isinstance(ical, (bytes, bytearray)) else str(ical))
+        if kept is not None:
+            self.put(kept)
+
+    def _find(self, uid):
+        if uid not in self.events:
+            raise NotFoundError(f"no event {uid}")
+        return self.events[uid]
+
+
 def _stored(data):
-    event = MagicMock()
-    event.data = data
-    calendar = MagicMock()
-    calendar.name = "Home"
-    calendar.event_by_uid.return_value = event
-    return event, calendar
+    calendar = FakeCalendar()
+    return calendar.put(data), calendar
 
 
 def _events(data):
@@ -69,8 +114,7 @@ async def _delete(calendar, **which):
 @pytest.mark.asyncio
 async def test_a_new_weekly_event_is_written_with_its_repeat_rule():
     connector = CalDavCalendarConnector()
-    calendar = MagicMock()
-    calendar.name = "Home"
+    calendar = FakeCalendar()
     with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
         created = await connector.create_event(
             credential=_credential(),
@@ -89,7 +133,7 @@ async def test_a_new_weekly_event_is_written_with_its_repeat_rule():
 @pytest.mark.asyncio
 async def test_a_new_all_day_event_repeating_a_number_of_times_counts_them():
     connector = CalDavCalendarConnector()
-    calendar = MagicMock()
+    calendar = FakeCalendar()
     with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
         await connector.create_event(
             credential=_credential(),
@@ -186,7 +230,6 @@ async def test_moving_one_date_changes_only_that_date():
 async def test_changing_a_date_changed_before_edits_that_same_date():
     event, calendar = _stored(GYM)
     await _update(calendar, title="Gym with Liam", occurrence_start=THU_1_OCT)
-    calendar.event_by_uid.return_value.data = event.data
 
     await _update(calendar, location="Studio 2", occurrence_start=THU_1_OCT)
 
@@ -461,10 +504,117 @@ async def test_a_date_the_series_does_not_have_is_refused_with_the_dates_it_does
 
 @pytest.mark.asyncio
 async def test_removing_an_event_the_calendar_does_not_have_says_so():
-    from caldav.lib.error import NotFoundError
-
     event, calendar = _stored(SHOP)
     calendar.event_by_uid.side_effect = NotFoundError("no such event")
 
     with pytest.raises(CalendarIntegrationException, match="not found"):
         await _delete(calendar, occurrence_start=SHOP_8_OCT)
+
+
+# --- The connector reads the calendar back after it writes -----------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_skip_the_calendar_did_not_keep_is_not_reported_as_done():
+    event, calendar = _stored(SHOP)
+    calendar.keeps = lambda data: re.sub(r"EXDATE[^\r\n]*\r?\n", "", data)
+
+    with pytest.raises(CalendarWriteNotConfirmedException, match="2026-10-08"):
+        await _delete(calendar, occurrence_start=SHOP_8_OCT)
+
+
+@pytest.mark.asyncio
+async def test_an_event_still_there_after_removing_it_is_not_reported_as_done():
+    event, calendar = _stored(GYM.replace("RRULE:FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20261224T235959Z\r\n", ""))
+    calendar.keeps_deleted = True
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _delete(calendar)
+
+
+@pytest.mark.asyncio
+async def test_a_series_the_calendar_did_not_end_is_not_reported_as_done():
+    event, calendar = _stored(SHOP)
+    calendar.keeps = lambda data: SHOP
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _delete(calendar, occurrence_start=datetime(2026, 10, 15, 17, 30, tzinfo=MADRID), scope="following")
+
+
+async def _create(calendar, **event):
+    connector = CalDavCalendarConnector()
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        return await connector.create_event(credential=_credential(), secret="s", **event)
+
+
+GYM_AT_7 = dict(title="Gym", start_time=FIRST, end_time=datetime(2026, 9, 29, 8, 0, tzinfo=timezone.utc))
+
+
+@pytest.mark.asyncio
+async def test_a_new_event_the_calendar_stored_at_another_time_is_not_reported_as_done():
+    calendar = FakeCalendar()
+    calendar.keeps = lambda data: data.replace("DTSTART:20260929T070000Z", "DTSTART:20260929T090000Z")
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _create(calendar, **GYM_AT_7)
+
+
+@pytest.mark.asyncio
+async def test_a_new_event_the_calendar_dropped_is_not_reported_as_done():
+    calendar = FakeCalendar()
+    calendar.keeps = lambda data: None
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _create(calendar, **GYM_AT_7)
+
+
+@pytest.mark.asyncio
+async def test_a_new_repeating_event_stored_without_its_repeat_is_not_reported_as_done():
+    calendar = FakeCalendar()
+    calendar.keeps = lambda data: re.sub(r"RRULE[^\r\n]*\r?\n", "", data)
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _create(calendar, repeat=Repeat(frequency="weekly", days=["TU", "TH"]), **GYM_AT_7)
+
+
+@pytest.mark.asyncio
+async def test_a_calendar_that_only_rewrites_the_zone_has_taken_the_event():
+    # Google names a fixed +02:00 offset after a place that keeps it, as it did with Africa/Maputo.
+    calendar = FakeCalendar()
+    calendar.keeps = lambda data: data.replace("DTSTART:20260929T070000Z", "DTSTART;TZID=Africa/Maputo:20260929T090000").replace(
+        "DTEND:20260929T080000Z", "DTEND;TZID=Africa/Maputo:20260929T100000"
+    )
+
+    created = await _create(calendar, repeat=Repeat(frequency="weekly", days=["TU", "TH"]), **GYM_AT_7)
+
+    assert created.title == "Gym"
+
+
+@pytest.mark.asyncio
+async def test_a_change_the_calendar_did_not_keep_is_not_reported_as_done():
+    one_off = GYM.replace("RRULE:FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20261224T235959Z\r\n", "")
+    event, calendar = _stored(one_off)
+    calendar.keeps = lambda data: one_off
+
+    with pytest.raises(CalendarWriteNotConfirmedException, match="Gym"):
+        await _update(calendar, title="Swim")
+
+
+@pytest.mark.asyncio
+async def test_a_changed_date_the_calendar_did_not_keep_is_not_reported_as_done():
+    event, calendar = _stored(SHOP)
+    calendar.keeps = lambda data: SHOP
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _update(calendar, title="Big shop", occurrence_start=SHOP_8_OCT)
+
+
+@pytest.mark.asyncio
+async def test_a_split_whose_new_half_the_calendar_dropped_is_not_reported_as_done():
+    event, calendar = _stored(SHOP)
+    calendar.keeps = lambda data: data if "UID:gym-1" in data else None
+
+    with pytest.raises(CalendarWriteNotConfirmedException):
+        await _update(
+            calendar, title="Big shop", occurrence_start=datetime(2026, 10, 15, 17, 30, tzinfo=MADRID), scope="following"
+        )
