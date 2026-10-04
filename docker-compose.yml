@@ -347,6 +347,7 @@ services:
     container_name: ollama
     environment:
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-15m}
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
       - OLLAMA_ORIGINS=*
       - TZ=${TZ:-America/Mexico_City}
     volumes:

@@ -1,6 +1,8 @@
 # Qwen3.8-27B RVN (abliterated), IQ3_M. Only 16 of its 64 layers keep a KV cache, so context is
 # cheap: 64 MiB per 1k tokens (f16). At 32k Ollama kept 1 of 65 layers on the CPU (2026-09-24),
 # about 180 MiB short; 28k frees 256 MiB so the whole model stays on the RTX 5080.
+# Compose now stores the cache as q8_0 (OLLAMA_KV_CACHE_TYPE), expected ~32 MiB per 1k tokens
+# (not yet measured); going back to 32k waits on that measurement (#82).
 # The hub's LLM_CONTEXT_TOKENS must match num_ctx.
 FROM /root/.ollama/imports/qwen3.8-rvn.gguf
 RENDERER qwen3.8

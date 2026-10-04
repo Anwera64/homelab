@@ -476,6 +476,20 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
+  await t.test('Ollama keeps the KV cache at q8_0, half the f16 size', () => {
+    // At f16 the chat model's 28k cache took 1,792 MiB and left the RTX 5080 nearly full (#82).
+    assert.ok(
+      composeService('ollama').includes('- OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}'),
+      'ollama must default OLLAMA_KV_CACHE_TYPE to q8_0'
+    );
+    assert.match(envExampleContent, /^OLLAMA_KV_CACHE_TYPE=q8_0$/m, '.env.example must set OLLAMA_KV_CACHE_TYPE=q8_0');
+    assert.match(
+      envExampleContent,
+      /^#[^\n]*\bf16\b[^\n]*\nOLLAMA_KV_CACHE_TYPE=/m,
+      '.env.example must name f16 as the way back, just above OLLAMA_KV_CACHE_TYPE'
+    );
+  });
+
   await t.test('Household Hub runs in compose with its data in a named volume', () => {
     // On the host the backend could not resolve searxng:8080; inside compose every service name resolves.
     const hubMatch = dockerComposeContent.match(/^  household-hub:\s*\n([\s\S]*?)(?=^  [a-z][\w-]*:\s*\n|^[a-z]+:\s*\n)/m);
