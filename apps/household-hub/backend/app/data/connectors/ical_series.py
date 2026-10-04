@@ -10,7 +10,7 @@ master's UID, so a date is only told apart by when it was due: its "occurrence".
 import copy
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from dateutil.rrule import rrulestr
 from icalendar import Calendar as ICalendar, Event as IEvent, vRecur
@@ -206,12 +206,76 @@ def duration(component: IEvent) -> timedelta:
     return timedelta(days=1) if not isinstance(start, datetime) else timedelta(0)
 
 
+def dates(calendar: ICalendar, start, limit: int) -> List[Any]:
+    """
+    Up to [limit] dates of the series from [start] on, in DTSTART's form, as a strict calendar app
+    counts them: the rule's dates, less the ones skipped by an EXDATE that names a date exactly. A
+    skip written for a moment the rule never gives skips nothing, which is how Google reads it.
+    """
+    main = master(calendar)
+    first = main.get("dtstart").dt
+    skipped = _skipped(main)
+    found: List[Any] = []
+    if limit < 1:
+        return found
+    for when in _rule(main).xafter(_in_rule(start, first), inc=True):
+        if when in skipped:
+            continue
+        found.append(when if isinstance(first, datetime) else when.date())
+        if len(found) >= limit:
+            break
+    return found
+
+
+def occurrence_at(calendar: ICalendar, moment: datetime) -> Optional[Any]:
+    """
+    The date of the series that [moment] means, in DTSTART's form, or None when it is none of them.
+    The same instant is tried first, then the same time of day in the event's own zone: a model
+    often writes the local time and calls it UTC. A date already skipped is none of them.
+    """
+    first = master(calendar).get("dtstart").dt
+    exact = like(moment, first)
+    if dates(calendar, exact, 1) == [exact]:
+        return exact
+    if isinstance(first, datetime) and first.tzinfo is not None and moment.tzinfo is not None:
+        local = moment.replace(tzinfo=first.tzinfo)
+        if dates(calendar, local, 1) == [local]:
+            return local
+    return None
+
+
+def nearby(calendar: ICalendar, moment: datetime, count: int = 3) -> List[Any]:
+    """The series' date just before [moment] and the ones from it on, [count] at most: what to offer instead."""
+    main = master(calendar)
+    first = main.get("dtstart").dt
+    rule, skipped = _rule(main), _skipped(main)
+    before = rule.before(_in_rule(moment, first))
+    while before is not None and before in skipped:
+        before = rule.before(before)
+    around = [] if before is None else [before if isinstance(first, datetime) else before.date()]
+    return around + dates(calendar, moment, count - len(around))
+
+
+def _rule(main: IEvent):
+    return rrulestr(main.get("rrule").to_ical().decode(), dtstart=_naive_or_aware(main.get("dtstart").dt))
+
+
+def _in_rule(value, first) -> datetime:
+    """[value], a moment or a day, as the rule of a series starting at [first] counts its dates."""
+    moment = value if isinstance(value, datetime) else datetime.combine(value, datetime.min.time())
+    return _naive_or_aware(like(moment, first))
+
+
+def _skipped(main: IEvent) -> set:
+    first = main.get("dtstart").dt
+    exdates = main.get("exdate") or []
+    return {_in_rule(entry.dt, first) for group in (exdates if isinstance(exdates, list) else [exdates]) for entry in group.dts}
+
+
 def _dates_before(main: IEvent, at) -> int:
     """How many dates the rule gave before [at]: what a COUNT has already used up."""
-    start = main.get("dtstart").dt
-    rule = rrulestr(main.get("rrule").to_ical().decode(), dtstart=_naive_or_aware(start))
     limit = _naive_or_aware(at)
-    return sum(1 for when in rule if when < limit)
+    return sum(1 for when in _rule(main) if when < limit)
 
 
 def _naive_or_aware(value) -> datetime:

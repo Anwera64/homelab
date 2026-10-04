@@ -338,3 +338,82 @@ def test_the_tool_refuses_a_repeat_it_cannot_write(repeat):
 def test_the_tool_refuses_a_scope_it_does_not_have():
     with pytest.raises(CalendarArgumentError):
         calendar_arguments.scope("all")
+
+# --- The hub checks the agent's dates against the series itself -------------------------------
+
+from app.data.connectors import ical_series  # noqa: E402
+
+# Grocery shop on Thursdays at 17:30 Madrid time (+02:00 until 25 Oct) from Thu 8 Oct 2026.
+SHOP = (
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//CalDAV//EN\r\n"
+    "BEGIN:VEVENT\r\nUID:gym-1\r\nDTSTAMP:20261004T000000Z\r\n"
+    "DTSTART;TZID=Europe/Madrid:20261008T173000\r\nDTEND;TZID=Europe/Madrid:20261008T183000\r\n"
+    "SUMMARY:Weekly grocery shop\r\nRRULE:FREQ=WEEKLY;BYDAY=TH\r\n"
+    "END:VEVENT\r\nEND:VCALENDAR\r\n"
+)
+MADRID = ZoneInfo("Europe/Madrid")
+SHOP_8_OCT = datetime(2026, 10, 8, 17, 30, tzinfo=MADRID)
+
+
+def _shop(data=SHOP):
+    return ICalendar.from_ical(data)
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        datetime(2026, 10, 8, 17, 30, tzinfo=MADRID),
+        datetime(2026, 10, 8, 15, 30, tzinfo=timezone.utc),  # the same instant
+        datetime(2026, 10, 8, 17, 30, tzinfo=timezone.utc),  # the local time, wrongly called UTC
+        datetime(2026, 10, 8, 17, 30),  # no zone at all
+    ],
+)
+def test_a_date_the_agent_names_is_matched_to_the_real_date_of_the_series(said):
+    found = ical_series.occurrence_at(_shop(), said)
+
+    assert found == SHOP_8_OCT
+    assert found.utcoffset() == SHOP_8_OCT.utcoffset()
+
+
+def test_a_moment_that_is_no_date_of_the_series_matches_nothing():
+    assert ical_series.occurrence_at(_shop(), datetime(2026, 10, 7, 17, 30, tzinfo=MADRID)) is None
+    assert ical_series.occurrence_at(_shop(), datetime(2026, 10, 8, 9, 0, tzinfo=MADRID)) is None
+    assert ical_series.occurrence_at(_shop(), datetime(2026, 10, 1, 17, 30, tzinfo=MADRID)) is None
+
+
+def test_a_date_already_skipped_is_no_longer_a_date_of_the_series():
+    skipped = _shop(SHOP.replace("RRULE:", "EXDATE;TZID=Europe/Madrid:20261015T173000\r\nRRULE:"))
+
+    assert ical_series.occurrence_at(skipped, datetime(2026, 10, 15, 17, 30, tzinfo=MADRID)) is None
+    assert ical_series.occurrence_at(skipped, SHOP_8_OCT) == SHOP_8_OCT
+
+
+def test_a_skip_written_for_the_wrong_time_skips_nothing():
+    # What Google held on 4 Oct 2026: the skip two hours after the date it was meant for.
+    stale = _shop(SHOP.replace("RRULE:", "EXDATE;TZID=Europe/Madrid:20261008T193000\r\nRRULE:"))
+
+    assert ical_series.dates(stale, SHOP_8_OCT, 2) == [SHOP_8_OCT, datetime(2026, 10, 15, 17, 30, tzinfo=MADRID)]
+
+
+def test_an_all_day_series_is_matched_by_its_day():
+    bins = _shop(
+        SHOP.replace("DTSTART;TZID=Europe/Madrid:20261008T173000", "DTSTART;VALUE=DATE:20261008").replace(
+            "DTEND;TZID=Europe/Madrid:20261008T183000", "DTEND;VALUE=DATE:20261009"
+        )
+    )
+
+    assert ical_series.occurrence_at(bins, datetime(2026, 10, 15, tzinfo=timezone.utc)) == date(2026, 10, 15)
+    assert ical_series.occurrence_at(bins, datetime(2026, 10, 14, tzinfo=timezone.utc)) is None
+
+
+def test_the_dates_around_a_moment_are_the_one_before_and_the_ones_after():
+    around = ical_series.nearby(_shop(), datetime(2026, 10, 20, 12, 0, tzinfo=MADRID))
+
+    assert around == [datetime(2026, 10, day, 17, 30, tzinfo=MADRID) for day in (15, 22, 29)]
+
+
+def test_a_series_that_ended_has_no_dates_after_its_end():
+    ended = _shop(SHOP.replace("BYDAY=TH", "BYDAY=TH;UNTIL=20261015T153000Z"))
+
+    assert ical_series.dates(ended, datetime(2026, 10, 16, tzinfo=timezone.utc), 3) == []
+    assert len(ical_series.dates(ended, SHOP_8_OCT, 5)) == 2
