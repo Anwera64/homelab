@@ -248,16 +248,8 @@ class CalDavCalendarConnector(ICalendarConnector):
                         repeat = rules.get(uid)
                         of_series = repeat is not None or "recurrence-id" in component
 
-                        # Normalize to datetime with timezone
-                        if not isinstance(evt_start, datetime):
-                            evt_start = datetime.combine(evt_start, datetime.min.time(), tzinfo=timezone.utc)
-                        elif evt_start.tzinfo is None:
-                            evt_start = evt_start.replace(tzinfo=timezone.utc)
-
-                        if not isinstance(evt_end, datetime):
-                            evt_end = datetime.combine(evt_end, datetime.min.time(), tzinfo=timezone.utc)
-                        elif evt_end.tzinfo is None:
-                            evt_end = evt_end.replace(tzinfo=timezone.utc)
+                        evt_start = _aware(evt_start)
+                        evt_end = _aware(evt_end)
 
                         events.append(
                             CalendarEvent(
@@ -538,6 +530,39 @@ class CalDavCalendarConnector(ICalendarConnector):
             occurrence_start=occurrence,
         )
 
+    def _sync_get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+    ) -> Optional[CalendarEvent]:
+        client = self._sync_get_client(credential, secret)
+        try:
+            target_cal = self._sync_get_target_calendar(client, credential)
+            try:
+                item = target_cal.event_by_uid(event_id)
+            except NotFoundError:
+                return None
+            for component in ICalendar.from_ical(item.data).walk("VEVENT"):
+                start = _aware(component.get("dtstart").dt)
+                end = _aware(component.get("dtend").dt) if component.get("dtend") else start
+                return CalendarEvent(
+                    id=event_id,
+                    title=str(component.get("summary", "Untitled Event")),
+                    start_time=start,
+                    end_time=end,
+                    description=str(component.get("description", "")),
+                    location=str(component.get("location", "")),
+                    is_all_day=not isinstance(component.get("dtstart").dt, datetime),
+                    calendar_name=target_cal.name or credential.calendar_name,
+                )
+            return None
+        except Exception as e:
+            if isinstance(e, CalendarIntegrationException):
+                raise
+            _raise_if_refused(e, credential)
+            raise CalendarIntegrationException(f"Failed to read CalDAV event '{event_id}': {str(e)}")
+
     def _sync_delete_event(
         self,
         credential: CalendarCredential,
@@ -680,6 +705,21 @@ class CalDavCalendarConnector(ICalendarConnector):
         except asyncio.TimeoutError:
             raise CalendarIntegrationException(f"CalDAV event update timed out after {timeout:.1f}s.")
 
+    async def get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        timeout: float = 10.0,
+    ) -> Optional[CalendarEvent]:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._sync_get_event, credential, secret, event_id),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise CalendarIntegrationException(f"CalDAV event read timed out after {timeout:.1f}s.")
+
     async def delete_event(
         self,
         credential: CalendarCredential,
@@ -703,6 +743,13 @@ class CalDavCalendarConnector(ICalendarConnector):
             )
         except asyncio.TimeoutError:
             raise CalendarIntegrationException(f"CalDAV event deletion timed out after {timeout:.1f}s.")
+
+
+def _aware(moment) -> datetime:
+    """A start or end as a datetime with a zone: a whole day is its midnight, a floating time is UTC."""
+    if not isinstance(moment, datetime):
+        return datetime.combine(moment, datetime.min.time(), tzinfo=timezone.utc)
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
 
 
 def _raise_if_refused(error: Exception, credential: CalendarCredential) -> None:

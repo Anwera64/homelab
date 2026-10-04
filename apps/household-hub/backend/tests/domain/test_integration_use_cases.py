@@ -27,6 +27,7 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
 from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
 from app.domain.use_cases.integrations.manage_documents import (
@@ -170,6 +171,15 @@ class MockCalendarConnector:
                     evt.is_all_day = is_all_day
                 return evt
         raise CalendarIntegrationException(f"Event {event_id} not found")
+
+    async def get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        timeout: float = 10.0,
+    ) -> Optional[CalendarEvent]:
+        return next((evt for evt in self.events if evt.id == event_id), None)
 
     async def delete_event(
         self,
@@ -449,6 +459,31 @@ async def test_calendar_event_lifecycle():
     delete_blocked_uc = DeleteCalendarEventUseCase(repo, connector, secrets, allow_agent_delete=False)
     with pytest.raises(ToolPermissionDeniedException):
         await delete_blocked_uc.execute(user_id="u1", event_id="evt-2")
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_event_WHEN_it_is_looked_up_by_its_id_THEN_it_comes_back_and_an_unknown_id_is_none():
+    repo = MockCalendarCredentialRepository()
+    connector = MockCalendarConnector()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+    await repo.save(
+        CalendarCredential(user_id="u1", provider="apple_icloud", url="https://caldav.icloud.com", username="u1", encrypted_secret="ENC:pass")
+    )
+    now = datetime.now(timezone.utc)
+    created = await CreateCalendarEventUseCase(repo, connector, secrets).execute(user_id="u1", title="Dentist", start_time=now, end_time=now)
+
+    lookup = GetCalendarEventUseCase(repo, connector, secrets)
+
+    assert (await lookup.execute(user_id="u1", event_id=created.id)).title == "Dentist"
+    assert await lookup.execute(user_id="u1", event_id="test-event-1") is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_no_calendar_connected_WHEN_an_event_is_looked_up_THEN_there_is_none():
+    repo = MockCalendarCredentialRepository()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+
+    assert await GetCalendarEventUseCase(repo, MockCalendarConnector(), secrets).execute(user_id="u1", event_id="evt-1") is None
 
 
 # Tests for SearXNG Use Case

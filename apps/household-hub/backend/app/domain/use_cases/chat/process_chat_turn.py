@@ -17,14 +17,17 @@ from app.domain.repositories.tool_approval_repository import IToolApprovalReposi
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
+from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
-from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, describe_write, summarize_tool
+from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, describe_write, summarize_tool, write_action
 from app.domain.use_cases.chat.tool_approval_settings import auto_approved
 from app.domain.use_cases.chat.tool_approval import (
     DECLINED,
     PAUSED_TURN,
+    as_proposed,
     card_to_decide,
     dump_messages,
+    event_on_card,
     load_messages,
     member_changes,
     needs_asking,
@@ -242,6 +245,7 @@ class ProcessChatTurnUseCase:
         context_window_tokens: Optional[int] = None,
         answer_reserve_tokens: int = 4096,
         approval_repo: Optional[IToolApprovalRepository] = None,
+        event_lookup: Optional[GetCalendarEventUseCase] = None,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -261,6 +265,8 @@ class ProcessChatTurnUseCase:
         self.answer_reserve_tokens = answer_reserve_tokens
         # Which writes each member lets agents do without asking. None: every write asks.
         self.approval_repo = approval_repo
+        # Finds the event a remove or change card is about, so the card can name it. None: it can't.
+        self.event_lookup = event_lookup
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -775,7 +781,13 @@ class ProcessChatTurnUseCase:
             for index, part in enumerate(turn.answer.parts):
                 if part.get("type") != "proposal":
                     continue
-                call = LLMToolCall(id=part["tool_call_id"], name=part["tool"], arguments=part["arguments"])
+                # What the card showed, and the call itself: details only looked up for the card don't run.
+                shown = part["arguments"]
+                call = LLMToolCall(
+                    id=part["tool_call_id"],
+                    name=part["tool"],
+                    arguments=as_proposed(shown, part.get("looked_up") or {}),
+                )
                 if part["status"] == "approved":
                     edited = part.get("edited")
                     if edited:
@@ -784,10 +796,12 @@ class ProcessChatTurnUseCase:
                             for proposed in message.tool_calls or []:
                                 if proposed.id == call.id:
                                     proposed.arguments = call.arguments
-                    async for event in self._run_call(turn, call, current_user.id, at=index, edited=edited):
+                    async for event in self._run_call(
+                        turn, call, current_user.id, at=index, edited=edited, shown=shown
+                    ):
                         yield event
                 else:
-                    summary = describe_write(call.name, call.arguments)
+                    summary = describe_write(call.name, shown)
                     turn.answer.parts[index] = {"type": "declined", "tool": call.name, "summary": summary}
                     yield {"type": "tool_declined", "tool": call.name, "summary": summary}
                     turn.llm_messages.append(
@@ -965,6 +979,11 @@ class ProcessChatTurnUseCase:
             if asks:
                 for tc in asks:
                     part = proposal_part(tc)
+                    looked_up = await self._event_on_card(tc, current_user.id, turn.timezone_name)
+                    if looked_up:
+                        # Only the card's copy: the model's call stays as it made it.
+                        part["arguments"] = {**tc.arguments, **looked_up}
+                        part["looked_up"] = looked_up
                     turn.answer.parts.append(part)
                     yield proposal_event(part)
                 turn.paused_in_round = round_number
@@ -978,12 +997,14 @@ class ProcessChatTurnUseCase:
         at: Optional[int] = None,
         auto: bool = False,
         edited: Optional[Dict[str, Any]] = None,
+        shown: Optional[Dict[str, Any]] = None,
     ):
         """
         Runs one call and records it: a step in the answer, and a result for the model to read.
 
         [edited] are the details the member changed on the card before approving. The model is told
-        beside the result, or it would go on to describe the write as it proposed it.
+        beside the result, or it would go on to describe the write as it proposed it. [shown] is
+        what the card showed, so the step names the event the card did.
         """
         yield {"type": "tool_executing", "tool": tc.name, "arguments": tc.arguments}
         tool_result = await self._run_tool(
@@ -995,7 +1016,7 @@ class ProcessChatTurnUseCase:
             offered=turn.agent_tools,
             timezone_name=turn.timezone_name,
         )
-        summary = summarize_tool(tc.name, tc.arguments, tool_result)
+        summary = summarize_tool(tc.name, shown or tc.arguments, tool_result)
         exec_info = {
             "tool": tc.name,
             "success": tool_result.success,
@@ -1018,6 +1039,24 @@ class ProcessChatTurnUseCase:
         )
         turn.out_of_room = turn.out_of_room or no_room
         turn.llm_messages.append(LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen))
+
+    async def _event_on_card(self, tc: LLMToolCall, user_id: str, timezone_name: Optional[str]) -> Dict[str, Any]:
+        """
+        The real details of the event a remove or change card is about (#63). Nothing when it can't
+        be found: the card then reads as before, and the write still waits for the member.
+        """
+        event_id = (tc.arguments or {}).get("event_id")
+        action = write_action(tc.name, tc.arguments)
+        if self.event_lookup is None or tc.name != "calendar_write" or action not in ("delete", "update"):
+            return {}
+        if not isinstance(event_id, str) or not event_id:
+            return {}
+        try:
+            event = await self.event_lookup.execute(user_id=user_id, event_id=event_id)
+        except Exception:
+            logger.warning("Could not look up event %s for its card", event_id, exc_info=True)
+            return {}
+        return event_on_card(action, tc.arguments, event, timezone_name) if event else {}
 
     async def _finish(self, turn: "_Turn"):
         """Saves the answer, and says it is done or waiting on the member."""
@@ -1132,6 +1171,8 @@ class _Turn:
     out_of_room: bool = False
     finish_reasons: List[str] = field(default_factory=list)
     paused_in_round: Optional[int] = None
+    # The phone's zone, for times the hub puts on a card.
+    timezone_name: Optional[str] = None
     # The saved answer this turn carries on, once there is one.
     message: Optional[ChatMessage] = None
     # The zone the phone named for this turn: tools read calendar times as clock time in it.

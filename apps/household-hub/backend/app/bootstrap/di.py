@@ -147,6 +147,7 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.execute_search import ExecuteSearchUseCase
 from app.domain.use_cases.integrations.parse_pdf_document import ParsePdfDocumentUseCase
 from app.domain.use_cases.integrations.manage_documents import (
@@ -315,6 +316,7 @@ def get_container(session: AsyncSession):
         context_window_tokens=settings.LLM_CONTEXT_TOKENS,
         answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
         approval_repo=tool_approval_repo,
+        event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
     )
 
     summarize_history_uc = SummarizeHistoryUseCase(

@@ -60,6 +60,16 @@ class ICalendarConnector(Protocol):
         """
         ...
 
+    async def get_event(
+        self,
+        credential: CalendarCredential,
+        secret: str,
+        event_id: str,
+        timeout: float = 10.0,
+    ) -> Optional[CalendarEvent]:
+        """The event with that ID, or None when the calendar has none."""
+        ...
+
     async def delete_event(
         self,
         credential: CalendarCredential,
