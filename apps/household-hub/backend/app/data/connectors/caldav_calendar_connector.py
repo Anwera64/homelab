@@ -60,13 +60,25 @@ def _change(component, title, start_time, end_time, description, location) -> No
     _bump(component)
 
 
-def _required_occurrence(occurrence_start: Optional[datetime], event_id: str) -> datetime:
+def _real_occurrence(cal_obj: ICalendar, occurrence_start: Optional[datetime], event_id: str) -> datetime:
+    """
+    The date of the series a write is for, as the series itself has it. What the model named is only
+    a pointer to it: a date the series doesn't have is refused, with the ones it does have, rather
+    than written and reported as done.
+    """
     if occurrence_start is None:
         raise CalendarIntegrationException(
             f"Event '{event_id}' repeats. Say which of its dates you mean with occurrence_start, as "
             "calendar_read gave it, and with scope whether it is for that date only or it and the ones after."
         )
-    return occurrence_start
+    found = ical_series.occurrence_at(cal_obj, occurrence_start)
+    if found is None:
+        real = ", ".join(when.isoformat() for when in ical_series.nearby(cal_obj, occurrence_start))
+        raise CalendarIntegrationException(
+            f"Event '{event_id}' has no date at {occurrence_start.isoformat()}, so nothing was changed. "
+            f"Its dates around then: {real or 'none'}. Use one of those as occurrence_start."
+        )
+    return ical_series.as_moment(found)
 
 
 class CalDavCalendarConnector(ICalendarConnector):
@@ -395,7 +407,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         series from its first date is the "following" case at that date. A later date splits the
         series: the old one ends the day before, a new one carries on changed.
         """
-        occurrence = _required_occurrence(occurrence_start, event_id)
+        occurrence = _real_occurrence(cal_obj, occurrence_start, event_id)
         main = ical_series.master(cal_obj)
         rest = None
         if scope != THIS_AND_FOLLOWING:
@@ -439,13 +451,17 @@ class CalDavCalendarConnector(ICalendarConnector):
         client = self._sync_get_client(credential, secret)
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
-            event = target_cal.event_by_uid(event_id)
+            try:
+                event = target_cal.event_by_uid(event_id)
+            except Exception as e:
+                _raise_if_refused(e, credential)
+                raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
             cal_obj = ICalendar.from_ical(event.data)
             if not ical_series.repeats(cal_obj):
                 event.delete()
                 return True
 
-            occurrence = _required_occurrence(occurrence_start, event_id)
+            occurrence = _real_occurrence(cal_obj, occurrence_start, event_id)
             if scope != THIS_AND_FOLLOWING:
                 ical_series.skip(cal_obj, occurrence)
             elif not ical_series.end_before(cal_obj, occurrence):

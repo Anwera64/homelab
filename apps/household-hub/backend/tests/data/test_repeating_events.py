@@ -417,3 +417,54 @@ def test_a_series_that_ended_has_no_dates_after_its_end():
 
     assert ical_series.dates(ended, datetime(2026, 10, 16, tzinfo=timezone.utc), 3) == []
     assert len(ical_series.dates(ended, SHOP_8_OCT, 5)) == 2
+
+
+# --- The connector checks the agent's date before it writes ----------------------------------
+
+
+@pytest.mark.asyncio
+async def test_removing_a_date_named_in_the_wrong_zone_skips_the_real_date():
+    event, calendar = _stored(SHOP)
+
+    await _delete(calendar, occurrence_start=datetime(2026, 10, 8, 17, 30, tzinfo=timezone.utc), scope="this")
+
+    assert "EXDATE;TZID=Europe/Madrid:20261008T173000" in event.data
+    assert "T193000" not in event.data
+
+
+@pytest.mark.asyncio
+async def test_changing_a_date_named_in_the_wrong_zone_changes_the_real_date():
+    event, calendar = _stored(SHOP)
+
+    await _update(calendar, title="Big shop", occurrence_start=datetime(2026, 10, 8, 17, 30, tzinfo=timezone.utc))
+
+    _, changed = _events(event.data)
+    assert changed["recurrence-id"].dt == SHOP_8_OCT
+    assert changed["dtstart"].dt == SHOP_8_OCT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["this", "following"])
+async def test_a_date_the_series_does_not_have_is_refused_with_the_dates_it_does_have(scope):
+    event, calendar = _stored(SHOP)
+    wednesday = datetime(2026, 10, 14, 17, 30, tzinfo=MADRID)
+
+    with pytest.raises(CalendarIntegrationException, match="2026-10-08T17:30.*2026-10-15T17:30"):
+        await _delete(calendar, occurrence_start=wednesday, scope=scope)
+    with pytest.raises(CalendarIntegrationException, match="2026-10-08T17:30.*2026-10-15T17:30"):
+        await _update(calendar, title="Big shop", occurrence_start=wednesday, scope=scope)
+
+    event.save.assert_not_called()
+    event.delete.assert_not_called()
+    calendar.add_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_removing_an_event_the_calendar_does_not_have_says_so():
+    from caldav.lib.error import NotFoundError
+
+    event, calendar = _stored(SHOP)
+    calendar.event_by_uid.side_effect = NotFoundError("no such event")
+
+    with pytest.raises(CalendarIntegrationException, match="not found"):
+        await _delete(calendar, occurrence_start=SHOP_8_OCT)
