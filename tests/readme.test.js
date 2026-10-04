@@ -61,6 +61,41 @@ test('Root README matches the repository', async (t) => {
     }
   });
 
+  await t.test('the log stack is in the Hosts table, the graph, the endpoints and the tree', () => {
+    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m);
+    assert.ok(desktopRow, 'the Hosts table must have a Desktop row');
+    for (const service of ['Loki', 'Alloy', 'Grafana']) {
+      assert.ok(desktopRow[0].includes(service), `the Desktop row must name ${service}`);
+    }
+
+    const graph = readme.match(/```mermaid\n([\s\S]*?)```/);
+    assert.ok(graph, 'README must have the network flow graph');
+    const logs = graph[1].match(/subgraph Logs \[[^\]]*\]\n([\s\S]*?)\n\s*end/);
+    assert.ok(logs, 'the graph must have a Logs subgraph');
+    assert.match(logs[1], /ALLOY\[[^\]]*Alloy[^\]]*\] --> LOKI\[[^\]]*Loki[^\]]*30 days[^\]]*\] --> GRAFANA\[[^\]]*Grafana[^\]]*\]/);
+    assert.match(graph[1], /-\.->\|Docker socket\| ALLOY/, 'the graph must show Alloy reading the Docker socket');
+    assert.match(graph[1], /CADDY -->\|published LAN ports\|[^\n]*\bGRAFANA\b/, 'Caddy must route to Grafana in the graph');
+
+    assert.match(readme, /^\| \*\*Grafana\*\* \| Desktop \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:3002` \|/m);
+    assert.match(readme, /^\| \*\*Loki\*\* \| Desktop \| — \| internal `http:\/\/loki:3100` \|/m);
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| — \| — \|/m);
+
+    const paths = treePaths(readme);
+    for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+  });
+
+  await t.test('says how to search the logs, what is kept and how to open the port', () => {
+    assert.ok(readme.includes('{container="household-hub"}'), 'README must show a LogQL query by container');
+    assert.match(readme, /30 days/);
+    assert.ok(readme.includes('logs=off'), 'README must name the opt-out label');
+    assert.match(readme, /calendar titles and note text/, 'README must say what the hub\'s lines carry');
+    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
+    assert.ok(firewall, 'README must show the firewall rule');
+    assert.ok(firewall[1].split(',').includes('3002'), 'the firewall rule must admit 3002');
+  });
+
   await t.test('host IPs appear only in the Hosts table', () => {
     const hosts = readme.match(/## 🖥️ Hosts\n[\s\S]*?(?=\n## )/);
     assert.ok(hosts, 'README must have a Hosts section');

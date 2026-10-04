@@ -19,7 +19,8 @@ const SERVICE_PORTS = {
   'radarr': '7878',
   'prowlarr': '9696',
   'bazarr': '6767',
-  'flaresolverr': '8191'
+  'flaresolverr': '8191',
+  'grafana': '3002'
 };
 
 const PORT_TO_SERVICE = {
@@ -33,7 +34,8 @@ const PORT_TO_SERVICE = {
   '7878': 'radarr',
   '9696': 'prowlarr',
   '6767': 'bazarr',
-  '8191': 'flaresolverr'
+  '8191': 'flaresolverr',
+  '3002': 'grafana'
 };
 
 // Homepage runs on the Pi; the services themselves run on the desktop.

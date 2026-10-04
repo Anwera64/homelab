@@ -72,6 +72,10 @@ test('PowerShell Automation Scripts Suite', async (t) => {
       startupContent.includes('DuckDNS HTTPS') && startupContent.includes('$domain'),
       'startup_homelab.ps1 must display DuckDNS HTTPS endpoints'
     );
+    assert.ok(
+      startupContent.includes('https://grafana.$domain'),
+      'startup_homelab.ps1 must list Grafana, where the logs are searched'
+    );
   });
 
   await t.test('startup_homelab.ps1 provisions the Ollama models listed in the manifest', () => {

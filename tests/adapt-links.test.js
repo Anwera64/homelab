@@ -64,6 +64,10 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
       'https://cleanuparr.spicy-llama.duckdns.org/'
     );
     assert.equal(
+      adaptServiceUrl('http://desktop-kujo8mp:3002', duckdnsOrigin),
+      'https://grafana.spicy-llama.duckdns.org/'
+    );
+    assert.equal(
       adaptServiceUrl('http://desktop-kujo8mp:8191', duckdnsOrigin),
       'https://flaresolverr.spicy-llama.duckdns.org/'
     );
@@ -85,6 +89,10 @@ test('DuckDNS Subdomain & Ingress Link Adapter Suite', async (t) => {
     assert.equal(
       adaptServiceUrl('https://seerr.spicy-llama.duckdns.org', localHostOrigin),
       'http://desktop-kujo8mp:5055/'
+    );
+    assert.equal(
+      adaptServiceUrl('https://grafana.spicy-llama.duckdns.org', localHostOrigin),
+      'http://desktop-kujo8mp:3002/'
     );
   });
 

@@ -12,6 +12,12 @@ config/ollama/
 !config/ollama-models/**
 !config/searxng/
 !config/searxng/**
+!config/loki/
+!config/loki/**
+!config/alloy/
+!config/alloy/**
+!config/grafana/
+!config/grafana/**
 config/open-webui/*
 !config/open-webui/filters/
 !config/open-webui/filters/**

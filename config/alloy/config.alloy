@@ -1,0 +1,48 @@
+// =============================================================================
+// Alloy - reads every container's output through the Docker socket and ships
+// it to Loki. Label a container logs=off to leave it out.
+// =============================================================================
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  // The default is a minute: a container that crashes at start would be gone before it was seen.
+  refresh_interval = "5s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_logs"]
+    regex         = "off"
+    action        = "drop"
+  }
+
+  // Docker names a container "/household-hub"; search by "household-hub".
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  // The Pi's containers slot in later under their own host.
+  labels     = {
+    host = "desktop",
+  }
+  forward_to = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
