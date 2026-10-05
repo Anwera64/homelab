@@ -1,0 +1,491 @@
+# ==============================================================================
+# The always-on server (192.168.1.30): media, the arr pipeline behind the VPN
+# kill-switch, the Household Hub and the log stack. Ollama stays on the desktop.
+# Run through bootstrap.sh; see README.md.
+#
+# Every service has a memory cap (the host has 16 GB). Services in the "media"
+# profile need the media disk at /data: the disk guard (system/server-media.sh)
+# stops them while it is unplugged. The server's .env sets COMPOSE_PROFILES=media,
+# so plain `docker compose` commands cover them too.
+# ==============================================================================
+
+# Docker's own copy of each container's log, capped: Loki holds the history (section 11).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Public resolvers for the services that reach indexers and metadata sites.
+x-public-dns: &public-dns
+  - 1.1.1.1
+  - 1.0.0.1
+  - 8.8.8.8
+
+services:
+  # ==============================================================================
+  # 1. Network & VPN Gateway (Gluetun)
+  # ==============================================================================
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
+      - TZ=${TZ:-Europe/Madrid}
+      - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
+    healthcheck:
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - 6881:6881       # qBittorrent Torrent Protocol (TCP)
+      - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
+      - 8080:8080       # qBittorrent WebUI (qbittorrent shares this network)
+      - 8000:8000       # Gluetun control API, for the Pi's Homepage widget
+    mem_limit: 256m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 2. Download Clients & Solvers (Routed strictly through VPN)
+  # ==============================================================================
+  qbittorrent:
+    profiles: ["media"]
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Madrid}
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+      - DOCKER_MODS=ghcr.io/vuetorrent/vuetorrent-lsio-mod:latest
+    volumes:
+      - ${CONFIG_PATH}/qbittorrent:/config
+      - ${MEDIA_ROOT}:/data
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    stop_grace_period: 30s
+    mem_limit: 2g
+    restart: unless-stopped
+    logging: *default-logging
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    ports:
+      - 8191:8191
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-Europe/Madrid}
+    dns: *public-dns
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
+  # ==============================================================================
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    ports:
+      - 9696:9696
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Madrid}
+    dns: *public-dns
+    volumes:
+      - ${CONFIG_PATH}/prowlarr:/config
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  radarr:
+    profiles: ["media"]
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Madrid}
+    dns: *public-dns
+    volumes:
+      - ${CONFIG_PATH}/radarr:/config
+      - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  sonarr:
+    profiles: ["media"]
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Madrid}
+    dns: *public-dns
+    volumes:
+      - ${CONFIG_PATH}/sonarr:/config
+      - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  bazarr:
+    profiles: ["media"]
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    ports:
+      - 6767:6767
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Madrid}
+    dns: *public-dns
+    volumes:
+      - ${CONFIG_PATH}/bazarr:/config
+      - ${MEDIA_ROOT}:/data
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 4. Request UI & Discovery (Seerr)
+  # ==============================================================================
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    ports:
+      - 5055:5055
+    init: true
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - ${CONFIG_PATH}/seerr:/app/config
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 5. Media Server (Jellyfin with NVENC Transcoding)
+  # ==============================================================================
+  jellyfin:
+    profiles: ["media"]
+    image: jellyfin/jellyfin:12.0
+    container_name: jellyfin
+    ports:
+      - 8096:8096
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - ${CONFIG_PATH}/jellyfin/config:/config
+      - ${CONFIG_PATH}/jellyfin/cache:/cache
+      - ${MEDIA_ROOT}:/data:ro
+      - ${MOVIES_PATH}:/media/movies:ro
+      - ${SHOWS_PATH}:/media/tv:ro
+    # The only hardware-specific block in this file: the laptop's GTX 1660 Ti (H.264 and
+    # HEVC, no AV1 encoding). On an Intel host this becomes a /dev/dri device for Quick Sync.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    mem_limit: 4g
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 6. Media Analytics & Telemetry (Jellystat)
+  # ==============================================================================
+  jellystat-db:
+    image: postgres:16-alpine
+    container_name: jellystat-db
+    environment:
+      - POSTGRES_USER=${JELLYSTAT_DB_USER:-jellystat}
+      - POSTGRES_PASSWORD=${JELLYSTAT_DB_PASSWORD:?set JELLYSTAT_DB_PASSWORD in hosts/server/.env}
+      - POSTGRES_DB=${JELLYSTAT_DB_NAME:-jellystat}
+    volumes:
+      - ${CONFIG_PATH}/jellystat/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JELLYSTAT_DB_USER:-jellystat} -d ${JELLYSTAT_DB_NAME:-jellystat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  jellystat:
+    image: cyfershepard/jellystat:latest
+    container_name: jellystat
+    ports:
+      - 3005:3000
+    environment:
+      - POSTGRES_IP=jellystat-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${JELLYSTAT_DB_USER:-jellystat}
+      - POSTGRES_PASSWORD=${JELLYSTAT_DB_PASSWORD:?set JELLYSTAT_DB_PASSWORD in hosts/server/.env}
+      - POSTGRES_DB=${JELLYSTAT_DB_NAME:-jellystat}
+      - JWT_SECRET=${JELLYSTAT_JWT_SECRET:?set JELLYSTAT_JWT_SECRET in hosts/server/.env}
+      - TZ=${TZ:-Europe/Madrid}
+    depends_on:
+      jellystat-db:
+        condition: service_healthy
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 7. Automated Media Lifecycle & Cleanup (Maintainerr)
+  # ==============================================================================
+  maintainerr:
+    profiles: ["media"]
+    image: ghcr.io/maintainerr/maintainerr:latest
+    container_name: maintainerr
+    ports:
+      - 6246:6246
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - NODE_ENV=production
+    volumes:
+      - ${CONFIG_PATH}/maintainerr:/opt/data
+    depends_on:
+      - sonarr
+      - radarr
+      - jellyfin
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 7b. Download Queue Cleanup (Cleanuparr)
+  # Removes fake, failed and stalled downloads (blocklisting them and searching
+  # again) and torrents past their seeding limit. Settings live in its web UI.
+  # /data matches qBittorrent's path so it can tell which torrents are hardlinked.
+  # ==============================================================================
+  cleanuparr:
+    profiles: ["media"]
+    image: ghcr.io/cleanuparr/cleanuparr:latest
+    container_name: cleanuparr
+    ports:
+      - 11011:11011
+    environment:
+      - PORT=11011
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - ${CONFIG_PATH}/cleanuparr:/config
+      - ${MEDIA_ROOT}:/data
+    depends_on:
+      - sonarr
+      - radarr
+      - qbittorrent
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 8. TRaSH Guides Automation (Recyclarr)
+  # ==============================================================================
+  recyclarr:
+    profiles: ["media"]
+    image: ghcr.io/recyclarr/recyclarr:8
+    container_name: recyclarr
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - CRON_SCHEDULE=0 3 * * * # Automatically sync daily at 3:00 AM
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+    volumes:
+      - ${CONFIG_PATH}/recyclarr:/config
+    depends_on:
+      - sonarr
+      - radarr
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 256m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 9. Automated Image Updates & Lifecycle (Watchtower)
+  # The maintained fork: containrrr/watchtower was archived in December 2025.
+  # Pinned, and bumped in a PR.
+  # ==============================================================================
+  watchtower:
+    image: nickfedor/watchtower:1.22.3
+    container_name: watchtower
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
+      - WATCHTOWER_ROLLING_RESTART=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    mem_limit: 256m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 10. Household Hub and its private search. The model runs on the desktop's
+  # RTX 5080, reached over the LAN.
+  # ==============================================================================
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+    volumes:
+      - ${CONFIG_PATH}/searxng:/etc/searxng:ro
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  household-hub:
+    build:
+      context: ../../apps/household-hub/backend
+    container_name: household-hub
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}
+      # Google Calendar sign-in (#54); empty ID leaves Google unavailable in the app.
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-https://hub.${DOMAIN_NAME:-spicy-llama.duckdns.org}}
+    volumes:
+      - household_hub_data:/data
+    ports:
+      - 127.0.0.1:3050:3050   # /docs and /health from the server itself
+      - 3051:3050             # LAN, for the Pi's Caddy (hub.spicy-llama.duckdns.org)
+    depends_on:
+      - searxng
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 11. Logs (Loki + Alloy + Grafana)
+  # A container's log dies with the container. Alloy reads every container's
+  # output through the Docker socket (label a container logs=off to leave it out),
+  # Loki keeps it for 30 days, Grafana searches it. Versions are pinned.
+  # ==============================================================================
+  loki:
+    image: grafana/loki:3.7.8
+    container_name: loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
+  alloy:
+    image: grafana/alloy:v1.20.1
+    container_name: alloy
+    ports:
+      - 4318:4318   # OTLP over HTTP: the app's logs, through the Pi's Caddy (telemetry.spicy-llama.duckdns.org)
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    volumes:
+      - ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Read positions, so a restart neither re-sends nor skips lines.
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: grafana
+    ports:
+      - 3002:3000   # LAN, for the Pi's Caddy (grafana.spicy-llama.duckdns.org)
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      # Only read on the first start of grafana_data; admin/admin forces a change at first login.
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN_NAME:-spicy-llama.duckdns.org}
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      # Dashboards as images, when grafana-renderer is running. The renderer loads the page
+      # from Grafana inside this network, so the callback is not the public name.
+      - GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_RENDERING_RENDERER_TOKEN=${GRAFANA_RENDERER_TOKEN:-homelab-renderer}
+    volumes:
+      - ${CONFIG_PATH}/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Draws a dashboard or a panel as a PNG for Grafana. A headless browser, so it only
+  # starts when asked:
+  #   docker compose --profile render up -d grafana-renderer
+  grafana-renderer:
+    profiles: ["render"]
+    image: grafana/grafana-image-renderer:v5.12.5
+    container_name: grafana-renderer
+    environment:
+      - AUTH_TOKEN=${GRAFANA_RENDERER_TOKEN:-homelab-renderer}
+      - GOMEMLIMIT=256MiB
+    mem_limit: 2g
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  household_hub_data:
+    name: household_hub_data
+  loki_data:
+    name: loki_data
+  alloy_data:
+    name: alloy_data
+  grafana_data:
+    name: grafana_data

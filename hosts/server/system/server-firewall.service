@@ -1,0 +1,12 @@
+[Unit]
+Description=Server firewall: who may reach the published ports and the host
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@SERVER_DIR@/system/server-firewall.sh
+
+[Install]
+WantedBy=multi-user.target docker.service
