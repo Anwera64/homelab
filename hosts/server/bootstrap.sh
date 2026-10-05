@@ -219,6 +219,15 @@ fi
 step "Disk guard: media services run only while the disk is there"
 install_unit server-media.service
 
+step "App settings folders"
+# Created here, owned by the apps' user: Docker would create a missing one as
+# root, and the apps that run as user 1000 could not write to it.
+CONFIG_PATH="$(env_value CONFIG_PATH)"
+APP_FOLDERS=(qbittorrent prowlarr radarr sonarr bazarr seerr jellyfin jellyfin/config jellyfin/cache maintainerr cleanuparr recyclarr)
+for app in "${APP_FOLDERS[@]}"; do
+  [ -d "$CONFIG_PATH/$app" ] || install -d -o 1000 -g 1000 "$CONFIG_PATH/$app"
+done
+
 step "Stack"
 if [ "$NO_STACK" -eq 1 ]; then
   echo "Skipped (--no-stack)."

@@ -42,6 +42,15 @@ test('Root README matches the repository', async (t) => {
     assert.ok(!readme.includes('-DisableAI'), 'startup_homelab.ps1 has no -DisableAI flag');
   });
 
+  await t.test('points to the server README and lists the server files in the tree', () => {
+    assert.ok(readme.includes('hosts/server/README.md'));
+    const paths = treePaths(readme);
+    for (const p of ['hosts/server/README.md', 'hosts/server/bootstrap.sh', 'hosts/server/docker-compose.yml', 'hosts/server/.env.example', 'hosts/server/system', 'tests/server-stack.test.js', 'tests/server-bootstrap.test.js']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+    assert.match(readme, /`docker compose config` for the desktop, Pi and server stacks/);
+  });
+
   await t.test('every startup_homelab.ps1 flag it mentions is real', () => {
     const script = read('startup_homelab.ps1');
     const params = new Set([...script.matchAll(/\[switch\]\$(\w+)/g)].map((m) => m[1]));

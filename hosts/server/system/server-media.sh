@@ -11,13 +11,12 @@
 # ==============================================================================
 set -euo pipefail
 
-SERVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# The compose file's "media" profile (tests keep the two lists equal).
+# The compose file's "media" profile, by container name (tests keep the two lists
+# equal). Plain docker, not compose: the guard must work whatever state .env is in.
 MEDIA_SERVICES=(qbittorrent sonarr radarr bazarr jellyfin cleanuparr maintainerr recyclarr)
 INTERVAL=15
 
 log() { echo "disk guard: $*"; }
-compose() { docker compose --project-directory "$SERVER_DIR" --profile media "$@"; }
 
 # present: mounted and its device is still there. dead: a USB disk that dropped
 # out leaves the mount behind, so the mount alone proves nothing.
@@ -39,16 +38,16 @@ apply() {
   case "$1" in
     present)
       log "media disk present: starting the media services"
-      compose start "${MEDIA_SERVICES[@]}" || log "nothing to start yet (bootstrap.sh creates them)"
+      docker start "${MEDIA_SERVICES[@]}" >/dev/null 2>&1 || log "not all of them exist yet (bootstrap.sh creates them)"
       ;;
     dead)
       log "media disk dropped out: stopping the media services"
-      compose stop "${MEDIA_SERVICES[@]}" || true
+      docker stop "${MEDIA_SERVICES[@]}" >/dev/null 2>&1 || true
       umount -l /data || true
       ;;
     absent)
       log "no media disk: the media services stay stopped"
-      compose stop "${MEDIA_SERVICES[@]}" || true
+      docker stop "${MEDIA_SERVICES[@]}" >/dev/null 2>&1 || true
       ;;
   esac
 }

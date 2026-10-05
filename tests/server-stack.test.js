@@ -194,3 +194,48 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(compose.includes('${JELLYSTAT_JWT_SECRET:?'), 'the Jellystat token secret must not fall back to a default');
   });
 });
+
+test('The server compose file is validated wherever the others are', async (t) => {
+  const validate = '-f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q';
+
+  await t.test('in CI', () => {
+    assert.ok(read(path.join(ROOT_DIR, '.github/workflows/test.yml')).includes(validate));
+  });
+
+  await t.test('in the pre-commit hook', () => {
+    assert.ok(read(path.join(ROOT_DIR, '.githooks/pre-commit')).includes(validate));
+  });
+});
+
+test('Server README', async (t) => {
+  const readme = read(path.join(SERVER_DIR, 'README.md'));
+
+  await t.test('covers the install, the bootstrap and its host-only mode', () => {
+    assert.match(readme, /Debian 13/);
+    assert.ok(readme.includes('sudo hosts/server/bootstrap.sh'));
+    assert.ok(readme.includes('--no-stack'));
+    assert.match(readme, /reboot/i);
+  });
+
+  await t.test('explains the firewall, the allowed list and the safe way to try a change', () => {
+    assert.ok(readme.includes('SERVER_ALLOWED_SOURCES'));
+    assert.ok(readme.includes('server-firewall.sh --try'));
+    assert.ok(readme.includes('server-firewall.sh --confirm'));
+  });
+
+  await t.test('explains the media disk, its guard and the battery rule', () => {
+    assert.ok(readme.includes('DATA_DISK_UUID'));
+    assert.match(readme, /\/data\/media\/movies/);
+    assert.match(readme, /\/data\/torrents/);
+    assert.match(readme, /10%/);
+  });
+
+  await t.test('records why nouveau is blocked first, and how to move to other hardware', () => {
+    assert.match(readme, /nouveau/);
+    assert.match(readme, /## Moving to other hardware/);
+  });
+
+  await t.test('says the server is not live yet', () => {
+    assert.match(readme, /not live yet/i);
+  });
+});

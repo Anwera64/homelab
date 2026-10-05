@@ -133,6 +133,17 @@ test('Server bootstrap script', async (t) => {
     assert.match(script, /systemctl enable --now/);
   });
 
+  await t.test('creates the app settings folders itself, before Docker would create them as root', () => {
+    // Seerr, Maintainerr and Recyclarr run as user 1000 and cannot write to a root-owned folder.
+    const folders = (script.match(/^APP_FOLDERS=\(([^)]*)\)$/m) || ['', ''])[1].split(/\s+/).filter(Boolean);
+    for (const app of ['seerr', 'maintainerr', 'recyclarr', 'sonarr', 'radarr', 'jellyfin/config', 'jellyfin/cache']) {
+      assert.ok(folders.includes(app), `${app} must be in APP_FOLDERS`);
+    }
+    const create = at(script, 'install -d -o 1000 -g 1000 "$CONFIG_PATH/$app"');
+    assert.match(script, /\[ -d "\$CONFIG_PATH\/\$app" \] \|\|/, 'existing folders keep their owner');
+    assert.ok(create < at(script, 'docker compose --project-directory "$SERVER_DIR" build'));
+  });
+
   await t.test('seeds .env on the first run and leaves the secrets to a human', () => {
     assert.match(script, /cp "\$SERVER_DIR\/\.env\.example" "\$SERVER_DIR\/\.env"/);
     assert.match(script, /chmod 600 "\$SERVER_DIR\/\.env"/);
@@ -225,11 +236,12 @@ test('Server disk guard', async (t) => {
   });
 
   await t.test('stops the media services when the disk goes, and only restarts what already existed', () => {
-    assert.match(script, /compose stop "\$\{MEDIA_SERVICES\[@\]\}"/);
+    assert.match(script, /docker stop "\$\{MEDIA_SERVICES\[@\]\}"/);
     assert.match(script, /umount -l \/data/, 'the dead mount is released so a replugged disk can mount again');
-    // `start` never creates a container: bootstrap.sh decides what runs, the guard only resumes it.
-    assert.match(script, /compose start "\$\{MEDIA_SERVICES\[@\]\}"/);
-    assert.doesNotMatch(script, /compose[^\n]* up /, 'the guard must not create containers');
+    // `docker start` never creates a container: bootstrap.sh decides what runs, the guard only resumes it.
+    assert.match(script, /docker start "\$\{MEDIA_SERVICES\[@\]\}"/);
+    // By container name, not through compose: a half-filled .env must not stop the guard working.
+    assert.doesNotMatch(script, /docker compose/, 'the guard must not depend on the compose file resolving');
   });
 
   await t.test('watches in a loop and only acts on a change', () => {
@@ -255,7 +267,8 @@ test('Server battery watcher', async (t) => {
   await t.test('shuts down cleanly at 10%, and only while running on battery', () => {
     assert.match(script, /BATTERY_SHUTDOWN_PERCENT:-10/);
     assert.match(script, /\[ "\$online" = "0" \] && \[ "\$capacity" -le "\$THRESHOLD" \]/);
-    const stop = at(script, /compose stop/);
+    // Every container, by ID: this must work whatever state .env is in.
+    const stop = at(script, /docker stop \$\(docker ps -q\)/);
     const poweroff = at(script, 'systemctl poweroff');
     assert.ok(stop < poweroff, 'the containers stop before the power goes');
   });

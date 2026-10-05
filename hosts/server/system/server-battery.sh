@@ -10,13 +10,11 @@
 # ==============================================================================
 set -euo pipefail
 
-SERVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONSERVATION=/sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode
 THRESHOLD="${BATTERY_SHUTDOWN_PERCENT:-10}"
 INTERVAL=60
 
 log() { echo "battery: $*"; }
-compose() { docker compose --project-directory "$SERVER_DIR" --profile media "$@"; }
 
 check() {
   local online capacity
@@ -34,7 +32,8 @@ check() {
       log "dry run: nothing was stopped"
       return
     fi
-    compose stop || true
+    # shellcheck disable=SC2046  # one ID per word is the point
+    docker stop $(docker ps -q) >/dev/null 2>&1 || true
     systemctl poweroff
   fi
 }

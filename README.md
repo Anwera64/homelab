@@ -135,16 +135,22 @@ graph TD
 ├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture, environment)
 ├── ROADMAP.md                       # Roadmap
 ├── hosts/
-│   └── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
-│       ├── README.md                # Pi setup, DHCP switch-over, checks, backups
-│       ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
-│       ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage
-│       ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
-│       ├── caddy/
-│       │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
-│       │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
-│       └── unbound/
-│           └── unbound.conf         # Recursive DNSSEC resolver on 127.0.0.1:5335
+│   ├── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
+│   │   ├── README.md                # Pi setup, DHCP switch-over, checks, backups
+│   │   ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
+│   │   ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage
+│   │   ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
+│   │   ├── caddy/
+│   │   │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
+│   │   │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
+│   │   └── unbound/
+│   │       └── unbound.conf         # Recursive DNSSEC resolver on 127.0.0.1:5335
+│   └── server/                      # The always-on app server (laptop); not live yet
+│       ├── README.md                # Install, bootstrap, firewall, media disk, moving hardware
+│       ├── bootstrap.sh             # Idempotent setup: NVIDIA, Docker, SSH, firewall, disk guard, stack
+│       ├── docker-compose.yml       # The desktop services except Ollama, with memory caps
+│       ├── .env.example             # Server settings template (paths, allowed addresses, secrets)
+│       └── system/                  # Firewall, disk guard and battery scripts with their units
 ├── apps/
 │   └── household-hub/               # Household Hub: backend (FastAPI) and client (KMP)
 ├── config/
@@ -173,6 +179,8 @@ graph TD
     ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
+    ├── server-stack.test.js         # Server compose, env template, CI gates and server README
+    ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard and battery scripts
     ├── ci-workflow.test.js          # Hub client CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
@@ -184,6 +192,9 @@ graph TD
 
 ### lemonpi
 See [`hosts/pi/README.md`](hosts/pi/README.md): a sparse clone of `hosts/pi` (plus `config/homepage`), then `sudo hosts/pi/bootstrap.sh`. It covers the DHCP switch-over from the Livebox, Tailscale, and pointing DuckDNS at the Pi.
+
+### Server (not live yet)
+See [`hosts/server/README.md`](hosts/server/README.md): a Debian 13 install on the laptop, then `sudo hosts/server/bootstrap.sh`. The services still run on the desktop until the cutover.
 
 ### Desktop
 Prerequisites: Docker Desktop (WSL2 backend), the NVIDIA Container Toolkit (GPU transcoding and Ollama), and Node.js 18+ (tests).
@@ -259,10 +270,10 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 🧪 Quality Gate
 
-* **Tests (`node --test`):** about 115 checks across seven suites (see `tests/` above). They keep the desktop compose file, the Pi compose file and Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
+* **Tests (`node --test`):** about 190 checks across nine suites (see `tests/` above). They keep the desktop, Pi and server compose files, the Pi's Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
 * **Pre-commit hook (`.githooks/pre-commit`):**
   * the test suite
-  * `docker compose config` for both the desktop and Pi stacks
+  * `docker compose config` for the desktop, Pi and server stacks
   * the hub backend's Clean Architecture boundary tests
   * for hub client changes, ktlint and the architecture tests
 * **CI (`.github/workflows/`):**

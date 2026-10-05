@@ -462,7 +462,7 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - loki
-    mem_limit: 512m
+    mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
 
