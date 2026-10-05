@@ -29,3 +29,10 @@
 - **Delegate what doesn't need the main model's judgement:** **Sonnet** for simple, well-specified tasks, **Haiku** for the most basic ones (lookups, boilerplate, doc checkboxes).
 - **The main agent keeps design decisions** and reviews every delegated diff before it is committed.
 - **Hand-offs are complete:** a sub-agent starts cold, so give it the tests, specs and file paths it needs.
+
+## 5. Environment and Constraints
+- **On-demand model:** The local LLM is loaded and offloaded on demand by design. Don't suggest keep-alive or keeping the model resident.
+- **Hub logs live in Grafana:** Query Grafana/Loki for hub logs rather than `docker logs`.
+- **Local services:** Services on the local network (e.g. Cleanuparr) need no API key unless stated.
+- **Connectivity:** Windows Firewall on the desktop can block ports from the Pi; check this early. For phone connectivity, check the Android local-network permission.
+- **Client builds:** Build and test client (Kotlin) code before committing; if the environment can't build it, say so clearly in the commit and PR.
