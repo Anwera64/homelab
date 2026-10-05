@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT_DIR, file), 'utf8').replace(/\r\n/g, '\n');
@@ -109,6 +110,19 @@ test('Root README matches the repository', async (t) => {
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
     assert.ok(firewall[1].split(',').includes('4318'), 'the firewall rule must admit 4318');
     assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
+  });
+
+  await t.test('the firewall rule admits every port the Pi proxies to', () => {
+    // -LocalPort replaces the whole list, so a port missing here is closed by copying the command
+    // (Cleanuparr's 11011 was, and its HTTPS name answered 502).
+    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
+    assert.ok(firewall, 'README must show the firewall rule');
+    const admitted = firewall[1].split(',');
+    // The hub (3051), Alloy's OTLP receiver (4318) and the Gluetun API (8000) are reached from the Pi
+    // without being in the link adapter.
+    for (const port of [...Object.keys(PORT_TO_SERVICE), '3051', '4318', '8000']) {
+      assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
+    }
   });
 
   await t.test('host IPs appear only in the Hosts table', () => {
