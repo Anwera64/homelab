@@ -132,7 +132,7 @@ graph TD
 ├── stop_homelab.ps1                 # Desktop: clean shutdown
 ├── compact_docker_disk.ps1          # Desktop: shrink Docker's virtual disk
 ├── enable_virtualization.ps1        # Desktop: Hyper-V / WSL2 setup helper
-├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture)
+├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture, environment)
 ├── ROADMAP.md                       # Roadmap
 ├── hosts/
 │   └── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
