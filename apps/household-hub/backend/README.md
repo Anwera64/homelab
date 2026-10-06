@@ -83,7 +83,7 @@ Tests run on the host against a local virtual environment:
 cd apps\household-hub\backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
