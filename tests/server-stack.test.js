@@ -311,6 +311,10 @@ test('Server README', async (t) => {
     assert.match(section[1], /Authentication Required/, 'it must name the arr setting');
     assert.match(section[1], /Disable Auth for Local Addresses/, 'it must name the Cleanuparr switch');
     assert.match(section[1], /MAINTAINERR_PASSWORD_HASH/, 'it must say where the Maintainerr password lives');
+    // The password is on the name only, so the direct port must be closed on whichever machine runs it.
+    const maintainerr = items.find((item) => item.includes('Maintainerr has no login'));
+    assert.match(maintainerr, /Windows firewall rule admits only lemonpi/, 'it must say the desktop\'s direct port is closed too');
+    assert.doesNotMatch(maintainerr, /answers the whole LAN/);
   });
 
   await t.test('documents the one-port rule that lets the desktop ship its logs', () => {

@@ -166,6 +166,9 @@ test('Root README matches the repository', async (t) => {
     assert.ok(!readme.includes('flaresolverr.spicy-llama.duckdns.org'), 'FlareSolverr has no https:// name');
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
     assert.ok(!firewall[1].split(',').includes('8191'), 'the firewall rule must not admit FlareSolverr\'s port');
+    // The desktop's ports answer lemonpi alone: Maintainerr has no login, and its Caddy password is on the name only.
+    assert.match(readme, /Set-NetFirewallRule -DisplayName "Homelab Stack \(LAN\)" -RemoteAddress 192\.168\.1\.35\s*$/m, 'README must show the rule is narrowed to lemonpi');
+    assert.doesNotMatch(readme, /or LAN devices need/, 'LAN devices do not reach the desktop\'s ports directly');
     assert.doesNotMatch(endpoints[1], /http:\/\/[\w.-]+\.lan/, 'no direct .lan address in the endpoints');
   });
 

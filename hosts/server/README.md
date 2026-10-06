@@ -92,7 +92,7 @@ Work through this once after the media services have moved here:
 - [ ] qBittorrent: Options → Web UI: untick both "Bypass authentication" boxes (localhost and whitelisted subnets). Then check that Sonarr, Radarr and Cleanuparr have the password saved in their download client, and put `QBITTORRENT_USERNAME` and `QBITTORRENT_PASSWORD` in lemonpi's `.env` for the dashboard.
 - [ ] Cleanuparr: Settings → General: "Disable Auth for Local Addresses" **off**. Copy the API key from its account settings to `CLEANUPARR_API_KEY` in lemonpi's `.env` for the dashboard.
 - [ ] Seerr, Jellystat: open each in a private window and confirm the login page comes first.
-- [ ] Maintainerr has no login of its own. Caddy asks for a password on its name: `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` in lemonpi's `.env`. That only holds here, where the firewall closes the direct port. While Maintainerr still runs on the desktop, port 6246 answers the whole LAN without a password.
+- [ ] Maintainerr has no login of its own. Caddy asks for a password on its name: `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` in lemonpi's `.env`. The password is on the name only, so the direct port (6246) must stay closed: here the firewall does that, and on the desktop the Windows firewall rule admits only lemonpi.
 - [ ] FlareSolverr has no login and no page to use. It has no `https://` name and publishes no port: Prowlarr reaches it inside the stack at `http://flaresolverr:8191`. Confirm an indexer that uses it still tests green.
 
 The dashboard's widgets keep working with the logins on: they use each app's API key, or the qBittorrent login above.
