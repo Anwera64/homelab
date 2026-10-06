@@ -92,8 +92,8 @@ pip install -r requirements-dev.txt
 `requirements.in` lists the packages the hub names itself, and `requirements-dev.in` adds the test tools. The image installs `requirements.txt` and the tests install `requirements-dev.txt`: lock files generated from those, which pin every package at an exact version, including the ones that come in indirectly. Never edit a lock by hand. After changing a `.in` file, regenerate both (`pip install uv` once):
 
 ```powershell
-uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal
-uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal
+uv pip compile requirements.in --output-file=requirements.txt --python-version=3.12 --universal
+uv pip compile requirements-dev.in --output-file=requirements-dev.txt --python-version=3.12 --universal
 ```
 
 CI fails when a lock no longer matches its `.in` file.

@@ -58,8 +58,8 @@ test('Root README matches the repository', async (t) => {
     }
     const backend = read('apps/household-hub/backend/README.md');
     assert.ok(backend.includes('pip install -r requirements-dev.txt'));
-    assert.ok(backend.includes('uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal'));
-    assert.ok(backend.includes('uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal'));
+    assert.ok(backend.includes('uv pip compile requirements.in --output-file=requirements.txt --python-version=3.12 --universal'));
+    assert.ok(backend.includes('uv pip compile requirements-dev.in --output-file=requirements-dev.txt --python-version=3.12 --universal'));
   });
 
   await t.test('every startup_homelab.ps1 flag it mentions is real', () => {

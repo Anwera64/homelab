@@ -49,8 +49,8 @@ jobs:
       - name: Check the lock files match their .in files
         run: |
           pip install uv==0.12.23
-          uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal
-          uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal
+          uv pip compile requirements.in --output-file=requirements.txt --python-version=3.12 --universal
+          uv pip compile requirements-dev.in --output-file=requirements-dev.txt --python-version=3.12 --universal
           git diff --exit-code -- requirements.txt requirements-dev.txt
 
       - name: Install dependencies
