@@ -37,8 +37,8 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.ok(asList(config.extends).includes('config:recommended'));
   });
 
-  await t.test('reads the compose files and the client\'s Gradle build, and nothing it was not asked to', () => {
-    assert.deepEqual([...config.enabledManagers].sort(), ['docker-compose', 'gradle', 'gradle-wrapper']);
+  await t.test('reads the compose files, the client\'s Gradle build and the hub\'s requirements and Dockerfile, and nothing it was not asked to', () => {
+    assert.deepEqual([...config.enabledManagers].sort(), ['docker-compose', 'dockerfile', 'gradle', 'gradle-wrapper', 'pip_requirements']);
   });
 
   await t.test('opens its PRs once a week, on releases at least three days old', () => {
@@ -160,6 +160,31 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     for (const name of ['org.jetbrains.kotlinx:kotlinx-coroutines-core', 'io.ktor:ktor-client-core', 'androidx.activity:activity-compose']) {
       assert.ok(!picks(toolchain.matchPackageNames, name), `${name} is not toolchain`);
     }
+  });
+
+  await t.test('groups the hub\'s minor and patch bumps into a weekly PR, merged once the backend CI is green', () => {
+    const index = rules.findIndex((r) => r.groupName === 'hub dependencies');
+    assert.ok(index >= 0, 'a hub dependencies group must exist');
+    const group = rules[index];
+    assert.deepEqual([...group.matchManagers].sort(), ['dockerfile', 'pip_requirements']);
+    assert.deepEqual(group.matchFileNames, ['apps/household-hub/backend/**']);
+    assert.deepEqual([...group.matchUpdateTypes].sort(), ['minor', 'patch']);
+    assert.equal(group.automerge, true);
+    // The backend CI is what that green means.
+    assert.ok(fs.existsSync(path.join(ROOT_DIR, '.github/workflows/household-hub-backend.yml')));
+  });
+
+  await t.test('a new Python release (3.12 to 3.13) gets a PR of its own and waits for a human', () => {
+    const index = rules.findIndex((r) => r.groupName === 'Python');
+    assert.ok(index >= 0, 'a Python rule must exist');
+    const python = rules[index];
+    assert.deepEqual(python.matchPackageNames, ['python']);
+    assert.deepEqual(python.matchUpdateTypes, ['minor']);
+    assert.equal(python.automerge, false);
+    // Without this, a pending 3.14 hides the 3.12 patch releases, security fixes included.
+    const [patches] = ruleFor((r) => asList(r.matchPackageNames).includes('python') && r.separateMinorPatch === true);
+    assert.ok(patches, 'Python patch releases must still come, in the weekly hub PR');
+    assert.ok(index > rules.findIndex((r) => r.groupName === 'hub dependencies'), 'it must override the hub group');
   });
 
   await t.test('every image on the server and the Pi has a version Renovate can compare', () => {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["docker-compose", "gradle", "gradle-wrapper"],
+  "enabledManagers": ["docker-compose", "dockerfile", "gradle", "gradle-wrapper", "pip_requirements"],
   "timezone": "Europe/Madrid",
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
@@ -30,6 +30,26 @@
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "client dependencies",
       "automerge": true
+    },
+    {
+      "description": "The hub backend's minor and patch bumps (its Python packages and base image): one PR a week, merged once the backend CI is green.",
+      "matchManagers": ["pip_requirements", "dockerfile"],
+      "matchFileNames": ["apps/household-hub/backend/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "hub dependencies",
+      "automerge": true
+    },
+    {
+      "description": "Python patch releases (3.12.x) still come in the weekly hub PR while a newer Python is waiting.",
+      "matchPackageNames": ["python"],
+      "separateMinorPatch": true
+    },
+    {
+      "description": "A new Python release (3.12 to 3.13) gets a PR of its own and waits for a human.",
+      "matchPackageNames": ["python"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "Python",
+      "automerge": false
     },
     {
       "description": "Kotlin, Compose Multiplatform and AGP move together, majors included: a Kotlin release often needs its Compose.",

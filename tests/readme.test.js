@@ -58,10 +58,10 @@ test('Root README matches the repository', async (t) => {
     assert.match(serverRow, /nightly update/, 'the Server row must name the nightly update');
     assert.match(desktopRow, /Watchtower/);
     assert.match(readme, /^\| \*\*Watchtower\*\* \| Desktop \| — \| [^|]+\|$/m);
-    assert.match(readme, /^\| \*\*Renovate\*\* \| GitHub \| — \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*Renovate\*\* \| GitHub \| — \| [^|]*the hub[^|]*\|$/m);
     assert.match(readme, /^\| \*\*Nightly update\*\* \| Server \| — \| [^|]*4 AM[^|]*\|$/m);
     const paths = treePaths(readme);
-    for (const p of ['renovate.json', 'tests/renovate.test.js']) {
+    for (const p of ['renovate.json', 'tests/renovate.test.js', '.github/workflows/household-hub-backend.yml', 'tests/backend-workflow.test.js']) {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
     // The Pi's pins are Renovate's too.
@@ -74,7 +74,7 @@ test('Root README matches the repository', async (t) => {
     assert.match(server, /^\| Nightly update \(systemd timer\) \| [^|]*04:00[^|]*\|$/m);
     const updating = server.match(/^## Updating\n([\s\S]*?)(?=^## )/m);
     assert.ok(updating, 'the server README must have an Updating section');
-    for (const needle of ['Renovate', 'server-update.timer', 'journalctl -u server-update', 'sudo hosts/server/bootstrap.sh', 'Jellyfin', 'Postgres']) {
+    for (const needle of ['Renovate', 'server-update.timer', 'journalctl -u server-update', 'sudo hosts/server/bootstrap.sh', 'Jellyfin', 'Postgres', "The Hub's Python packages"]) {
       assert.ok(updating[1].includes(needle), `Updating must mention ${needle}`);
     }
   });

@@ -125,7 +125,7 @@ graph TD
 | **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
 | **Recyclarr** | Desktop | — | TRaSH Guides sync, daily 3 AM |
 | **Watchtower** | Desktop | — | Image updates, daily 4 AM |
-| **Renovate** | GitHub | — | Version bump PRs for the server, the Pi and the hub client, weekly |
+| **Renovate** | GitHub | — | Version bump PRs for the server, the Pi, the hub and its client, weekly |
 | **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
 
 The server has a firewall, so its service ports answer lemonpi only.
@@ -140,8 +140,9 @@ The server has a firewall, so its service ports answer lemonpi only.
 │   └── workflows/
 │       ├── test.yml                 # CI: node tests + compose validation
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
+│       ├── household-hub-backend.yml # CI: hub backend tests (pytest) and image build
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
-├── renovate.json                    # Renovate: weekly bump PRs for pinned images and the client's libraries
+├── renovate.json                    # Renovate: weekly bump PRs for pinned images and the hub's and client's libraries
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
 ├── docker-compose.yml               # Desktop stack: media services, Ollama, Alloy
@@ -200,6 +201,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── server-stack.test.js         # Server compose, env template, CI gates and server README
     ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
     ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
+    ├── backend-workflow.test.js     # Hub backend CI workflow
     ├── ci-workflow.test.js          # Hub client CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo

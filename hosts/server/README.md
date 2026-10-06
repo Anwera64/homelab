@@ -56,6 +56,7 @@ The open-source `nouveau` driver hangs this GPU when it wakes it up. That freeze
 Every image in `docker-compose.yml` is pinned to a release, so the repo says what runs here. Renovate opens the bump PRs on Monday mornings:
 
 - **Minor and patch bumps** come in one PR a week, which merges itself once CI is green.
+- **The Hub's Python packages** and its base image come in a weekly PR of their own, merged once the backend's tests and image build pass. A new Python version (3.12 to 3.13) waits for you.
 - **Major bumps** get a PR each and wait for you. So does **Jellyfin**, whose upgrades migrate the library database. **Postgres** majors are never proposed: they need a dump and restore by hand.
 
 `server-update.timer` applies what was merged at 04:00. It fast-forwards the checkout and, if anything changed, rebuilds and restarts the stack and removes the old images. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
