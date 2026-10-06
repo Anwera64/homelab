@@ -1,7 +1,8 @@
 # ==============================================================================
 # Caddyfile - lemonpi HTTPS ingress (*.spicy-llama.duckdns.org -> 192.168.1.35)
-# Pi-local services are served here; desktop services go to the ports their
-# containers publish on 192.168.1.20, and fail with a 502 while the desktop is off.
+# Pi-local services are served here. The rest go to the ports their containers
+# publish: the Hub and the logs on the server (192.168.1.30), the media services
+# on the desktop (192.168.1.20) until they move. A machine that is off gives a 502.
 # ==============================================================================
 
 {
@@ -90,12 +91,13 @@
         reverse_proxy 192.168.1.20:8191
     }
 
+    # On the server
     @grafana host grafana.spicy-llama.duckdns.org
     handle @grafana {
-        reverse_proxy 192.168.1.20:3002
+        reverse_proxy 192.168.1.30:3002
     }
 
-    # The app's logs, to Alloy on the desktop. The hub is asked whose token it is first;
+    # The app's logs, to Alloy on the server. The hub is asked whose token it is first;
     # it never sees the logs themselves.
     @telemetry host telemetry.spicy-llama.duckdns.org
     handle @telemetry {
@@ -107,11 +109,11 @@
             # route keeps this order; Caddy's own would strip the header after the hub set it.
             route {
                 request_header -X-Member-Id
-                forward_auth 192.168.1.20:3051 {
+                forward_auth 192.168.1.30:3051 {
                     uri /api/v1/auth/verify
                     copy_headers X-Member-Id
                 }
-                reverse_proxy 192.168.1.20:4318
+                reverse_proxy 192.168.1.30:4318
             }
         }
         handle {
@@ -121,7 +123,7 @@
 
     @hub host hub.spicy-llama.duckdns.org
     handle @hub {
-        reverse_proxy 192.168.1.20:3051
+        reverse_proxy 192.168.1.30:3051
     }
 
     # Default / Dashboard (Homepage, on the Pi)

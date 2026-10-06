@@ -1,14 +1,19 @@
 # server: the always-on app server
 
-A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It will run everything the desktop runs today except Ollama: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub and the log stack.
+A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It will run everything the desktop used to run except Ollama: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub and the log stack.
 
-**Not live yet.** The services still run on the desktop, and lemonpi's Caddy and Homepage still point there. This folder sets the server up; the cutover is a later change.
+## What is live
+
+- **Live here:** the Household Hub, SearXNG, Loki, Grafana and Alloy. lemonpi's Caddy sends `hub.`, `grafana.` and `telemetry.` to this machine.
+- **Still on the desktop:** the media services (Jellyfin, the arr apps, qBittorrent and their companions). They move once the media disk is in; until then the bootstrap script leaves them stopped here.
+- **Staying on the desktop:** Ollama, on the RTX 5080. The Hub reaches it over the LAN, so the chat model needs the desktop awake. The desktop also keeps an Alloy that ships its logs to this Loki.
 
 ## What runs here
 
 | Piece | What it does |
 | --- | --- |
 | The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the model. |
+| Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
 | Disk guard | Stops the media services while the media disk is unplugged, and starts them again when it is back. |
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
@@ -59,7 +64,13 @@ Docker forwards a published port before the host's usual input rules see the pac
 - **Service ports** are filtered in Docker's `DOCKER-USER` chain. Only the addresses in `SERVER_ALLOWED_SOURCES` (space-separated, in `.env`) get through. lemonpi is the default and the only one that needs it: everything else uses the `https://` names.
 - **The host itself** drops incoming traffic except SSH from the LAN, ping and DHCP. This also covers IPv6.
 
-To change the list, edit `.env` and run `sudo systemctl restart server-firewall`.
+One port can be opened for one address with `SERVER_PORT_SOURCES`, as `port=address` pairs. That is how the desktop's Alloy reaches Loki, which has no login of its own, and nothing else:
+
+```ini
+SERVER_PORT_SOURCES=3100=192.168.1.20
+```
+
+To change either list, edit `.env` and run `sudo systemctl restart server-firewall`.
 
 To try a change to the rules themselves without risking your SSH session:
 
