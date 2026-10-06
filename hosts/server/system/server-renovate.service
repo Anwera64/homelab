@@ -1,0 +1,8 @@
+[Unit]
+Description=Renovate: one run that opens and merges the version bump PRs
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@SERVER_DIR@/system/server-renovate.sh

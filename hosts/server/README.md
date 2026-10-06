@@ -18,7 +18,8 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Disk guard | Stops the media services while the media disk is unplugged, and starts them again when it is back. |
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
-| Watchtower (Docker) | Updates the `:latest` images daily at 04:00. |
+| Renovate (Docker, systemd timer) | Runs every hour: opens the weekly version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
+| Nightly update (systemd timer) | At 04:00, brings in what was merged on GitHub and restarts the stack when something changed. |
 
 ## Fresh install
 
@@ -53,8 +54,46 @@ The open-source `nouveau` driver hangs this GPU when it wakes it up. That freeze
 
 ## Updating
 
+Every image in `docker-compose.yml` is pinned to a release, so the repo says what runs here. Renovate opens the bump PRs on Monday mornings:
+
+- **Minor and patch bumps** come in one PR a week, which merges itself once CI is green.
+- **The Hub's Python packages** and its base image come in a weekly PR of their own, merged once the backend's tests and image build pass. Renovate edits `requirements.in` and regenerates the lock files; a second weekly PR refreshes the packages nobody names (the indirect ones). A new Python version (3.12 to 3.13) waits for you.
+- **Major bumps** get a PR each and wait for you. So does **Jellyfin**, whose upgrades migrate the library database. **Postgres** majors are never proposed: they need a dump and restore by hand.
+
+`server-update.timer` applies what was merged at 04:00. It fast-forwards the checkout and, if anything changed, rebuilds and restarts the stack and removes the old images. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
+
+```sh
+journalctl -u server-update
+```
+
+The timer only touches the stack. When a merge changes the host setup (`bootstrap.sh` or `system/`), it says so in that log, and you run the full update:
+
 ```sh
 cd ~/homelab && git pull && sudo hosts/server/bootstrap.sh
+```
+
+To undo a bad bump, revert its PR on GitHub. The timer applies the revert the next night, or right away with `sudo systemctl start server-update`.
+
+### Renovate runs on this machine
+
+Renovate is the `renovate` service in `docker-compose.yml`. It is not part of the running stack: `server-renovate.timer` starts one run every hour, and the container exits when the run ends. A run on Monday morning opens the PRs; later runs merge them once CI is green. The rules are in [`renovate.json`](../../renovate.json).
+
+It needs a GitHub token, as `RENOVATE_TOKEN` in `.env`. Until that is set, every run is skipped. Create a fine-grained token for the `Anwera64/homelab` repository only, with these repository permissions, which are the ones Renovate's documentation lists:
+
+- **Contents** (read and write): it pushes the bump branches and merges.
+- **Pull requests** (read and write): it opens, updates and merges the PRs.
+- **Issues** (read and write): it keeps a Dependency Dashboard issue listing what it found.
+- **Commit statuses** (read and write): it posts a status while a release is younger than three days.
+- **Workflows** (read and write): needed to push a branch that touches a workflow file.
+- **Dependabot alerts** (read-only): it reads the repo's vulnerability alerts.
+
+When the token expires the runs fail until it is replaced. The PRs are opened in the name of the token's owner.
+
+```sh
+sudo systemctl start server-renovate     # one run now
+journalctl -u server-renovate            # what the runs did (also in Grafana, container renovate)
+# What a run would do, without changing anything on GitHub:
+docker compose --profile renovate run --rm -e RENOVATE_DRY_RUN=full renovate
 ```
 
 ## Firewall

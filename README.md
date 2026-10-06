@@ -13,7 +13,7 @@ A three-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house net
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Watchtower. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
+| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Renovate (hourly runs that open the version bump PRs), and a nightly update that applies the merged ones. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
 | **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama. Alloy ships its container logs to the server | root [`docker-compose.yml`](docker-compose.yml) |
 
 All three addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names (`lemonpi.lan`, `server.lan`, `desktop-kujo8mp.lan`), which Pi-hole resolves for every DHCP client.
@@ -124,7 +124,9 @@ graph TD
 | **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
 | **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
 | **Recyclarr** | Desktop | — | TRaSH Guides sync, daily 3 AM |
-| **Watchtower** | Server and Desktop | — | Image updates, daily 4 AM |
+| **Watchtower** | Desktop | — | Image updates, daily 4 AM |
+| **Renovate** | Server | — | Version bump PRs for the server, the Pi, the hub and its client, weekly; runs every hour |
+| **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
 
 The server has a firewall, so its service ports answer lemonpi only.
 
@@ -140,6 +142,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
 │       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
+├── renovate.json                    # Renovate: weekly bump PRs for pinned images and the hub's and client's libraries
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
 ├── docker-compose.yml               # Desktop stack: media services, Ollama, Alloy
@@ -166,7 +169,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── bootstrap.sh             # Idempotent setup: NVIDIA, Docker, SSH, firewall, disk guard, stack
 │       ├── docker-compose.yml       # The desktop services and the embedder, with memory caps
 │       ├── .env.example             # Server settings template (paths, allowed addresses, secrets)
-│       └── system/                  # Firewall, disk guard and battery scripts with their units
+│       └── system/                  # Firewall, disk guard, battery, nightly update and Renovate scripts with their units
 ├── apps/
 │   └── household-hub/               # Household Hub: backend (FastAPI) and client (KMP)
 ├── config/
@@ -196,9 +199,10 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
     ├── server-stack.test.js         # Server compose, env template, CI gates and server README
-    ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard and battery scripts
-    ├── ci-workflow.test.js          # Hub client CI workflow
+    ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
+    ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
     ├── backend-workflow.test.js     # Hub backend CI workflow
+    ├── ci-workflow.test.js          # Hub client CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
 ```
@@ -278,7 +282,7 @@ New-NetFirewallRule -DisplayName "Homelab Ollama (server)" -Direction Inbound -P
 * **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki's port is open to the desktop's Alloy only.
 
 **lemonpi**
-* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; bump them in a PR.
+* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; Renovate opens the bump PRs.
 * **Caddy image:** CI builds it monthly and on changes to `hosts/pi/caddy/Dockerfile`. Bump the pinned tag to roll it out.
 * **Checks, backups and rollback:** see [`hosts/pi/README.md`](hosts/pi/README.md).
 

@@ -1,3 +1,4 @@
 hosts/pi/**/*.sh text eol=lf
 hosts/server/**/*.sh text eol=lf
 hosts/server/system/*.service text eol=lf
+hosts/server/system/*.timer text eol=lf

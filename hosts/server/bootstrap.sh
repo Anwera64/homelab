@@ -48,9 +48,14 @@ write_if_changed() {
   rm -f "$tmp"
 }
 
-# Installs a unit from system/ with this checkout's path filled in, and starts it.
+# Writes a unit from system/ with this checkout's path filled in. Succeeds when it changed.
+place_unit() {
+  sed "s|@SERVER_DIR@|$SERVER_DIR|g" "$SERVER_DIR/system/$1" | write_if_changed "/etc/systemd/system/$1"
+}
+
+# Places a unit and starts it.
 install_unit() {
-  if sed "s|@SERVER_DIR@|$SERVER_DIR|g" "$SERVER_DIR/system/$1" | write_if_changed "/etc/systemd/system/$1"; then
+  if place_unit "$1"; then
     systemctl daemon-reload
     systemctl enable --now "$1"
     systemctl restart "$1"
@@ -219,6 +224,15 @@ fi
 step "Disk guard: media services run only while the disk is there"
 install_unit server-media.service
 
+step "Nightly update at 04:00: what was merged on GitHub reaches the stack"
+# The timer starts the service; the service itself is never enabled.
+place_unit server-update.service && systemctl daemon-reload
+install_unit server-update.timer
+
+step "Renovate every hour: the version bump PRs (skipped until RENOVATE_TOKEN is in .env)"
+place_unit server-renovate.service && systemctl daemon-reload
+install_unit server-renovate.timer
+
 step "App settings folders"
 # Created here, owned by the apps' user: Docker would create a missing one as
 # root, and the apps that run as user 1000 could not write to it.
@@ -234,14 +248,7 @@ if [ "$NO_STACK" -eq 1 ]; then
 elif [ "$ENV_CREATED" -eq 1 ]; then
   echo "Fill in $SERVER_DIR/.env, then rerun this script to start the stack."
 else
-  docker compose --project-directory "$SERVER_DIR" build
-  if mountpoint -q /data; then
-    docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans
-  else
-    # Without the disk the media services are left out; they cannot mount /data.
-    COMPOSE_PROFILES="" docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans
-  fi
-  "$SERVER_DIR/system/server-media.sh" --once
+  "$SERVER_DIR/system/server-stack-up.sh"
 
   step "Embedding model ($EMBEDDING_MODEL)"
   # Ollama takes a moment to answer after it starts.
