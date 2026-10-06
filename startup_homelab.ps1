@@ -326,7 +326,6 @@ if ($failedContainers.Count -gt 0) {
     Write-Host "  * Bazarr:         https://bazarr.$domain" -ForegroundColor White
     Write-Host "  * Maintainerr:    https://maintainerr.$domain" -ForegroundColor White
     Write-Host "  * qBittorrent:    https://qbit.$domain" -ForegroundColor White
-    Write-Host "  * FlareSolverr:   https://flaresolverr.$domain" -ForegroundColor White
     Write-Host "  * Grafana (logs): https://grafana.$domain" -ForegroundColor White
     Write-Host ""
     Write-Host "  --- Direct Port Fallbacks (Localhost) ---" -ForegroundColor DarkGray

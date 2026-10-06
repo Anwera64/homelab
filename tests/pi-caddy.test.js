@@ -9,6 +9,7 @@ const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/caddy-image.yml');
 const PI_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/pi/docker-compose.yml');
 const PI_CADDYFILE_PATH = path.join(ROOT_DIR, 'hosts/pi/caddy/Caddyfile');
 const PI_ENV_EXAMPLE_PATH = path.join(ROOT_DIR, 'hosts/pi/.env.example');
+const PRE_COMMIT_PATH = path.join(ROOT_DIR, '.githooks/pre-commit');
 const DESKTOP = '192\\.168\\.1\\.20';
 const SERVER = '192\\.168\\.1\\.30';
 // What already runs on the server; the media services follow once its disk is in.
@@ -87,6 +88,11 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     }
     assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051`));
   });
+
+  await t.test('FlareSolverr, which has no login and no page to use, has no name', () => {
+    assert.doesNotMatch(caddyfile, /flaresolverr/i);
+    assert.doesNotMatch(caddyfile, /:8191\b/);
+  });
   await t.test('telemetry goes to Alloy only after the hub accepts the sender\'s token', () => {
     const block = caddyfile.match(/@telemetry host telemetry\.spicy-llama\.duckdns\.org\s*\n\s*handle @telemetry \{\n([\s\S]*?)\n    \}/);
     assert.ok(block, 'the Caddyfile must route telemetry.spicy-llama.duckdns.org');
@@ -117,5 +123,21 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
 
   await t.test('.env.example declares the DuckDNS token, empty', () => {
     assert.match(read(PI_ENV_EXAMPLE_PATH), /^DUCKDNS_TOKEN=$/m);
+  });
+
+  await t.test('Maintainerr, which has no login of its own, is behind a Caddy password', () => {
+    const block = caddyfile.match(/handle @maintainerr \{\n([\s\S]*?)\n    \}/);
+    assert.ok(block, 'the Caddyfile must route maintainerr.spicy-llama.duckdns.org');
+    const guard = block[1].search(/basic_auth \{\s*\n\s*\{\$MAINTAINERR_USER\} \{\$MAINTAINERR_PASSWORD_HASH\}\s*\n\s*\}/);
+    const proxy = block[1].indexOf('reverse_proxy');
+    assert.ok(guard >= 0, 'the name must ask for the user and password hash from the Pi\'s .env');
+    assert.ok(guard < proxy, 'the password comes before the proxy');
+    // Caddy does not start on an empty user or hash, so compose refuses first, with a message.
+    for (const name of ['MAINTAINERR_USER', 'MAINTAINERR_PASSWORD_HASH']) {
+      assert.match(caddy, new RegExp(`${name}:\\s*\\$\\{${name}:\\?`), `the caddy service must require ${name}`);
+      assert.match(read(PI_ENV_EXAMPLE_PATH), new RegExp(`^${name}=$`, 'm'), `.env.example must declare ${name}, empty`);
+      assert.match(read(PRE_COMMIT_PATH), new RegExp(`${name}=validate[^\\n]*hosts/pi/docker-compose\\.yml`), `the pre-commit hook must set ${name} to validate the Pi stack`);
+    }
+    assert.match(read(PI_ENV_EXAMPLE_PATH), /caddy hash-password/, '.env.example must say how to make the hash');
   });
 });

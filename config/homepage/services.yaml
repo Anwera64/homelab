@@ -125,6 +125,8 @@
         widget:
           type: customapi
           url: http://192.168.1.20:11011/api/v2/stats
+          headers:
+            X-Api-Key: "{{HOMEPAGE_VAR_CLEANUPARR_API_KEY}}"
           mappings:
             - field: strikes.total
               label: Strikes
@@ -148,6 +150,8 @@
         widget:
           type: qbittorrent
           url: http://192.168.1.20:8080
+          username: "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}"
+          password: "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}"
 
     - Gluetun VPN:
         icon: gluetun.png
@@ -157,12 +161,6 @@
           url: http://192.168.1.20:8000
           key: "{{HOMEPAGE_VAR_GLUETUN_API_KEY}}"
           version: 2
-
-    - FlareSolverr:
-        icon: flaresolverr.png
-        href: https://flaresolverr.spicy-llama.duckdns.org
-        description: Cloudflare Solver Proxy
-        siteMonitor: http://192.168.1.20:8191
 
 - Ingress & Security:
     - Tailscale:

@@ -63,8 +63,11 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const expected = {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
-      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
+      gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
     };
+    // FlareSolverr has no login: only Prowlarr reaches it, inside the stack.
+    assert.equal(composePorts('flaresolverr'), '', 'FlareSolverr must publish no port on the desktop');
+    assert.equal(composePorts('flaresolverr', serverComposeContent), '', 'FlareSolverr must publish no port on the server');
     for (const [service, mappings] of Object.entries(expected)) {
       const ports = composePorts(service);
       for (const mapping of mappings) {
@@ -338,9 +341,11 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.deepEqual(containers, ['caddy', 'pihole', 'unbound']);
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
-      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Cleanuparr: 11011,
+      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, Cleanuparr: 11011,
       Grafana: 3002,
     };
+    // No name and no port to open: FlareSolverr has no card.
+    assert.doesNotMatch(servicesYamlContent, /flaresolverr/i);
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
       assert.ok(block, `services.yaml must list ${name}`);
@@ -349,7 +354,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('The Cleanuparr card shows what it did to the queue, read keyless from its stats API', () => {
+  await t.test('The Cleanuparr card shows what it did to the queue, read from its stats API with its key', () => {
     const card = servicesYamlContent.match(/- Cleanuparr:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
     assert.ok(card, 'services.yaml must list Cleanuparr');
     // Homepage has no native cleanuparr widget, so the card maps /api/v2/stats itself.
@@ -361,8 +366,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     for (const [field, label] of Object.entries(mappings)) {
       assert.match(card[1], new RegExp(`-\\s*field:\\s*${field.replace('.', '\\.')}\\s*\\r?\\n\\s*label:\\s*${label}\\s*$`, 'm'), `${field} must show as ${label}`);
     }
-    // Cleanuparr asks for no key on the LAN, so the Pi .env stays untouched.
-    assert.doesNotMatch(card[1], /HOMEPAGE_VAR_/, 'the Cleanuparr widget needs no API key');
+    // Cleanuparr's login is on for local addresses too (#99), so the widget sends its API key.
+    assert.match(card[1], /headers:\s*\r?\n\s*X-Api-Key:\s*"\{\{HOMEPAGE_VAR_CLEANUPARR_API_KEY\}\}"\s*$/m, 'the Cleanuparr widget must send its API key');
+  });
+
+  await t.test('The qBittorrent widget signs in: the login is on for local addresses too', () => {
+    const card = servicesYamlContent.match(/- qBittorrent:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(card, 'services.yaml must list qBittorrent');
+    assert.match(card[1], /type:\s*qbittorrent/);
+    assert.match(card[1], /username:\s*"\{\{HOMEPAGE_VAR_QBITTORRENT_USERNAME\}\}"\s*$/m);
+    assert.match(card[1], /password:\s*"\{\{HOMEPAGE_VAR_QBITTORRENT_PASSWORD\}\}"\s*$/m);
   });
 
   await t.test('The Grafana card opens the log search and holds no credentials', () => {

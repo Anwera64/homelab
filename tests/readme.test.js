@@ -162,6 +162,10 @@ test('Root README matches the repository', async (t) => {
       assert.equal(row.split('|').length - 2, 4, `this row must have four cells: ${row}`);
     }
     assert.ok(!readme.includes('Local HTTP'), 'the Local HTTP column was removed');
+    // FlareSolverr has no login, so it has no name and no open port.
+    assert.ok(!readme.includes('flaresolverr.spicy-llama.duckdns.org'), 'FlareSolverr has no https:// name');
+    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
+    assert.ok(!firewall[1].split(',').includes('8191'), 'the firewall rule must not admit FlareSolverr\'s port');
     assert.doesNotMatch(endpoints[1], /http:\/\/[\w.-]+\.lan/, 'no direct .lan address in the endpoints');
   });
 

@@ -34,7 +34,7 @@ sudo tailscale up                   # open the printed URL to log in
 ```
 
 4. In the Tailscale admin console: disable key expiry for `lemonpi`, and under **Edit route settings** approve the `192.168.1.0/24` subnet route. With that route, tailnet devices away from home reach the whole LAN through the Pi, including `*.spicy-llama.duckdns.org`, which resolves to the desktop's LAN IP. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
-5. Fill `DUCKDNS_TOKEN` and the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap. Point the DuckDNS record at 192.168.1.35.. Switch DHCP over to Pi-hole (next section).
+5. Fill `DUCKDNS_TOKEN` and the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap. `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` are required too: Caddy asks for them on Maintainerr's name, and the stack does not start without them (`.env.example` shows how to make the hash). Point the DuckDNS record at 192.168.1.35.. Switch DHCP over to Pi-hole (next section).
 
 ## DHCP (Pi-hole replaces the Livebox's)
 
