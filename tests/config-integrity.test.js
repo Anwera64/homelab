@@ -7,6 +7,11 @@ const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-lin
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
+const SERVER_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/server/docker-compose.yml');
+const SERVER_HOST = '192.168.1.30';
+const DESKTOP_HOST = '192.168.1.20';
+// What already runs on the server; the media services follow once its disk is in.
+const ON_SERVER = new Set(['Grafana']);
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
 const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
@@ -19,6 +24,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
   const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
+  const serverComposeContent = fs.readFileSync(SERVER_COMPOSE_PATH, 'utf8').replace(/\r\n/g, '\n');
 
   // A tracked config file; a missing one reads as empty so its case fails with its own message.
   const readConfig = (file) => {
@@ -26,22 +32,23 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     return fs.existsSync(full) ? fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n') : '';
   };
 
-  // Body of one root compose service.
-  const composeService = (name) => {
-    const block = dockerComposeContent.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z]|(?![\\s\\S]))`, 'm'));
-    assert.ok(block, `docker-compose.yml must define ${name}`);
+  // Body of one compose service: the desktop's file unless another is given.
+  const composeService = (name, content = dockerComposeContent) => {
+    const block = content.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z]|(?![\\s\\S]))`, 'm'));
+    assert.ok(block, `the compose file must define ${name}`);
     return block[1];
   };
+  const serverService = (name) => composeService(name, serverComposeContent);
 
-  // Ports block of one root compose service.
-  const composePorts = (name) => {
-    const ports = composeService(name).match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
+  // Ports block of one compose service.
+  const composePorts = (name, content = dockerComposeContent) => {
+    const ports = composeService(name, content).match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
     return ports ? ports[1] : '';
   };
 
   // A named volume declared at the root with a fixed name.
-  const declaresVolume = (name) =>
-    new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${name}:\\s*\\n\\s+name:\\s*${name}\\s*$`, 'm').test(dockerComposeContent);
+  const declaresVolume = (name, content = dockerComposeContent) =>
+    new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${name}:\\s*\\n\\s+name:\\s*${name}\\s*$`, 'm').test(content);
 
   await t.test('The desktop runs no Caddy: the Pi terminates HTTPS and the containers publish their own ports', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*caddy:\s*$/m, 'no caddy service on the desktop');
@@ -57,7 +64,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
       flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
-      grafana: ['3002:3000'],
     };
     for (const [service, mappings] of Object.entries(expected)) {
       const ports = composePorts(service);
@@ -65,10 +71,15 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
         assert.match(ports, new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
       }
     }
-    // Every port the link adapter knows is covered by the table above.
+    // Every port the link adapter knows is published here, or on the server for what moved there.
     const published = Object.values(expected).flat().map((m) => m.split(':')[0]);
+    const onServer = { 3002: 'grafana' };
     for (const port of Object.keys(PORT_TO_SERVICE)) {
-      assert.ok(published.includes(port), `port ${port} must be published by its service`);
+      if (onServer[port]) {
+        assert.match(composePorts(onServer[port], serverComposeContent), new RegExp(`-\\s*${port}:`), `the server must publish ${port}`);
+      } else {
+        assert.ok(published.includes(port), `port ${port} must be published by its service`);
+      }
     }
   });
   await t.test('Cleanuparr cleans the download queue and sees the torrents at qBittorrent\'s own path', () => {
@@ -90,10 +101,41 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Logs outlive their containers: Loki, Alloy and Grafana run beside the stack', () => {
-    const loki = composeService('loki');
+  await t.test('The Hub, its search and the log store moved to the server: the desktop runs none of them', () => {
+    for (const name of ['household-hub', 'searxng', 'loki', 'grafana', 'grafana-renderer']) {
+      assert.doesNotMatch(dockerComposeContent, new RegExp(`^  ${name}:\\s*$`, 'm'), `${name} now runs on the server`);
+    }
+    for (const volume of ['household_hub_data', 'loki_data', 'grafana_data']) {
+      assert.ok(!declaresVolume(volume), `the desktop no longer declares ${volume}`);
+    }
+    assert.doesNotMatch(dockerComposeContent, /SEARXNG_SECRET|GOOGLE_OAUTH|GF_SECURITY|GRAFANA_/);
+    for (const port of ['3002', '3051', '3050', '4318']) {
+      assert.doesNotMatch(dockerComposeContent, new RegExp(`^\\s+-\\s*(?:127\\.0\\.0\\.1:)?${port}:`, 'm'), `nothing on the desktop publishes ${port} any more`);
+    }
+  });
+
+  await t.test('The desktop keeps Alloy, which ships its containers\' logs to the server\'s Loki', () => {
+    // Ollama stays here for good, so the desktop always needs a collector.
     const alloy = composeService('alloy');
-    const grafana = composeService('grafana');
+    assert.match(alloy, /image:\s*grafana\/alloy:v\d+\.\d+\.\d+\s*$/m);
+    assert.doesNotMatch(alloy, /watchtower\.enable/, 'pinned; Watchtower must not update it');
+    assert.doesNotMatch(alloy, /profiles:/, 'logs are collected whatever is started: -NoAI and -ArrOnly included');
+    assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
+    assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
+    assert.ok(alloy.includes('- /var/run/docker.sock:/var/run/docker.sock:ro'), 'Alloy only reads the Docker socket');
+    assert.ok(alloy.includes('- alloy_data:/var/lib/alloy/data'));
+    assert.ok(declaresVolume('alloy_data'));
+    assert.ok(alloy.includes('- LOG_HOST=desktop'));
+    assert.ok(alloy.includes(`- LOKI_URL=\${LOKI_URL:-http://${SERVER_HOST}:3100/loki/api/v1/push}`));
+    assert.doesNotMatch(alloy, /depends_on:/, 'there is no Loki here to wait for');
+    assert.equal(composePorts('alloy'), '', 'the phones\' app logs go to the server\'s Alloy');
+    assert.equal((alloy.match(/image:\s*(\S+)/) || [])[1], (serverService('alloy').match(/image:\s*(\S+)/) || [])[1], 'both Alloys run the same version');
+  });
+
+  await t.test('On the server, logs outlive their containers: Loki, Alloy and Grafana', () => {
+    const loki = serverService('loki');
+    const alloy = serverService('alloy');
+    const grafana = serverService('grafana');
 
     // Pinned to a release and bumped in a PR, so Watchtower leaves them alone.
     assert.match(loki, /image:\s*grafana\/loki:\d+\.\d+\.\d+\s*$/m);
@@ -101,8 +143,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(grafana, /image:\s*grafana\/grafana:\d+\.\d+\.\d+\s*$/m);
     for (const [name, svc] of Object.entries({ loki, alloy, grafana })) {
       assert.doesNotMatch(svc, /watchtower\.enable/, `${name} is pinned; Watchtower must not update it`);
-      // Logs are collected whatever is started: -NoAI and -ArrOnly included.
-      assert.doesNotMatch(svc, /profiles:/, `${name} must be in the default profile`);
+      assert.doesNotMatch(svc, /profiles:/, `${name} must always run`);
       assert.match(svc, new RegExp(`container_name:\\s*${name}\\s*$`, 'm'));
       assert.match(svc, /restart:\s*unless-stopped/);
     }
@@ -110,6 +151,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(loki, /command:\s*-config\.file=\/etc\/loki\/loki-config\.yaml/);
     assert.ok(loki.includes('- ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro'));
     assert.ok(loki.includes('- loki_data:/loki'), 'Loki must keep its logs in the loki_data volume');
+    // Loki has no login of its own. The port is for the desktop's Alloy, and the server's
+    // firewall admits nobody else (SERVER_PORT_SOURCES).
+    assert.match(composePorts('loki', serverComposeContent), /^\s+-\s*3100:3100\b[^\n]*\n$/, 'Loki must publish 3100 and nothing else');
 
     assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
     assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
@@ -117,6 +161,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // Read positions: a restart of Alloy neither re-sends nor skips lines.
     assert.ok(alloy.includes('- alloy_data:/var/lib/alloy/data'));
     assert.match(alloy, /depends_on:\s*\n\s+- loki\b/);
+    assert.ok(alloy.includes('- LOG_HOST=server'));
+    assert.ok(alloy.includes('- LOKI_URL=http://loki:3100/loki/api/v1/push'));
+    // Alloy publishes only the OTLP receiver, for the app's telemetry through the Pi's Caddy.
+    assert.match(composePorts('alloy', serverComposeContent), /^\s+-\s*4318:4318\b[^\n]*\n$/, 'Alloy must publish 4318 and nothing else');
 
     // Only the data sources folder: mounting all of provisioning/ hides the image's other
     // folders and Grafana logs an error for each one at every start.
@@ -129,16 +177,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(grafana, /-\s*TZ=\$\{TZ/);
     assert.match(grafana, /depends_on:\s*\n\s+- loki\b/);
 
-    // Only Grafana is reachable, and it asks for a login; Loki has none of its own.
-    assert.equal(composePorts('loki'), '', 'Loki must not publish a port');
-    // Alloy publishes only the OTLP receiver, for the app's telemetry through the Pi's Caddy.
-    assert.match(composePorts('alloy'), /^\s+-\s*4318:4318\b[^\n]*\n$/, 'Alloy must publish 4318 and nothing else');
-
     for (const volume of ['loki_data', 'alloy_data', 'grafana_data']) {
-      assert.ok(declaresVolume(volume), `docker-compose.yml must declare the ${volume} volume with a fixed name`);
+      assert.ok(declaresVolume(volume, serverComposeContent), `the server must declare the ${volume} volume with a fixed name`);
     }
   });
-
   await t.test('Loki keeps 30 days on its volume and drops a runaway stream instead of filling the disk', () => {
     const loki = readConfig('config/loki/loki-config.yaml');
     assert.match(loki, /^auth_enabled:\s*false\s*$/m);
@@ -172,9 +214,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // The container's name without Docker's leading slash is the label to search by.
     assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_name"\]\s*\n\s*regex\s*=\s*"\/\(\.\*\)"\s*\n\s*target_label\s*=\s*"container"/);
     assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_label_logs"\]\s*\n\s*regex\s*=\s*"off"\s*\n\s*action\s*=\s*"drop"/);
-    assert.match(alloy, /url\s*=\s*"http:\/\/loki:3100\/loki\/api\/v1\/push"/);
-    // The Pi's logs slot in later under their own host.
-    assert.match(alloy, /host\s*=\s*"desktop"/);
+    // One config for both machines: each compose file says where Loki is and which host this is.
+    assert.match(alloy, /url\s*=\s*sys\.env\("LOKI_URL"\)/);
+    assert.match(alloy, /host\s*=\s*sys\.env\("LOG_HOST"\)/);
+    assert.doesNotMatch(alloy, /"desktop"|loki:3100/, 'nothing about one machine may be fixed in the shared config');
   });
 
   await t.test('Alloy receives the app\'s logs over OTLP and stores them with the member Caddy vouched for', () => {
@@ -217,16 +260,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   });
 
   await t.test('Grafana can draw a dashboard as an image, with a renderer that only runs when asked for', () => {
-    const renderer = composeService('grafana-renderer');
-    const grafana = composeService('grafana');
+    const renderer = serverService('grafana-renderer');
+    const grafana = serverService('grafana');
 
     assert.match(renderer, /image:\s*grafana\/grafana-image-renderer:v\d+\.\d+\.\d+\s*$/m, 'the renderer must be pinned to a release');
     assert.doesNotMatch(renderer, /watchtower\.enable/, 'pinned; Watchtower must not update it');
-    // A headless browser: too heavy to keep running beside Ollama, so it is started on demand.
+    // A headless browser: too heavy to keep running, so it is started on demand.
     assert.match(renderer, /profiles:\s*\["render"\]/);
     assert.match(renderer, /mem_limit:\s*2g\s*$/m);
     assert.ok(renderer.includes('- GOMEMLIMIT=256MiB'), 'Go must stay well under the container limit');
-    assert.equal(composePorts('grafana-renderer'), '', 'only Grafana talks to the renderer');
+    assert.equal(composePorts('grafana-renderer', serverComposeContent), '', 'only Grafana talks to the renderer');
     assert.match(renderer, /container_name:\s*grafana-renderer\s*$/m);
     assert.match(renderer, /restart:\s*unless-stopped/);
 
@@ -264,7 +307,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
     const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
     const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]);
-    assert.ok(names.length >= 20, 'the service list should be readable');
+    assert.ok(names.length >= 15, 'the service list should be readable');
     for (const name of names) {
       assert.match(composeService(name), /^    logging:\s*\*default-logging\s*$/m, `${name} must use the capped logging block`);
     }
@@ -301,7 +344,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
       assert.ok(block, `services.yaml must list ${name}`);
-      const monitor = `http://192.168.1.20:${port}`;
+      const monitor = `http://${ON_SERVER.has(name) ? SERVER_HOST : DESKTOP_HOST}:${port}`;
       assert.match(block[1], new RegExp(`siteMonitor:\\s*${monitor.replace(/\./g, '\\.')}/?\\s*$`, 'm'), `${name} must be monitored at ${monitor}`);
     }
   });
@@ -385,15 +428,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(
       !/^\s*secret_key\s*:/m.test(searxngSettingsContent),
       'config/searxng/settings.yml must not contain secret_key; it is injected via SEARXNG_SECRET'
-    );
-  });
-
-  await t.test('SearXNG service receives SEARXNG_SECRET in docker-compose.yml', () => {
-    const searxngMatch = dockerComposeContent.match(/container_name:\s*searxng[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|$)/);
-    assert.ok(searxngMatch, 'docker-compose.yml must contain a searxng service with environment section');
-    assert.ok(
-      searxngMatch[1].includes('SEARXNG_SECRET=${SEARXNG_SECRET}'),
-      'SearXNG service must receive SEARXNG_SECRET=${SEARXNG_SECRET}'
     );
   });
 
@@ -555,20 +589,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('Household Hub runs in compose with its data in a named volume', () => {
-    // On the host the backend could not resolve searxng:8080; inside compose every service name resolves.
-    const hubMatch = dockerComposeContent.match(/^  household-hub:\s*\n([\s\S]*?)(?=^  [a-z][\w-]*:\s*\n|^[a-z]+:\s*\n)/m);
-    assert.ok(hubMatch, 'docker-compose.yml must declare a household-hub service');
-    const hub = hubMatch[1];
-    assert.match(hub, /profiles:\s*\["ai"\]/, 'household-hub must be in the ai profile so an arr-only start leaves it off');
-    assert.match(hub, /context:\s*\.\/apps\/household-hub\/backend/, 'household-hub must build from the backend folder');
-    assert.ok(hub.includes('- household_hub_data:/data'), 'household-hub must keep its SQLite database in the household_hub_data volume');
-    assert.ok(hub.includes('- 127.0.0.1:3050:3050'), 'household-hub must keep 3050 on loopback for /docs from the PC');
-    assert.match(hub, /-\s*3051:3050\b/, 'household-hub must publish 3051 on the LAN for the Pi\'s Caddy');
-    assert.match(hub, /depends_on:\s*\n\s+- ollama\s*\n\s+- searxng/, 'household-hub must start after ollama and searxng');
-    assert.ok(
-      /^volumes:\s*\n[\s\S]*?^  household_hub_data:\s*\n\s+name:\s*household_hub_data\s*$/m.test(dockerComposeContent),
-      'docker-compose.yml must declare the household_hub_data volume with a fixed name'
-    );
+  await t.test('Ollama answers the server\'s Hub over the LAN', () => {
+    const ollama = composeService('ollama');
+    // The Windows firewall admits only the server on this port (see README).
+    assert.match(composePorts('ollama'), /^\s+-\s*11434:11434\s*\n$/, 'Ollama must publish 11434 on the LAN and nothing else');
+    assert.doesNotMatch(ollama, /127\.0\.0\.1:11434/);
   });
 });

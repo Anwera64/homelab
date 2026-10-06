@@ -38,9 +38,15 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
   const block = (name) => serviceBlock(compose, name);
 
   await t.test('runs every desktop service except Ollama, which stays on the RTX 5080', () => {
-    const expected = serviceNames(desktop).filter((name) => name !== 'ollama').sort();
-    assert.ok(expected.length >= 20, 'the desktop service list should be readable');
+    const expected = [
+      'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
+      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'prowlarr', 'qbittorrent', 'radarr',
+      'recyclarr', 'searxng', 'seerr', 'sonarr', 'watchtower',
+    ];
     assert.deepEqual([...names].sort(), expected);
+    assert.ok(!names.includes('ollama'));
+    // Until the media disk is in, the desktop still runs the media services too.
+    assert.ok(serviceNames(desktop).includes('ollama'));
     for (const name of names) {
       assert.match(block(name), new RegExp(`^    container_name:\\s*${name}\\s*$`, 'm'), `${name} keeps its container name`);
     }
@@ -62,7 +68,9 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     for (const port of Object.keys(PORT_TO_SERVICE)) {
       assert.ok(published.includes(port), `port ${port} must be published by its service`);
     }
-    assert.equal(portsOf(block('loki')), '', 'Loki must not publish a port');
+    // For the desktop's Alloy; the firewall admits nobody else on it.
+    assert.match(portsOf(block('loki')), /-\s*3100:3100\b/, 'Loki must publish 3100');
+    assert.match(envExample, /^SERVER_PORT_SOURCES=3100=192\.168\.1\.20$/m);
   });
 
   await t.test('caps the memory of every service: the host has 16 GB', () => {
@@ -156,11 +164,13 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.doesNotMatch(watchtower, /watchtower\.enable/, 'pinned; it must not update itself');
   });
 
-  await t.test('the log stack and the on-demand renderer match the desktop\'s', () => {
+  await t.test('the log stack is pinned, with the renderer on demand', () => {
+    const image = (text, name) => (serviceBlock(text, name).match(/^    image:\s*(\S+)/m) || [])[1];
     for (const name of ['loki', 'alloy', 'grafana', 'grafana-renderer']) {
-      const image = (text) => (serviceBlock(text, name).match(/^    image:\s*(\S+)/m) || [])[1];
-      assert.equal(image(compose), image(desktop), `${name} must run the desktop's pinned image`);
+      assert.match(image(compose, name), /:v?\d+\.\d+\.\d+$/, `${name} must be pinned to a release`);
     }
+    // The desktop keeps an Alloy of its own, shipping here; the two must not drift apart.
+    assert.equal(image(compose, 'alloy'), image(desktop, 'alloy'));
     assert.match(block('grafana-renderer'), /^    profiles:\s*\["render"\]\s*$/m);
     for (const volume of ['household_hub_data', 'loki_data', 'alloy_data', 'grafana_data']) {
       assert.match(compose, new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${volume}:\\s*\\n\\s+name:\\s*${volume}\\s*$`, 'm'), `${volume} keeps its fixed name`);
@@ -235,7 +245,18 @@ test('Server README', async (t) => {
     assert.match(readme, /## Moving to other hardware/);
   });
 
-  await t.test('says the server is not live yet', () => {
-    assert.match(readme, /not live yet/i);
+  await t.test('says what is live on it and what still waits for the media disk', () => {
+    assert.match(readme, /## What is live/);
+    const live = readme.match(/## What is live\n([\s\S]*?)(?=\n## )/)[1];
+    for (const service of ['Household Hub', 'SearXNG', 'Loki', 'Grafana', 'Alloy']) {
+      assert.ok(live.includes(service), `${service} is live on the server`);
+    }
+    assert.match(live, /media/i, 'it must say the media services are still on the desktop');
+    assert.doesNotMatch(readme, /\*\*Not live yet\.\*\*/);
+  });
+
+  await t.test('documents the one-port rule that lets the desktop ship its logs', () => {
+    assert.ok(readme.includes('SERVER_PORT_SOURCES'));
+    assert.match(readme, /3100/);
   });
 });

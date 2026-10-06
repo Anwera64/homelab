@@ -9,6 +9,10 @@ const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/caddy-image.yml');
 const PI_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/pi/docker-compose.yml');
 const PI_CADDYFILE_PATH = path.join(ROOT_DIR, 'hosts/pi/caddy/Caddyfile');
 const PI_ENV_EXAMPLE_PATH = path.join(ROOT_DIR, 'hosts/pi/.env.example');
+const DESKTOP = '192\\.168\\.1\\.20';
+const SERVER = '192\\.168\\.1\\.30';
+// What already runs on the server; the media services follow once its disk is in.
+const ON_SERVER = new Set(['grafana']);
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '');
@@ -72,17 +76,17 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.20:8096/);
   });
 
-  await t.test('every desktop service goes to its own published port on the desktop', () => {
+  await t.test('every service goes to its own published port, on the machine that runs it', () => {
     for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
+      const host = ON_SERVER.has(service) ? SERVER : DESKTOP;
       assert.match(
         caddyfile,
-        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy 192\\.168\\.1\\.20:${port}\\b`),
-        `${service} must proxy to 192.168.1.20:${port}`
+        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy ${host}:${port}\\b`),
+        `${service} must proxy to port ${port} on ${ON_SERVER.has(service) ? 'the server' : 'the desktop'}`
       );
     }
-    assert.match(caddyfile, /@hub host hub\.spicy-llama\.duckdns\.org\s*\n\s*handle @hub \{\s*\n\s*reverse_proxy 192\.168\.1\.20:3051/);
+    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051`));
   });
-
   await t.test('telemetry goes to Alloy only after the hub accepts the sender\'s token', () => {
     const block = caddyfile.match(/@telemetry host telemetry\.spicy-llama\.duckdns\.org\s*\n\s*handle @telemetry \{\n([\s\S]*?)\n    \}/);
     assert.ok(block, 'the Caddyfile must route telemetry.spicy-llama.duckdns.org');
@@ -96,8 +100,9 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     const steps = guarded[1];
     // A sender cannot name the member itself: the header is removed, then set from the hub's answer.
     const strip = steps.indexOf('request_header -X-Member-Id');
-    const auth = steps.search(/forward_auth 192\.168\.1\.20:3051 \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
-    const proxy = steps.indexOf('reverse_proxy 192.168.1.20:4318');
+    // Both the Hub and Alloy are on the server now.
+    const auth = steps.search(/forward_auth 192\.168\.1\.30:3051 \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
+    const proxy = steps.indexOf('reverse_proxy 192.168.1.30:4318');
     assert.ok(strip >= 0 && auth >= 0 && proxy >= 0, 'strip, forward_auth and reverse_proxy must all be present');
     assert.ok(strip < auth && auth < proxy, 'strip the header, then ask the hub, then pass to Alloy');
     assert.match(body, /handle \{\s*\n\s*respond 404\s*\n\s*\}/, 'anything else on this name is refused');

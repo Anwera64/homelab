@@ -71,76 +71,95 @@ test('Root README matches the repository', async (t) => {
     }
   });
 
-  await t.test('the log stack is in the Hosts table, the graph, the endpoints and the tree', () => {
+  await t.test('the log stack is on the server in the Hosts table, the graph, the endpoints and the tree', () => {
+    const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m);
+    assert.ok(serverRow, 'the Hosts table must have a Server row');
+    for (const service of ['Household Hub', 'SearXNG', 'Loki', 'Alloy', 'Grafana']) {
+      assert.ok(serverRow[0].includes(service), `the Server row must name ${service}`);
+    }
     const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m);
     assert.ok(desktopRow, 'the Hosts table must have a Desktop row');
-    for (const service of ['Loki', 'Alloy', 'Grafana']) {
-      assert.ok(desktopRow[0].includes(service), `the Desktop row must name ${service}`);
+    assert.ok(desktopRow[0].includes('Ollama'));
+    // The desktop keeps a collector for good, beside Ollama.
+    assert.ok(desktopRow[0].includes('Alloy'));
+    for (const moved of ['Loki', 'Grafana', 'Household Hub', 'SearXNG']) {
+      assert.ok(!desktopRow[0].includes(moved), `${moved} no longer runs on the desktop`);
     }
 
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/);
     assert.ok(graph, 'README must have the network flow graph');
-    const logs = graph[1].match(/subgraph Logs \[[^\]]*\]\n([\s\S]*?)\n\s*end/);
-    assert.ok(logs, 'the graph must have a Logs subgraph');
+    const server = graph[1].match(/subgraph Server \[[^\]]*\]\n([\s\S]*?)\n    end/);
+    assert.ok(server, 'the graph must have a Server subgraph');
+    const logs = server[1].match(/subgraph Logs \[[^\]]*\]\n([\s\S]*?)\n\s*end/);
+    assert.ok(logs, 'the Logs subgraph must be inside the server');
     assert.match(logs[1], /ALLOY\[[^\]]*Alloy[^\]]*\] --> LOKI\[[^\]]*Loki[^\]]*30 days[^\]]*\] --> GRAFANA\[[^\]]*Grafana[^\]]*\]/);
-    assert.match(graph[1], /-\.->\|Docker socket\| ALLOY/, 'the graph must show Alloy reading the Docker socket');
+    assert.match(server[1], /HUB\[[^\]]*Household Hub[^\]]*\]/, 'the Hub must be inside the server');
+    assert.match(graph[1], /Server -\.->\|Docker socket\| ALLOY/, 'the graph must show Alloy reading the server\'s Docker socket');
+    assert.match(graph[1], /DALLOY\[[^\]]*Alloy[^\]]*\] -->\|ships logs\| LOKI/, 'the desktop\'s Alloy must ship to the server\'s Loki');
+    assert.match(graph[1], /HUB -->\|LAN\| OLLAMA/, 'the Hub must reach Ollama on the desktop');
     assert.match(graph[1], /CADDY -->\|published LAN ports\|[^\n]*\bGRAFANA\b/, 'Caddy must route to Grafana in the graph');
 
-    assert.match(readme, /^\| \*\*Grafana\*\* \| Desktop \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:3002` \|/m);
-    assert.match(readme, /^\| \*\*Loki\*\* \| Desktop \| — \| internal `http:\/\/loki:3100` \|/m);
+    assert.match(readme, /^\| \*\*Grafana\*\* \| Server \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:3002` \|/m);
+    assert.match(readme, /^\| \*\*Loki\*\* \| Server \| — \| `http:\/\/server\.lan:3100` \(the desktop's Alloy only\) \|/m);
+    assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:3051` \|/m);
+    assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \(AI profile\) \| — \| `http:\/\/desktop-kujo8mp\.lan:11434` \(the server only\) \|/m);
 
     const paths = treePaths(readme);
     for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
   });
-
   await t.test('says how to start the dashboard image renderer, which does not run by itself', () => {
     assert.ok(readme.includes('docker compose --profile render up -d grafana-renderer'), 'README must show how to start the renderer');
     assert.ok(readme.includes('docker compose --profile render stop grafana-renderer'), 'README must show how to stop it');
-    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m)[0];
-    assert.match(desktopRow, /image renderer \(on demand\)/, 'the Desktop row must list the renderer as on demand');
+    const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m)[0];
+    assert.match(serverRow, /image renderer \(on demand\)/, 'the Server row must list the renderer as on demand');
   });
-
-  await t.test('says how to search the logs, what is kept and how to open the port', () => {
+  await t.test('says how to search the logs, what is kept and which ports the desktop opens', () => {
     assert.ok(readme.includes('{container="household-hub"}'), 'README must show a LogQL query by container');
+    assert.ok(readme.includes('{host="desktop", container="ollama"}'), 'README must show how to find the desktop\'s lines');
     assert.match(readme, /30 days/);
     assert.ok(readme.includes('logs=off'), 'README must name the opt-out label');
     assert.match(readme, /calendar titles and note text/, 'README must say what the hub\'s lines carry');
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
-    assert.ok(firewall, 'README must show the firewall rule');
-    assert.ok(firewall[1].split(',').includes('3002'), 'the firewall rule must admit 3002');
+    assert.ok(firewall, 'README must show the firewall rule for the media ports');
+    const ports = firewall[1].split(',');
+    assert.ok(ports.includes('8096'), 'the rule must still admit Jellyfin');
+    for (const moved of ['3002', '3051', '4318', '11434']) {
+      assert.ok(!ports.includes(moved), `the LAN-wide rule must not admit ${moved}`);
+    }
+    // Ollama is for the server alone.
+    assert.match(readme, /New-NetFirewallRule[^\n]*-LocalPort 11434[^\n]*-RemoteAddress 192\.168\.1\.30/);
   });
-
-  await t.test('the telemetry route is in the endpoints, the graph and the firewall rule', () => {
-    assert.match(readme, /^\| \*\*Alloy\*\* \| Desktop \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| `http:\/\/desktop-kujo8mp\.lan:4318` \|/m);
+  await t.test('the telemetry route is in the endpoints and the graph', () => {
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Server \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:4318` \|/m);
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
     assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
-    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
-    assert.ok(firewall[1].split(',').includes('4318'), 'the firewall rule must admit 4318');
     assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
   });
-
-  await t.test('the firewall rule admits every port the Pi proxies to', () => {
+  await t.test('the firewall rule admits every port the Pi proxies to on the desktop', () => {
     // -LocalPort replaces the whole list, so a port missing here is closed by copying the command
     // (Cleanuparr's 11011 was, and its HTTPS name answered 502).
     const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
     assert.ok(firewall, 'README must show the firewall rule');
     const admitted = firewall[1].split(',');
-    // The hub (3051), Alloy's OTLP receiver (4318) and the Gluetun API (8000) are reached from the Pi
-    // without being in the link adapter.
-    for (const port of [...Object.keys(PORT_TO_SERVICE), '3051', '4318', '8000']) {
+    // Grafana (3002) moved to the server, with the hub and Alloy's receiver.
+    const onServer = ['3002'];
+    const onDesktop = Object.keys(PORT_TO_SERVICE).filter((port) => !onServer.includes(port));
+    // The Gluetun API (8000) is reached from the Pi without being in the link adapter.
+    for (const port of [...onDesktop, '8000']) {
       assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
     }
   });
 
-  await t.test('host IPs appear only in the Hosts table', () => {
+  await t.test('host IPs appear only in the Hosts table, and in the one firewall rule that needs an address', () => {
     const hosts = readme.match(/## 🖥️ Hosts\n[\s\S]*?(?=\n## )/);
     assert.ok(hosts, 'README must have a Hosts section');
-    assert.match(hosts[0], /192\.168\.1\.35/);
-    assert.match(hosts[0], /192\.168\.1\.20/);
-    const rest = readme.replace(hosts[0], '');
+    for (const ip of ['192.168.1.35', '192.168.1.20', '192.168.1.30']) {
+      assert.ok(hosts[0].includes(ip), `the Hosts table must give ${ip}`);
+    }
+    const rest = readme.replace(hosts[0], '').split('\n').filter((line) => !line.includes('-RemoteAddress')).join('\n');
     const stray = rest.match(/192\.168\.1\.\d+(?!\/\d)/g) || [];
-    assert.deepEqual(stray, [], 'use lemonpi.lan / desktop-kujo8mp.lan outside the Hosts table');
+    assert.deepEqual(stray, [], 'use lemonpi.lan / server.lan / desktop-kujo8mp.lan outside the Hosts table');
   });
 });

@@ -4,7 +4,8 @@
 # the host's own input rules ever see the packet:
 #
 #   1. DOCKER-USER: who may reach the published service ports. Only the
-#      addresses in SERVER_ALLOWED_SOURCES (hosts/server/.env), lemonpi by default.
+#      addresses in SERVER_ALLOWED_SOURCES (hosts/server/.env), lemonpi by default,
+#      plus single ports for single addresses in SERVER_PORT_SOURCES (port=address).
 #   2. An input policy for the host itself: SSH for the LAN, nothing else. This
 #      also covers IPv6, where published ports are reached through the host.
 #
@@ -26,13 +27,17 @@ allowed_sources() {
   echo "${sources:-192.168.1.35}"
 }
 
+port_sources() {
+  sed -n 's/^SERVER_PORT_SOURCES=//p' "$SERVER_DIR/.env" 2>/dev/null | tail -1 | tr -d '"'
+}
+
 clear_rules() {
   iptables -F DOCKER-USER 2>/dev/null || true
   nft delete table inet server_host 2>/dev/null || true
 }
 
 apply_rules() {
-  local iface source
+  local iface source pair port address
 
   iptables -N DOCKER-USER 2>/dev/null || true
   iptables -F DOCKER-USER
@@ -40,6 +45,12 @@ apply_rules() {
   for iface in "${LAN_IFACES[@]}"; do
     for source in $(allowed_sources); do
       iptables -A DOCKER-USER -i "$iface" -s "$source" -j RETURN
+    done
+    # The port the caller dialled, not the container's: Docker has already rewritten it here.
+    for pair in $(port_sources); do
+      port="${pair%%=*}"
+      address="${pair#*=}"
+      iptables -A DOCKER-USER -i "$iface" -s "$address" -p tcp -m conntrack --ctorigdstport "$port" -j RETURN
     done
   done
   for iface in "${LAN_IFACES[@]}"; do

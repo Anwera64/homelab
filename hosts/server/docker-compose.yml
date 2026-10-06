@@ -411,11 +411,16 @@ services:
   # A container's log dies with the container. Alloy reads every container's
   # output through the Docker socket (label a container logs=off to leave it out),
   # Loki keeps it for 30 days, Grafana searches it. Versions are pinned.
+  # The desktop runs an Alloy of its own that ships its logs to this Loki.
   # ==============================================================================
   loki:
     image: grafana/loki:3.7.8
     container_name: loki
     command: -config.file=/etc/loki/loki-config.yaml
+    # For the desktop's Alloy. Loki has no login of its own: the firewall admits only the
+    # addresses in SERVER_PORT_SOURCES on this port.
+    ports:
+      - 3100:3100
     volumes:
       - ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
@@ -429,6 +434,9 @@ services:
     ports:
       - 4318:4318   # OTLP over HTTP: the app's logs, through the Pi's Caddy (telemetry.spicy-llama.duckdns.org)
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    environment:
+      - LOG_HOST=server
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
     volumes:
       - ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

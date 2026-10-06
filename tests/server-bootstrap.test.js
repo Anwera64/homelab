@@ -187,6 +187,15 @@ test('Server firewall', async (t) => {
     assert.doesNotMatch(script, /192\.168\.1\.20/, 'the desktop is allowed through .env, not the script');
   });
 
+  await t.test('admits one port for one address, matched on the port the caller dialled', () => {
+    // SERVER_PORT_SOURCES="3100=192.168.1.20": the desktop's Alloy reaches Loki and nothing else.
+    assert.match(script, /SERVER_PORT_SOURCES/);
+    const perPort = at(script, /iptables -A DOCKER-USER -i "\$iface" -s "\$address" -p tcp -m conntrack --ctorigdstport "\$port" -j RETURN/);
+    const drop = at(script, /iptables -A DOCKER-USER -i "\$iface" -j DROP/);
+    assert.ok(perPort < drop, 'the per-port accepts come before the drop');
+    assert.doesNotMatch(script, /3100/, 'ports come from .env, not the script');
+  });
+
   await t.test('drops everything else aimed at the host, IPv6 included, but keeps SSH for the LAN', () => {
     assert.match(script, /table inet server_host/);
     assert.match(script, /type filter hook input priority 0; policy drop;/);
