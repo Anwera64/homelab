@@ -99,10 +99,10 @@ test('Root README matches the repository', async (t) => {
     assert.match(graph[1], /HUB -->\|LAN\| OLLAMA/, 'the Hub must reach Ollama on the desktop');
     assert.match(graph[1], /CADDY -->\|published LAN ports\|[^\n]*\bGRAFANA\b/, 'Caddy must route to Grafana in the graph');
 
-    assert.match(readme, /^\| \*\*Grafana\*\* \| Server \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:3002` \|/m);
-    assert.match(readme, /^\| \*\*Loki\*\* \| Server \| — \| `http:\/\/server\.lan:3100` \(the desktop's Alloy only\) \|/m);
-    assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:3051` \|/m);
-    assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \(AI profile\) \| — \| `http:\/\/desktop-kujo8mp\.lan:11434` \(the server only\) \|/m);
+    assert.match(readme, /^\| \*\*Grafana\*\* \| Server \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| Log search/m);
+    assert.match(readme, /^\| \*\*Loki\*\* \| Server \| — \| [^|]*port 3100, the desktop's Alloy only/m);
+    assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org` \| Family assistant backend/m);
+    assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \(AI profile\) \| — \| [^|]*port 11434, the server only/m);
 
     const paths = treePaths(readme);
     for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
@@ -132,7 +132,7 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /New-NetFirewallRule[^\n]*-LocalPort 11434[^\n]*-RemoteAddress 192\.168\.1\.30/);
   });
   await t.test('the telemetry route is in the endpoints and the graph', () => {
-    assert.match(readme, /^\| \*\*Alloy\*\* \| Server \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| `http:\/\/server\.lan:4318` \|/m);
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Server \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| Ships/m);
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
     assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
     assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
@@ -150,6 +150,19 @@ test('Root README matches the repository', async (t) => {
     for (const port of [...onDesktop, '8000']) {
       assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
     }
+  });
+
+  await t.test('the endpoints table gives the https:// name only: direct ports are not a way in', () => {
+    const endpoints = readme.match(/## 🌐 Service Endpoints\n([\s\S]*?)\n---/);
+    assert.ok(endpoints, 'README must have a Service Endpoints section');
+    const rows = endpoints[1].split('\n').filter((line) => line.startsWith('|'));
+    assert.equal(rows[0], '| Service | Host | HTTPS (home + Tailscale) | Role |');
+    assert.ok(rows.length > 20, 'the table should list the services');
+    for (const row of rows) {
+      assert.equal(row.split('|').length - 2, 4, `this row must have four cells: ${row}`);
+    }
+    assert.ok(!readme.includes('Local HTTP'), 'the Local HTTP column was removed');
+    assert.doesNotMatch(endpoints[1], /http:\/\/[\w.-]+\.lan/, 'no direct .lan address in the endpoints');
   });
 
   await t.test('host IPs appear only in the Hosts table, and in the one firewall rule that needs an address', () => {
