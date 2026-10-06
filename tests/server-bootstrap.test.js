@@ -159,6 +159,21 @@ test('Server bootstrap script', async (t) => {
     assert.match(script, /--no-stack/);
   });
 
+  await t.test('pulls the embedding model once the stack is up, and only when it is missing', () => {
+    const up = at(script, 'docker compose --project-directory "$SERVER_DIR" up -d');
+    const pull = at(script, 'docker exec ollama ollama pull "$EMBEDDING_MODEL"');
+    assert.ok(up < pull, 'Ollama must be running before the pull');
+    assert.match(script, /^EMBEDDING_MODEL="bge-m3"$/m);
+    // Ollama takes a moment to answer after it starts; the wait is bounded.
+    assert.match(script, /for _ in \$\(seq 1 30\); do\n\s+docker exec ollama ollama list/);
+    assert.match(script, /ollama list[^\n]*\| grep -q "\^\$EMBEDDING_MODEL\[:\[:space:\]\]"/, 'checks before it pulls');
+    // Without the model the Hub still answers, by keywords: a failed pull must not stop the script.
+    assert.match(script, /ollama pull "\$EMBEDDING_MODEL" \|\| echo/);
+    // The model it pulls is the one the Hub asks for.
+    const compose = read(path.join(SERVER_DIR, 'docker-compose.yml'));
+    assert.ok(compose.includes('- EMBEDDING_MODEL=bge-m3'));
+  });
+
   await t.test('reminds about a pending reboot and the temporary sudo rule', () => {
     assert.match(script, /^finish\(\) \{$/m);
     assert.match(script, /\/sys\/module\/nvidia/);

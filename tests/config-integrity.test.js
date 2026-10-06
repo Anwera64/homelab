@@ -529,12 +529,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(hubWindow, 'the hub must declare LLM_CONTEXT_TOKENS');
     assert.equal(hubWindow[1], rvnModelfile.match(/PARAMETER num_ctx (\d+)/)[1], 'LLM_CONTEXT_TOKENS must match the Modelfile num_ctx');
 
-    // The embedder runs on the CPU so the chat model keeps the whole GPU.
-    const embedder = manifest.models.find((m) => m.name === 'bge-m3-cpu');
-    assert.ok(embedder, 'manifest must provision bge-m3-cpu, the source index embedder');
-    assert.equal(embedder.ollama_pull, 'bge-m3', 'bge-m3-cpu is built from the Ollama library bge-m3');
-    const embedderModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, embedder.modelfile), 'utf8');
-    assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
+    // The embedder runs on the server's own Ollama (#106), which pulls bge-m3 itself; the desktop provisions none.
+    assert.deepEqual(manifest.models.filter((m) => /bge/.test(m.name)), [], 'the desktop manifest must not provision an embedder');
+    assert.ok(!fs.existsSync(path.join(OLLAMA_MODELS_DIR, 'bge-m3-cpu.Modelfile')), 'bge-m3-cpu.Modelfile must be gone');
   });
 
   await t.test('Every tool the hub offers has words of its own in the app', () => {

@@ -1,18 +1,18 @@
 # server: the always-on app server
 
-A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It will run everything the desktop used to run except Ollama: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub and the log stack.
+A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It will run everything the desktop used to run except the chat model: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub with its embedder, and the log stack.
 
 ## What is live
 
-- **Live here:** the Household Hub, SearXNG, Loki, Grafana and Alloy. lemonpi's Caddy sends `hub.`, `grafana.` and `telemetry.` to this machine.
+- **Live here:** the Household Hub, SearXNG, Loki, Grafana and Alloy. lemonpi's Caddy sends `hub.`, `grafana.` and `telemetry.` to this machine. An Ollama of its own runs the embedder (`bge-m3`) on the GTX 1660 Ti: it ranks what a chat turn reads. It unloads after 30 minutes without use, and if it is down the Hub ranks by keywords instead.
 - **Still on the desktop:** the media services (Jellyfin, the arr apps, qBittorrent and their companions). They move once the media disk is in; until then the bootstrap script leaves them stopped here.
-- **Staying on the desktop:** Ollama, on the RTX 5080. The Hub reaches it over the LAN, so the chat model needs the desktop awake. The desktop also keeps an Alloy that ships its logs to this Loki.
+- **Staying on the desktop:** the chat model, in Ollama on the RTX 5080. The Hub reaches it over the LAN, so the chat model needs the desktop awake. The desktop also keeps an Alloy that ships its logs to this Loki.
 
 ## What runs here
 
 | Piece | What it does |
 | --- | --- |
-| The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the model. |
+| The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the chat model and the stack's own Ollama for embeddings; the bootstrap script pulls `bge-m3` when it is missing. |
 | Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
 | Disk guard | Stops the media services while the media disk is unplugged, and starts them again when it is back. |
@@ -123,9 +123,9 @@ Jellyfin transcodes with NVENC (H.264 and HEVC). This GPU cannot encode AV1, so 
 The setup is meant to outlive the laptop:
 
 1. Install Debian on the new machine and give it the `192.168.1.30` reservation, so lemonpi and the Hub need no change.
-2. Move the media disk over. Copy `config/` and the named volumes (`household_hub_data`, `grafana_data`, `loki_data`).
+2. Move the media disk over. Copy `config/` and the named volumes (`household_hub_data`, `grafana_data`, `loki_data`). `ollama_models` need not move: the bootstrap script pulls the model again.
 3. In [`bootstrap.sh`](bootstrap.sh), the section between `# >>> laptop` and `# <<< laptop` is the hardware-specific part: the NVIDIA driver, the lid and the battery. Replace it for the new machine.
-4. In [`docker-compose.yml`](docker-compose.yml), Jellyfin's `deploy` block is the only GPU setting. On an Intel machine it becomes a `/dev/dri` device for Quick Sync.
+4. In [`docker-compose.yml`](docker-compose.yml), the `deploy` blocks of Jellyfin and Ollama are the only GPU settings. On an Intel machine Jellyfin's becomes a `/dev/dri` device for Quick Sync, and Ollama's goes: the embedder then runs on the CPU.
 
 ## The Hub's key
 

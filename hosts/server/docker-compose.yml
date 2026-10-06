@@ -1,6 +1,6 @@
 # ==============================================================================
 # The always-on server (192.168.1.30): media, the arr pipeline behind the VPN
-# kill-switch, the Household Hub and the log stack. Ollama stays on the desktop.
+# kill-switch, the Household Hub and the log stack. The chat model stays on the desktop.
 # Run through bootstrap.sh; see README.md.
 #
 # Every service has a memory cap (the host has 16 GB). Services in the "media"
@@ -214,7 +214,7 @@ services:
       - ${MEDIA_ROOT}:/data:ro
       - ${MOVIES_PATH}:/media/movies:ro
       - ${SHOWS_PATH}:/media/tv:ro
-    # The only hardware-specific block in this file: the laptop's GTX 1660 Ti (H.264 and
+    # Hardware-specific, like Ollama's block in section 10: the laptop's GTX 1660 Ti (H.264 and
     # HEVC, no AV1 encoding). On an Intel host this becomes a /dev/dri device for Quick Sync.
     deploy:
       resources:
@@ -367,8 +367,8 @@ services:
     logging: *default-logging
 
   # ==============================================================================
-  # 10. Household Hub and its private search. The model runs on the desktop's
-  # RTX 5080, reached over the LAN.
+  # 10. Household Hub, its private search and its embedder. The chat model runs
+  # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
     image: searxng/searxng:latest
@@ -384,6 +384,28 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
+  # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
+  ollama:
+    image: ollama/ollama:0.35.1
+    container_name: ollama
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      # Loaded through a conversation, unloaded when the house is quiet.
+      - OLLAMA_KEEP_ALIVE=30m
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    mem_limit: 2g
+    restart: unless-stopped
+    logging: *default-logging
+
   household-hub:
     build:
       context: ../../apps/household-hub/backend
@@ -395,6 +417,9 @@ services:
       - ENVIRONMENT=production
       - SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}
+      # What a turn reads is embedded here. If this Ollama is down, the turn ranks by keywords.
+      - EMBEDDING_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=bge-m3
       # Google Calendar sign-in (#54); empty ID leaves Google unavailable in the app.
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
       - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
@@ -406,6 +431,7 @@ services:
       - 3051:3050             # LAN, for the Pi's Caddy (hub.spicy-llama.duckdns.org)
     depends_on:
       - searxng
+      - ollama
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -495,6 +521,8 @@ services:
 volumes:
   household_hub_data:
     name: household_hub_data
+  ollama_models:
+    name: ollama_models
   loki_data:
     name: loki_data
   alloy_data:
