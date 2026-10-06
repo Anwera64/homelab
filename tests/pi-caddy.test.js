@@ -108,8 +108,11 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.match(body, /handle \{\s*\n\s*respond 404\s*\n\s*\}/, 'anything else on this name is refused');
   });
 
-  await t.test('plain HTTP on the Pi shows Homepage', () => {
-    assert.match(caddyfile, /http:\/\/192\.168\.1\.35, http:\/\/lemonpi[^{]*\{[^}]*reverse_proxy 127\.0\.0\.1:3000/);
+  await t.test('plain HTTP on the Pi\'s own names redirects to the dashboard\'s HTTPS name', () => {
+    const plain = caddyfile.match(/^http:\/\/192\.168\.1\.35, http:\/\/lemonpi, http:\/\/lemonpi\.lan, http:\/\/lemonpi\.local \{\n([\s\S]*?)\n\}/m);
+    assert.ok(plain, 'the plain HTTP block must cover the Pi\'s address and names');
+    assert.match(plain[1], /^\s*redir https:\/\/home\.spicy-llama\.duckdns\.org\{uri\}\s*$/m);
+    assert.ok(!plain[1].includes('reverse_proxy'), 'plain HTTP must not serve the dashboard itself');
   });
 
   await t.test('.env.example declares the DuckDNS token, empty', () => {
