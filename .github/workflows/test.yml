@@ -27,3 +27,7 @@ jobs:
         run: |
           MEDIA_ROOT=/tmp/media MOVIES_PATH=/tmp/movies SHOWS_PATH=/tmp/shows DOWNLOADS_PATH=/tmp/downloads docker compose -f docker-compose.yml --env-file .env.example config -q
 
+      - name: Validate Server Docker Compose Configuration
+        run: |
+          JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
+

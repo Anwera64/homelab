@@ -1,0 +1,11 @@
+[Unit]
+Description=Battery watcher: conservation mode on, clean shutdown when a power cut drains it
+After=docker.service
+
+[Service]
+ExecStart=@SERVER_DIR@/system/server-battery.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

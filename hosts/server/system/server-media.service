@@ -1,0 +1,12 @@
+[Unit]
+Description=Disk guard: media services run only while the media disk is at /data
+After=docker.service
+Wants=docker.service
+
+[Service]
+ExecStart=@SERVER_DIR@/system/server-media.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
