@@ -14,6 +14,8 @@ from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
 def settings_without_overrides(monkeypatch: pytest.MonkeyPatch) -> Settings:
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.delenv("SEARXNG_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_TIMEOUT_SECONDS", raising=False)
     return Settings(_env_file=None)
 
 
@@ -58,8 +60,50 @@ def test_GIVEN_no_override_WHEN_settings_load_THEN_the_window_budgets_match_the_
     s = settings_without_overrides
     assert (s.LLM_CONTEXT_TOKENS, s.ANSWER_RESERVE_TOKENS) == (40960, 4096)
     assert (s.HISTORY_TOKENS, s.HISTORY_SUMMARY_TOKENS) == (6000, 1000)
-    assert s.EMBEDDING_MODEL == "bge-m3-cpu"
+    assert s.EMBEDDING_MODEL == "bge-m3"
     assert not hasattr(s, "MAX_CONTEXT_TOKENS")
+
+
+def test_GIVEN_no_embedding_address_WHEN_settings_load_THEN_the_embedder_shares_the_chat_models_ollama(
+    settings_without_overrides: Settings,
+):
+    s = settings_without_overrides
+    assert s.EMBEDDING_BASE_URL == s.OLLAMA_BASE_URL == "http://ollama:11434"
+    assert s.EMBEDDING_TIMEOUT_SECONDS == 60.0
+
+
+def test_GIVEN_only_the_ollama_address_is_set_WHEN_settings_load_THEN_the_embedder_follows_it():
+    s = Settings(_env_file=None, OLLAMA_BASE_URL="http://192.168.1.20:11434")
+    assert s.EMBEDDING_BASE_URL == "http://192.168.1.20:11434"
+
+
+def test_GIVEN_an_empty_embedding_address_WHEN_settings_load_THEN_it_counts_as_unset():
+    s = Settings(_env_file=None, OLLAMA_BASE_URL="http://192.168.1.20:11434", EMBEDDING_BASE_URL="")
+    assert s.EMBEDDING_BASE_URL == "http://192.168.1.20:11434"
+
+
+def test_GIVEN_an_embedding_address_WHEN_settings_load_THEN_the_chat_model_keeps_its_own():
+    s = Settings(
+        _env_file=None, OLLAMA_BASE_URL="http://192.168.1.20:11434", EMBEDDING_BASE_URL="http://ollama:11434"
+    )
+    assert (s.OLLAMA_BASE_URL, s.EMBEDDING_BASE_URL) == ("http://192.168.1.20:11434", "http://ollama:11434")
+
+
+def test_GIVEN_embedding_settings_WHEN_the_embedder_is_built_THEN_it_uses_their_address_model_and_timeout():
+    from app.bootstrap import di
+
+    embedder = di._build_embedder(
+        Settings(
+            _env_file=None,
+            OLLAMA_BASE_URL="http://192.168.1.20:11434",
+            EMBEDDING_BASE_URL="http://ollama:11434",
+            EMBEDDING_MODEL="bge-m3",
+            EMBEDDING_TIMEOUT_SECONDS=15.0,
+        )
+    )
+
+    assert (embedder.base_url, embedder.model, embedder.timeout_seconds) == ("http://ollama:11434", "bge-m3", 15.0)
+    assert di._source_index_factory._embedder is di._embedder
 
 
 def test_GIVEN_budget_settings_WHEN_the_container_is_built_THEN_the_turn_the_assembler_and_the_summary_use_them(
