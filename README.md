@@ -113,7 +113,7 @@ graph TD
 | **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | Subtitles |
 | **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | Media lifecycle & cleanup |
 | **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | Download queue cleanup: fakes, failed imports, seeding limits |
-| **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | Cloudflare challenge solver |
+| **FlareSolverr** | Desktop | — | Cloudflare challenge solver. No login, so no name and no port: only Prowlarr reaches it |
 | **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org` | Family assistant backend (`/docs` at `http://127.0.0.1:3050` on the server itself) |
 | **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | Log search (sign-in required) |
 | **Gluetun API** | Desktop | — | VPN status for Homepage (port 8000, API key) |
@@ -236,9 +236,13 @@ DOMAIN_NAME=spicy-llama.duckdns.org
 
 Then start it with `.\startup_homelab.ps1`.
 
-The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the media ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
+The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the media ports from lemonpi alone: every other device uses the `https://` names. Maintainerr has no login of its own, so its direct port must not answer the LAN:
 ```powershell
-Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3005,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696,11011
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -RemoteAddress 192.168.1.35
+```
+Any new desktop port that the Pi (Caddy, Homepage) needs must be added to the rule from an admin PowerShell:
+```powershell
+Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3005,5055,6246,6767,7878,8000,8080,8096,8989,9696,11011
 ```
 `-LocalPort` replaces the whole list, so always pass every port, not only the new one.
 

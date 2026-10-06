@@ -116,7 +116,7 @@ graph TD
 | **Maintainerr** | [https://maintainerr.spicy-llama.duckdns.org](https://maintainerr.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:6246](http://desktop-kujo8mp:6246) | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality & format sync |
 | **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
-| **FlareSolverr** | [https://flaresolverr.spicy-llama.duckdns.org](https://flaresolverr.spicy-llama.duckdns.org) | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
+| **FlareSolverr** | — | — | Cloudflare bypass API |
 | **Open WebUI (AI)** | [https://ai.spicy-llama.duckdns.org](https://ai.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3080](http://desktop-kujo8mp:3080) | Local LLM Assistant (RTX 5080 GPU accelerated) |
 | **Household Hub** | [https://hub.spicy-llama.duckdns.org](https://hub.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3050](http://desktop-kujo8mp:3050) | Household Hub (Stages 1-4 complete; KMP Shared Client Core `:shared` verified with 20 test suites; Stage 5 Compose Multiplatform next) |
 
