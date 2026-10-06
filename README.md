@@ -203,6 +203,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
     ├── backend-workflow.test.js     # Hub backend CI workflow
     ├── ci-workflow.test.js          # Hub client CI workflow
+    ├── backend-workflow.test.js     # Hub backend CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
 ```
