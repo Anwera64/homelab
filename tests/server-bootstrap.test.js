@@ -166,7 +166,8 @@ test('Server bootstrap script', async (t) => {
     assert.match(script, /^EMBEDDING_MODEL="bge-m3"$/m);
     // Ollama takes a moment to answer after it starts; the wait is bounded.
     assert.match(script, /for _ in \$\(seq 1 30\); do\n\s+docker exec ollama ollama list/);
-    assert.match(script, /ollama list[^\n]*\| grep -q "\^\$EMBEDDING_MODEL\[:\[:space:\]\]"/, 'checks before it pulls');
+    // Braced: shellcheck reads "$EMBEDDING_MODEL[" as an array index (SC1087).
+    assert.match(script, /ollama list[^\n]*\| grep -q "\^\$\{EMBEDDING_MODEL\}\[:\[:space:\]\]"/, 'checks before it pulls');
     // Without the model the Hub still answers, by keywords: a failed pull must not stop the script.
     assert.match(script, /ollama pull "\$EMBEDDING_MODEL" \|\| echo/);
     // The model it pulls is the one the Hub asks for.

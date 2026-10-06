@@ -249,7 +249,7 @@ else
     docker exec ollama ollama list >/dev/null 2>&1 && break
     sleep 1
   done
-  if docker exec ollama ollama list 2>/dev/null | grep -q "^$EMBEDDING_MODEL[:[:space:]]"; then
+  if docker exec ollama ollama list 2>/dev/null | grep -q "^${EMBEDDING_MODEL}[:[:space:]]"; then
     echo "Already there."
   else
     # Without it the Hub still answers: a turn ranks what it read by keywords.
