@@ -83,9 +83,20 @@ Tests run on the host against a local virtual environment:
 cd apps\household-hub\backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
+
+### Dependencies are locked
+
+`requirements.in` lists the packages the hub names itself, and `requirements-dev.in` adds the test tools. The image installs `requirements.txt` and the tests install `requirements-dev.txt`: lock files generated from those, which pin every package at an exact version, including the ones that come in indirectly. Never edit a lock by hand. After changing a `.in` file, regenerate both (`pip install uv` once):
+
+```powershell
+uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal
+uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal
+```
+
+CI fails when a lock no longer matches its `.in` file.
 
 The 291 automated tests (100% passing) cover:
 * `tests/architecture/test_architecture_boundaries.py`: AST static analysis verifying strict layer boundaries and coroutine DI providers.
