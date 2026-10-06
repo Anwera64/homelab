@@ -13,7 +13,7 @@ A three-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house net
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Watchtower. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
+| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Watchtower. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
 | **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama. Alloy ships its container logs to the server | root [`docker-compose.yml`](docker-compose.yml) |
 
 All three addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names (`lemonpi.lan`, `server.lan`, `desktop-kujo8mp.lan`), which Pi-hole resolves for every DHCP client.
@@ -119,6 +119,7 @@ graph TD
 | **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |
 | **SearXNG** | Server | — | internal `http://searxng:8080` | Private search for the hub |
 | **Ollama** | Desktop (AI profile) | — | `http://desktop-kujo8mp.lan:11434` (the server only) | Local LLM inference |
+| **Ollama (embedder)** | Server | — | internal `http://ollama:11434` | `bge-m3`, ranks what a chat turn reads |
 | **Loki** | Server | — | `http://server.lan:3100` (the desktop's Alloy only) | Log store, 30 days |
 | **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | `http://server.lan:4318` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
 | **Alloy** | Desktop | — | — | Ships the desktop's container output to the server's Loki |
@@ -162,7 +163,7 @@ The server has a firewall, so its local HTTP ports answer lemonpi only.
 │   └── server/                      # The always-on app server (laptop): Hub and logs live, media to follow
 │       ├── README.md                # Install, bootstrap, firewall, media disk, moving hardware
 │       ├── bootstrap.sh             # Idempotent setup: NVIDIA, Docker, SSH, firewall, disk guard, stack
-│       ├── docker-compose.yml       # The desktop services except Ollama, with memory caps
+│       ├── docker-compose.yml       # The desktop services and the embedder, with memory caps
 │       ├── .env.example             # Server settings template (paths, allowed addresses, secrets)
 │       └── system/                  # Firewall, disk guard and battery scripts with their units
 ├── apps/

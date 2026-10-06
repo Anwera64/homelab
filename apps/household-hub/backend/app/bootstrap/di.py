@@ -217,12 +217,20 @@ _google_oauth = (
     if settings.GOOGLE_OAUTH_CLIENT_ID
     else None
 )
+def _build_embedder(settings) -> OllamaEmbedder:
+    return OllamaEmbedder(
+        base_url=settings.EMBEDDING_BASE_URL,
+        model=settings.EMBEDDING_MODEL,
+        timeout_seconds=settings.EMBEDDING_TIMEOUT_SECONDS,
+    )
+
+
 _sign_in_states = JwtSignInStateService(secret_key=settings.SECRET_KEY)
 _ollama_connector = OllamaLLMConnector(
     base_url=settings.OLLAMA_BASE_URL,
     timeout_seconds=settings.OLLAMA_TIMEOUT_SECONDS,
 )
-_embedder = OllamaEmbedder(base_url=settings.OLLAMA_BASE_URL, model=settings.EMBEDDING_MODEL)
+_embedder = _build_embedder(settings)
 # Each streamed turn gets a fresh index from this; nothing one turn reads is seen by another.
 _source_index_factory = SqliteSourceIndexFactory(embedder=_embedder)
 _page_reader = HttpPageReader(document_reader=_document_reader)

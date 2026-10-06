@@ -37,15 +37,14 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
   const names = serviceNames(compose);
   const block = (name) => serviceBlock(compose, name);
 
-  await t.test('runs every desktop service except Ollama, which stays on the RTX 5080', () => {
+  await t.test('runs every desktop service, with an Ollama of its own for the embedder only', () => {
     const expected = [
       'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
-      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'prowlarr', 'qbittorrent', 'radarr',
+      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'ollama', 'prowlarr', 'qbittorrent', 'radarr',
       'recyclarr', 'searxng', 'seerr', 'sonarr', 'watchtower',
     ];
     assert.deepEqual([...names].sort(), expected);
-    assert.ok(!names.includes('ollama'));
-    // Until the media disk is in, the desktop still runs the media services too.
+    // The chat model stays on the desktop's RTX 5080. Until the media disk is in, so do the media services.
     assert.ok(serviceNames(desktop).includes('ollama'));
     for (const name of names) {
       assert.match(block(name), new RegExp(`^    container_name:\\s*${name}\\s*$`, 'm'), `${name} keeps its container name`);
@@ -132,17 +131,36 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.match(jellyfin, /image:\s*jellyfin\/jellyfin:12\.0\s*$/m);
     assert.match(jellyfin, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
     const gpuUsers = names.filter((name) => /driver:\s*nvidia/.test(block(name)));
-    assert.deepEqual(gpuUsers, ['jellyfin'], 'only Jellyfin uses the GPU on the server');
+    assert.deepEqual(gpuUsers, ['jellyfin', 'ollama'], 'only Jellyfin and the embedder use the GPU on the server');
   });
 
-  await t.test('the Hub is always on, built from the repo, and asks the desktop for the model', () => {
+  await t.test('the embedder has an Ollama on the laptop\'s GPU that only the Hub can reach', () => {
+    const ollama = block('ollama');
+    // The desktop's version, pinned: it must not update itself.
+    assert.match(ollama, /image:\s*ollama\/ollama:0\.35\.1\s*$/m);
+    assert.doesNotMatch(ollama, /watchtower\.enable/);
+    assert.match(ollama, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
+    assert.equal(portsOf(ollama), '', 'Ollama publishes nothing: the Hub reaches it inside the stack');
+    assert.doesNotMatch(ollama, /profiles:/, 'it does not wait for the media disk');
+    // Loaded through a conversation, unloaded when the house is quiet (AGENTS.md: models load on demand).
+    assert.ok(ollama.includes('- OLLAMA_KEEP_ALIVE=30m'));
+    assert.ok(ollama.includes('- ollama_models:/root/.ollama'));
+    assert.match(ollama, /^    mem_limit:\s*2g\s*$/m);
+  });
+
+  await t.test('the Hub is always on, built from the repo, and asks the desktop for the chat model only', () => {
     const hub = block('household-hub');
     assert.doesNotMatch(hub, /profiles:/, 'the hub is not optional on the server');
     assert.match(hub, /context:\s*\.\.\/\.\.\/apps\/household-hub\/backend\s*$/m);
     assert.ok(hub.includes('- OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}'));
+    // What a turn reads is embedded here, by the stack's own Ollama (#106).
+    assert.ok(hub.includes('- EMBEDDING_BASE_URL=http://ollama:11434'));
+    assert.ok(hub.includes('- EMBEDDING_MODEL=bge-m3'));
     assert.ok(hub.includes('- household_hub_data:/data'));
     assert.ok(hub.includes('- 127.0.0.1:3050:3050'));
-    assert.deepEqual(dependsOn(hub), ['searxng']);
+    // Start order only: without the embedder the Hub still answers, by keywords.
+    assert.deepEqual(dependsOn(hub), ['searxng', 'ollama']);
+    assert.doesNotMatch(hub, /condition:/);
     assert.doesNotMatch(block('searxng'), /profiles:/);
     assert.ok(block('searxng').includes('- SEARXNG_SECRET=${SEARXNG_SECRET}'));
   });
@@ -181,10 +199,9 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     // The desktop keeps an Alloy of its own, shipping here; the two must not drift apart.
     assert.equal(image(compose, 'alloy'), image(desktop, 'alloy'));
     assert.match(block('grafana-renderer'), /^    profiles:\s*\["render"\]\s*$/m);
-    for (const volume of ['household_hub_data', 'loki_data', 'alloy_data', 'grafana_data']) {
+    for (const volume of ['household_hub_data', 'ollama_models', 'loki_data', 'alloy_data', 'grafana_data']) {
       assert.match(compose, new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${volume}:\\s*\\n\\s+name:\\s*${volume}\\s*$`, 'm'), `${volume} keeps its fixed name`);
     }
-    assert.doesNotMatch(compose, /ollama_models/, 'no Ollama volume on the server');
   });
 
   await t.test('runs no ingress of its own: the Pi terminates HTTPS and routes the tailnet', () => {
@@ -263,6 +280,16 @@ test('Server README', async (t) => {
     }
     assert.match(live, /media/i, 'it must say the media services are still on the desktop');
     assert.doesNotMatch(readme, /\*\*Not live yet\.\*\*/);
+  });
+
+  await t.test('says the embedder runs here while the chat model still needs the desktop', () => {
+    const live = readme.match(/## What is live\n([\s\S]*?)(?=\n## )/)[1];
+    assert.match(live, /bge-m3/, 'the embedder is live on the server');
+    assert.match(live, /chat model needs the desktop awake/);
+    assert.doesNotMatch(readme, /except Ollama/, 'the server runs an Ollama now');
+    // Two services hold the GPU now; a move to other hardware touches both.
+    const moving = readme.match(/## Moving to other hardware\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    assert.match(moving, /Ollama/);
   });
 
   await t.test('explains the Hub\'s key and what changing it costs', () => {

@@ -11,7 +11,7 @@ async def test_GIVEN_texts_WHEN_embed_is_called_THEN_it_posts_model_and_input_an
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/embed"
         req_body = json.loads(request.content)
-        assert req_body["model"] == "bge-m3-cpu"
+        assert req_body["model"] == "bge-m3"
         assert req_body["input"] == ["hello", "world"]
 
         resp_body = {"embeddings": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}

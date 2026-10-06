@@ -15,6 +15,8 @@ SERVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_USER="${SUDO_USER:-$(stat -c %U "$SERVER_DIR")}"
 USER_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 CODENAME="$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
+# What the Hub embeds with (EMBEDDING_MODEL in docker-compose.yml).
+EMBEDDING_MODEL="bge-m3"
 NO_STACK=0
 ENV_CREATED=0
 REBOOT_PENDING=0
@@ -240,6 +242,19 @@ else
     COMPOSE_PROFILES="" docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans
   fi
   "$SERVER_DIR/system/server-media.sh" --once
+
+  step "Embedding model ($EMBEDDING_MODEL)"
+  # Ollama takes a moment to answer after it starts.
+  for _ in $(seq 1 30); do
+    docker exec ollama ollama list >/dev/null 2>&1 && break
+    sleep 1
+  done
+  if docker exec ollama ollama list 2>/dev/null | grep -q "^${EMBEDDING_MODEL}[:[:space:]]"; then
+    echo "Already there."
+  else
+    # Without it the Hub still answers: a turn ranks what it read by keywords.
+    docker exec ollama ollama pull "$EMBEDDING_MODEL" || echo "The pull failed; rerun this script to try again."
+  fi
 fi
 
 step "Done."

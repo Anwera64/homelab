@@ -50,8 +50,12 @@ class Settings(BaseSettings):
     # A chat's newest messages, word for word; older ones live in its summary of this size.
     HISTORY_TOKENS: int = 6000
     HISTORY_SUMMARY_TOKENS: int = 1000
-    # Embeds what a turn reads, for its source index. Runs on the CPU (see its Modelfile).
-    EMBEDDING_MODEL: str = "bge-m3-cpu"
+    # Embeds what a turn reads, for its source index. On the server it has an Ollama of its own,
+    # on that machine's GPU; left empty, the address is the chat model's.
+    EMBEDDING_BASE_URL: str = ""
+    EMBEDDING_MODEL: str = "bge-m3"
+    # How long a turn waits for vectors before its index falls back to keywords.
+    EMBEDDING_TIMEOUT_SECONDS: float = 60.0
     MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
     MAX_GOSSIP_SUMMARY_LENGTH: int = 250
     
@@ -64,6 +68,12 @@ class Settings(BaseSettings):
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    @model_validator(mode="after")
+    def embedder_defaults_to_the_chat_models_ollama(self) -> "Settings":
+        if not self.EMBEDDING_BASE_URL:
+            self.EMBEDDING_BASE_URL = self.OLLAMA_BASE_URL
+        return self
 
     @model_validator(mode="after")
     def validate_security(self) -> "Settings":
