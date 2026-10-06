@@ -138,6 +138,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │   └── workflows/
 │       ├── test.yml                 # CI: node tests + compose validation
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
+│       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
@@ -197,6 +198,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── server-stack.test.js         # Server compose, env template, CI gates and server README
     ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard and battery scripts
     ├── ci-workflow.test.js          # Hub client CI workflow
+    ├── backend-workflow.test.js     # Hub backend CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
 ```

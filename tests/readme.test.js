@@ -51,6 +51,17 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /`docker compose config` for the desktop, Pi and server stacks/);
   });
 
+  await t.test('lists the hub backend CI and says how its lock files are regenerated', () => {
+    const paths = treePaths(readme);
+    for (const p of ['.github/workflows/household-hub-backend.yml', 'tests/backend-workflow.test.js']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+    const backend = read('apps/household-hub/backend/README.md');
+    assert.ok(backend.includes('pip install -r requirements-dev.txt'));
+    assert.ok(backend.includes('uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal'));
+    assert.ok(backend.includes('uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal'));
+  });
+
   await t.test('every startup_homelab.ps1 flag it mentions is real', () => {
     const script = read('startup_homelab.ps1');
     const params = new Set([...script.matchAll(/\[switch\]\$(\w+)/g)].map((m) => m[1]));
