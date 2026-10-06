@@ -2,12 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(ROOT_DIR, 'hosts/server');
 const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
-const SCRIPTS = ['bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh'];
+const SCRIPTS = [
+  'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
+  'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh',
+];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '');
@@ -125,7 +129,7 @@ test('Server bootstrap script', async (t) => {
   });
 
   await t.test('installs the firewall, disk guard and battery units with the repo path filled in', () => {
-    for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service']) {
+    for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service', 'server-update.timer', 'server-renovate.timer']) {
       assert.ok(script.includes(unit), `must install ${unit}`);
     }
     assert.match(script, /s\|@SERVER_DIR@\|\$SERVER_DIR\|g/);
@@ -141,7 +145,7 @@ test('Server bootstrap script', async (t) => {
     }
     const create = at(script, 'install -d -o 1000 -g 1000 "$CONFIG_PATH/$app"');
     assert.match(script, /\[ -d "\$CONFIG_PATH\/\$app" \] \|\|/, 'existing folders keep their owner');
-    assert.ok(create < at(script, 'docker compose --project-directory "$SERVER_DIR" build'));
+    assert.ok(create < at(script, '"$SERVER_DIR/system/server-stack-up.sh"'));
   });
 
   await t.test('seeds .env on the first run and leaves the secrets to a human', () => {
@@ -151,16 +155,23 @@ test('Server bootstrap script', async (t) => {
   });
 
   await t.test('builds and starts the stack from its own folder, then lets the disk guard decide', () => {
-    const build = at(script, 'docker compose --project-directory "$SERVER_DIR" build');
-    const up = at(script, 'docker compose --project-directory "$SERVER_DIR" up -d');
-    const guard = at(script, /server-media\.sh" --once/);
+    // One script starts the stack, for bootstrap and the nightly update alike, so the two cannot drift.
+    const stackUp = read(path.join(SYSTEM_DIR, 'server-stack-up.sh'));
+    assert.match(script, /^  "\$SERVER_DIR\/system\/server-stack-up\.sh"$/m);
+    assert.doesNotMatch(script, /docker compose/, 'bootstrap leaves compose to server-stack-up.sh');
+    const build = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" build');
+    const up = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans');
+    const guard = at(stackUp, /server-media\.sh" --once/);
     assert.ok(build < up && up < guard);
+    // Without the disk the media services are left out; they cannot mount /data.
+    assert.match(stackUp, /if mountpoint -q \/data; then/);
+    assert.match(stackUp, /COMPOSE_PROFILES="" docker compose --project-directory "\$SERVER_DIR" up -d --remove-orphans/);
     // Host setup alone, for the days before the data is migrated.
     assert.match(script, /--no-stack/);
   });
 
   await t.test('pulls the embedding model once the stack is up, and only when it is missing', () => {
-    const up = at(script, 'docker compose --project-directory "$SERVER_DIR" up -d');
+    const up = at(script, '"$SERVER_DIR/system/server-stack-up.sh"');
     const pull = at(script, 'docker exec ollama ollama pull "$EMBEDDING_MODEL"');
     assert.ok(up < pull, 'Ollama must be running before the pull');
     assert.match(script, /^EMBEDDING_MODEL="bge-m3"$/m);
@@ -310,6 +321,200 @@ test('Server battery watcher', async (t) => {
   });
 });
 
+test('Server nightly update', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-update.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-update.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-update.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('runs at 04:00, and catches up on a night the server was off', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* 04:00:00$/m);
+    assert.match(timer, /^Persistent=true$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-update\.sh$/m);
+    assert.match(unit, /^After=docker\.service network-online\.target$/m);
+    assert.match(unit, /^Wants=network-online\.target$/m);
+    // The timer starts it; enabling the service itself would run an update on every boot.
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, and the service without starting it', () => {
+    assert.match(bootstrap, /^place_unit server-update\.service/m);
+    assert.match(bootstrap, /^install_unit server-update\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-update\.service/);
+  });
+
+  await t.test('only fast-forwards, as the checkout\'s owner', () => {
+    // git refuses a root-run command in a checkout someone else owns.
+    assert.match(script, /runuser -u "\$OWNER" -- git -C "\$REPO_DIR"/);
+    assert.match(script, /merge --ff-only/);
+    assert.doesNotMatch(script, /reset --hard|push|rebase|git pull(?! --ff-only)/);
+  });
+
+  // Behaviour, against a throwaway origin and checkout. docker and runuser are stubs on PATH.
+  const bash = spawnSync('bash', ['-c', 'command -v git'], { encoding: 'utf8' });
+  const canRun = process.platform !== 'win32' && !bash.error && bash.status === 0;
+  const git = (cwd, ...args) => {
+    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=master', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const setup = () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-update-'));
+    const origin = path.join(root, 'origin.git');
+    const seed = path.join(root, 'seed');
+    const checkout = path.join(root, 'homelab');
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${log}"\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'runuser'), '#!/bin/sh\n[ "$1" = "-u" ] && [ "$3" = "--" ] || exit 2\nshift 3\nexec "$@"\n', { mode: 0o755 });
+    git(root, 'init', '-q', '--bare', origin);
+    git(root, 'clone', '-q', origin, seed);
+    const system = path.join(seed, 'hosts/server/system');
+    fs.mkdirSync(system, { recursive: true });
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-update.sh'), path.join(system, 'server-update.sh'));
+    fs.chmodSync(path.join(system, 'server-update.sh'), 0o755);
+    fs.writeFileSync(path.join(system, 'server-stack-up.sh'), `#!/bin/sh\necho "stack-up" >> "${log}"\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(seed, 'hosts/server/docker-compose.yml'), 'image: app:1.0.0\n');
+    fs.writeFileSync(path.join(seed, 'hosts/server/bootstrap.sh'), '#!/bin/sh\n');
+    git(seed, 'add', '-A');
+    git(seed, 'commit', '-qm', 'first');
+    git(seed, 'push', '-q', 'origin', 'HEAD:master');
+    git(root, 'clone', '-q', origin, checkout);
+    const run = () => spawnSync(path.join(checkout, 'hosts/server/system/server-update.sh'), [], {
+      encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+    });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    const upstream = (file, content) => {
+      fs.writeFileSync(path.join(seed, file), content);
+      git(seed, 'commit', '-qam', `change ${file}`);
+      git(seed, 'push', '-q', 'origin', 'HEAD:master');
+    };
+    return { root, seed, checkout, run, calls, upstream };
+  };
+
+  await t.test('does nothing when nothing was merged', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, calls } = setup();
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(calls(), '', 'the stack is left alone');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('applies a merged bump: fast-forwards, restarts the stack, prunes old images', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(checkout, 'hosts/server/docker-compose.yml'), 'utf8'), 'image: app:1.0.1\n');
+    assert.deepEqual(calls().trim().split('\n'), ['stack-up', 'docker image prune -f']);
+    assert.doesNotMatch(result.stdout, /bootstrap/, 'no host change, no reminder');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('says when a merge changed the host setup, which only bootstrap applies', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, upstream } = setup();
+    upstream('hosts/server/bootstrap.sh', '#!/bin/sh\necho new step\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /sudo hosts\/server\/bootstrap\.sh/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('changes nothing in a checkout with local edits', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'hosts/server/bootstrap.sh'), '#!/bin/sh\necho edited by hand\n');
+    const before = git(checkout, 'rev-parse', 'HEAD');
+    const result = run();
+    assert.notEqual(result.status, 0);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('changes nothing in a checkout that has diverged from origin', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'local.txt'), 'x\n');
+    git(checkout, 'add', 'local.txt');
+    git(checkout, 'commit', '-qm', 'local commit');
+    const before = git(checkout, 'rev-parse', 'HEAD');
+    const result = run();
+    assert.notEqual(result.status, 0);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server Renovate runs', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-renovate.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-renovate.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-renovate.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('start every hour: one run opens the PRs, a later one merges them once CI is green', () => {
+    assert.match(timer, /^OnCalendar=hourly$/m);
+    assert.match(timer, /^Persistent=true$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-renovate\.sh$/m);
+    assert.match(unit, /^After=docker\.service network-online\.target$/m);
+    assert.match(unit, /^Wants=network-online\.target$/m);
+    // The timer starts it; enabling the service itself would run it on every boot.
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, and the service without starting it', () => {
+    assert.match(bootstrap, /^place_unit server-renovate\.service/m);
+    assert.match(bootstrap, /^install_unit server-renovate\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-renovate\.service/);
+  });
+
+  // Behaviour, in a throwaway server folder. docker is a stub on PATH.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = (envFile) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-renovate-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(root, 'server/system'), { recursive: true });
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${log}"\n`, { mode: 0o755 });
+    const target = path.join(root, 'server/system/server-renovate.sh');
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-renovate.sh'), target);
+    fs.chmodSync(target, 0o755);
+    if (envFile !== null) fs.writeFileSync(path.join(root, 'server/.env'), envFile);
+    const run = () => spawnSync(target, [], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    return { root, run, calls };
+  };
+
+  await t.test('skips the run, and says why, until the token is in .env', { skip: !canRun && 'needs bash' }, () => {
+    for (const envFile of ['RENOVATE_TOKEN=\n', 'TZ=Europe/Madrid\n', null]) {
+      const { root, run, calls } = setup(envFile);
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /RENOVATE_TOKEN is not set/);
+      assert.equal(calls(), '', 'Renovate must not start without a token');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('runs Renovate once through compose and reports how it ended', { skip: !canRun && 'needs bash' }, () => {
+    const { root, run, calls } = setup('TZ=Europe/Madrid\nRENOVATE_TOKEN=github_pat_example\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const serverDir = path.join(root, 'server');
+    assert.equal(calls().trim(), `docker compose --project-directory ${serverDir} --profile renovate up --exit-code-from renovate renovate`);
+    // The token is read by compose from .env; it must never be printed.
+    assert.doesNotMatch(result.stdout + result.stderr, /github_pat_example/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
 test('Server scripts are safe to run from a Windows checkout', async (t) => {
   await t.test('keep LF line endings', () => {
     for (const file of SCRIPTS) {
@@ -320,6 +525,7 @@ test('Server scripts are safe to run from a Windows checkout', async (t) => {
     const attributes = read(path.join(ROOT_DIR, '.gitattributes'));
     assert.match(attributes, /^hosts\/server\/\*\*\/\*\.sh text eol=lf$/m);
     assert.match(attributes, /^hosts\/server\/system\/\*\.service text eol=lf$/m);
+    assert.match(attributes, /^hosts\/server\/system\/\*\.timer text eol=lf$/m);
   });
 
   await t.test('are marked executable in git', () => {

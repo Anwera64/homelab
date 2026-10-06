@@ -9,7 +9,7 @@
 # so plain `docker compose` commands cover them too.
 # ==============================================================================
 
-# Docker's own copy of each container's log, capped: Loki holds the history (section 11).
+# Docker's own copy of each container's log, capped: Loki holds the history (section 10).
 x-logging: &default-logging
   driver: json-file
   options:
@@ -89,8 +89,6 @@ services:
       - LOG_LEVEL=info
       - TZ=${TZ:-Europe/Madrid}
     dns: *public-dns
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -110,8 +108,6 @@ services:
     dns: *public-dns
     volumes:
       - ${CONFIG_PATH}/prowlarr:/config
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -130,8 +126,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/radarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -150,8 +144,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/sonarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -170,8 +162,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/bazarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -190,8 +180,6 @@ services:
       - TZ=${TZ:-Europe/Madrid}
     volumes:
       - ${CONFIG_PATH}/seerr:/app/config
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -213,7 +201,7 @@ services:
       - ${MEDIA_ROOT}:/data:ro
       - ${MOVIES_PATH}:/media/movies:ro
       - ${SHOWS_PATH}:/media/tv:ro
-    # Hardware-specific, like Ollama's block in section 10: the laptop's GTX 1660 Ti (H.264 and
+    # Hardware-specific, like Ollama's block in section 9: the laptop's GTX 1660 Ti (H.264 and
     # HEVC, no AV1 encoding). On an Intel host this becomes a /dev/dri device for Quick Sync.
     deploy:
       resources:
@@ -285,8 +273,6 @@ services:
       - sonarr
       - radarr
       - jellyfin
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -316,8 +302,6 @@ services:
       - sonarr
       - radarr
       - qbittorrent
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -339,34 +323,12 @@ services:
     depends_on:
       - sonarr
       - radarr
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 256m
     restart: unless-stopped
     logging: *default-logging
 
   # ==============================================================================
-  # 9. Automated Image Updates & Lifecycle (Watchtower)
-  # The maintained fork: containrrr/watchtower was archived in December 2025.
-  # Pinned, and bumped in a PR.
-  # ==============================================================================
-  watchtower:
-    image: nickfedor/watchtower:1.22.3
-    container_name: watchtower
-    environment:
-      - TZ=${TZ:-Europe/Madrid}
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
-      - WATCHTOWER_ROLLING_RESTART=true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    mem_limit: 256m
-    restart: unless-stopped
-    logging: *default-logging
-
-  # ==============================================================================
-  # 10. Household Hub, its private search and its embedder. The chat model runs
+  # 9. Household Hub, its private search and its embedder. The chat model runs
   # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
@@ -377,8 +339,6 @@ services:
       - SEARXNG_SECRET=${SEARXNG_SECRET}
     volumes:
       - ${CONFIG_PATH}/searxng:/etc/searxng:ro
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -436,7 +396,7 @@ services:
     logging: *default-logging
 
   # ==============================================================================
-  # 11. Logs (Loki + Alloy + Grafana)
+  # 10. Logs (Loki + Alloy + Grafana)
   # A container's log dies with the container. Alloy reads every container's
   # output through the Docker socket (label a container logs=off to leave it out),
   # Loki keeps it for 30 days, Grafana searches it. Versions are pinned.
@@ -517,6 +477,33 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # ==============================================================================
+  # 11. Version bumps (Renovate)
+  # Opens the weekly bump PRs for the pinned versions in this repo and merges the
+  # ones renovate.json allows once CI is green. One run, then it exits:
+  # server-renovate.timer starts it every hour. To see what a run would do:
+  #   docker compose --profile renovate run --rm -e RENOVATE_DRY_RUN=full renovate
+  # ==============================================================================
+  renovate:
+    profiles: ["renovate"]
+    image: renovate/renovate:44.141.0
+    container_name: renovate
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - RENOVATE_PLATFORM=github
+      - RENOVATE_REPOSITORIES=Anwera64/homelab
+      # A fine-grained token for this one repo; README.md lists the permissions it needs.
+      - RENOVATE_TOKEN=${RENOVATE_TOKEN:-}
+      # The rules are renovate.json in the repo; without it Renovate does nothing.
+      - RENOVATE_ONBOARDING=false
+      - RENOVATE_REQUIRE_CONFIG=required
+      - LOG_LEVEL=info
+    volumes:
+      - renovate_cache:/tmp/renovate
+    mem_limit: 2g
+    restart: "no"
+    logging: *default-logging
+
 volumes:
   household_hub_data:
     name: household_hub_data
@@ -528,3 +515,5 @@ volumes:
     name: alloy_data
   grafana_data:
     name: grafana_data
+  renovate_cache:
+    name: renovate_cache

@@ -43,7 +43,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     const expected = [
       'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
       'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'ollama', 'prowlarr', 'qbittorrent', 'radarr',
-      'recyclarr', 'searxng', 'seerr', 'sonarr', 'watchtower',
+      'recyclarr', 'renovate', 'searxng', 'seerr', 'sonarr',
     ];
     assert.deepEqual([...names].sort(), expected);
     // The chat model stays on the desktop's RTX 5080. Until the media disk is in, so do the media services.
@@ -153,7 +153,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 
   await t.test('Jellyfin transcodes on the laptop\'s NVIDIA GPU, pinned to the desktop\'s version', () => {
     const jellyfin = block('jellyfin');
-    assert.match(jellyfin, /image:\s*jellyfin\/jellyfin:12\.0\s*$/m);
+    // Jellyfin's release tags are major.minor (12.0, 12.1); each one is a fixed release.
+    assert.match(imageOf(jellyfin), /^jellyfin\/jellyfin:\d+\.\d+$/);
     assert.match(jellyfin, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
     const gpuUsers = names.filter((name) => /driver:\s*nvidia/.test(block(name)));
     assert.deepEqual(gpuUsers, ['jellyfin', 'ollama'], 'only Jellyfin and the embedder use the GPU on the server');
@@ -161,9 +162,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 
   await t.test('the embedder has an Ollama on the laptop\'s GPU that only the Hub can reach', () => {
     const ollama = block('ollama');
-    // The desktop's version, pinned: it must not update itself.
-    assert.match(ollama, /image:\s*ollama\/ollama:0\.35\.1\s*$/m);
-    assert.doesNotMatch(ollama, /watchtower\.enable/);
+    // Pinned, and bumped in a PR like every other image.
+    assert.match(imageOf(ollama), /^ollama\/ollama:\d+\.\d+\.\d+$/);
     assert.match(ollama, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
     assert.equal(portsOf(ollama), '', 'Ollama publishes nothing: the Hub reaches it inside the stack');
     assert.doesNotMatch(ollama, /profiles:/, 'it does not wait for the media disk');
@@ -206,14 +206,35 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.equal(portsOf(qbit), '', 'qBittorrent publishes nothing itself');
   });
 
-  await t.test('Watchtower is the maintained fork, pinned, without the old API workaround', () => {
-    const watchtower = block('watchtower');
-    // containrrr/watchtower was archived in December 2025.
-    assert.match(watchtower, /image:\s*nickfedor\/watchtower:\d+\.\d+\.\d+\s*$/m);
-    assert.doesNotMatch(watchtower, /DOCKER_API_VERSION/);
-    assert.ok(watchtower.includes('- WATCHTOWER_LABEL_ENABLE=true'));
-    assert.ok(watchtower.includes('- WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}'));
-    assert.doesNotMatch(watchtower, /watchtower\.enable/, 'pinned; it must not update itself');
+  await t.test('runs no Watchtower: pinned images change only through a merged PR', () => {
+    assert.ok(!names.includes('watchtower'));
+    assert.doesNotMatch(compose, /watchtower/i, 'no service carries a Watchtower label');
+    assert.doesNotMatch(envExample, /WATCHTOWER/);
+  });
+
+  await t.test('Renovate runs here, one run at a time, with the repo token and nothing else', () => {
+    const renovate = block('renovate');
+    assert.match(imageOf(renovate), /^renovate\/renovate:\d+\.\d+\.\d+$/, 'pinned; it bumps itself in the weekly PR');
+    // Its own profile: the stack never starts it, server-renovate.timer does.
+    assert.match(renovate, /^    profiles:\s*\["renovate"\]\s*$/m);
+    assert.match(renovate, /^    restart:\s*"no"\s*$/m, 'a run ends; nothing restarts it');
+    assert.equal(portsOf(renovate), '', 'it serves nothing');
+    assert.doesNotMatch(renovate, /docker\.sock/, 'it reads registries and GitHub, not this host');
+    for (const line of [
+      '- RENOVATE_PLATFORM=github',
+      '- RENOVATE_REPOSITORIES=Anwera64/homelab',
+      '- RENOVATE_TOKEN=${RENOVATE_TOKEN:-}',
+      // The config is renovate.json in the repo; without one it must not open an onboarding PR.
+      '- RENOVATE_ONBOARDING=false',
+      '- RENOVATE_REQUIRE_CONFIG=required',
+    ]) {
+      assert.ok(renovate.includes(line), `renovate must set ${line}`);
+    }
+    assert.ok(renovate.includes('- renovate_cache:/tmp/renovate'), 'lookups are cached between runs');
+    assert.match(compose, /^volumes:\s*\n[\s\S]*?^  renovate_cache:\s*\n\s+name:\s*renovate_cache\s*$/m);
+    assert.match(renovate, /^    mem_limit:\s*2g\s*$/m);
+    // Empty until a human creates the token; the timer skips its runs until then.
+    assert.match(envExample, /^RENOVATE_TOKEN=$/m);
   });
 
   await t.test('the log stack is pinned, with the renderer on demand', () => {
