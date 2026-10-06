@@ -51,6 +51,34 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /`docker compose config` for the desktop, Pi and server stacks/);
   });
 
+  await t.test('says who updates what: Renovate PRs for the server, Watchtower on the desktop only', () => {
+    const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m)[0];
+    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m)[0];
+    assert.doesNotMatch(serverRow, /Watchtower/, 'the server runs no Watchtower');
+    assert.match(serverRow, /nightly update/, 'the Server row must name the nightly update');
+    assert.match(desktopRow, /Watchtower/);
+    assert.match(readme, /^\| \*\*Watchtower\*\* \| Desktop \| — \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*Renovate\*\* \| GitHub \| — \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*Nightly update\*\* \| Server \| — \| [^|]*4 AM[^|]*\|$/m);
+    const paths = treePaths(readme);
+    for (const p of ['renovate.json', 'tests/renovate.test.js']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+    // The Pi's pins are Renovate's too.
+    assert.match(readme, /Image versions are pinned in `hosts\/pi\/docker-compose\.yml`; Renovate opens the bump PRs\./);
+  });
+
+  await t.test('the server README describes the bump PRs and the nightly update', () => {
+    const server = read('hosts/server/README.md');
+    assert.doesNotMatch(server, /Watchtower/);
+    assert.match(server, /^\| Nightly update \(systemd timer\) \| [^|]*04:00[^|]*\|$/m);
+    const updating = server.match(/^## Updating\n([\s\S]*?)(?=^## )/m);
+    assert.ok(updating, 'the server README must have an Updating section');
+    for (const needle of ['Renovate', 'server-update.timer', 'journalctl -u server-update', 'sudo hosts/server/bootstrap.sh', 'Jellyfin', 'Postgres']) {
+      assert.ok(updating[1].includes(needle), `Updating must mention ${needle}`);
+    }
+  });
+
   await t.test('every startup_homelab.ps1 flag it mentions is real', () => {
     const script = read('startup_homelab.ps1');
     const params = new Set([...script.matchAll(/\[switch\]\$(\w+)/g)].map((m) => m[1]));
