@@ -1,0 +1,7 @@
+# The test tools, on top of the hub's packages. Regenerate the lock after any change here:
+#   uv pip compile requirements-dev.in --output-file=requirements-dev.txt --python-version=3.12 --universal
+-r requirements.in
+-c requirements.txt
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0

@@ -20,6 +20,8 @@ const serviceBlock = (compose, name) => {
   return match ? match[1] : '';
 };
 
+const imageOf = (block) => (block.match(/^    image:\s*(\S+)\s*$/m) || [])[1];
+
 const portsOf = (block) => {
   const ports = block.match(/^    ports:\s*\n((?:\s+-[^\n]*\n)+)/m);
   return ports ? ports[1] : '';
@@ -72,6 +74,27 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     // For the desktop's Alloy; the firewall admits nobody else on it.
     assert.match(portsOf(block('loki')), /-\s*3100:3100\b/, 'Loki must publish 3100');
     assert.match(envExample, /^SERVER_PORT_SOURCES=3100=192\.168\.1\.20$/m);
+  });
+
+  await t.test('pins every image to a release, so the repo says what runs here', () => {
+    // A full version, never latest or a bare major. A suffix may follow: Postgres' -alpine,
+    // linuxserver's image build (-ls479), qBittorrent's libtorrent version (_v2.0.15).
+    const pinned = /:v?\d+\.\d+(\.\d+)*([-_][a-z0-9._-]+)?$/;
+    for (const name of names) {
+      const image = imageOf(block(name));
+      if (!image) {
+        assert.match(block(name), /^    build:/m, `${name} must have an image or be built here`);
+        continue;
+      }
+      assert.match(image, pinned, `${name}: "${image}" must be pinned to a release`);
+      assert.doesNotMatch(image, /:latest$/, `${name} must not run latest`);
+    }
+    // qBittorrent's VueTorrent mod publishes only latest and sha- tags: the one floating reference.
+    const floating = [...compose.matchAll(/(\S+:latest)\b/g)].map((m) => m[1]);
+    assert.deepEqual(floating, ['DOCKER_MODS=ghcr.io/vuetorrent/vuetorrent-lsio-mod:latest']);
+    // qBittorrent's current line carries the libtorrent version. The 5.1.x tags without it are an
+    // old line: pinning one of those would be a downgrade.
+    assert.match(imageOf(block('qbittorrent')), /:\d+\.\d+\.\d+_v\d+\.\d+\.\d+-ls\d+$/);
   });
 
   await t.test('caps the memory of every service: the host has 16 GB', () => {
