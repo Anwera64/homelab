@@ -11,7 +11,6 @@ const PORT_TO_SERVICE = {
   '7878': 'radarr',
   '9696': 'prowlarr',
   '6767': 'bazarr',
-  '8191': 'flaresolverr',
   '3002': 'grafana'
 };
 

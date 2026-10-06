@@ -57,9 +57,11 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     const expected = {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
-      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
+      gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
       grafana: ['3002:3000'], 'household-hub': ['3051:3050'], alloy: ['4318:4318'],
     };
+    // FlareSolverr has no login: Prowlarr reaches it inside the stack, and nothing else does.
+    assert.doesNotMatch(block('flaresolverr'), /^    ports:/m, 'FlareSolverr must publish no port');
     for (const [service, mappings] of Object.entries(expected)) {
       for (const mapping of mappings) {
         assert.match(portsOf(block(service)), new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
@@ -312,6 +314,23 @@ test('Server README', async (t) => {
     assert.ok(readme.includes('HUB_SECRET_KEY'));
     assert.match(readme, /signs every phone out/);
     assert.match(readme, /calendar/i);
+  });
+
+  await t.test('has a login checklist for every app, because the firewall does not guard the https:// names', () => {
+    const section = readme.match(/## App logins\n([\s\S]*?)(?=\n## |(?![\s\S]))/);
+    assert.ok(section, 'the README must have an App logins section');
+    assert.match(section[1], /lemonpi/, 'it must say the apps see every request coming from lemonpi');
+    const items = section[1].split('\n').filter((line) => line.startsWith('- [ ] '));
+    for (const app of ['Sonarr', 'Radarr', 'Prowlarr', 'Bazarr', 'qBittorrent', 'Cleanuparr', 'Seerr', 'Jellystat', 'Maintainerr', 'FlareSolverr']) {
+      assert.ok(items.some((item) => item.includes(app)), `the checklist must have an open item for ${app}`);
+    }
+    assert.match(section[1], /Authentication Required/, 'it must name the arr setting');
+    assert.match(section[1], /Disable Auth for Local Addresses/, 'it must name the Cleanuparr switch');
+    assert.match(section[1], /MAINTAINERR_PASSWORD_HASH/, 'it must say where the Maintainerr password lives');
+    // The password is on the name only, so the direct port must be closed on whichever machine runs it.
+    const maintainerr = items.find((item) => item.includes('Maintainerr has no login'));
+    assert.match(maintainerr, /Windows firewall rule admits only lemonpi/, 'it must say the desktop\'s direct port is closed too');
+    assert.doesNotMatch(maintainerr, /answers the whole LAN/);
   });
 
   await t.test('documents the one-port rule that lets the desktop ship its logs', () => {

@@ -33,7 +33,7 @@ if command -v docker >/dev/null 2>&1; then
   fi
 
   echo "  [+] Validating hosts/pi/docker-compose.yml configuration..."
-  PIHOLE_PASSWORD=validate DUCKDNS_TOKEN=validate docker compose -f hosts/pi/docker-compose.yml --env-file hosts/pi/.env.example config -q
+  PIHOLE_PASSWORD=validate DUCKDNS_TOKEN=validate MAINTAINERR_USER=validate MAINTAINERR_PASSWORD_HASH=validate docker compose -f hosts/pi/docker-compose.yml --env-file hosts/pi/.env.example config -q
   if [ $? -ne 0 ]; then
     echo ""
     echo "[Pre-Commit FAILED] hosts/pi/docker-compose.yml validation failed! Commit aborted."

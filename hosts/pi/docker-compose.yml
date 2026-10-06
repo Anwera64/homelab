@@ -65,6 +65,9 @@ services:
     network_mode: host
     environment:
       DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in hosts/pi/.env}
+      # The password on maintainerr.spicy-llama.duckdns.org. Caddy does not start without them.
+      MAINTAINERR_USER: ${MAINTAINERR_USER:?set MAINTAINERR_USER in hosts/pi/.env}
+      MAINTAINERR_PASSWORD_HASH: ${MAINTAINERR_PASSWORD_HASH:?set MAINTAINERR_PASSWORD_HASH in hosts/pi/.env}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./data/caddy:/data
@@ -88,6 +91,9 @@ services:
       HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
       HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
       HOMEPAGE_VAR_GLUETUN_API_KEY: ${GLUETUN_API_KEY:-}
+      HOMEPAGE_VAR_CLEANUPARR_API_KEY: ${CLEANUPARR_API_KEY:-}
+      HOMEPAGE_VAR_QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-}
+      HOMEPAGE_VAR_QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-}
     volumes:
       - ../../config/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -73,6 +73,10 @@
 
     @maintainerr host maintainerr.spicy-llama.duckdns.org
     handle @maintainerr {
+        # Maintainerr has no login of its own.
+        basic_auth {
+            {$MAINTAINERR_USER} {$MAINTAINERR_PASSWORD_HASH}
+        }
         reverse_proxy 192.168.1.20:6246
     }
 
@@ -84,11 +88,6 @@
     @cleanuparr host cleanuparr.spicy-llama.duckdns.org
     handle @cleanuparr {
         reverse_proxy 192.168.1.20:11011
-    }
-
-    @flaresolverr host flaresolverr.spicy-llama.duckdns.org
-    handle @flaresolverr {
-        reverse_proxy 192.168.1.20:8191
     }
 
     # On the server
