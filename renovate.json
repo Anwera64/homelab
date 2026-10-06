@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["docker-compose"],
+  "timezone": "Europe/Madrid",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
+  "semanticCommits": "disabled",
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "packageRules": [
+    {
+      "description": "The desktop stack still runs on Watchtower. Only its Alloy is bumped, together with the server's.",
+      "matchFileNames": ["docker-compose.yml"],
+      "matchPackageNames": ["!grafana/alloy"],
+      "enabled": false
+    },
+    {
+      "description": "Minor and patch image bumps: one PR a week, merged once CI is green.",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "container images",
+      "automerge": true
+    },
+    {
+      "description": "linuxserver tags where the app version has four parts: the image build (-lsNNN) is the revision.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["lscr.io/linuxserver/prowlarr", "lscr.io/linuxserver/radarr", "lscr.io/linuxserver/sonarr"],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$"
+    },
+    {
+      "description": "linuxserver tags where the app version has three parts: the image build (-lsNNN) is the build, or Renovate would not count it.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["lscr.io/linuxserver/qbittorrent", "lscr.io/linuxserver/bazarr"],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-r\\d+)?-ls(?<build>\\d+)$"
+    },
+    {
+      "description": "SearXNG tags are the build date and a commit hash.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["searxng/searxng"],
+      "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)-[0-9a-f]+$"
+    },
+    {
+      "description": "A Postgres major needs a dump and restore by hand.",
+      "matchPackageNames": ["postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Jellyfin upgrades migrate the library database: they get a PR of their own and wait for a human.",
+      "matchPackageNames": ["jellyfin/jellyfin"],
+      "groupName": "Jellyfin",
+      "automerge": false
+    }
+  ]
+}

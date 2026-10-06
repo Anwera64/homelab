@@ -9,7 +9,7 @@
 # so plain `docker compose` commands cover them too.
 # ==============================================================================
 
-# Docker's own copy of each container's log, capped: Loki holds the history (section 11).
+# Docker's own copy of each container's log, capped: Loki holds the history (section 10).
 x-logging: &default-logging
   driver: json-file
   options:
@@ -27,7 +27,7 @@ services:
   # 1. Network & VPN Gateway (Gluetun)
   # ==============================================================================
   gluetun:
-    image: qmcgaw/gluetun:latest
+    image: qmcgaw/gluetun:v3.41.3
     container_name: gluetun
     cap_add:
       - NET_ADMIN
@@ -60,7 +60,7 @@ services:
   # ==============================================================================
   qbittorrent:
     profiles: ["media"]
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: lscr.io/linuxserver/qbittorrent:5.1.4-r3-ls453
     container_name: qbittorrent
     network_mode: "service:gluetun"
     environment:
@@ -82,7 +82,7 @@ services:
     logging: *default-logging
 
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.2
     container_name: flaresolverr
     ports:
       - 8191:8191
@@ -90,8 +90,6 @@ services:
       - LOG_LEVEL=info
       - TZ=${TZ:-Europe/Madrid}
     dns: *public-dns
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -100,7 +98,7 @@ services:
   # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
   # ==============================================================================
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls162
     container_name: prowlarr
     ports:
       - 9696:9696
@@ -111,15 +109,13 @@ services:
     dns: *public-dns
     volumes:
       - ${CONFIG_PATH}/prowlarr:/config
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
 
   radarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls319
     container_name: radarr
     ports:
       - 7878:7878
@@ -131,15 +127,13 @@ services:
     volumes:
       - ${CONFIG_PATH}/radarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
 
   sonarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls326
     container_name: sonarr
     ports:
       - 8989:8989
@@ -151,15 +145,13 @@ services:
     volumes:
       - ${CONFIG_PATH}/sonarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
 
   bazarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/bazarr:latest
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls366
     container_name: bazarr
     ports:
       - 6767:6767
@@ -171,8 +163,6 @@ services:
     volumes:
       - ${CONFIG_PATH}/bazarr:/config
       - ${MEDIA_ROOT}:/data
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -181,7 +171,7 @@ services:
   # 4. Request UI & Discovery (Seerr)
   # ==============================================================================
   seerr:
-    image: ghcr.io/seerr-team/seerr:latest
+    image: ghcr.io/seerr-team/seerr:v3.5.0
     container_name: seerr
     ports:
       - 5055:5055
@@ -191,8 +181,6 @@ services:
       - TZ=${TZ:-Europe/Madrid}
     volumes:
       - ${CONFIG_PATH}/seerr:/app/config
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging
@@ -214,7 +202,7 @@ services:
       - ${MEDIA_ROOT}:/data:ro
       - ${MOVIES_PATH}:/media/movies:ro
       - ${SHOWS_PATH}:/media/tv:ro
-    # Hardware-specific, like Ollama's block in section 10: the laptop's GTX 1660 Ti (H.264 and
+    # Hardware-specific, like Ollama's block in section 9: the laptop's GTX 1660 Ti (H.264 and
     # HEVC, no AV1 encoding). On an Intel host this becomes a /dev/dri device for Quick Sync.
     deploy:
       resources:
@@ -231,7 +219,7 @@ services:
   # 6. Media Analytics & Telemetry (Jellystat)
   # ==============================================================================
   jellystat-db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     container_name: jellystat-db
     environment:
       - POSTGRES_USER=${JELLYSTAT_DB_USER:-jellystat}
@@ -249,7 +237,7 @@ services:
     logging: *default-logging
 
   jellystat:
-    image: cyfershepard/jellystat:latest
+    image: cyfershepard/jellystat:1.1.12
     container_name: jellystat
     ports:
       - 3005:3000
@@ -273,7 +261,7 @@ services:
   # ==============================================================================
   maintainerr:
     profiles: ["media"]
-    image: ghcr.io/maintainerr/maintainerr:latest
+    image: ghcr.io/maintainerr/maintainerr:3.30.1
     container_name: maintainerr
     ports:
       - 6246:6246
@@ -286,8 +274,6 @@ services:
       - sonarr
       - radarr
       - jellyfin
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -300,7 +286,7 @@ services:
   # ==============================================================================
   cleanuparr:
     profiles: ["media"]
-    image: ghcr.io/cleanuparr/cleanuparr:latest
+    image: ghcr.io/cleanuparr/cleanuparr:2.10.8
     container_name: cleanuparr
     ports:
       - 11011:11011
@@ -317,8 +303,6 @@ services:
       - sonarr
       - radarr
       - qbittorrent
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -328,7 +312,7 @@ services:
   # ==============================================================================
   recyclarr:
     profiles: ["media"]
-    image: ghcr.io/recyclarr/recyclarr:8
+    image: ghcr.io/recyclarr/recyclarr:8.7.3
     container_name: recyclarr
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -340,46 +324,22 @@ services:
     depends_on:
       - sonarr
       - radarr
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 256m
     restart: unless-stopped
     logging: *default-logging
 
   # ==============================================================================
-  # 9. Automated Image Updates & Lifecycle (Watchtower)
-  # The maintained fork: containrrr/watchtower was archived in December 2025.
-  # Pinned, and bumped in a PR.
-  # ==============================================================================
-  watchtower:
-    image: nickfedor/watchtower:1.22.3
-    container_name: watchtower
-    environment:
-      - TZ=${TZ:-Europe/Madrid}
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
-      - WATCHTOWER_ROLLING_RESTART=true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    mem_limit: 256m
-    restart: unless-stopped
-    logging: *default-logging
-
-  # ==============================================================================
-  # 10. Household Hub, its private search and its embedder. The chat model runs
+  # 9. Household Hub, its private search and its embedder. The chat model runs
   # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:2026.10.4-d48c4b555
     container_name: searxng
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
       - SEARXNG_SECRET=${SEARXNG_SECRET}
     volumes:
       - ${CONFIG_PATH}/searxng:/etc/searxng:ro
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
     mem_limit: 512m
     restart: unless-stopped
     logging: *default-logging
@@ -437,7 +397,7 @@ services:
     logging: *default-logging
 
   # ==============================================================================
-  # 11. Logs (Loki + Alloy + Grafana)
+  # 10. Logs (Loki + Alloy + Grafana)
   # A container's log dies with the container. Alloy reads every container's
   # output through the Docker socket (label a container logs=off to leave it out),
   # Loki keeps it for 30 days, Grafana searches it. Versions are pinned.
