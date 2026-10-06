@@ -41,7 +41,7 @@ if command -v docker >/dev/null 2>&1; then
   fi
 
   echo "  [+] Validating hosts/server/docker-compose.yml configuration..."
-  JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
+  JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate HUB_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
   if [ $? -ne 0 ]; then
     echo ""
     echo "[Pre-Commit FAILED] hosts/server/docker-compose.yml validation failed! Commit aborted."
