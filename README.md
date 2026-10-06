@@ -171,8 +171,7 @@ The server has a firewall, so its local HTTP ports answer lemonpi only.
 ├── config/
 │   ├── homepage/                    # Homepage config, served from the Pi
 │   │   ├── services.yaml            # Services, widgets and HTTP checks
-│   │   ├── adapt-links.js           # Link adapter: HTTPS names remotely, LAN ports locally
-│   │   ├── custom.js                # The adapter, running in the browser
+│   │   ├── custom.js                # GPS weather badge in the header
 │   │   ├── custom.css               # Styling overrides
 │   │   ├── settings.yaml            # Layout
 │   │   ├── widgets.yaml             # Header widgets
@@ -190,7 +189,8 @@ The server has a firewall, so its local HTTP ports answer lemonpi only.
 │           └── datasources/
 │               └── loki.yaml        # Loki as Grafana's data source
 └── tests/
-    ├── adapt-links.test.js          # Link adapter
+    ├── service-ports.js             # The port each service publishes, shared by the suites
+    ├── homepage-custom.test.js      # Homepage's custom.js and its https:// links
     ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
