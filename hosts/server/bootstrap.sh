@@ -18,7 +18,6 @@ CODENAME="$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
 NO_STACK=0
 ENV_CREATED=0
 REBOOT_PENDING=0
-UNITS_CHANGED=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -50,7 +49,6 @@ write_if_changed() {
 # Installs a unit from system/ with this checkout's path filled in, and starts it.
 install_unit() {
   if sed "s|@SERVER_DIR@|$SERVER_DIR|g" "$SERVER_DIR/system/$1" | write_if_changed "/etc/systemd/system/$1"; then
-    UNITS_CHANGED=1
     systemctl daemon-reload
     systemctl enable --now "$1"
     systemctl restart "$1"
