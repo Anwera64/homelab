@@ -43,7 +43,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     const expected = [
       'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
       'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'ollama', 'prowlarr', 'qbittorrent', 'radarr',
-      'recyclarr', 'searxng', 'seerr', 'sonarr',
+      'recyclarr', 'renovate', 'searxng', 'seerr', 'sonarr',
     ];
     assert.deepEqual([...names].sort(), expected);
     // The chat model stays on the desktop's RTX 5080. Until the media disk is in, so do the media services.
@@ -207,6 +207,31 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(!names.includes('watchtower'));
     assert.doesNotMatch(compose, /watchtower/i, 'no service carries a Watchtower label');
     assert.doesNotMatch(envExample, /WATCHTOWER/);
+  });
+
+  await t.test('Renovate runs here, one run at a time, with the repo token and nothing else', () => {
+    const renovate = block('renovate');
+    assert.match(imageOf(renovate), /^renovate\/renovate:\d+\.\d+\.\d+$/, 'pinned; it bumps itself in the weekly PR');
+    // Its own profile: the stack never starts it, server-renovate.timer does.
+    assert.match(renovate, /^    profiles:\s*\["renovate"\]\s*$/m);
+    assert.match(renovate, /^    restart:\s*"no"\s*$/m, 'a run ends; nothing restarts it');
+    assert.equal(portsOf(renovate), '', 'it serves nothing');
+    assert.doesNotMatch(renovate, /docker\.sock/, 'it reads registries and GitHub, not this host');
+    for (const line of [
+      '- RENOVATE_PLATFORM=github',
+      '- RENOVATE_REPOSITORIES=Anwera64/homelab',
+      '- RENOVATE_TOKEN=${RENOVATE_TOKEN:-}',
+      // The config is renovate.json in the repo; without one it must not open an onboarding PR.
+      '- RENOVATE_ONBOARDING=false',
+      '- RENOVATE_REQUIRE_CONFIG=required',
+    ]) {
+      assert.ok(renovate.includes(line), `renovate must set ${line}`);
+    }
+    assert.ok(renovate.includes('- renovate_cache:/tmp/renovate'), 'lookups are cached between runs');
+    assert.match(compose, /^volumes:\s*\n[\s\S]*?^  renovate_cache:\s*\n\s+name:\s*renovate_cache\s*$/m);
+    assert.match(renovate, /^    mem_limit:\s*2g\s*$/m);
+    // Empty until a human creates the token; the timer skips its runs until then.
+    assert.match(envExample, /^RENOVATE_TOKEN=$/m);
   });
 
   await t.test('the log stack is pinned, with the renderer on demand', () => {

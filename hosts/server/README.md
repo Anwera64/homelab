@@ -18,6 +18,7 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Disk guard | Stops the media services while the media disk is unplugged, and starts them again when it is back. |
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
+| Renovate (Docker, systemd timer) | Runs every hour: opens the weekly version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
 | Nightly update (systemd timer) | At 04:00, brings in what was merged on GitHub and restarts the stack when something changed. |
 
 ## Fresh install
@@ -72,6 +73,26 @@ cd ~/homelab && git pull && sudo hosts/server/bootstrap.sh
 ```
 
 To undo a bad bump, revert its PR on GitHub. The timer applies the revert the next night, or right away with `sudo systemctl start server-update`.
+
+### Renovate runs on this machine
+
+Renovate is the `renovate` service in `docker-compose.yml`. It is not part of the running stack: `server-renovate.timer` starts one run every hour, and the container exits when the run ends. A run on Monday morning opens the PRs; later runs merge them once CI is green. The rules are in [`renovate.json`](../../renovate.json).
+
+It needs a GitHub token, as `RENOVATE_TOKEN` in `.env`. Until that is set, every run is skipped. Create a fine-grained token for the `Anwera64/homelab` repository only, with read and write on:
+
+- **Contents**: it pushes the bump branches and merges.
+- **Pull requests**: it opens, updates and merges the PRs.
+- **Issues**: it keeps a Dependency Dashboard issue listing what it found.
+- **Commit statuses**: it posts a status while a release is younger than three days.
+
+When the token expires the runs fail until it is replaced. The PRs are opened in the name of the token's owner.
+
+```sh
+sudo systemctl start server-renovate     # one run now
+journalctl -u server-renovate            # what the runs did (also in Grafana, container renovate)
+# What a run would do, without changing anything on GitHub:
+docker compose --profile renovate run --rm -e RENOVATE_DRY_RUN=full renovate
+```
 
 ## Firewall
 

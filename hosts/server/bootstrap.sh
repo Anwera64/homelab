@@ -229,6 +229,10 @@ step "Nightly update at 04:00: what was merged on GitHub reaches the stack"
 place_unit server-update.service && systemctl daemon-reload
 install_unit server-update.timer
 
+step "Renovate every hour: the version bump PRs (skipped until RENOVATE_TOKEN is in .env)"
+place_unit server-renovate.service && systemctl daemon-reload
+install_unit server-renovate.timer
+
 step "App settings folders"
 # Created here, owned by the apps' user: Docker would create a missing one as
 # root, and the apps that run as user 1000 could not write to it.

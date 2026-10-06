@@ -477,6 +477,33 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # ==============================================================================
+  # 11. Version bumps (Renovate)
+  # Opens the weekly bump PRs for the pinned versions in this repo and merges the
+  # ones renovate.json allows once CI is green. One run, then it exits:
+  # server-renovate.timer starts it every hour. To see what a run would do:
+  #   docker compose --profile renovate run --rm -e RENOVATE_DRY_RUN=full renovate
+  # ==============================================================================
+  renovate:
+    profiles: ["renovate"]
+    image: renovate/renovate:44.141.0
+    container_name: renovate
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - RENOVATE_PLATFORM=github
+      - RENOVATE_REPOSITORIES=Anwera64/homelab
+      # A fine-grained token for this one repo: Contents, Pull requests and Issues, read and write.
+      - RENOVATE_TOKEN=${RENOVATE_TOKEN:-}
+      # The rules are renovate.json in the repo; without it Renovate does nothing.
+      - RENOVATE_ONBOARDING=false
+      - RENOVATE_REQUIRE_CONFIG=required
+      - LOG_LEVEL=info
+    volumes:
+      - renovate_cache:/tmp/renovate
+    mem_limit: 2g
+    restart: "no"
+    logging: *default-logging
+
 volumes:
   household_hub_data:
     name: household_hub_data
@@ -488,3 +515,5 @@ volumes:
     name: alloy_data
   grafana_data:
     name: grafana_data
+  renovate_cache:
+    name: renovate_cache

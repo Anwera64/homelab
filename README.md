@@ -13,7 +13,7 @@ A three-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house net
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
 | **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), and a nightly update that applies merged version bumps. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
+| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Renovate (hourly runs that open the version bump PRs), and a nightly update that applies the merged ones. The media services follow once its media disk is installed | [`hosts/server/`](hosts/server/README.md) |
 | **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, and the AI profile: Ollama. Alloy ships its container logs to the server | root [`docker-compose.yml`](docker-compose.yml) |
 
 All three addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names (`lemonpi.lan`, `server.lan`, `desktop-kujo8mp.lan`), which Pi-hole resolves for every DHCP client.
@@ -125,7 +125,7 @@ graph TD
 | **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
 | **Recyclarr** | Desktop | — | TRaSH Guides sync, daily 3 AM |
 | **Watchtower** | Desktop | — | Image updates, daily 4 AM |
-| **Renovate** | GitHub | — | Version bump PRs for the server, the Pi, the hub and its client, weekly |
+| **Renovate** | Server | — | Version bump PRs for the server, the Pi, the hub and its client, weekly; runs every hour |
 | **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
 
 The server has a firewall, so its service ports answer lemonpi only.
@@ -169,7 +169,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── bootstrap.sh             # Idempotent setup: NVIDIA, Docker, SSH, firewall, disk guard, stack
 │       ├── docker-compose.yml       # The desktop services and the embedder, with memory caps
 │       ├── .env.example             # Server settings template (paths, allowed addresses, secrets)
-│       └── system/                  # Firewall, disk guard, battery and nightly update scripts with their units
+│       └── system/                  # Firewall, disk guard, battery, nightly update and Renovate scripts with their units
 ├── apps/
 │   └── household-hub/               # Household Hub: backend (FastAPI) and client (KMP)
 ├── config/

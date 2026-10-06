@@ -10,7 +10,7 @@ const SERVER_DIR = path.join(ROOT_DIR, 'hosts/server');
 const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
 const SCRIPTS = [
   'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
-  'system/server-stack-up.sh', 'system/server-update.sh',
+  'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh',
 ];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
@@ -129,7 +129,7 @@ test('Server bootstrap script', async (t) => {
   });
 
   await t.test('installs the firewall, disk guard and battery units with the repo path filled in', () => {
-    for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service', 'server-update.timer']) {
+    for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service', 'server-update.timer', 'server-renovate.timer']) {
       assert.ok(script.includes(unit), `must install ${unit}`);
     }
     assert.match(script, /s\|@SERVER_DIR@\|\$SERVER_DIR\|g/);
@@ -446,6 +446,71 @@ test('Server nightly update', async (t) => {
     assert.notEqual(result.status, 0);
     assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
     assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server Renovate runs', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-renovate.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-renovate.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-renovate.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('start every hour: one run opens the PRs, a later one merges them once CI is green', () => {
+    assert.match(timer, /^OnCalendar=hourly$/m);
+    assert.match(timer, /^Persistent=true$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-renovate\.sh$/m);
+    assert.match(unit, /^After=docker\.service network-online\.target$/m);
+    assert.match(unit, /^Wants=network-online\.target$/m);
+    // The timer starts it; enabling the service itself would run it on every boot.
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, and the service without starting it', () => {
+    assert.match(bootstrap, /^place_unit server-renovate\.service/m);
+    assert.match(bootstrap, /^install_unit server-renovate\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-renovate\.service/);
+  });
+
+  // Behaviour, in a throwaway server folder. docker is a stub on PATH.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = (envFile) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-renovate-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(root, 'server/system'), { recursive: true });
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${log}"\n`, { mode: 0o755 });
+    const target = path.join(root, 'server/system/server-renovate.sh');
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-renovate.sh'), target);
+    fs.chmodSync(target, 0o755);
+    if (envFile !== null) fs.writeFileSync(path.join(root, 'server/.env'), envFile);
+    const run = () => spawnSync(target, [], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    return { root, run, calls };
+  };
+
+  await t.test('skips the run, and says why, until the token is in .env', { skip: !canRun && 'needs bash' }, () => {
+    for (const envFile of ['RENOVATE_TOKEN=\n', 'TZ=Europe/Madrid\n', null]) {
+      const { root, run, calls } = setup(envFile);
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /RENOVATE_TOKEN is not set/);
+      assert.equal(calls(), '', 'Renovate must not start without a token');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('runs Renovate once through compose and reports how it ended', { skip: !canRun && 'needs bash' }, () => {
+    const { root, run, calls } = setup('TZ=Europe/Madrid\nRENOVATE_TOKEN=github_pat_example\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const serverDir = path.join(root, 'server');
+    assert.equal(calls().trim(), `docker compose --project-directory ${serverDir} --profile renovate up --exit-code-from renovate renovate`);
+    // The token is read by compose from .env; it must never be printed.
+    assert.doesNotMatch(result.stdout + result.stderr, /github_pat_example/);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });
