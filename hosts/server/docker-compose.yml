@@ -390,6 +390,10 @@ services:
     container_name: household-hub
     environment:
       - TZ=${TZ:-Europe/Madrid}
+      # Signs every login and encrypts the stored calendar credentials. In production mode
+      # the Hub refuses to start on the default from the repo, or on a key under 32 characters.
+      - ENVIRONMENT=production
+      - SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}
       # Google Calendar sign-in (#54); empty ID leaves Google unavailable in the app.
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}

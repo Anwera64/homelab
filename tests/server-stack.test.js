@@ -147,6 +147,15 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(block('searxng').includes('- SEARXNG_SECRET=${SEARXNG_SECRET}'));
   });
 
+  await t.test('the Hub cannot start on the default signing key from the public repo', () => {
+    const hub = block('household-hub');
+    // In production mode the Hub refuses the built-in default and any key under 32 characters (#102).
+    assert.ok(hub.includes('- ENVIRONMENT=production'));
+    assert.ok(hub.includes('- SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}'), 'the key is required and has no default');
+    assert.match(envExample, /^HUB_SECRET_KEY=$/m, 'the key must be present and empty in .env.example');
+    assert.match(envExample, /openssl rand -hex 32/);
+  });
+
   await t.test('the VPN kill-switch is unchanged: qBittorrent only has Gluetun\'s network', () => {
     const qbit = block('qbittorrent');
     assert.match(qbit, /network_mode:\s*"service:gluetun"/);
@@ -206,7 +215,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 });
 
 test('The server compose file is validated wherever the others are', async (t) => {
-  const validate = '-f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q';
+  // The required secrets get a stand-in value, or the compose file would refuse to resolve.
+  const validate = 'HUB_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q';
 
   await t.test('in CI', () => {
     assert.ok(read(path.join(ROOT_DIR, '.github/workflows/test.yml')).includes(validate));
@@ -253,6 +263,12 @@ test('Server README', async (t) => {
     }
     assert.match(live, /media/i, 'it must say the media services are still on the desktop');
     assert.doesNotMatch(readme, /\*\*Not live yet\.\*\*/);
+  });
+
+  await t.test('explains the Hub\'s key and what changing it costs', () => {
+    assert.ok(readme.includes('HUB_SECRET_KEY'));
+    assert.match(readme, /signs every phone out/);
+    assert.match(readme, /calendar/i);
   });
 
   await t.test('documents the one-port rule that lets the desktop ship its logs', () => {

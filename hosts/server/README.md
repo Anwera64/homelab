@@ -127,6 +127,15 @@ The setup is meant to outlive the laptop:
 3. In [`bootstrap.sh`](bootstrap.sh), the section between `# >>> laptop` and `# <<< laptop` is the hardware-specific part: the NVIDIA driver, the lid and the battery. Replace it for the new machine.
 4. In [`docker-compose.yml`](docker-compose.yml), Jellyfin's `deploy` block is the only GPU setting. On an Intel machine it becomes a `/dev/dri` device for Quick Sync.
 
+## The Hub's key
+
+`HUB_SECRET_KEY` in `.env` signs every login token and encrypts the calendar credentials stored in the Hub's database. The Hub refuses to start without it, or on a key shorter than 32 characters. Make one with `openssl rand -hex 32` and never commit it.
+
+Changing the key later has two costs:
+
+- It signs every phone out; each member signs in again once.
+- The stored calendar credentials can no longer be read. Re-encrypt them with the new key while the Hub is stopped, or reconnect each calendar in the app afterwards.
+
 ## Backups
 
 `hosts/server/.env` is not in git. `config/` on the SSD holds every app's settings and databases; the Hub's database is in the `household_hub_data` volume.

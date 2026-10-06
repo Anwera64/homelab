@@ -29,5 +29,5 @@ jobs:
 
       - name: Validate Server Docker Compose Configuration
         run: |
-          JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
+          JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate HUB_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
 
