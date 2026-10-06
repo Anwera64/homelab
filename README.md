@@ -99,34 +99,34 @@ graph TD
 
 ## 🌐 Service Endpoints
 
-| Service | Host | HTTPS (home + Tailscale) | Local HTTP | Role |
-| :--- | :--- | :--- | :--- | :--- |
-| **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | `http://lemonpi.lan` | Dashboard: HTTP checks for desktop services, Docker status for the Pi's |
-| **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | `http://lemonpi.lan:8081/admin` | DNS, ad blocking and DHCP |
-| **Jellyfin** | Desktop | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8096` | Media server with NVENC transcoding |
-| **Seerr** | Desktop | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:5055` | Request & discovery portal |
-| **Jellystat** | Desktop | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3005` | Playback analytics |
-| **qBittorrent** | Desktop | `https://qbit.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8080` | Download client (VueTorrent), published through Gluetun |
-| **Sonarr** | Desktop | `https://sonarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8989` | TV series |
-| **Radarr** | Desktop | `https://radarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:7878` | Movies |
-| **Prowlarr** | Desktop | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:9696` | Indexer proxy |
-| **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6767` | Subtitles |
-| **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6246` | Media lifecycle & cleanup |
-| **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:11011` | Download queue cleanup: fakes, failed imports, seeding limits |
-| **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8191` | Cloudflare challenge solver |
-| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org` | `http://server.lan:3051` | Family assistant backend (`/docs` at `http://127.0.0.1:3050` on the server itself) |
-| **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | `http://server.lan:3002` | Log search (sign-in required) |
-| **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |
-| **SearXNG** | Server | — | internal `http://searxng:8080` | Private search for the hub |
-| **Ollama** | Desktop (AI profile) | — | `http://desktop-kujo8mp.lan:11434` (the server only) | Local LLM inference |
-| **Ollama (embedder)** | Server | — | internal `http://ollama:11434` | `bge-m3`, ranks what a chat turn reads |
-| **Loki** | Server | — | `http://server.lan:3100` (the desktop's Alloy only) | Log store, 30 days |
-| **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | `http://server.lan:4318` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
-| **Alloy** | Desktop | — | — | Ships the desktop's container output to the server's Loki |
-| **Recyclarr** | Desktop | — | — | TRaSH Guides sync, daily 3 AM |
-| **Watchtower** | Server and Desktop | — | — | Image updates, daily 4 AM |
+| Service | Host | HTTPS (home + Tailscale) | Role |
+| :--- | :--- | :--- | :--- |
+| **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | Dashboard: HTTP checks for desktop services, Docker status for the Pi's |
+| **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | DNS, ad blocking and DHCP |
+| **Jellyfin** | Desktop | `https://jellyfin.spicy-llama.duckdns.org` | Media server with NVENC transcoding |
+| **Seerr** | Desktop | `https://seerr.spicy-llama.duckdns.org` | Request & discovery portal |
+| **Jellystat** | Desktop | `https://stat.spicy-llama.duckdns.org` | Playback analytics |
+| **qBittorrent** | Desktop | `https://qbit.spicy-llama.duckdns.org` | Download client (VueTorrent), published through Gluetun |
+| **Sonarr** | Desktop | `https://sonarr.spicy-llama.duckdns.org` | TV series |
+| **Radarr** | Desktop | `https://radarr.spicy-llama.duckdns.org` | Movies |
+| **Prowlarr** | Desktop | `https://prowlarr.spicy-llama.duckdns.org` | Indexer proxy |
+| **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | Subtitles |
+| **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | Media lifecycle & cleanup |
+| **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | Download queue cleanup: fakes, failed imports, seeding limits |
+| **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | Cloudflare challenge solver |
+| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org` | Family assistant backend (`/docs` at `http://127.0.0.1:3050` on the server itself) |
+| **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | Log search (sign-in required) |
+| **Gluetun API** | Desktop | — | VPN status for Homepage (port 8000, API key) |
+| **SearXNG** | Server | — | Private search for the hub (internal `http://searxng:8080`) |
+| **Ollama** | Desktop (AI profile) | — | Local LLM inference (port 11434, the server only) |
+| **Ollama (embedder)** | Server | — | `bge-m3`, ranks what a chat turn reads (internal `http://ollama:11434`) |
+| **Loki** | Server | — | Log store, 30 days (port 3100, the desktop's Alloy only) |
+| **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
+| **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
+| **Recyclarr** | Desktop | — | TRaSH Guides sync, daily 3 AM |
+| **Watchtower** | Server and Desktop | — | Image updates, daily 4 AM |
 
-The server has a firewall, so its local HTTP ports answer lemonpi only.
+The server has a firewall, so its service ports answer lemonpi only.
 
 ---
 
@@ -171,8 +171,7 @@ The server has a firewall, so its local HTTP ports answer lemonpi only.
 ├── config/
 │   ├── homepage/                    # Homepage config, served from the Pi
 │   │   ├── services.yaml            # Services, widgets and HTTP checks
-│   │   ├── adapt-links.js           # Link adapter: HTTPS names remotely, LAN ports locally
-│   │   ├── custom.js                # The adapter, running in the browser
+│   │   ├── custom.js                # GPS weather badge in the header
 │   │   ├── custom.css               # Styling overrides
 │   │   ├── settings.yaml            # Layout
 │   │   ├── widgets.yaml             # Header widgets
@@ -190,7 +189,8 @@ The server has a firewall, so its local HTTP ports answer lemonpi only.
 │           └── datasources/
 │               └── loki.yaml        # Loki as Grafana's data source
 └── tests/
-    ├── adapt-links.test.js          # Link adapter
+    ├── service-ports.js             # The port each service publishes, shared by the suites
+    ├── homepage-custom.test.js      # Homepage's custom.js and its https:// links
     ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow

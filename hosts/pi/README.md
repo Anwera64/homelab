@@ -9,7 +9,7 @@ A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), w
 | Pi-hole v6 (Docker) | DNS, ad blocking and DHCP. Admin page: https://pihole.spicy-llama.duckdns.org/admin or http://192.168.1.35:8081/admin |
 | Caddy (Docker) | HTTPS for `*.spicy-llama.duckdns.org` (DuckDNS points here), wildcard cert via the DuckDNS DNS challenge. Pi-hole and Homepage are served locally; desktop services go to the ports their containers publish on 192.168.1.20 and return 502 while it's off. Image built by CI (`.github/workflows/caddy-image.yml`). |
 | Unbound (Docker) | Pi-hole's only upstream, on `127.0.0.1:5335`. Recursive from the root servers, DNSSEC on. |
-| Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org, http://192.168.1.35 or :3000. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
+| Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org. Plain http://192.168.1.35 redirects there; http://192.168.1.35:3000 is the container's own port, for when HTTPS is down. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
 | Tailscale (native) | Subnet router for `192.168.1.0/24`, so remote devices reach the LAN, and ad blocking away from home. |
 | log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
 | unattended-upgrades | Installs Debian security updates by itself. |

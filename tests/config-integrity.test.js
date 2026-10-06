@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
@@ -71,7 +71,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
         assert.match(ports, new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
       }
     }
-    // Every port the link adapter knows is published here, or on the server for what moved there.
+    // Every port in the service table is published here, or on the server for what moved there.
     const published = Object.values(expected).flat().map((m) => m.split(':')[0]);
     const onServer = { 3002: 'grafana' };
     for (const port of Object.keys(PORT_TO_SERVICE)) {

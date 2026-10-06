@@ -132,8 +132,7 @@
     }
 }
 
-# Plain HTTP on the Pi's own names shows the dashboard.
+# Plain HTTP on the Pi's own names goes to the dashboard's HTTPS name.
 http://192.168.1.35, http://lemonpi, http://lemonpi.lan, http://lemonpi.local {
-    import security_headers
-    reverse_proxy 127.0.0.1:3000
+    redir https://home.spicy-llama.duckdns.org{uri}
 }
