@@ -20,6 +20,8 @@ const imagesOf = (compose) => [...compose.matchAll(/^    image:\s*(\S+)\s*$/gm)]
 const asList = (value) => (value === undefined ? [] : [].concat(value));
 // The regex of a "regex:..." versioning, as a JavaScript RegExp (the named groups read the same).
 const versioningRegex = (rule) => new RegExp(rule.versioning.replace(/^regex:/, ''));
+// Whether a matchPackageNames list picks a name: "/regex/" entries only, which is what these rules use.
+const picks = (patterns, name) => asList(patterns).some((p) => /^\/.*\/$/.test(p) && new RegExp(p.slice(1, -1)).test(name));
 
 test('Renovate: pinned images and client dependencies, bumped in PRs', async (t) => {
   const config = parse(read(CONFIG_PATH));
@@ -35,8 +37,8 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.ok(asList(config.extends).includes('config:recommended'));
   });
 
-  await t.test('reads the compose files and nothing it was not asked to', () => {
-    assert.ok(asList(config.enabledManagers).includes('docker-compose'));
+  await t.test('reads the compose files and the client\'s Gradle build, and nothing it was not asked to', () => {
+    assert.deepEqual([...config.enabledManagers].sort(), ['docker-compose', 'gradle', 'gradle-wrapper']);
   });
 
   await t.test('opens its PRs once a week, on releases at least three days old', () => {
@@ -128,6 +130,36 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     const tag = serverImages.find((image) => image.startsWith('searxng/searxng:')).split(':')[1];
     assert.match(tag, scheme);
     assert.doesNotMatch('latest', scheme);
+  });
+
+  await t.test('groups the client\'s minor and patch bumps into a weekly PR of their own, merged once CI is green', () => {
+    const [group] = ruleFor((r) => r.groupName === 'client dependencies');
+    assert.ok(group, 'a client dependencies group must exist');
+    assert.deepEqual([...group.matchManagers].sort(), ['gradle', 'gradle-wrapper']);
+    assert.deepEqual(group.matchFileNames, ['apps/household-hub/client/**']);
+    assert.deepEqual([...group.matchUpdateTypes].sort(), ['minor', 'patch']);
+    assert.equal(group.automerge, true);
+  });
+
+  await t.test('Kotlin, Compose Multiplatform and AGP move together: a Kotlin release often needs its Compose', () => {
+    const index = rules.findIndex((r) => r.groupName === 'Kotlin, Compose and AGP');
+    assert.ok(index >= 0, 'a toolchain group must exist');
+    const toolchain = rules[index];
+    assert.ok(index > rules.findIndex((r) => r.groupName === 'client dependencies'), 'it must override the client group');
+    assert.equal(toolchain.matchUpdateTypes, undefined, 'majors move together too');
+    // Renovate's package names for the plugins in libs.versions.toml, and AGP's.
+    for (const name of [
+      'org.jetbrains.kotlin.multiplatform:org.jetbrains.kotlin.multiplatform.gradle.plugin',
+      'org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin',
+      'org.jetbrains.compose:org.jetbrains.compose.gradle.plugin',
+      'com.android.application:com.android.application.gradle.plugin',
+      'com.android.kotlin.multiplatform.library:com.android.kotlin.multiplatform.library.gradle.plugin',
+    ]) {
+      assert.ok(picks(toolchain.matchPackageNames, name), `${name} is in the toolchain group`);
+    }
+    for (const name of ['org.jetbrains.kotlinx:kotlinx-coroutines-core', 'io.ktor:ktor-client-core', 'androidx.activity:activity-compose']) {
+      assert.ok(!picks(toolchain.matchPackageNames, name), `${name} is not toolchain`);
+    }
   });
 
   await t.test('every image on the server and the Pi has a version Renovate can compare', () => {

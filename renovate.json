@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["docker-compose"],
+  "enabledManagers": ["docker-compose", "gradle", "gradle-wrapper"],
   "timezone": "Europe/Madrid",
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
@@ -22,6 +22,19 @@
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "container images",
       "automerge": true
+    },
+    {
+      "description": "The hub client's minor and patch bumps: one PR a week, merged once its Android and iOS CI is green.",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "matchFileNames": ["apps/household-hub/client/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "client dependencies",
+      "automerge": true
+    },
+    {
+      "description": "Kotlin, Compose Multiplatform and AGP move together, majors included: a Kotlin release often needs its Compose.",
+      "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/", "/^org\\.jetbrains\\.compose[.:]/", "/^com\\.android\\./"],
+      "groupName": "Kotlin, Compose and AGP"
     },
     {
       "description": "linuxserver tags where the app version has four parts: the image build (-lsNNN) is the revision.",
