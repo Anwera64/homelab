@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT_DIR, file), 'utf8').replace(/\r\n/g, '\n');
@@ -146,7 +146,7 @@ test('Root README matches the repository', async (t) => {
     // Grafana (3002) moved to the server, with the hub and Alloy's receiver.
     const onServer = ['3002'];
     const onDesktop = Object.keys(PORT_TO_SERVICE).filter((port) => !onServer.includes(port));
-    // The Gluetun API (8000) is reached from the Pi without being in the link adapter.
+    // The Gluetun API (8000) is reached from the Pi without being in the service table.
     for (const port of [...onDesktop, '8000']) {
       assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
     }

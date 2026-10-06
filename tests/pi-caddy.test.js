@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/caddy-image.yml');
