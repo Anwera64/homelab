@@ -15,7 +15,8 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the chat model and the stack's own Ollama for embeddings; the bootstrap script pulls `bge-m3` when it is missing. |
 | Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
-| Disk guard | Stops the media services while the media disk is unplugged, and starts them again when it is back. |
+| Disk guard | Stops the media services while the media disk is unplugged. When it is plugged back in, checks the filesystem, mounts it and starts them again. |
+| smartd | Runs a short self-test on both disks every Sunday at 03:00. |
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
 | Renovate (Docker, systemd timer) | Runs every hour: opens the weekly version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
@@ -149,7 +150,21 @@ All media lives on one disk mounted at `/data`, in the TRaSH layout, so download
 1. Format the disk ext4 and read its ID: `lsblk -o NAME,SIZE,FSTYPE,UUID`.
 2. Put the ID in `DATA_DISK_UUID` in `.env` and rerun the bootstrap script. It adds the mount, creates the folders and starts the media services.
 
-While the disk is not mounted, `/data` is an empty, read-only folder, so nothing can fill the SSD by mistake. If the disk drops out, the disk guard stops qBittorrent, the arr apps, Jellyfin and the other media services, and starts them again when it is back. The Hub, Seerr and the logs keep running. `journalctl -u server-media` shows what it did.
+While the disk is not mounted, `/data` is an empty, read-only folder, so nothing can fill the SSD by mistake. If the disk drops out, the disk guard stops qBittorrent, the arr apps, Jellyfin and the other media services. The Hub, Seerr and the logs keep running.
+
+When the disk is plugged back in, the guard checks the filesystem, mounts it and starts the media services again, within about 15 seconds of the disk spinning up. If the check finds damage it cannot repair by itself, the guard leaves the disk unmounted and says so: run `sudo e2fsck -f` on the partition, then `sudo mount /data`. `journalctl -u server-media` shows what it did.
+
+### Disk health
+
+`smartd` runs a short self-test on the SSD and the media disk every Sunday at 03:00, and logs any change in their health counters. To read the results:
+
+```sh
+sudo smartctl -l selftest /dev/sda   # the media disk's test history
+sudo smartctl -H -A /dev/sda         # health verdict and the counters (reallocated and pending sectors should be 0)
+journalctl -u smartd                 # what smartd noticed
+```
+
+There is no scheduled extended test: it reads the whole surface and takes about 12 hours on this disk. Start one by hand with `sudo smartctl -t long /dev/sda` when in doubt.
 
 ## Battery
 
