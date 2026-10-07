@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Host metrics. The numbers about this machine that no exporter reports, left
-# as files for the node exporter (the server dashboard's Disks and Updates
-# sections):
+# as files for the node exporter (the server dashboard's Temperatures, Disks
+# and Updates sections):
 #
 #   server_host.prom   when unattended upgrades last ran, whether the media disk
-#                      is mounted, whether a reboot is waiting
+#                      is mounted, whether a reboot is waiting, how long the CPU
+#                      has been slowed down for heat
 #   server_smart.prom  each disk's latest self-test: passed or not, and the
 #                      disk's power-on hours when it ran
 #
@@ -16,6 +17,7 @@ set -euo pipefail
 TEXTFILE_DIR="${SERVER_TEXTFILE_DIR:-/var/lib/node_exporter/textfile}"
 APT_STAMP="${SERVER_APT_STAMP:-/var/lib/apt/periodic/unattended-upgrades-stamp}"
 REBOOT_FLAG="${SERVER_REBOOT_FLAG:-/run/reboot-required}"
+CPU_THROTTLE_FILE="${SERVER_CPU_THROTTLE_FILE:-/sys/devices/system/cpu/cpu0/thermal_throttle/package_throttle_total_time_ms}"
 SMART_PROM="$TEXTFILE_DIR/server_smart.prom"
 
 # Writes stdin to $1. Written beside the file and moved over it, so the exporter
@@ -37,6 +39,11 @@ mkdir -p "$TEXTFILE_DIR"
   [ ! -e "$APT_STAMP" ] || echo "server_unattended_upgrade_last_run_timestamp_seconds $(stat -c %Y "$APT_STAMP")"
   echo "server_media_disk_mounted $(flag mountpoint -q /data)"
   echo "server_reboot_required $(flag test -e "$REBOOT_FLAG")"
+  # The kernel counts, in milliseconds since boot, how long the CPU was slowed down for heat.
+  if [ -r "$CPU_THROTTLE_FILE" ]; then
+    ms="$(<"$CPU_THROTTLE_FILE")"
+    printf 'server_cpu_throttled_seconds_total %d.%03d\n' "$((ms / 1000))" "$((ms % 1000))"
+  fi
 } | write_prom "$TEXTFILE_DIR/server_host.prom"
 
 # The latest self-test of one disk, as "passed hours", or nothing when it has
