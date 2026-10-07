@@ -9,9 +9,6 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
 const SERVER_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/server/docker-compose.yml');
 const SERVER_HOST = '192.168.1.30';
-const DESKTOP_HOST = '192.168.1.20';
-// What already runs on the server; the media services follow once its disk is in.
-const ON_SERVER = new Set(['Grafana']);
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
 const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
@@ -324,16 +321,19 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.doesNotMatch(envExampleContent, /^TS_[A-Z_]+=/m, '.env.example must not document TS_* variables');
   });
 
-  await t.test('Homepage (on the Pi) reaches desktop services by LAN IP, never by container name', () => {
+  await t.test('Homepage (on the Pi) reaches the server\'s services by LAN IP, never by container name', () => {
     const urls = [...servicesYamlContent.matchAll(/^\s*(?:url|ping|siteMonitor):\s*(\S+)/gm)].map((m) => m[1]);
     assert.ok(urls.length > 0, 'services.yaml should declare service URLs');
     for (const url of urls) {
       const host = new URL(url).hostname;
       assert.ok(host.includes('.') || host === 'localhost', `${url} uses a bare container name the Pi can't resolve`);
     }
+    // The media services left the desktop: a card still pointed there shows as down.
+    assert.doesNotMatch(servicesYamlContent, /192\.168\.1\.20/, 'no card reads from the desktop any more');
+    assert.match(servicesYamlContent, /type:\s*gluetun\s*\r?\n\s*url:\s*http:\/\/192\.168\.1\.30:8000\s*$/m, 'the VPN widget reads the server\'s Gluetun');
   });
 
-  await t.test('Desktop services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
+  await t.test('The server\'s services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
     const caddyCard = servicesYamlContent.match(/- Caddy[^:]*:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
     assert.ok(caddyCard, 'services.yaml must list the Pi Caddy');
     assert.match(caddyCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*caddy/);
@@ -349,7 +349,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
       assert.ok(block, `services.yaml must list ${name}`);
-      const monitor = `http://${ON_SERVER.has(name) ? SERVER_HOST : DESKTOP_HOST}:${port}`;
+      const monitor = `http://${SERVER_HOST}:${port}`;
       assert.match(block[1], new RegExp(`siteMonitor:\\s*${monitor.replace(/\./g, '\\.')}/?\\s*$`, 'm'), `${name} must be monitored at ${monitor}`);
     }
   });
@@ -359,7 +359,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(card, 'services.yaml must list Cleanuparr');
     // Homepage has no native cleanuparr widget, so the card maps /api/v2/stats itself.
     assert.match(card[1], /type:\s*customapi/);
-    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.20:11011\/api\/v2\/stats\s*$/m);
+    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.30:11011\/api\/v2\/stats\s*$/m);
     const mappings = {
       'strikes.total': 'Strikes', 'removals.total': 'Removed', 'cleaned.total': 'Cleaned', 'searches.grabbed': 'Grabbed',
     };
@@ -487,8 +487,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
   await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
     assert.ok(
-      /url:\s*http:\/\/192\.168\.1\.20:5055/.test(servicesYamlContent),
-      'Homepage services.yaml must point the Seerr widget at the desktop (192.168.1.20:5055)'
+      /url:\s*http:\/\/192\.168\.1\.30:5055/.test(servicesYamlContent),
+      'Homepage services.yaml must point the Seerr widget at the server (192.168.1.30:5055)'
     );
     assert.ok(
       /type:\s*seerr/.test(servicesYamlContent),
