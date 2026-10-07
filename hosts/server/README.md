@@ -155,6 +155,8 @@ All media lives on one disk mounted at `/data`, in the TRaSH layout, so download
 
 While the disk is not mounted, `/data` is an empty, read-only folder, so nothing can fill the SSD by mistake. If the disk drops out, the disk guard stops qBittorrent, the arr apps, Jellyfin and the other media services. The Hub, Seerr and the logs keep running.
 
+Jellyfin runs as user 1000, like the other media apps, and sees the media read-only: it cannot change or delete a file on the disk. Whenever the stack starts, its settings folder is handed back to that user if anything in it belongs to someone else.
+
 When the disk is plugged back in, the guard checks the filesystem, mounts it and starts the media services again, within about 15 seconds of the disk spinning up. If the check finds damage it cannot repair by itself, the guard leaves the disk unmounted and says so: run `sudo e2fsck -f` on the partition, then `sudo mount /data`. `journalctl -u server-media` shows what it did.
 
 ### Disk health

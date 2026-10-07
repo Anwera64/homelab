@@ -194,6 +194,95 @@ test('Server bootstrap script', async (t) => {
   });
 });
 
+test('Server stack start: Jellyfin\'s settings belong to the user it runs as', async (t) => {
+  const stackUp = read(path.join(SYSTEM_DIR, 'server-stack-up.sh'));
+
+  await t.test('re-owns the folder between the build and the start, with Jellyfin stopped', () => {
+    // Jellyfin ran as root before it got a user of its own, and left root-owned files behind.
+    // The nightly update starts the stack through this script too, without bootstrap.sh.
+    assert.match(stackUp, /^APP_UID="\$\{SERVER_APP_UID:-1000\}"$/m, 'user 1000 unless a test says otherwise');
+    const build = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" build');
+    const stop = at(stackUp, 'docker stop jellyfin');
+    const chown = at(stackUp, 'chown -R "$APP_UID:$APP_UID" "$JELLYFIN_DIR"');
+    const up = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans');
+    assert.ok(build < stop && stop < chown && chown < up);
+    assert.match(stackUp, /find "\$JELLYFIN_DIR" ! -uid "\$APP_UID" -print -quit/, 'only when something has another owner');
+  });
+
+  // Behaviour, in a throwaway server folder. docker, chown, mountpoint and the disk guard are stubs.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = ({ env = true, folder = true } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-stack-up-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    const system = path.join(root, 'server/system');
+    const jellyfin = path.join(root, 'config/jellyfin');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(system, { recursive: true });
+    for (const name of ['docker', 'chown', 'mountpoint']) {
+      fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $*" >> "${log}"\n`, { mode: 0o755 });
+    }
+    fs.writeFileSync(path.join(system, 'server-media.sh'), `#!/bin/sh\necho "server-media.sh $*" >> "${log}"\n`, { mode: 0o755 });
+    const target = path.join(system, 'server-stack-up.sh');
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-stack-up.sh'), target);
+    fs.chmodSync(target, 0o755);
+    if (env) fs.writeFileSync(path.join(root, 'server/.env'), `TZ=Europe/Madrid\nCONFIG_PATH=${path.join(root, 'config')}\n`);
+    if (folder) {
+      fs.mkdirSync(path.join(jellyfin, 'config/log'), { recursive: true });
+      fs.writeFileSync(path.join(jellyfin, 'config/log/log.log'), '');
+    }
+    const run = (uid) => spawnSync(target, [], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_APP_UID: String(uid) },
+    });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : []);
+    return { root, jellyfin, serverDir: path.join(root, 'server'), run, calls };
+  };
+  // The files a test creates belong to whoever runs it.
+  const mine = canRun ? process.getuid() : 0;
+  const someoneElse = mine + 4242;
+
+  await t.test('GIVEN files of another owner WHEN the stack starts THEN Jellyfin is stopped and the folder re-owned first', { skip: !canRun && 'needs bash' }, () => {
+    const { root, jellyfin, serverDir, run, calls } = setup();
+    const result = run(someoneElse);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), [
+      `docker compose --project-directory ${serverDir} build`,
+      'docker stop jellyfin',
+      `chown -R ${someoneElse}:${someoneElse} ${jellyfin}`,
+      'mountpoint -q /data',
+      `docker compose --project-directory ${serverDir} up -d --remove-orphans`,
+      'server-media.sh --once',
+    ]);
+    assert.match(result.stdout, /Jellyfin/, 'says what it did');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN every file already belongs to the apps\' user WHEN the stack starts THEN nothing is stopped or re-owned', { skip: !canRun && 'needs bash' }, () => {
+    const { root, serverDir, run, calls } = setup();
+    const result = run(mine);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), [
+      `docker compose --project-directory ${serverDir} build`,
+      'mountpoint -q /data',
+      `docker compose --project-directory ${serverDir} up -d --remove-orphans`,
+      'server-media.sh --once',
+    ]);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no .env or no Jellyfin folder WHEN the stack starts THEN it starts as before', { skip: !canRun && 'needs bash' }, () => {
+    for (const missing of [{ env: false }, { folder: false }]) {
+      const { root, run, calls } = setup(missing);
+      const result = run(someoneElse);
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(!calls().some((call) => /^(chown|docker stop)/.test(call)), 'nothing to re-own');
+      assert.ok(calls().some((call) => / up -d --remove-orphans$/.test(call)), 'the stack still starts');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 test('Server firewall', async (t) => {
   const script = read(path.join(SYSTEM_DIR, 'server-firewall.sh'));
   const unit = read(path.join(SYSTEM_DIR, 'server-firewall.service'));

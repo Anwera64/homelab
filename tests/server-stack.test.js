@@ -161,6 +161,13 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.deepEqual(gpuUsers, ['jellyfin', 'ollama', 'nvidia-gpu-exporter'], 'only Jellyfin, the embedder and the GPU\'s exporter use it');
   });
 
+  await t.test('Jellyfin runs as the apps\' user, not root', () => {
+    // Its image starts as root unless told otherwise. The GPU's devices are open to every user.
+    assert.match(block('jellyfin'), /^    user:\s*"1000:1000"\s*$/m);
+    const asRoot = names.filter((name) => /^    user:\s*"?(?:root|0)\b/m.test(block(name)));
+    assert.deepEqual(asRoot, ['smartctl-exporter'], 'only the SMART exporter asks for root');
+  });
+
   await t.test('the embedder has an Ollama on the laptop\'s GPU that only the Hub can reach', () => {
     const ollama = block('ollama');
     // Pinned, and bumped in a PR like every other image.
@@ -367,6 +374,13 @@ test('Server README', async (t) => {
     assert.match(readme, /\/data\/media\/movies/);
     assert.match(readme, /\/data\/torrents/);
     assert.match(readme, /10%/);
+  });
+
+  await t.test('says which user Jellyfin runs as and that it cannot change the media', () => {
+    const jellyfin = (readme.match(/^Jellyfin runs as user 1000[^\n]*$/m) || [''])[0];
+    assert.ok(jellyfin, 'a paragraph must start with "Jellyfin runs as user 1000"');
+    assert.match(jellyfin, /read-only/);
+    assert.match(jellyfin, /settings folder/, 'the stack start re-owns it');
   });
 
   await t.test('records why nouveau is blocked first, and how to move to other hardware', () => {
