@@ -457,7 +457,8 @@ test('Server Renovate runs', async (t) => {
   const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
 
   await t.test('start every hour: one run opens the PRs, a later one merges them once CI is green', () => {
-    assert.match(timer, /^OnCalendar=hourly$/m);
+    // Not on the hour: the registries answer 429 in the first minute of every hour.
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:52:00$/m);
     assert.match(timer, /^Persistent=true$/m);
     assert.match(timer, /^WantedBy=timers\.target$/m);
     assert.match(unit, /^Type=oneshot$/m);
