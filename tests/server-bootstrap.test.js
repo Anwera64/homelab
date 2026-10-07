@@ -280,6 +280,17 @@ test('Server disk guard', async (t) => {
     assert.doesNotMatch(script, /docker compose/, 'the guard must not depend on the compose file resolving');
   });
 
+  await t.test('mounts a disk that was plugged back in, after checking its filesystem', () => {
+    // fstab only mounts at boot. Without this a dropout leaves the media services down until a reboot.
+    assert.match(script, /findmnt --fstab --evaluate -no SOURCE \/data/, 'the device comes from fstab, not .env');
+    assert.match(script, /^\s+returned\)$/m, 'a state for "the device is back but not mounted"');
+    const returned = script.slice(at(script, /^\s+returned\)$/m));
+    // A pulled disk has an unfinished journal: e2fsck replays it. 4 and up means errors it left alone.
+    assert.ok(at(returned, 'e2fsck -p') < at(returned, 'mount /data'), 'the check runs before the mount');
+    assert.match(returned, /-ge 4/, 'uncorrected errors keep the disk unmounted');
+    assert.match(returned, /needs a manual check/);
+  });
+
   await t.test('watches in a loop and only acts on a change', () => {
     assert.match(script, /--once\)/, 'bootstrap.sh runs a single pass');
     assert.match(script, /while true; do/);
@@ -550,5 +561,38 @@ test('Server scripts are safe to run from a Windows checkout', async (t) => {
       const shellcheck = spawnSync('shellcheck', ['-s', 'bash', '-'], { input: source, encoding: 'utf8' });
       if (!shellcheck.error) assert.equal(shellcheck.status, 0, `${file}: ${shellcheck.stdout}`);
     }
+  });
+});
+
+test('Server disk health checks', async (t) => {
+  const script = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+  const readme = read(path.join(SERVER_DIR, 'README.md'));
+
+  await t.test('installs smartmontools and schedules a short self-test every week', () => {
+    assert.match(script, /apt-get install -y -q .*\bsmartmontools\b/);
+    const conf = (script.match(/write_if_changed \/etc\/smartd\.conf <<'EOF'\n([\s\S]*?)\nEOF/) || ['', ''])[1];
+    // Sundays at 03:00. DEVICESCAN covers the SSD and the media disk without naming either.
+    assert.match(conf, /^DEVICESCAN .*-s S\/\.\.\/\.\.\/7\/03( |$)/m);
+    assert.match(conf, /-d removable/, 'smartd must keep running while the USB disk is unplugged');
+    // The extended test reads the whole surface: 12 hours at over 60 C on this disk.
+    assert.doesNotMatch(conf, /L\//, 'no scheduled extended self-test');
+    // Debian's unit is smartmontools; "smartd" is an alias, and systemctl refuses to enable an alias.
+    assert.match(script, /systemctl restart smartmontools$/m);
+    assert.match(script, /systemctl enable -q smartmontools$/m);
+    assert.doesNotMatch(script, /systemctl \w+( -q)? smartd$/m);
+  });
+
+  await t.test('keeps the disks\' serial numbers out of the repo', () => {
+    for (const file of ['bootstrap.sh', 'system/server-media.sh', 'README.md']) {
+      assert.doesNotMatch(read(path.join(SERVER_DIR, file)), /usb-WD_|by-id\//, `${file} must not name a disk by its ID`);
+    }
+  });
+
+  await t.test('the README says what happens after a dropout and how to read the self-tests', () => {
+    const disk = (readme.match(/## Media disk\n([\s\S]*?)(?=\n## )/) || ['', ''])[1];
+    assert.match(disk, /plugged back in/);
+    assert.match(disk, /checks the filesystem/);
+    assert.match(disk, /smartctl -l selftest/);
+    assert.match(disk, /Sunday/);
   });
 });

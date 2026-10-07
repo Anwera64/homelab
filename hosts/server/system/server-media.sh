@@ -5,6 +5,7 @@
 #
 #   disk present  -> start the media services that exist
 #   disk gone     -> stop them, and release the dead mount
+#   disk returned -> check its filesystem and mount it; "present" follows
 #
 # It never creates a container: bootstrap.sh decides what runs, the guard only
 # pauses and resumes it. Runs as a service; --once does a single pass.
@@ -18,12 +19,23 @@ INTERVAL=15
 
 log() { echo "disk guard: $*"; }
 
+# The device fstab names for /data, or nothing while it is unplugged. fstab, not
+# .env, for the same reason as plain docker above.
+fstab_device() {
+  findmnt --fstab --evaluate -no SOURCE /data 2>/dev/null || true
+}
+
 # present: mounted and its device is still there. dead: a USB disk that dropped
-# out leaves the mount behind, so the mount alone proves nothing.
+# out leaves the mount behind, so the mount alone proves nothing. returned: the
+# device is back but nothing mounted it, because fstab only mounts at boot.
 disk_state() {
   local source
   if ! mountpoint -q /data; then
-    echo absent
+    if [ -b "$(fstab_device)" ]; then
+      echo returned
+    else
+      echo absent
+    fi
     return
   fi
   source="$(findmnt -no SOURCE /data)"
@@ -48,6 +60,17 @@ apply() {
     absent)
       log "no media disk: the media services stay stopped"
       docker stop "${MEDIA_SERVICES[@]}" >/dev/null 2>&1 || true
+      ;;
+    returned)
+      log "media disk is back: checking its filesystem"
+      # A pulled disk has an unfinished journal, which e2fsck replays. 4 and up
+      # means errors it would not fix alone: those wait for a person.
+      local device status=0
+      device="$(fstab_device)"
+      e2fsck -p "$device" || status=$?
+      if [ "$status" -ge 4 ] || ! mount /data; then
+        log "the media disk needs a manual check (e2fsck exit $status): left unmounted"
+      fi
       ;;
   esac
 }

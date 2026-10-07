@@ -92,7 +92,7 @@ if ! grep -qE '^deb .* non-free( |$)' /etc/apt/sources.list; then
 fi
 apt-get update -q
 apt-get full-upgrade -y -q
-apt-get install -y -q git curl ca-certificates gnupg jq rsync rfkill iptables nftables unattended-upgrades
+apt-get install -y -q git curl ca-certificates gnupg jq rsync rfkill iptables nftables unattended-upgrades smartmontools
 
 step "Unattended upgrades (Debian security and Docker), rebooting at 05:00 when needed"
 AUTO_UPGRADES=/etc/apt/apt.conf.d/20auto-upgrades
@@ -220,6 +220,19 @@ if mountpoint -q /data; then
   # TRaSH layout; the apps run as 1000:1000.
   install -d -o 1000 -g 1000 /data/media /data/media/movies /data/media/tv /data/torrents
 fi
+
+step "Disk health: a short self-test every Sunday at 03:00"
+# Every disk smartd finds, so neither is named here. "removable" keeps smartd
+# running while the media disk is unplugged. No extended test: it reads the
+# whole surface, 12 hours on the media disk.
+if write_if_changed /etc/smartd.conf <<'EOF'
+DEVICESCAN -d removable -n standby -a -s S/../../7/03 -m root -M exec /usr/share/smartmontools/smartd-runner
+EOF
+then
+  systemctl restart smartmontools
+fi
+# Debian's unit name; "smartd" is an alias, which systemctl refuses to enable.
+systemctl enable -q smartmontools
 
 step "Disk guard: media services run only while the disk is there"
 install_unit server-media.service
