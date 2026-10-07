@@ -15,6 +15,8 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | --- | --- |
 | The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the chat model and the stack's own Ollama for embeddings; the bootstrap script pulls `bge-m3` when it is missing. |
 | Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
+| Metrics (Docker) | Prometheus keeps a year of the machine's own numbers. Three exporters report them: the node exporter (CPU, memory, disks, network, temperatures, battery), the SMART exporter (disk health and the media disk's temperature) and the GPU exporter (the GTX 1660 Ti, through nvidia-smi). None of the four has a login, so each publishes no port: only Grafana and Prometheus inside the stack reach them. |
+| Host metrics (systemd timer) | Once every minute, `server-metrics.sh` writes down what no exporter reports: when unattended upgrades last ran, whether the media disk is mounted, whether a reboot is waiting, and each disk's latest self-test. The nightly update writes when it ran and when it last applied something. The node exporter reads both from `/var/lib/node_exporter/textfile`. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
 | Disk guard | Stops the media services while the media disk is unplugged. When it is plugged back in, checks the filesystem, mounts it and starts them again. |
 | smartd | Runs a short self-test on both disks every Sunday at 03:00. |
@@ -166,6 +168,32 @@ journalctl -u smartd                 # what smartd noticed
 ```
 
 There is no scheduled extended test: it reads the whole surface and takes about 12 hours on this disk. Start one by hand with `sudo smartctl -t long /dev/sda` when in doubt.
+
+## The server dashboard
+
+It is in Grafana (https://grafana.spicy-llama.duckdns.org), named "Server", and opens on the last 7 days. Averages and maximums follow the period picked at the top right. It has six sections: Power, Temperatures, Load, Activity, Disks and Updates.
+
+| Section | What it shows |
+| --- | --- |
+| Power | Uptime, mains on or off, battery charge. |
+| Temperatures | CPU, GPU, media disk and SSD as gauges, with the average and maximum under each. |
+| Load | Average CPU, memory, GPU load and GPU memory use, and graphs over time. |
+| Activity | Network traffic and disk reads and writes. |
+| Disks | SMART verdict, reallocated and pending sectors, last self-test, SSD wear, whether the media disk is mounted, free space. |
+| Updates | When the nightly update last ran and last applied something, when unattended upgrades last ran, whether a reboot is waiting. |
+
+The gauge colours come from limits read from the hardware. The media disk turns amber at 55 °C and red at 60 °C. WD gives 65 °C as its maximum operating temperature.
+
+The dashboard is the file `config/grafana/dashboards/server.json` in the repo. It can be changed and saved in Grafana. The next change to the file replaces it, so a change worth keeping goes back into the file. Grafana looks at the folder every 30 seconds, so a merged change shows up without a restart.
+
+The host metrics timer and its folder are installed by the bootstrap script (`sudo hosts/server/bootstrap.sh`). Until it has run, the unattended upgrades and reboot tiles, the "mounted" tile and the self-test column stay empty; the nightly update's tiles fill in after its first run at 04:00. The self-test column also stays empty until the first Sunday self-test.
+
+When a panel is empty, look at Prometheus' log and at its own target list:
+
+```sh
+docker logs prometheus
+docker exec prometheus wget -qO- localhost:9090/api/v1/targets
+```
 
 ## Battery
 

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Host metrics. The numbers about this machine that no exporter reports, left
+# as files for the node exporter (the server dashboard's Disks and Updates
+# sections):
+#
+#   server_host.prom   when unattended upgrades last ran, whether the media disk
+#                      is mounted, whether a reboot is waiting
+#   server_smart.prom  each disk's latest self-test: passed or not, and the
+#                      disk's power-on hours when it ran
+#
+# Runs every minute from server-metrics.timer, as root (smartctl needs it).
+# ==============================================================================
+set -euo pipefail
+
+TEXTFILE_DIR="${SERVER_TEXTFILE_DIR:-/var/lib/node_exporter/textfile}"
+APT_STAMP="${SERVER_APT_STAMP:-/var/lib/apt/periodic/unattended-upgrades-stamp}"
+REBOOT_FLAG="${SERVER_REBOOT_FLAG:-/run/reboot-required}"
+SMART_PROM="$TEXTFILE_DIR/server_smart.prom"
+
+# Writes stdin to $1. Written beside the file and moved over it, so the exporter
+# never reads half of one. 644: the exporter does not run as root.
+write_prom() {
+  local tmp
+  tmp="$(mktemp "$1.XXXXXX")"
+  cat > "$tmp"
+  chmod 644 "$tmp"
+  mv "$tmp" "$1"
+}
+
+flag() { if "$@"; then echo 1; else echo 0; fi; }
+
+mkdir -p "$TEXTFILE_DIR"
+
+{
+  # apt touches the stamp after each unattended-upgrades run.
+  [ ! -e "$APT_STAMP" ] || echo "server_unattended_upgrade_last_run_timestamp_seconds $(stat -c %Y "$APT_STAMP")"
+  echo "server_media_disk_mounted $(flag mountpoint -q /data)"
+  echo "server_reboot_required $(flag test -e "$REBOOT_FLAG")"
+} | write_prom "$TEXTFILE_DIR/server_host.prom"
+
+# The latest self-test of one disk, as "passed hours", or nothing when it has
+# never run one. ATA disks say passed or not; NVMe gives a result code, 0 for passed.
+selftest() {
+  jq -r '
+    (.ata_smart_self_test_log.standard.table[0] // empty | "\(if .status.passed then 1 else 0 end) \(.lifetime_hours)"),
+    (.nvme_self_test_log.table[0] // empty | "\(if .self_test_result.value == 0 then 1 else 0 end) \(.power_on_hours)")
+  ' | head -1
+}
+
+{
+  # "sda", "nvme0": the names the SMART exporter gives the disks.
+  for device in $(smartctl --scan | awk '{print $1}'); do
+    name="${device#/dev/}"
+    # -n standby: a sleeping disk is left asleep, as smartd leaves it. smartctl's
+    # exit status is a set of bits; 2 is "asleep, or could not be opened".
+    status=0
+    json="$(smartctl -n standby -l selftest -j "$device")" || status=$?
+    read -r passed hours < <(selftest <<<"$json" 2>/dev/null; echo) || true
+    if [ -n "$passed" ]; then
+      echo "server_smart_selftest_passed{device=\"$name\"} $passed"
+      echo "server_smart_selftest_power_on_hours{device=\"$name\"} $hours"
+    elif (( status & 2 )); then
+      # Its last answer stands.
+      grep -F "{device=\"$name\"}" "$SMART_PROM" 2>/dev/null || true
+    fi
+  done
+} | write_prom "$SMART_PROM"

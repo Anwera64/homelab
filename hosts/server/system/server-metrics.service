@@ -1,0 +1,6 @@
+[Unit]
+Description=Host metrics: the numbers no exporter reports, for the server dashboard
+
+[Service]
+Type=oneshot
+ExecStart=@SERVER_DIR@/system/server-metrics.sh

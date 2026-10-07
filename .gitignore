@@ -18,6 +18,8 @@ config/ollama/
 !config/alloy/**
 !config/grafana/
 !config/grafana/**
+!config/prometheus/
+!config/prometheus/**
 config/open-webui/*
 !config/open-webui/filters/
 !config/open-webui/filters/**
