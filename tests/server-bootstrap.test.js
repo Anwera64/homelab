@@ -10,7 +10,7 @@ const SERVER_DIR = path.join(ROOT_DIR, 'hosts/server');
 const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
 const SCRIPTS = [
   'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
-  'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh',
+  'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh', 'system/server-metrics.sh',
 ];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
@@ -394,17 +394,66 @@ test('Server nightly update', async (t) => {
     git(seed, 'commit', '-qm', 'first');
     git(seed, 'push', '-q', 'origin', 'HEAD:master');
     git(root, 'clone', '-q', origin, checkout);
+    const textfile = path.join(root, 'textfile');
     const run = () => spawnSync(path.join(checkout, 'hosts/server/system/server-update.sh'), [], {
-      encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+      encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_TEXTFILE_DIR: textfile },
     });
     const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    // What the run left for the node exporter, as { metric: value }.
+    const prom = () => {
+      const file = path.join(textfile, 'server_update.prom');
+      const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
+      return Object.fromEntries(lines.filter((l) => l && !l.startsWith('#')).map((l) => l.split(' ')).map(([k, v]) => [k, Number(v)]));
+    };
     const upstream = (file, content) => {
       fs.writeFileSync(path.join(seed, file), content);
       git(seed, 'commit', '-qam', `change ${file}`);
       git(seed, 'push', '-q', 'origin', 'HEAD:master');
     };
-    return { root, seed, checkout, run, calls, upstream };
+    return { root, seed, checkout, run, calls, upstream, prom, textfile };
   };
+
+  await t.test('leaves its numbers where the node exporter reads them', () => {
+    assert.match(script, /^TEXTFILE_DIR="\$\{SERVER_TEXTFILE_DIR:-\/var\/lib\/node_exporter\/textfile\}"$/m);
+    // The exporter does not run as root, and must never read a half-written file.
+    assert.match(script, /chmod 644/);
+    assert.match(script, /mv "\$tmp" "\$PROM"/);
+  });
+
+  await t.test('a quiet night records that it ran, and no update', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, prom } = setup();
+    const started = Math.floor(Date.now() / 1000);
+    assert.equal(run().status, 0);
+    assert.ok(prom().server_update_last_run_timestamp_seconds >= started);
+    assert.equal(prom().server_update_last_run_success, 1);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, undefined, 'nothing was applied yet');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('an applied bump records when, and later quiet nights keep that time', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, prom, upstream, textfile } = setup();
+    const started = Math.floor(Date.now() / 1000);
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    assert.equal(run().status, 0);
+    const applied = prom().server_update_last_applied_timestamp_seconds;
+    assert.ok(applied >= started);
+    assert.equal(run().status, 0);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, applied);
+    // The exporter runs as nobody; only finished .prom files are in the folder.
+    assert.deepEqual(fs.readdirSync(textfile), ['server_update.prom']);
+    assert.equal(fs.statSync(path.join(textfile, 'server_update.prom')).mode & 0o777, 0o644);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('a refused run is recorded as failed', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, prom, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'hosts/server/bootstrap.sh'), '#!/bin/sh\necho edited by hand\n');
+    assert.notEqual(run().status, 0);
+    assert.equal(prom().server_update_last_run_success, 0);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, undefined);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
 
   await t.test('does nothing when nothing was merged', { skip: !canRun && 'needs bash and git' }, () => {
     const { root, run, calls } = setup();
@@ -457,6 +506,114 @@ test('Server nightly update', async (t) => {
     assert.notEqual(result.status, 0);
     assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
     assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server host metrics', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-metrics.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-metrics.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-metrics.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('run every minute, from a timer', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:00$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-metrics\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap creates the folder the exporter reads, and installs the timer', () => {
+    assert.match(bootstrap, /install -d -m 0755 \/var\/lib\/node_exporter\/textfile/);
+    assert.match(bootstrap, /^place_unit server-metrics\.service/m);
+    assert.match(bootstrap, /^install_unit server-metrics\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-metrics\.service/);
+  });
+
+  await t.test('never wakes a sleeping disk to ask about its self-test', () => {
+    assert.match(script, /smartctl -n standby -l selftest -j/);
+  });
+
+  // Behaviour, in a throwaway folder. mountpoint and smartctl are stubs on PATH.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'command -v jq']).status;
+  const ATA_PASSED = JSON.stringify({ ata_smart_self_test_log: { standard: { table: [
+    { type: { string: 'Short offline' }, status: { string: 'Completed without error', passed: true }, lifetime_hours: 20 },
+    { type: { string: 'Short offline' }, status: { string: 'Completed: read failure', passed: false }, lifetime_hours: 3 },
+  ] } } });
+  const NVME_FAILED = JSON.stringify({ nvme_self_test_log: { table: [
+    { self_test_code: { value: 1 }, self_test_result: { value: 7, string: 'Completed: failed segments' }, power_on_hours: 2107 },
+  ] } });
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {} } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
+    const bin = path.join(root, 'bin');
+    const textfile = path.join(root, 'textfile');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
+    // --scan lists the devices; a device with no answer here is asleep (exit 2).
+    const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
+    const scan = Object.keys(selftests).map((dev) => `/dev/${dev} -d x # ${dev}`).join('\n');
+    fs.writeFileSync(path.join(bin, 'smartctl'), `#!/bin/sh\nif [ "$1" = "--scan" ]; then cat <<'SCAN'\n${scan}\nSCAN\nexit 0; fi\nfor last; do :; done\ncase "$last" in\n${cases}\n  *) exit 2 ;;\nesac\n`, { mode: 0o755 });
+    const stampFile = path.join(root, 'unattended-upgrades-stamp');
+    if (stamp) {
+      fs.writeFileSync(stampFile, '');
+      fs.utimesSync(stampFile, 1790000000, 1790000000);
+    }
+    const rebootFlag = path.join(root, 'reboot-required');
+    if (reboot) fs.writeFileSync(rebootFlag, '');
+    const run = () => spawnSync(path.join(SYSTEM_DIR, 'server-metrics.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        SERVER_TEXTFILE_DIR: textfile, SERVER_APT_STAMP: stampFile, SERVER_REBOOT_FLAG: rebootFlag,
+      },
+    });
+    const prom = (name) => (fs.existsSync(path.join(textfile, name)) ? fs.readFileSync(path.join(textfile, name), 'utf8') : '');
+    return { root, bin, textfile, run, prom };
+  };
+
+  await t.test('say when unattended upgrades last ran, whether the disk is mounted and a reboot is waiting', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ mounted: true, reboot: false });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const host = prom('server_host.prom');
+    assert.match(host, /^server_unattended_upgrade_last_run_timestamp_seconds 1790000000$/m);
+    assert.match(host, /^server_media_disk_mounted 1$/m);
+    assert.match(host, /^server_reboot_required 0$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_host.prom')).mode & 0o777, 0o644);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say so when the disk is gone and a reboot is waiting, and nothing about upgrades that never ran', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup({ mounted: false, stamp: false, reboot: true });
+    assert.equal(run().status, 0);
+    const host = prom('server_host.prom');
+    assert.match(host, /^server_media_disk_mounted 0$/m);
+    assert.match(host, /^server_reboot_required 1$/m);
+    assert.doesNotMatch(host, /server_unattended_upgrade/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('report each disk\'s latest self-test under the name the SMART exporter uses', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup({ selftests: { sda: ATA_PASSED, nvme0: NVME_FAILED } });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const smart = prom('server_smart.prom');
+    assert.match(smart, /^server_smart_selftest_passed\{device="sda"\} 1$/m);
+    assert.match(smart, /^server_smart_selftest_power_on_hours\{device="sda"\} 20$/m);
+    assert.match(smart, /^server_smart_selftest_passed\{device="nvme0"\} 0$/m);
+    assert.match(smart, /^server_smart_selftest_power_on_hours\{device="nvme0"\} 2107$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('keep a sleeping disk\'s last answer, and say nothing of a disk never tested', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, bin, run, prom } = setup({ selftests: { sda: ATA_PASSED, nvme0: '{}' } });
+    assert.equal(run().status, 0);
+    assert.doesNotMatch(prom('server_smart.prom'), /nvme0/);
+    // The disk goes to sleep: smartctl answers 2 and prints nothing.
+    fs.writeFileSync(path.join(bin, 'smartctl'), '#!/bin/sh\nif [ "$1" = "--scan" ]; then echo "/dev/sda -d x # sda"; exit 0; fi\nexit 2\n', { mode: 0o755 });
+    assert.equal(run().status, 0);
+    assert.match(prom('server_smart.prom'), /^server_smart_selftest_passed\{device="sda"\} 1$/m);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

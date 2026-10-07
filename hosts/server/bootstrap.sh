@@ -246,6 +246,12 @@ step "Renovate every hour: the version bump PRs (skipped until RENOVATE_TOKEN is
 place_unit server-renovate.service && systemctl daemon-reload
 install_unit server-renovate.timer
 
+step "Host metrics every minute: what no exporter reports, for the server dashboard"
+# The node exporter reads this folder; server-update.sh writes there too.
+install -d -m 0755 /var/lib/node_exporter/textfile
+place_unit server-metrics.service && systemctl daemon-reload
+install_unit server-metrics.timer
+
 step "App settings folders"
 # Created here, owned by the apps' user: Docker would create a missing one as
 # root, and the apps that run as user 1000 could not write to it.
