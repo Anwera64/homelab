@@ -176,6 +176,30 @@ test('Root README matches the repository', async (t) => {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
   });
+  await t.test('the uptime checks and their alerts are on the server in the Hosts table, the graph and the endpoints', () => {
+    const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m)[0];
+    for (const service of ['Uptime Kuma', 'ntfy']) {
+      assert.ok(serverRow.includes(service), `the Server row must name ${service}`);
+    }
+    assert.match(readme, /^\| \*\*Uptime Kuma\*\* \| Server \| `https:\/\/uptime\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*ntfy\*\* \| Server \| `https:\/\/ntfy\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
+
+    const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
+    const server = graph.match(/subgraph Server \[[^\]]*\]\n([\s\S]*?)\n    end/)[1];
+    const uptime = server.match(/subgraph Uptime \[Uptime and alerts\]\n([\s\S]*?)\n\s*end/);
+    assert.ok(uptime, 'the Uptime subgraph must be inside the server');
+    assert.match(uptime[1], /KUMA\[[^\]]*Uptime Kuma[^\]]*\] -->\|alerts\| NTFY\[[^\]]*ntfy[^\]]*\]/);
+    assert.match(graph, /CADDY -->\|published LAN ports\|[^\n]*\bKUMA\b[^\n]*\bNTFY\b/, 'Caddy must route to both in the graph');
+    // What it watches outside the server; the checks inside the stack get no edges.
+    assert.match(graph, /KUMA -\.->\|HTTP checks\| PIHOLE & OLLAMA/);
+    assert.match(graph, /NTFY -\.->\|push\| CLIENTS & REMOTE/, 'ntfy must push to the phones');
+
+    // Both stop with the server, so its own outage is the one nobody is told about.
+    assert.match(readme, /\*\*Server off:\*\*[^\n]*no alert/);
+    const thanks = readme.match(/## 📄 Acknowledgments\n([\s\S]*)$/)[1];
+    assert.match(thanks, /\[Uptime Kuma\]\(https:\/\/github\.com\/louislam\/uptime-kuma\)/);
+    assert.match(thanks, /\[ntfy\]\(https:\/\/ntfy\.sh\/?\)/);
+  });
   await t.test('says how to start the dashboard image renderer, which does not run by itself', () => {
     assert.ok(readme.includes('docker compose --profile render up -d grafana-renderer'), 'README must show how to start the renderer');
     assert.ok(readme.includes('docker compose --profile render stop grafana-renderer'), 'README must show how to stop it');

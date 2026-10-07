@@ -575,7 +575,54 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # ==============================================================================
+  # 13. Uptime and alerts (Uptime Kuma + ntfy)
+  # Uptime Kuma asks each service whether it answers, keeps the history and sends
+  # an alert through ntfy, which pushes it to the phones. Monitors and the ntfy
+  # notification are set in Kuma's web UI; ntfy's users are made with its CLI
+  # (README.md). Both stop with this machine: a server outage sends no alert.
+  # ==============================================================================
+  uptime-kuma:
+    image: louislam/uptime-kuma:2.5.5
+    container_name: uptime-kuma
+    ports:
+      - 3001:3001   # LAN, for the Pi's Caddy (uptime.spicy-llama.duckdns.org)
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - uptime_kuma_data:/app/data
+    depends_on:
+      - ntfy
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+
+  ntfy:
+    image: binwiederhier/ntfy:v2.28.0
+    container_name: ntfy
+    command: serve
+    ports:
+      - 2586:80   # LAN, for the Pi's Caddy (ntfy.spicy-llama.duckdns.org)
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - NTFY_BASE_URL=https://ntfy.${DOMAIN_NAME:-spicy-llama.duckdns.org}
+      - NTFY_BEHIND_PROXY=true
+      # Nobody publishes or subscribes without a user or a token.
+      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      - NTFY_ENABLE_LOGIN=true
+      - NTFY_AUTH_FILE=/var/lib/ntfy/user.db
+      - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+    mem_limit: 128m
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
+  uptime_kuma_data:
+    name: uptime_kuma_data
+  ntfy_data:
+    name: ntfy_data
   prometheus_data:
     name: prometheus_data
   household_hub_data:

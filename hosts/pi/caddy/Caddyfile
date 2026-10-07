@@ -96,6 +96,17 @@
         reverse_proxy 192.168.1.30:3002
     }
 
+    # On the server: uptime checks, and the alerts they push to the phones
+    @uptime host uptime.spicy-llama.duckdns.org
+    handle @uptime {
+        reverse_proxy 192.168.1.30:3001
+    }
+
+    @ntfy host ntfy.spicy-llama.duckdns.org
+    handle @ntfy {
+        reverse_proxy 192.168.1.30:2586
+    }
+
     # The app's logs, to Alloy on the server. The hub is asked whose token it is first;
     # it never sees the logs themselves.
     @telemetry host telemetry.spicy-llama.duckdns.org

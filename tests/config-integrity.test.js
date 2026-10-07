@@ -69,7 +69,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
     // Every port in the service table is published by the server.
     for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
-      const owner = { qbit: 'gluetun', stat: 'jellystat' }[service] || service;
+      const owner = { qbit: 'gluetun', stat: 'jellystat', uptime: 'uptime-kuma' }[service] || service;
       assert.match(composePorts(owner, serverComposeContent), new RegExp(`-\\s*${port}:`), `the server must publish ${port}`);
     }
   });
@@ -358,7 +358,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
       Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, Cleanuparr: 11011,
-      Grafana: 3002,
+      Grafana: 3002, 'Uptime Kuma': 3001,
     };
     // No name and no port to open: FlareSolverr has no card.
     assert.doesNotMatch(servicesYamlContent, /flaresolverr/i);

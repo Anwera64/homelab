@@ -195,3 +195,9 @@
         description: Container Logs (Loki, 30 days)
         siteMonitor: http://192.168.1.30:3002
 
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: https://uptime.spicy-llama.duckdns.org
+        description: Uptime Checks & Alerts (ntfy)
+        siteMonitor: http://192.168.1.30:3001
+

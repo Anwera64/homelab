@@ -42,9 +42,9 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
   await t.test('runs every desktop service, with an Ollama of its own for the embedder only', () => {
     const expected = [
       'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
-      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'node-exporter', 'nvidia-gpu-exporter', 'ollama',
+      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'node-exporter', 'ntfy', 'nvidia-gpu-exporter', 'ollama',
       'prometheus', 'prowlarr', 'qbittorrent', 'radarr', 'recyclarr', 'renovate', 'searxng', 'seerr', 'smartctl-exporter',
-      'sonarr',
+      'sonarr', 'uptime-kuma',
     ];
     assert.deepEqual([...names].sort(), expected);
     // The chat model stays on the desktop's RTX 5080, with a log shipper beside it.
@@ -60,6 +60,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
       gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
       grafana: ['3002:3000'], 'household-hub': ['3051:3050'], alloy: ['4318:4318'],
+      'uptime-kuma': ['3001:3001'], ntfy: ['2586:80'],
     };
     // FlareSolverr has no login: Prowlarr reaches it inside the stack, and nothing else does.
     assert.doesNotMatch(block('flaresolverr'), /^    ports:/m, 'FlareSolverr must publish no port');
@@ -302,6 +303,45 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     }
   });
 
+  await t.test('Uptime Kuma checks the services over the stack\'s network, and outlives the media disk', () => {
+    const kuma = block('uptime-kuma');
+    assert.match(imageOf(kuma) || '', /^louislam\/uptime-kuma:\d+\.\d+\.\d+$/, 'pinned to a release');
+    // Its database is SQLite: a local volume, as its install notes ask.
+    assert.ok(kuma.includes('- uptime_kuma_data:/app/data'));
+    assert.match(compose, /^volumes:\s*\n[\s\S]*?^  uptime_kuma_data:\s*\n\s+name:\s*uptime_kuma_data\s*$/m);
+    assert.match(kuma, /-\s*TZ=\$\{TZ/);
+    assert.match(kuma, /^    mem_limit:\s*512m\s*$/m);
+    assert.doesNotMatch(kuma, /profiles:/, 'it does not wait for the media disk');
+    // It asks each service over HTTP. The socket would show it every container's secrets.
+    assert.doesNotMatch(kuma, /docker\.sock/);
+    // Start order only: the alerts go out through ntfy.
+    assert.deepEqual(dependsOn(kuma), ['ntfy']);
+    assert.doesNotMatch(kuma, /condition:/);
+  });
+
+  await t.test('ntfy delivers the alerts, and answers nobody without a login', () => {
+    const ntfy = block('ntfy');
+    assert.match(imageOf(ntfy) || '', /^binwiederhier\/ntfy:v\d+\.\d+\.\d+$/, 'pinned to a release');
+    assert.match(ntfy, /^    command:\s*serve\s*$/m);
+    for (const line of [
+      // Anonymous visitors can neither publish nor subscribe.
+      '- NTFY_AUTH_DEFAULT_ACCESS=deny-all',
+      '- NTFY_ENABLE_LOGIN=true',
+      // Users, tokens and undelivered messages survive a rebuild.
+      '- NTFY_AUTH_FILE=/var/lib/ntfy/user.db',
+      '- NTFY_CACHE_FILE=/var/lib/ntfy/cache.db',
+      // The phones reach it through the Pi's Caddy.
+      '- NTFY_BASE_URL=https://ntfy.${DOMAIN_NAME:-spicy-llama.duckdns.org}',
+      '- NTFY_BEHIND_PROXY=true',
+    ]) {
+      assert.ok(ntfy.includes(line), `ntfy must set ${line}`);
+    }
+    assert.ok(ntfy.includes('- ntfy_data:/var/lib/ntfy'));
+    assert.match(compose, /^volumes:\s*\n[\s\S]*?^  ntfy_data:\s*\n\s+name:\s*ntfy_data\s*$/m);
+    assert.match(ntfy, /^    mem_limit:\s*128m\s*$/m);
+    assert.doesNotMatch(ntfy, /profiles:/, 'it does not wait for the media disk');
+  });
+
   await t.test('runs no ingress of its own: the Pi terminates HTTPS and routes the tailnet', () => {
     assert.doesNotMatch(compose, /^\s*(caddy|homepage|tailscale):\s*$/m);
     assert.doesNotMatch(compose, /DUCKDNS_TOKEN|HOMEPAGE_VAR_/);
@@ -447,6 +487,44 @@ test('Server README', async (t) => {
     assert.match(readme, /65 °C/);
     // None of the four has a login, so none is reachable from the LAN.
     assert.match(readme, /publish(es)? no port/);
+  });
+
+  await t.test('says how to set up the uptime checks and their alerts, and what they cannot report', () => {
+    const live = readme.match(/## What is live\n([\s\S]*?)(?=\n## )/)[1];
+    for (const service of ['Uptime Kuma', 'ntfy']) {
+      assert.ok(live.includes(service), `${service} is live on the server`);
+    }
+    assert.match(readme, /^\| Uptime and alerts \(Docker\) \|.*Uptime Kuma.*ntfy/m);
+
+    const section = readme.match(/^## Uptime and alerts\n([\s\S]*?)(?=\n## |(?![\s\S]))/m);
+    assert.ok(section, 'the README must have an Uptime and alerts section');
+    for (const needle of [
+      'https://uptime.spicy-llama.duckdns.org', 'https://ntfy.spicy-llama.duckdns.org',
+      // The first visitor creates the admin account; the database stays in the volume.
+      'SQLite',
+      // ntfy's users are made with its CLI: an admin for the phones, a publisher for Kuma.
+      'ntfy user add --role=admin', 'ntfy user add kuma', 'ntfy access kuma', 'write-only', 'ntfy token add kuma',
+      // Kuma publishes inside the stack and checks the services by container name.
+      'http://ntfy', 'http://household-hub:3050/health', 'http://gluetun:8080', 'http://ntfy/v1/health',
+      // Outside the stack: lemonpi's DNS and Caddy, and the desktop's Ollama.
+      '192.168.1.35', 'http://192.168.1.20:11434',
+    ]) {
+      assert.ok(section[1].includes(needle), `Uptime and alerts must mention ${needle}`);
+    }
+    // The limits: both stop with the server, and away from home ntfy is reached over Tailscale.
+    assert.match(section[1], /no alert/);
+    assert.match(section[1], /Tailscale/);
+
+    const logins = readme.match(/## App logins\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    const items = logins.split('\n').filter((line) => line.startsWith('- [ ] '));
+    for (const app of ['Uptime Kuma', 'ntfy']) {
+      assert.ok(items.some((item) => item.includes(app)), `the checklist must have an open item for ${app}`);
+    }
+    // Their settings are in volumes: a move to other hardware takes them along.
+    const moving = readme.match(/## Moving to other hardware\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    for (const volume of ['uptime_kuma_data', 'ntfy_data']) {
+      assert.ok(moving.includes(volume), `Moving must name ${volume}`);
+    }
   });
 
   await t.test('documents the one-port rule that lets the desktop ship its logs', () => {
