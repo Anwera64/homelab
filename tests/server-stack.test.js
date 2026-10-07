@@ -511,6 +511,10 @@ test('Server README', async (t) => {
     ]) {
       assert.ok(section[1].includes(needle), `Uptime and alerts must mention ${needle}`);
     }
+    // The nightly update restarts the stack at 04:00 and a reboot can follow at 05:00:
+    // neither is an outage, so neither may reach the phones.
+    assert.match(section[1], /maintenance window[^\n]*04:00[^\n]*05:15/);
+    assert.match(section[1], /Retries[^\n]*3/);
     // The limits: both stop with the server, and away from home ntfy is reached over Tailscale.
     assert.match(section[1], /no alert/);
     assert.match(section[1], /Tailscale/);

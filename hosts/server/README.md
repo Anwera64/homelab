@@ -245,6 +245,13 @@ The monitors are added by hand in the Uptime Kuma page. Kuma reaches the stack's
 
 The desktop is off by design at times, so leave the notification off on the Ollama monitor: it is there for the history. The media services stop while the media disk is unplugged, so their monitors alert then, which is the point.
 
+### Restarts that are not outages
+
+The nightly update restarts the stack at 04:00 when a bump was merged, and a reboot for security updates can follow at 05:00. Two settings keep these from reaching the phones:
+
+- Under Maintenance, add a recurring maintenance window every day from 04:00 to 05:15, for all monitors. No alert is sent during it, so a real outage in that time alerts only once the window ends.
+- On each monitor, set Retries to 3. A service that is back within three checks is then never reported, at any hour.
+
 ### What it cannot report
 
 Uptime Kuma and ntfy stop with the server, so when the server itself is down no alert is sent. Homepage on lemonpi still shows the services as down. Away from home the phone reaches ntfy over Tailscale only, so an alert arrives when the phone is on the tailnet.
