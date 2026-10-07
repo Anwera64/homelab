@@ -544,7 +544,7 @@ test('Server host metrics', async (t) => {
   const NVME_FAILED = JSON.stringify({ nvme_self_test_log: { table: [
     { self_test_code: { value: 1 }, self_test_result: { value: 7, string: 'Completed: failed segments' }, power_on_hours: 2107 },
   ] } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {} } = {}) => {
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
@@ -561,11 +561,14 @@ test('Server host metrics', async (t) => {
     }
     const rebootFlag = path.join(root, 'reboot-required');
     if (reboot) fs.writeFileSync(rebootFlag, '');
+    const throttleFile = path.join(root, 'package_throttle_total_time_ms');
+    if (throttleMs !== null) fs.writeFileSync(throttleFile, `${throttleMs}\n`);
     const run = () => spawnSync(path.join(SYSTEM_DIR, 'server-metrics.sh'), [], {
       encoding: 'utf8',
       env: {
         ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         SERVER_TEXTFILE_DIR: textfile, SERVER_APT_STAMP: stampFile, SERVER_REBOOT_FLAG: rebootFlag,
+        SERVER_CPU_THROTTLE_FILE: throttleFile,
       },
     });
     const prom = (name) => (fs.existsSync(path.join(textfile, name)) ? fs.readFileSync(path.join(textfile, name), 'utf8') : '');
@@ -591,6 +594,23 @@ test('Server host metrics', async (t) => {
     assert.match(host, /^server_media_disk_mounted 0$/m);
     assert.match(host, /^server_reboot_required 1$/m);
     assert.doesNotMatch(host, /server_unattended_upgrade/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say how long the CPU has been slowed down for heat, in seconds', { skip: !canRun && 'needs bash and jq' }, () => {
+    // The kernel counts milliseconds since boot.
+    const { root, run, prom } = setup({ throttleMs: 304600 });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(prom('server_host.prom'), /^server_cpu_throttled_seconds_total 304\.600$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say nothing about throttling on a machine that does not count it', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup();
+    assert.equal(run().status, 0);
+    assert.doesNotMatch(prom('server_host.prom'), /server_cpu_throttled/);
+    assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
     fs.rmSync(root, { recursive: true, force: true });
   });
 

@@ -111,7 +111,7 @@ test('Server dashboard', async (t) => {
       'nvidia_smi_memory_total_bytes', 'nvidia_smi_power_draw_watts',
       'server_update_last_run_timestamp_seconds', 'server_update_last_run_success',
       'server_update_last_applied_timestamp_seconds', 'server_unattended_upgrade_last_run_timestamp_seconds',
-      'server_media_disk_mounted', 'server_reboot_required',
+      'server_media_disk_mounted', 'server_reboot_required', 'server_cpu_throttled_seconds_total',
       'server_smart_selftest_passed', 'server_smart_selftest_power_on_hours',
     ];
     const hostScripts = read(path.join(ROOT_DIR, 'hosts/server/system/server-update.sh')) + read(path.join(ROOT_DIR, 'hosts/server/system/server-metrics.sh'));
@@ -144,8 +144,62 @@ test('Server dashboard', async (t) => {
     }
   });
 
+  await t.test('shows how long the CPU was slowed down for heat, as bars across the section', () => {
+    const panel = titled('CPU throttling');
+    assert.equal(panel.type, 'timeseries');
+    assert.equal(section(panel), 'Temperatures');
+    assert.equal(panel.fieldConfig.defaults.custom.drawStyle, 'bars');
+    assert.equal(panel.fieldConfig.defaults.unit, 's');
+    // The script writes the counter once a minute: a shorter bar would have nothing to count.
+    assert.equal(panel.interval, '1m');
+    assert.deepEqual(exprs(panel), ['sum(increase(server_cpu_throttled_seconds_total{host="server"}[$__interval]))']);
+    // Full width, under the gauges and the graph, above the next section.
+    assert.equal(panel.gridPos.x, 0);
+    assert.equal(panel.gridPos.w, 24);
+    const above = drawn.filter((p) => section(p) === 'Temperatures' && p !== panel);
+    assert.equal(panel.gridPos.y, Math.max(...above.map((p) => p.gridPos.y + p.gridPos.h)));
+    const load = rows.find((row) => row.title === 'Load');
+    assert.equal(load.gridPos.y, panel.gridPos.y + panel.gridPos.h);
+  });
+
+  await t.test('draws each temperature as an average line inside a band from its lowest to its highest', () => {
+    const panel = titled('Temperatures');
+    assert.equal(panel.type, 'timeseries');
+    // The window follows the zoom, and is never shorter than a minute: the CPU's own
+    // sensor swings by 20 degrees from one reading to the next.
+    assert.equal(panel.interval, '1m');
+    const byLegend = Object.fromEntries(panel.targets.map((target) => [target.legendFormat, target.expr]));
+    assert.equal(panel.targets.length, 12);
+
+    // What the overrides add up to for one series, in order.
+    const matches = ({ id, options }, name) => (id === 'byName' ? options === name : id === 'byRegexp' && new RegExp(options.slice(1, -1)).test(name));
+    const settings = (name) => Object.fromEntries(panel.fieldConfig.overrides
+      .filter((override) => matches(override.matcher, name))
+      .flatMap((override) => override.properties.map((property) => [property.id, property.value])));
+
+    const colours = [];
+    for (const name of ['CPU', 'GPU', 'Media disk', 'SSD']) {
+      assert.match(byLegend[name], /^max\(avg_over_time\(.+\[\$__interval\]\)\)$/, `${name} is an average`);
+      assert.match(byLegend[`${name} min`], /^min\(min_over_time\(.+\[\$__interval\]\)\)$/);
+      assert.match(byLegend[`${name} max`], /^max\(max_over_time\(.+\[\$__interval\]\)\)$/);
+      // The band: the highest filled down to the lowest, neither drawn as a line nor named below the graph.
+      assert.equal(settings(`${name} max`)['custom.fillBelowTo'], `${name} min`);
+      assert.ok(settings(`${name} max`)['custom.fillOpacity'] > 0);
+      for (const edge of [`${name} min`, `${name} max`]) {
+        assert.equal(settings(edge)['custom.lineWidth'], 0);
+        assert.equal(settings(edge)['custom.hideFrom'].legend, true);
+        assert.deepEqual(settings(edge).color, settings(name).color, `${edge} has its line's colour`);
+      }
+      assert.equal(settings(name)['custom.hideFrom'], undefined);
+      assert.equal(settings(name).color.mode, 'fixed');
+      colours.push(settings(name).color.fixedColor);
+    }
+    assert.equal(new Set(colours).size, 4);
+  });
+
   await t.test('takes every average and maximum over the period picked at the top', () => {
-    const overTime = drawn.flatMap(exprs).filter((expr) => /(avg|max)_over_time/.test(expr));
+    // The graphs average over a step of the time axis; the numbers over the whole period.
+    const overTime = drawn.filter((p) => p.type !== 'timeseries').flatMap(exprs).filter((expr) => /(avg|max)_over_time/.test(expr));
     assert.ok(overTime.length >= 10);
     // A rate over the whole period reads low while the history is shorter than the period,
     // so usage is averaged from five-minute steps instead.
@@ -161,7 +215,7 @@ test('Server dashboard', async (t) => {
   await t.test('has a panel for every reading the issue asked for, in its section', () => {
     const expected = {
       Power: ['Uptime', 'Mains', 'Battery', 'Battery and mains'],
-      Temperatures: ['Temperatures'],
+      Temperatures: ['Temperatures', 'CPU throttling'],
       Load: ['CPU and memory', 'GPU load and power'],
       Activity: ['Network', 'Disk activity'],
       Disks: ['Disk health', 'Media disk', 'Free space', 'Free space left'],
