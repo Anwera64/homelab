@@ -229,9 +229,10 @@ if write_if_changed /etc/smartd.conf <<'EOF'
 DEVICESCAN -d removable -n standby -a -s S/../../7/03 -m root -M exec /usr/share/smartmontools/smartd-runner
 EOF
 then
-  systemctl restart smartd
+  systemctl restart smartmontools
 fi
-systemctl enable -q smartd
+# Debian's unit name; "smartd" is an alias, which systemctl refuses to enable.
+systemctl enable -q smartmontools
 
 step "Disk guard: media services run only while the disk is there"
 install_unit server-media.service

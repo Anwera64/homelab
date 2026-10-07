@@ -575,7 +575,10 @@ test('Server disk health checks', async (t) => {
     assert.match(conf, /-d removable/, 'smartd must keep running while the USB disk is unplugged');
     // The extended test reads the whole surface: 12 hours at over 60 C on this disk.
     assert.doesNotMatch(conf, /L\//, 'no scheduled extended self-test');
-    assert.match(script, /systemctl restart smartd/);
+    // Debian's unit is smartmontools; "smartd" is an alias, and systemctl refuses to enable an alias.
+    assert.match(script, /systemctl restart smartmontools$/m);
+    assert.match(script, /systemctl enable -q smartmontools$/m);
+    assert.doesNotMatch(script, /systemctl \w+( -q)? smartdb/);
   });
 
   await t.test('keeps the disks\' serial numbers out of the repo', () => {
