@@ -18,17 +18,17 @@ if [ $TEST_EXIT_CODE -ne 0 ]; then
 fi
 
 # 2. Validate Docker Compose Configuration
-echo "  [+] Validating docker-compose.yml configuration..."
+echo "  [+] Validating hosts/desktop/docker-compose.yml configuration..."
 if command -v docker >/dev/null 2>&1; then
-  ENV_FILE=".env"
+  ENV_FILE="hosts/desktop/.env"
   if [ ! -f "$ENV_FILE" ]; then
-    ENV_FILE=".env.example"
+    ENV_FILE="hosts/desktop/.env.example"
   fi
-  docker compose -f docker-compose.yml --env-file "$ENV_FILE" config -q
+  docker compose -f hosts/desktop/docker-compose.yml --env-file "$ENV_FILE" config -q
   COMPOSE_EXIT_CODE=$?
   if [ $COMPOSE_EXIT_CODE -ne 0 ]; then
     echo ""
-    echo "❌ [Pre-Commit FAILED] docker-compose.yml validation failed! Commit aborted."
+    echo "❌ [Pre-Commit FAILED] hosts/desktop/docker-compose.yml validation failed! Commit aborted."
     exit 1
   fi
 

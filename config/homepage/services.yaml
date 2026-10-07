@@ -195,6 +195,3 @@
         description: Container Logs (Loki, 30 days)
         siteMonitor: http://192.168.1.30:3002
 
-    - Watchtower:
-        icon: watchtower.png
-        description: Automated Image Updates on the desktop (Daily 4 AM)
