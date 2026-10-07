@@ -578,7 +578,7 @@ test('Server disk health checks', async (t) => {
     // Debian's unit is smartmontools; "smartd" is an alias, and systemctl refuses to enable an alias.
     assert.match(script, /systemctl restart smartmontools$/m);
     assert.match(script, /systemctl enable -q smartmontools$/m);
-    assert.doesNotMatch(script, /systemctl \w+( -q)? smartdb/);
+    assert.doesNotMatch(script, /systemctl \w+( -q)? smartd$/m);
   });
 
   await t.test('keeps the disks\' serial numbers out of the repo', () => {
