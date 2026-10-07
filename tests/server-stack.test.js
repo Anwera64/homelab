@@ -418,6 +418,23 @@ test('Server README', async (t) => {
     assert.doesNotMatch(maintainerr, /answers the whole LAN/);
   });
 
+  await t.test('says where the machine\'s own numbers are kept and where to look at them', () => {
+    // In the "What runs here" table: the store and its exporters, and the timer behind the host's numbers.
+    assert.match(readme, /^\| Metrics \(Docker\) \|.*Prometheus.*a year/m);
+    assert.match(readme, /^\| Metrics \(Docker\) \|.*node exporter.*SMART.*GPU/m);
+    assert.match(readme, /^\| Host metrics \(systemd timer\) \|.*every minute/m);
+    // A section of its own for the dashboard.
+    assert.match(readme, /^## The server dashboard$/m);
+    assert.ok(readme.includes('config/grafana/dashboards/server.json'));
+    assert.match(readme, /Power, Temperatures, Load, Activity, Disks,? and Updates/);
+    // Editable, but the file wins: the one thing to know before changing it in Grafana.
+    assert.match(readme, /saved? in Grafana[^.]*\.[^\n]*next change to the file replaces/i);
+    assert.match(readme, /amber at 55 °C and red at 60 °C/);
+    assert.match(readme, /65 °C/);
+    // None of the four has a login, so none is reachable from the LAN.
+    assert.match(readme, /publish(es)? no port/);
+  });
+
   await t.test('documents the one-port rule that lets the desktop ship its logs', () => {
     assert.ok(readme.includes('SERVER_PORT_SOURCES'));
     assert.match(readme, /3100/);
