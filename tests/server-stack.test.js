@@ -42,8 +42,9 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
   await t.test('runs every desktop service, with an Ollama of its own for the embedder only', () => {
     const expected = [
       'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
-      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'ollama', 'prowlarr', 'qbittorrent', 'radarr',
-      'recyclarr', 'renovate', 'searxng', 'seerr', 'sonarr',
+      'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'node-exporter', 'nvidia-gpu-exporter', 'ollama',
+      'prometheus', 'prowlarr', 'qbittorrent', 'radarr', 'recyclarr', 'renovate', 'searxng', 'seerr', 'smartctl-exporter',
+      'sonarr',
     ];
     assert.deepEqual([...names].sort(), expected);
     // The chat model stays on the desktop's RTX 5080, with a log shipper beside it.
@@ -157,7 +158,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.match(imageOf(jellyfin), /^jellyfin\/jellyfin:\d+\.\d+$/);
     assert.match(jellyfin, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
     const gpuUsers = names.filter((name) => /driver:\s*nvidia/.test(block(name)));
-    assert.deepEqual(gpuUsers, ['jellyfin', 'ollama'], 'only Jellyfin and the embedder use the GPU on the server');
+    assert.deepEqual(gpuUsers, ['jellyfin', 'ollama', 'nvidia-gpu-exporter'], 'only Jellyfin, the embedder and the GPU\'s exporter use it');
   });
 
   await t.test('the embedder has an Ollama on the laptop\'s GPU that only the Hub can reach', () => {
@@ -247,6 +248,50 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.match(block('grafana-renderer'), /^    profiles:\s*\["render"\]\s*$/m);
     for (const volume of ['household_hub_data', 'ollama_models', 'loki_data', 'alloy_data', 'grafana_data']) {
       assert.match(compose, new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${volume}:\\s*\\n\\s+name:\\s*${volume}\\s*$`, 'm'), `${volume} keeps its fixed name`);
+    }
+  });
+
+  await t.test('the metrics stack keeps a year, and publishes nothing', () => {
+    const metrics = ['prometheus', 'node-exporter', 'smartctl-exporter', 'nvidia-gpu-exporter'];
+    for (const name of metrics) {
+      assert.match(imageOf(block(name)) || '', /:v?\d+\.\d+\.\d+$/, `${name} must be pinned to a release`);
+      // Prometheus and the exporters have no login: only the stack reaches them.
+      assert.doesNotMatch(block(name), /^    ports:/m, `${name} must publish no port`);
+      assert.doesNotMatch(block(name), /profiles:/, `${name} does not wait for the media disk`);
+    }
+
+    const prometheus = block('prometheus');
+    assert.match(imageOf(prometheus), /^prom\/prometheus:/);
+    assert.ok(prometheus.includes('- --storage.tsdb.retention.time=1y'));
+    assert.ok(prometheus.includes('- --config.file=/etc/prometheus/prometheus.yml'));
+    assert.ok(prometheus.includes('- prometheus_data:/prometheus'));
+    // The node exporter is on the host's network: this name is how a container reaches the host.
+    assert.match(prometheus, /extra_hosts:\s*\n\s+- host\.docker\.internal:host-gateway/);
+    assert.match(prometheus, /^    mem_limit:\s*1g\s*$/m);
+    assert.match(compose, /^volumes:\s*\n[\s\S]*?^  prometheus_data:\s*\n\s+name:\s*prometheus_data\s*$/m);
+
+    // The host's own numbers, network traffic included: its network, its processes, its disks.
+    const node = block('node-exporter');
+    assert.match(imageOf(node), /^prom\/node-exporter:/);
+    assert.match(node, /^    network_mode:\s*host\s*$/m);
+    assert.match(node, /^    pid:\s*host\s*$/m);
+    assert.ok(node.includes('- /:/host:ro,rslave'));
+    assert.ok(node.includes('- --path.rootfs=/host'));
+    // Where server-update.sh and server-metrics.sh leave their numbers.
+    assert.ok(node.includes('- --collector.textfile.directory=/host/var/lib/node_exporter/textfile'));
+
+    // SMART needs the raw devices. A disk in standby is left asleep, as smartd leaves it.
+    const smart = block('smartctl-exporter');
+    assert.match(imageOf(smart), /^prometheuscommunity\/smartctl-exporter:/);
+    assert.match(smart, /^    privileged:\s*true\s*$/m);
+    assert.match(smart, /^    user:\s*root\s*$/m);
+
+    const gpu = block('nvidia-gpu-exporter');
+    assert.match(imageOf(gpu), /^utkuozdemir\/nvidia_gpu_exporter:/);
+    assert.match(gpu, /driver:\s*nvidia\s*\n\s*count:\s*all\s*\n\s*capabilities:\s*\[gpu\]/);
+
+    for (const name of ['node-exporter', 'smartctl-exporter', 'nvidia-gpu-exporter']) {
+      assert.match(block(name), /^    mem_limit:\s*128m\s*$/m, `${name} is capped at 128m`);
     }
   });
 

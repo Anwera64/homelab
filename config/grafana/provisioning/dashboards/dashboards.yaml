@@ -1,0 +1,11 @@
+# The dashboards in config/grafana/dashboards, loaded from the repo rather than built by hand.
+# They can be changed and saved in Grafana. A save lives in Grafana's own database: the next
+# change to the file replaces it, so a change worth keeping goes back into the file.
+apiVersion: 1
+
+providers:
+  - name: homelab
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

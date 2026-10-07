@@ -286,6 +286,31 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
+  await t.test('Grafana gets Prometheus as a second data source, and its dashboards, from the repo', () => {
+    const grafana = serverService('grafana');
+    const datasource = readConfig('config/grafana/provisioning/datasources/prometheus.yaml');
+    assert.match(datasource, /^apiVersion:\s*1\s*$/m);
+    assert.match(datasource, /type:\s*prometheus\s*$/m);
+    // The dashboards name it by this uid.
+    assert.match(datasource, /uid:\s*prometheus\s*$/m);
+    assert.match(datasource, /url:\s*http:\/\/prometheus:9090\s*$/m);
+    // Loki stays the default: Explore opens on the logs, as before.
+    assert.match(datasource, /isDefault:\s*false/);
+    assert.doesNotMatch(datasource, /password|secret|token/i);
+
+    const provider = readConfig('config/grafana/provisioning/dashboards/dashboards.yaml');
+    assert.match(provider, /^apiVersion:\s*1\s*$/m);
+    assert.match(provider, /type:\s*file\s*$/m);
+    assert.match(provider, /path:\s*\/etc\/grafana\/dashboards\s*$/m);
+    // The dashboards can be changed and saved in Grafana; the file wins again when it changes.
+    assert.match(provider, /allowUiUpdates:\s*true/);
+
+    // One folder at a time, never all of provisioning/ (see the Loki check above).
+    assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro'));
+    assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/dashboards:/etc/grafana/dashboards:ro'));
+    assert.match(grafana, /depends_on:\s*\n(?:\s+- [\w-]+\s*\n)*?\s+- prometheus\b/);
+  });
+
   await t.test('Docker keeps a capped local log for every service, now that Loki holds the history', () => {
     const anchor = dockerComposeContent.match(/^x-logging:\s*&default-logging\s*\n([\s\S]*?)(?=^[a-z])/m);
     assert.ok(anchor, 'docker-compose.yml must define x-logging: &default-logging');
