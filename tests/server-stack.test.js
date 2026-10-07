@@ -34,7 +34,7 @@ const dependsOn = (block) => {
 
 test('Server stack: the desktop services, on the always-on host', async (t) => {
   const compose = read(path.join(SERVER_DIR, 'docker-compose.yml'));
-  const desktop = read(path.join(ROOT_DIR, 'docker-compose.yml'));
+  const desktop = read(path.join(ROOT_DIR, 'hosts/desktop/docker-compose.yml'));
   const envExample = read(path.join(SERVER_DIR, '.env.example'));
   const names = serviceNames(compose);
   const block = (name) => serviceBlock(compose, name);
@@ -46,8 +46,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
       'recyclarr', 'renovate', 'searxng', 'seerr', 'sonarr',
     ];
     assert.deepEqual([...names].sort(), expected);
-    // The chat model stays on the desktop's RTX 5080. Until the media disk is in, so do the media services.
-    assert.ok(serviceNames(desktop).includes('ollama'));
+    // The chat model stays on the desktop's RTX 5080, with a log shipper beside it.
+    assert.deepEqual(serviceNames(desktop).sort(), ['alloy', 'ollama']);
     for (const name of names) {
       assert.match(block(name), new RegExp(`^    container_name:\\s*${name}\\s*$`, 'm'), `${name} keeps its container name`);
     }
@@ -288,6 +288,17 @@ test('The server compose file is validated wherever the others are', async (t) =
   await t.test('in the pre-commit hook', () => {
     assert.ok(read(path.join(ROOT_DIR, '.githooks/pre-commit')).includes(validate));
   });
+
+  await t.test('and so is the desktop\'s, at its new place', () => {
+    const ci = read(path.join(ROOT_DIR, '.github/workflows/test.yml'));
+    const hook = read(path.join(ROOT_DIR, '.githooks/pre-commit'));
+    assert.ok(ci.includes('docker compose -f hosts/desktop/docker-compose.yml --env-file hosts/desktop/.env.example config -q'));
+    assert.match(hook, /docker compose -f hosts\/desktop\/docker-compose\.yml --env-file "\$ENV_FILE" config -q/);
+    assert.match(hook, /ENV_FILE="hosts\/desktop\/\.env"/);
+    for (const text of [ci, hook]) {
+      assert.doesNotMatch(text, /-f docker-compose\.yml|MEDIA_ROOT=/, 'the root compose file and its media variables are gone');
+    }
+  });
 });
 
 test('Server README', async (t) => {
@@ -355,9 +366,10 @@ test('Server README', async (t) => {
     assert.match(section[1], /Authentication Required/, 'it must name the arr setting');
     assert.match(section[1], /Disable Auth for Local Addresses/, 'it must name the Cleanuparr switch');
     assert.match(section[1], /MAINTAINERR_PASSWORD_HASH/, 'it must say where the Maintainerr password lives');
-    // The password is on the name only, so the direct port must be closed on whichever machine runs it.
+    // The password is on the name only, so the direct port must stay closed: the server's firewall does that.
     const maintainerr = items.find((item) => item.includes('Maintainerr has no login'));
-    assert.match(maintainerr, /Windows firewall rule admits only lemonpi/, 'it must say the desktop\'s direct port is closed too');
+    assert.match(maintainerr, /direct port \(6246\) must stay closed: the firewall here does that/);
+    assert.doesNotMatch(maintainerr, /desktop|Windows/, 'Maintainerr no longer runs on the desktop');
     assert.doesNotMatch(maintainerr, /answers the whole LAN/);
   });
 

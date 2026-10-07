@@ -29,9 +29,6 @@ hosts/pi/data/
 *.log
 logs/
 
-# State files
-.last_update
-
 # Python cache & test artifacts
 __pycache__/
 *.py[cod]

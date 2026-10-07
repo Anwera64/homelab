@@ -51,13 +51,12 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /`docker compose config` for the desktop, Pi and server stacks/);
   });
 
-  await t.test('says who updates what: Renovate PRs for the server, Watchtower on the desktop only', () => {
+  await t.test('says who updates what: Renovate PRs for every host, and no Watchtower anywhere', () => {
     const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m)[0];
-    const desktopRow = readme.match(/^\| \*\*Desktop\*\*.*$/m)[0];
-    assert.doesNotMatch(serverRow, /Watchtower/, 'the server runs no Watchtower');
     assert.match(serverRow, /nightly update/, 'the Server row must name the nightly update');
-    assert.match(desktopRow, /Watchtower/);
-    assert.match(readme, /^\| \*\*Watchtower\*\* \| Desktop \| — \| [^|]+\|$/m);
+    assert.doesNotMatch(readme, /Watchtower/, 'nothing runs Watchtower any more');
+    // The desktop's two images are pinned; a merged bump reaches it on the next pull and start.
+    assert.match(readme, /`git pull`[^\n]*`startup_homelab\.ps1`/, 'README must say how a merged bump reaches the desktop');
     // Self-hosted: a container on the server, not the GitHub app.
     assert.match(readme, /^\| \*\*Renovate\*\* \| Server \| — \| [^|]*the hub[^|]*\|$/m);
     assert.match(serverRow, /Renovate/, 'the Server row must name Renovate');
@@ -100,13 +99,24 @@ test('Root README matches the repository', async (t) => {
     assert.ok(backend.includes('uv pip compile requirements-dev.in --output-file=requirements-dev.txt --python-version=3.12 --universal'));
   });
 
-  await t.test('every startup_homelab.ps1 flag it mentions is real', () => {
-    const script = read('startup_homelab.ps1');
+  await t.test('the desktop section matches its scripts: no flags, found by name through PATH', () => {
+    const script = read('hosts/desktop/startup_homelab.ps1');
     const params = new Set([...script.matchAll(/\[switch\]\$(\w+)/g)].map((m) => m[1]));
     const used = [...readme.matchAll(/startup_homelab\.ps1 -(\w+)/g)].map((m) => m[1]);
-    assert.ok(used.length > 0);
     for (const flag of used) {
       assert.ok(params.has(flag), `-${flag} is not a parameter of startup_homelab.ps1`);
+    }
+    const paths = treePaths(readme);
+    for (const p of ['hosts/desktop/README.md', 'hosts/desktop/docker-compose.yml', 'hosts/desktop/.env.example', 'hosts/desktop/startup_homelab.ps1', 'hosts/desktop/stop_homelab.ps1', 'hosts/desktop/compact_docker_disk.ps1', 'hosts/desktop/enable_virtualization.ps1']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+    assert.ok(readme.includes('hosts/desktop/README.md'), 'README must point to the desktop README');
+    const desktop = read('hosts/desktop/README.md');
+    // The scripts are run by name from any folder.
+    assert.match(desktop, /hosts\\desktop/, 'the desktop README must give the folder to add to PATH');
+    assert.match(desktop, /\[Environment\]::SetEnvironmentVariable\('Path'/, 'and the command that adds it');
+    for (const needle of ['startup_homelab.ps1', 'stop_homelab.ps1', 'compact_docker_disk.ps1', 'New-NetFirewallRule -DisplayName "Homelab Ollama (server)"', 'config/ollama-models/models.json']) {
+      assert.ok(desktop.includes(needle), `the desktop README must mention ${needle}`);
     }
   });
 
@@ -131,9 +141,17 @@ test('Root README matches the repository', async (t) => {
     assert.ok(desktopRow[0].includes('Ollama'));
     // The desktop keeps a collector for good, beside Ollama.
     assert.ok(desktopRow[0].includes('Alloy'));
-    for (const moved of ['Loki', 'Grafana', 'Household Hub', 'SearXNG']) {
+    for (const moved of ['Loki', 'Grafana', 'Household Hub', 'SearXNG', 'Jellyfin', 'Sonarr', 'Radarr', 'qBittorrent', 'Gluetun', 'Seerr']) {
       assert.ok(!desktopRow[0].includes(moved), `${moved} no longer runs on the desktop`);
     }
+    assert.ok(desktopRow[0].includes('hosts/desktop/'), 'the Desktop row must link its folder');
+    for (const media of ['Jellyfin', 'Seerr', 'Sonarr', 'Radarr', 'qBittorrent', 'Gluetun']) {
+      assert.ok(serverRow[0].includes(media), `the Server row must name ${media}`);
+    }
+    assert.doesNotMatch(readme, /once its (media )?disk is (in|installed)/, 'the media services have moved');
+    // In the endpoints, only Ollama and its log shipper are on the desktop.
+    const onDesktop = [...readme.matchAll(/^\| \*\*([^*]+)\*\* \| Desktop[^|]*\|/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(onDesktop, ['Alloy', 'Ollama']);
 
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/);
     assert.ok(graph, 'README must have the network flow graph');
@@ -151,7 +169,7 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /^\| \*\*Grafana\*\* \| Server \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| Log search/m);
     assert.match(readme, /^\| \*\*Loki\*\* \| Server \| — \| [^|]*port 3100, the desktop's Alloy only/m);
     assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org` \| Family assistant backend/m);
-    assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \(AI profile\) \| — \| [^|]*port 11434, the server only/m);
+    assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \| — \| [^|]*port 11434, the server only/m);
 
     const paths = treePaths(readme);
     for (const p of ['config/loki/loki-config.yaml', 'config/alloy/config.alloy', 'config/grafana/provisioning/datasources/loki.yaml']) {
@@ -170,14 +188,7 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /30 days/);
     assert.ok(readme.includes('logs=off'), 'README must name the opt-out label');
     assert.match(readme, /calendar titles and note text/, 'README must say what the hub\'s lines carry');
-    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
-    assert.ok(firewall, 'README must show the firewall rule for the media ports');
-    const ports = firewall[1].split(',');
-    assert.ok(ports.includes('8096'), 'the rule must still admit Jellyfin');
-    for (const moved of ['3002', '3051', '4318', '11434']) {
-      assert.ok(!ports.includes(moved), `the LAN-wide rule must not admit ${moved}`);
-    }
-    // Ollama is for the server alone.
+    // The desktop opens Ollama's port, for the server alone.
     assert.match(readme, /New-NetFirewallRule[^\n]*-LocalPort 11434[^\n]*-RemoteAddress 192\.168\.1\.30/);
   });
   await t.test('the telemetry route is in the endpoints and the graph', () => {
@@ -186,19 +197,11 @@ test('Root README matches the repository', async (t) => {
     assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
     assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
   });
-  await t.test('the firewall rule admits every port the Pi proxies to on the desktop', () => {
-    // -LocalPort replaces the whole list, so a port missing here is closed by copying the command
-    // (Cleanuparr's 11011 was, and its HTTPS name answered 502).
-    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
-    assert.ok(firewall, 'README must show the firewall rule');
-    const admitted = firewall[1].split(',');
-    // Grafana (3002) moved to the server, with the hub and Alloy's receiver.
-    const onServer = ['3002'];
-    const onDesktop = Object.keys(PORT_TO_SERVICE).filter((port) => !onServer.includes(port));
-    // The Gluetun API (8000) is reached from the Pi without being in the service table.
-    for (const port of [...onDesktop, '8000']) {
-      assert.ok(admitted.includes(port), `the firewall rule must admit ${port}`);
-    }
+  await t.test('the desktop opens one port, for the server: the media rule is gone', () => {
+    // The media ports left with the media services. Only Ollama answers, and only the server.
+    assert.match(readme, /New-NetFirewallRule -DisplayName "Homelab Ollama \(server\)"[^\n]*-LocalPort 11434 -RemoteAddress 192\.168\.1\.30/);
+    assert.doesNotMatch(readme, /Set-NetFirewallRule/, 'no rule is left to widen');
+    assert.match(readme, /Remove-NetFirewallRule -DisplayName "Homelab Stack \(LAN\)"/, 'README must say how to remove the old media rule');
   });
 
   await t.test('the endpoints table gives the https:// name only: direct ports are not a way in', () => {
@@ -213,11 +216,8 @@ test('Root README matches the repository', async (t) => {
     assert.ok(!readme.includes('Local HTTP'), 'the Local HTTP column was removed');
     // FlareSolverr has no login, so it has no name and no open port.
     assert.ok(!readme.includes('flaresolverr.spicy-llama.duckdns.org'), 'FlareSolverr has no https:// name');
-    const firewall = readme.match(/Set-NetFirewallRule[^\n]*-LocalPort ([\d,]+)/);
-    assert.ok(!firewall[1].split(',').includes('8191'), 'the firewall rule must not admit FlareSolverr\'s port');
-    // The desktop's ports answer lemonpi alone: Maintainerr has no login, and its Caddy password is on the name only.
-    assert.match(readme, /Set-NetFirewallRule -DisplayName "Homelab Stack \(LAN\)" -RemoteAddress 192\.168\.1\.35\s*$/m, 'README must show the rule is narrowed to lemonpi');
-    assert.doesNotMatch(readme, /or LAN devices need/, 'LAN devices do not reach the desktop\'s ports directly');
+    assert.doesNotMatch(readme, /8191/, 'FlareSolverr\'s port is published nowhere');
+    assert.doesNotMatch(readme, /or LAN devices need/, 'LAN devices do not reach the service ports directly');
     assert.doesNotMatch(endpoints[1], /http:\/\/[\w.-]+\.lan/, 'no direct .lan address in the endpoints');
   });
 

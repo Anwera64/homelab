@@ -96,10 +96,16 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.equal(rules[index].groupName, 'Jellyfin');
   });
 
-  await t.test('in the desktop stack, only Alloy: it must match the server\'s, and the rest is on Watchtower', () => {
-    const [rule] = ruleFor((r) => asList(r.matchFileNames).includes('docker-compose.yml') && r.enabled === false);
-    assert.ok(rule, 'a rule must turn the root docker-compose.yml off');
-    assert.deepEqual(rule.matchPackageNames, ['!grafana/alloy']);
+  await t.test('the desktop stack is read like the others: its Ollama and Alloy are bumped with the server\'s', () => {
+    // Watchtower is gone from the desktop, so nothing may switch its compose file off.
+    const off = ruleFor((r) => r.enabled === false && asList(r.matchFileNames).some((f) => /docker-compose\.yml$/.test(f)));
+    assert.deepEqual(off, [], 'no compose file is switched off');
+    const desktopImages = imagesOf(read(path.join(ROOT_DIR, 'hosts/desktop/docker-compose.yml')));
+    assert.equal(desktopImages.length, 2);
+    // Same image and same version on both machines: one grouped PR moves both.
+    for (const image of desktopImages) {
+      assert.ok(serverImages.includes(image), `${image} must be the version the server runs`);
+    }
   });
 
   await t.test('reads linuxserver tags by their own scheme, never an arch or version- variant', () => {

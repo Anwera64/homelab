@@ -6,12 +6,13 @@ const { spawnSync } = require('node:child_process');
 const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
+const DESKTOP_DIR = path.join(ROOT_DIR, 'hosts/desktop');
+const DOCKER_COMPOSE_PATH = path.join(DESKTOP_DIR, 'docker-compose.yml');
 const SERVER_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/server/docker-compose.yml');
 const SERVER_HOST = '192.168.1.30';
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
-const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
+const ENV_EXAMPLE_PATH = path.join(DESKTOP_DIR, '.env.example');
 const SEARXNG_SETTINGS_PATH = path.join(ROOT_DIR, 'config/searxng/settings.yml');
 const OLLAMA_MODELS_DIR = path.join(ROOT_DIR, 'config/ollama-models');
 
@@ -56,36 +57,25 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Each desktop service publishes its own LAN port, the ones the Pi and Homepage use', () => {
-    const expected = {
-      jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
-      sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
-      gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
-    };
-    // FlareSolverr has no login: only Prowlarr reaches it, inside the stack.
-    assert.equal(composePorts('flaresolverr'), '', 'FlareSolverr must publish no port on the desktop');
-    assert.equal(composePorts('flaresolverr', serverComposeContent), '', 'FlareSolverr must publish no port on the server');
-    for (const [service, mappings] of Object.entries(expected)) {
-      const ports = composePorts(service);
-      for (const mapping of mappings) {
-        assert.match(ports, new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
-      }
+  await t.test('The desktop runs Ollama and Alloy, and nothing else: the media services moved to the server', () => {
+    const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
+    const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(names, ['alloy', 'ollama']);
+    assert.doesNotMatch(dockerComposeContent, /MEDIA_ROOT|MOVIES_PATH|SHOWS_PATH|WIREGUARD|watchtower|profiles:/i);
+    // The desktop's files live with the other hosts'; the root keeps none of them.
+    for (const file of ['docker-compose.yml', '.env.example', 'startup_homelab.ps1', 'stop_homelab.ps1', 'compact_docker_disk.ps1', 'enable_virtualization.ps1']) {
+      assert.ok(!fs.existsSync(path.join(ROOT_DIR, file)), `${file} must not be in the repo root`);
+      assert.ok(fs.existsSync(path.join(DESKTOP_DIR, file)), `${file} must be in hosts/desktop`);
     }
-    // Every port in the service table is published here, or on the server for what moved there.
-    const published = Object.values(expected).flat().map((m) => m.split(':')[0]);
-    const onServer = { 3002: 'grafana' };
-    for (const port of Object.keys(PORT_TO_SERVICE)) {
-      if (onServer[port]) {
-        assert.match(composePorts(onServer[port], serverComposeContent), new RegExp(`-\\s*${port}:`), `the server must publish ${port}`);
-      } else {
-        assert.ok(published.includes(port), `port ${port} must be published by its service`);
-      }
+    // Every port in the service table is published by the server.
+    for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
+      const owner = { qbit: 'gluetun', stat: 'jellystat' }[service] || service;
+      assert.match(composePorts(owner, serverComposeContent), new RegExp(`-\\s*${port}:`), `the server must publish ${port}`);
     }
   });
+
   await t.test('Cleanuparr cleans the download queue and sees the torrents at qBittorrent\'s own path', () => {
-    const block = dockerComposeContent.match(/^  cleanuparr:\r?\n([\s\S]*?)(?=^  [a-z0-9_-]+:\r?\n|^[a-z]|(?![\s\S]))/m);
-    assert.ok(block, 'docker-compose.yml must define cleanuparr');
-    const svc = block[1];
+    const svc = serverService('cleanuparr');
     assert.match(svc, /image:\s*ghcr\.io\/cleanuparr\/cleanuparr:/);
     assert.match(svc, /-\s*\$\{CONFIG_PATH\}\/cleanuparr:\/config/);
     // Hardlink detection needs the same path qBittorrent downloads to.
@@ -94,7 +84,6 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(svc, /-\s*PUID=1000/);
     assert.match(svc, /-\s*PGID=1000/);
     assert.match(svc, /-\s*TZ=\$\{TZ/);
-    assert.match(svc, /com\.centurylinklabs\.watchtower\.enable=true/);
     assert.match(svc, /restart:\s*unless-stopped/);
     for (const dep of ['sonarr', 'radarr', 'qbittorrent']) {
       assert.match(svc, new RegExp(`depends_on:[\\s\\S]*-\\s*${dep}\\b`), `cleanuparr must start after ${dep}`);
@@ -118,8 +107,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // Ollama stays here for good, so the desktop always needs a collector.
     const alloy = composeService('alloy');
     assert.match(alloy, /image:\s*grafana\/alloy:v\d+\.\d+\.\d+\s*$/m);
-    assert.doesNotMatch(alloy, /watchtower\.enable/, 'pinned; Watchtower must not update it');
-    assert.doesNotMatch(alloy, /profiles:/, 'logs are collected whatever is started: -NoAI and -ArrOnly included');
+    assert.doesNotMatch(alloy, /profiles:/, 'logs are always collected');
     assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
     assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
     assert.ok(alloy.includes('- /var/run/docker.sock:/var/run/docker.sock:ro'), 'Alloy only reads the Docker socket');
@@ -307,7 +295,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
     const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
     const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]);
-    assert.ok(names.length >= 15, 'the service list should be readable');
+    assert.equal(names.length, 2, 'the service list should be readable');
     for (const name of names) {
       assert.match(composeService(name), /^    logging:\s*\*default-logging\s*$/m, `${name} must use the capped logging block`);
     }
@@ -409,6 +397,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
         `.env.example must define or document variable ${varName}`
       );
     }
+    // What the media services needed is in hosts/server/.env now.
+    assert.doesNotMatch(envExampleContent, /MEDIA_ROOT|MOVIES_PATH|SHOWS_PATH|DOWNLOADS_PATH|WIREGUARD|VPN_COUNTRY|_API_KEY|JELLYSTAT|WATCHTOWER|COMPOSE_PROFILES|WEBUI_SECRET/);
+    assert.match(envExampleContent, /^CONFIG_PATH=\.\.\/\.\.\/config$/m, 'config/ stays in the repo root, shared with the other hosts');
   });
 
   await t.test('Homepage services.yaml internal container URLs point to valid services in docker-compose.yml', () => {
@@ -429,8 +420,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Recyclarr service receives Sonarr and Radarr API keys in docker-compose.yml', () => {
-    const recyclarrMatch = dockerComposeContent.match(/container_name:\s*recyclarr[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*depends_on:|$)/);
+  await t.test('Recyclarr service receives Sonarr and Radarr API keys in the server\'s compose file', () => {
+    const recyclarrMatch = serverComposeContent.match(/container_name:\s*recyclarr[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*depends_on:|$)/);
     assert.ok(recyclarrMatch, 'docker-compose.yml must contain a recyclarr service with environment section');
     const recyclarrEnv = recyclarrMatch[1];
     assert.ok(recyclarrEnv.includes('SONARR_API_KEY'), 'Recyclarr service must receive SONARR_API_KEY');
@@ -444,8 +435,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('qBittorrent service enforces healthy Gluetun dependency in docker-compose.yml', () => {
-    const qbitMatch = dockerComposeContent.match(/container_name:\s*qbittorrent[\s\S]*?depends_on:\s*\n([\s\S]*?)(?=\n\s{4}[a-z_]+:|\n\s{2}[a-z_]+:|\n\s*restart:|$)/);
+  await t.test('qBittorrent service enforces healthy Gluetun dependency in the server\'s compose file', () => {
+    const qbitMatch = serverComposeContent.match(/container_name:\s*qbittorrent[\s\S]*?depends_on:\s*\n([\s\S]*?)(?=\n\s{4}[a-z_]+:|\n\s{2}[a-z_]+:|\n\s*restart:|$)/);
     assert.ok(qbitMatch, 'docker-compose.yml must contain a qbittorrent service with depends_on section');
     const qbitDepends = qbitMatch[1];
     assert.ok(qbitDepends.includes('gluetun'), 'qBittorrent must depend on gluetun');
@@ -460,29 +451,12 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(!malformedPattern.test(bookmarksYamlContent), 'bookmarks.yaml must not have separate array items for icon and href');
   });
 
-  await t.test('docker-compose.yml pins Jellyfin to 12.0 and defines Seerr with init: true', () => {
-    assert.ok(
-      /container_name:\s*jellyfin[\s\S]*?image:\s*jellyfin\/jellyfin:12\.0(\.0)?/.test(dockerComposeContent) ||
-      /image:\s*jellyfin\/jellyfin:12\.0(\.0)?[\s\S]*?container_name:\s*jellyfin/.test(dockerComposeContent),
-      'docker-compose.yml must pin jellyfin to jellyfin/jellyfin:12.0'
-    );
-
-    assert.ok(
-      /container_name:\s*seerr/.test(dockerComposeContent),
-      'docker-compose.yml must contain container_name: seerr'
-    );
-    assert.ok(
-      /image:\s*ghcr\.io\/seerr-team\/seerr:latest/.test(dockerComposeContent),
-      'docker-compose.yml must use image ghcr.io/seerr-team/seerr:latest'
-    );
-    assert.ok(
-      /init:\s*true/.test(dockerComposeContent),
-      'docker-compose.yml must specify init: true for seerr'
-    );
-    assert.ok(
-      /\$\{CONFIG_PATH\}\/seerr:\/app\/config/.test(dockerComposeContent),
-      'docker-compose.yml must map ${CONFIG_PATH}/seerr:/app/config'
-    );
+  await t.test('The server defines Seerr with init: true and its settings folder', () => {
+    const seerr = serverService('seerr');
+    assert.match(seerr, /container_name:\s*seerr/);
+    assert.match(seerr, /image:\s*ghcr\.io\/seerr-team\/seerr:v\d/);
+    assert.match(seerr, /init:\s*true/, 'Seerr needs an init process to reap its children');
+    assert.ok(seerr.includes('- ${CONFIG_PATH}/seerr:/app/config'));
   });
 
   await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
@@ -604,5 +578,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // The Windows firewall admits only the server on this port (see README).
     assert.match(composePorts('ollama'), /^\s+-\s*11434:11434\s*\n$/, 'Ollama must publish 11434 on the LAN and nothing else');
     assert.doesNotMatch(ollama, /127\.0\.0\.1:11434/);
+  });
+
+  await t.test('Ollama is pinned to the server\'s version and always runs', () => {
+    const ollama = composeService('ollama');
+    const image = (ollama.match(/image:\s*(\S+)/) || [])[1];
+    assert.match(image, /^ollama\/ollama:\d+\.\d+\.\d+$/, 'pinned to a release, bumped by Renovate');
+    // The chat model here and the embedder there are bumped in one PR.
+    assert.equal(image, (serverService('ollama').match(/image:\s*(\S+)/) || [])[1], 'both Ollamas run the same version');
+    assert.doesNotMatch(ollama, /profiles:/, 'the desktop has no optional modules left');
+    assert.doesNotMatch(ollama, /watchtower/);
+    assert.doesNotMatch(servicesYamlContent, /watchtower/i, 'nothing runs Watchtower, so the dashboard has no card for it');
   });
 });

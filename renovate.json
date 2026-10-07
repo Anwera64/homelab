@@ -19,12 +19,6 @@
   },
   "packageRules": [
     {
-      "description": "The desktop stack still runs on Watchtower. Only its Alloy is bumped, together with the server's.",
-      "matchFileNames": ["docker-compose.yml"],
-      "matchPackageNames": ["!grafana/alloy"],
-      "enabled": false
-    },
-    {
       "description": "Minor and patch image bumps: one PR a week, merged once CI is green.",
       "matchManagers": ["docker-compose"],
       "matchUpdateTypes": ["minor", "patch"],

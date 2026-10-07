@@ -23,9 +23,9 @@ jobs:
       - name: Run Node.js Test Suite
         run: node --test
 
-      - name: Validate Docker Compose Configuration
+      - name: Validate Desktop Docker Compose Configuration
         run: |
-          MEDIA_ROOT=/tmp/media MOVIES_PATH=/tmp/movies SHOWS_PATH=/tmp/shows DOWNLOADS_PATH=/tmp/downloads docker compose -f docker-compose.yml --env-file .env.example config -q
+          docker compose -f hosts/desktop/docker-compose.yml --env-file hosts/desktop/.env.example config -q
 
       - name: Validate Server Docker Compose Configuration
         run: |
