@@ -304,6 +304,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(provider, /path:\s*\/etc\/grafana\/dashboards\s*$/m);
     // The dashboards can be changed and saved in Grafana; the file wins again when it changes.
     assert.match(provider, /allowUiUpdates:\s*true/);
+    // Above 10 seconds Grafana polls the folder. At 10 or less it waits for the filesystem to
+    // announce a change, which a bind-mounted folder does not always do.
+    assert.match(provider, /updateIntervalSeconds:\s*30\s*$/m);
 
     // One folder at a time, never all of provisioning/ (see the Loki check above).
     assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro'));
