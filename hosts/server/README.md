@@ -1,11 +1,12 @@
 # server: the always-on app server
 
-A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It will run everything the desktop used to run except the chat model: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub with its embedder, and the log stack.
+A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the reserved address `192.168.1.30` (`server.lan`). It runs everything the desktop used to run except the chat model: the media server, the arr pipeline behind the VPN kill-switch, the Household Hub with its embedder, and the log stack.
 
 ## What is live
 
-- **Live here:** the Household Hub, SearXNG, Loki, Grafana and Alloy. lemonpi's Caddy sends `hub.`, `grafana.` and `telemetry.` to this machine. An Ollama of its own runs the embedder (`bge-m3`) on the GTX 1660 Ti: it ranks what a chat turn reads. It unloads after 30 minutes without use, and if it is down the Hub ranks by keywords instead.
-- **Still on the desktop:** the media services (Jellyfin, the arr apps, qBittorrent and their companions). They move once the media disk is in; until then the bootstrap script leaves them stopped here.
+- **The Hub and the logs:** the Household Hub, SearXNG, Loki, Grafana and Alloy. An Ollama of its own runs the embedder (`bge-m3`) on the GTX 1660 Ti: it ranks what a chat turn reads. It unloads after 30 minutes without use, and if it is down the Hub ranks by keywords instead.
+- **The media services:** Jellyfin, Seerr, Jellystat, Sonarr, Radarr, Prowlarr, Bazarr, Maintainerr, Cleanuparr, Recyclarr, and qBittorrent behind the Gluetun VPN. Their files are on the media disk at `/data`.
+- **Routing:** lemonpi's Caddy sends every `https://` name except Pi-hole and the dashboard to this machine.
 - **Staying on the desktop:** the chat model, in Ollama on the RTX 5080. The Hub reaches it over the LAN, so the chat model needs the desktop awake. The desktop also keeps an Alloy that ships its logs to this Loki.
 
 ## What runs here

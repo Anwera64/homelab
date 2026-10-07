@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
 
   # HTTPS entry point for *.spicy-llama.duckdns.org (DuckDNS points at this Pi). Pi-local
-  # services are served here; desktop services go to the desktop Caddy's LAN ports.
+  # services are served here; the rest go to the ports the server's containers publish.
   # The image (Caddy + DuckDNS DNS plugin) is built by .github/workflows/caddy-image.yml.
   caddy:
     image: ghcr.io/anwera64/caddy-duckdns:2.11.4
@@ -74,7 +74,7 @@ services:
     restart: unless-stopped
 
   # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
-  # the sparse checkout by bootstrap.sh); desktop services are reached on 192.168.1.20.
+  # the sparse checkout by bootstrap.sh); the server's services are reached on 192.168.1.30.
   homepage:
     image: ghcr.io/gethomepage/homepage:v2.4.0
     container_name: homepage

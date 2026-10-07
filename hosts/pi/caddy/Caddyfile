@@ -1,8 +1,8 @@
 # ==============================================================================
 # Caddyfile - lemonpi HTTPS ingress (*.spicy-llama.duckdns.org -> 192.168.1.35)
 # Pi-local services are served here. The rest go to the ports their containers
-# publish: the Hub and the logs on the server (192.168.1.30), the media services
-# on the desktop (192.168.1.20) until they move. A machine that is off gives a 502.
+# publish on the server (192.168.1.30): the Hub, the logs and the media services.
+# While it is off they answer 502.
 # ==============================================================================
 
 {
@@ -31,44 +31,44 @@
         reverse_proxy 127.0.0.1:8081
     }
 
-    # On the desktop
+    # On the server: media
     @jellyfin host jellyfin.spicy-llama.duckdns.org
     handle @jellyfin {
         # Jellyfin 12 dropped the /emby prefix some clients still send.
         handle_path /emby/* {
-            reverse_proxy 192.168.1.20:8096
+            reverse_proxy 192.168.1.30:8096
         }
-        reverse_proxy 192.168.1.20:8096
+        reverse_proxy 192.168.1.30:8096
     }
 
     @seerr host seerr.spicy-llama.duckdns.org jellyseerr.spicy-llama.duckdns.org
     handle @seerr {
-        reverse_proxy 192.168.1.20:5055
+        reverse_proxy 192.168.1.30:5055
     }
 
     @stat host stat.spicy-llama.duckdns.org jellystat.spicy-llama.duckdns.org
     handle @stat {
-        reverse_proxy 192.168.1.20:3005
+        reverse_proxy 192.168.1.30:3005
     }
 
     @sonarr host sonarr.spicy-llama.duckdns.org
     handle @sonarr {
-        reverse_proxy 192.168.1.20:8989
+        reverse_proxy 192.168.1.30:8989
     }
 
     @radarr host radarr.spicy-llama.duckdns.org
     handle @radarr {
-        reverse_proxy 192.168.1.20:7878
+        reverse_proxy 192.168.1.30:7878
     }
 
     @prowlarr host prowlarr.spicy-llama.duckdns.org
     handle @prowlarr {
-        reverse_proxy 192.168.1.20:9696
+        reverse_proxy 192.168.1.30:9696
     }
 
     @bazarr host bazarr.spicy-llama.duckdns.org
     handle @bazarr {
-        reverse_proxy 192.168.1.20:6767
+        reverse_proxy 192.168.1.30:6767
     }
 
     @maintainerr host maintainerr.spicy-llama.duckdns.org
@@ -77,20 +77,20 @@
         basic_auth {
             {$MAINTAINERR_USER} {$MAINTAINERR_PASSWORD_HASH}
         }
-        reverse_proxy 192.168.1.20:6246
+        reverse_proxy 192.168.1.30:6246
     }
 
     @qbit host qbit.spicy-llama.duckdns.org qbittorrent.spicy-llama.duckdns.org
     handle @qbit {
-        reverse_proxy 192.168.1.20:8080
+        reverse_proxy 192.168.1.30:8080
     }
 
     @cleanuparr host cleanuparr.spicy-llama.duckdns.org
     handle @cleanuparr {
-        reverse_proxy 192.168.1.20:11011
+        reverse_proxy 192.168.1.30:11011
     }
 
-    # On the server
+    # On the server: logs and the Hub
     @grafana host grafana.spicy-llama.duckdns.org
     handle @grafana {
         reverse_proxy 192.168.1.30:3002

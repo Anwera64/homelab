@@ -7,9 +7,9 @@ A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), w
 | Piece | What it does |
 | --- | --- |
 | Pi-hole v6 (Docker) | DNS, ad blocking and DHCP. Admin page: https://pihole.spicy-llama.duckdns.org/admin or http://192.168.1.35:8081/admin |
-| Caddy (Docker) | HTTPS for `*.spicy-llama.duckdns.org` (DuckDNS points here), wildcard cert via the DuckDNS DNS challenge. Pi-hole and Homepage are served locally; desktop services go to the ports their containers publish on 192.168.1.20 and return 502 while it's off. Image built by CI (`.github/workflows/caddy-image.yml`). |
+| Caddy (Docker) | HTTPS for `*.spicy-llama.duckdns.org` (DuckDNS points here), wildcard cert via the DuckDNS DNS challenge. Pi-hole and Homepage are served locally; everything else goes to the ports the server's containers publish on 192.168.1.30 and returns 502 while it's off. Image built by CI (`.github/workflows/caddy-image.yml`). |
 | Unbound (Docker) | Pi-hole's only upstream, on `127.0.0.1:5335`. Recursive from the root servers, DNSSEC on. |
-| Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org. Plain http://192.168.1.35 redirects there; http://192.168.1.35:3000 is the container's own port, for when HTTPS is down. Desktop services are checked over HTTP on 192.168.1.20; its config is `config/homepage` in this repo. |
+| Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org. Plain http://192.168.1.35 redirects there; http://192.168.1.35:3000 is the container's own port, for when HTTPS is down. The server's services are checked over HTTP on 192.168.1.30; its config is `config/homepage` in this repo. |
 | Tailscale (native) | Subnet router for `192.168.1.0/24`, so remote devices reach the LAN, and ad blocking away from home. |
 | log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
 | unattended-upgrades | Installs Debian security updates by itself. |
@@ -34,7 +34,7 @@ sudo tailscale up                   # open the printed URL to log in
 ```
 
 4. In the Tailscale admin console: disable key expiry for `lemonpi`, and under **Edit route settings** approve the `192.168.1.0/24` subnet route. With that route, tailnet devices away from home reach the whole LAN through the Pi, including `*.spicy-llama.duckdns.org`, which resolves to the desktop's LAN IP. Under DNS, add lemonpi's tailnet IP as a global nameserver and turn on "Override local DNS".
-5. Fill `DUCKDNS_TOKEN` and the Homepage API keys in `hosts/pi/.env` (same values as the desktop `.env`) and rerun bootstrap. `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` are required too: Caddy asks for them on Maintainerr's name, and the stack does not start without them (`.env.example` shows how to make the hash). Point the DuckDNS record at 192.168.1.35.. Switch DHCP over to Pi-hole (next section).
+5. Fill `DUCKDNS_TOKEN` and the Homepage API keys in `hosts/pi/.env` (each app shows its key in its own settings) and rerun bootstrap. `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` are required too: Caddy asks for them on Maintainerr's name, and the stack does not start without them (`.env.example` shows how to make the hash). Point the DuckDNS record at 192.168.1.35.. Switch DHCP over to Pi-hole (next section).
 
 ## DHCP (Pi-hole replaces the Livebox's)
 

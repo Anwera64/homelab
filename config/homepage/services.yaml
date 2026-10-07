@@ -1,8 +1,8 @@
 ---
 # ==============================================================================
 # Homepage Services Configuration (DuckDNS Subdomain Architecture)
-# Homepage runs on the Pi (hosts/pi). Desktop services are reached on the ports
-# their containers publish on 192.168.1.20 and checked over HTTP (siteMonitor);
+# Homepage runs on the Pi (hosts/pi). The server's services are reached on the ports
+# their containers publish on 192.168.1.30 and checked over HTTP (siteMonitor);
 # only the Pi's own containers use Docker status (my-docker = the Pi's socket).
 # ==============================================================================
 
@@ -11,10 +11,10 @@
         icon: jellyfin.png
         href: https://jellyfin.spicy-llama.duckdns.org
         description: Media Streaming (RTX 5080 NVENC)
-        siteMonitor: http://192.168.1.20:8096
+        siteMonitor: http://192.168.1.30:8096
         widget:
           type: jellyfin
-          url: http://192.168.1.20:8096
+          url: http://192.168.1.30:8096
           key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
           version: 2
           enableNowPlaying: true
@@ -24,20 +24,20 @@
         icon: seerr.png
         href: https://seerr.spicy-llama.duckdns.org
         description: Netflix-style Request & Discovery UI
-        siteMonitor: http://192.168.1.20:5055
+        siteMonitor: http://192.168.1.30:5055
         widget:
           type: seerr
-          url: http://192.168.1.20:5055
+          url: http://192.168.1.30:5055
           key: "{{HOMEPAGE_VAR_SEERR_API_KEY}}"
 
     - Jellystat:
         icon: jellystat.png
         href: https://stat.spicy-llama.duckdns.org
         description: Playback Analytics & Viewer Statistics
-        siteMonitor: http://192.168.1.20:3005
+        siteMonitor: http://192.168.1.30:3005
         widget:
           type: customapi
-          url: http://192.168.1.20:3005/stats/getLibraryCardStats
+          url: http://192.168.1.30:3005/stats/getLibraryCardStats
           headers:
             x-api-token: "{{HOMEPAGE_VAR_JELLYSTAT_API_KEY}}"
           mappings:
@@ -60,40 +60,40 @@
         icon: sonarr.png
         href: https://sonarr.spicy-llama.duckdns.org
         description: TV Series Management
-        siteMonitor: http://192.168.1.20:8989
+        siteMonitor: http://192.168.1.30:8989
         widget:
           type: sonarr
-          url: http://192.168.1.20:8989
+          url: http://192.168.1.30:8989
           key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
 
     - Radarr:
         icon: radarr.png
         href: https://radarr.spicy-llama.duckdns.org
         description: Movie Collection Management
-        siteMonitor: http://192.168.1.20:7878
+        siteMonitor: http://192.168.1.30:7878
         widget:
           type: radarr
-          url: http://192.168.1.20:7878
+          url: http://192.168.1.30:7878
           key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
 
     - Prowlarr:
         icon: prowlarr.png
         href: https://prowlarr.spicy-llama.duckdns.org
         description: Trackers & Indexer Proxy
-        siteMonitor: http://192.168.1.20:9696
+        siteMonitor: http://192.168.1.30:9696
         widget:
           type: prowlarr
-          url: http://192.168.1.20:9696
+          url: http://192.168.1.30:9696
           key: "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}"
 
     - Bazarr:
         icon: bazarr.png
         href: https://bazarr.spicy-llama.duckdns.org
         description: Automated Subtitle Sync
-        siteMonitor: http://192.168.1.20:6767
+        siteMonitor: http://192.168.1.30:6767
         widget:
           type: bazarr
-          url: http://192.168.1.20:6767
+          url: http://192.168.1.30:6767
           key: "{{HOMEPAGE_VAR_BAZARR_API_KEY}}"
 
     - Recyclarr:
@@ -105,10 +105,10 @@
         icon: maintainerr.png
         href: https://maintainerr.spicy-llama.duckdns.org
         description: Automated Media Lifecycle & Cleanup
-        siteMonitor: http://192.168.1.20:6246
+        siteMonitor: http://192.168.1.30:6246
         widget:
           type: customapi
-          url: http://192.168.1.20:6246/api/collections
+          url: http://192.168.1.30:6246/api/collections
           mappings:
             - field: 0.mediaCount
               label: Queued Movies
@@ -121,10 +121,10 @@
         icon: cleanuparr.png
         href: https://cleanuparr.spicy-llama.duckdns.org
         description: Download Queue Cleanup (Fakes, Failed Imports, Seeding Limits)
-        siteMonitor: http://192.168.1.20:11011
+        siteMonitor: http://192.168.1.30:11011
         widget:
           type: customapi
-          url: http://192.168.1.20:11011/api/v2/stats
+          url: http://192.168.1.30:11011/api/v2/stats
           headers:
             X-Api-Key: "{{HOMEPAGE_VAR_CLEANUPARR_API_KEY}}"
           mappings:
@@ -146,10 +146,10 @@
         icon: qbittorrent.png
         href: https://qbit.spicy-llama.duckdns.org
         description: Download Client (VueTorrent UI - Kill-Switch Isolated)
-        siteMonitor: http://192.168.1.20:8080
+        siteMonitor: http://192.168.1.30:8080
         widget:
           type: qbittorrent
-          url: http://192.168.1.20:8080
+          url: http://192.168.1.30:8080
           username: "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}"
           password: "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}"
 
@@ -158,7 +158,7 @@
         description: NordVPN WireGuard Gateway
         widget:
           type: gluetun
-          url: http://192.168.1.20:8000
+          url: http://192.168.1.30:8000
           key: "{{HOMEPAGE_VAR_GLUETUN_API_KEY}}"
           version: 2
 

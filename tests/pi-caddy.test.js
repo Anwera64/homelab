@@ -10,10 +10,7 @@ const PI_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/pi/docker-compose.yml');
 const PI_CADDYFILE_PATH = path.join(ROOT_DIR, 'hosts/pi/caddy/Caddyfile');
 const PI_ENV_EXAMPLE_PATH = path.join(ROOT_DIR, 'hosts/pi/.env.example');
 const PRE_COMMIT_PATH = path.join(ROOT_DIR, '.githooks/pre-commit');
-const DESKTOP = '192\\.168\\.1\\.20';
 const SERVER = '192\\.168\\.1\\.30';
-// What already runs on the server; the media services follow once its disk is in.
-const ON_SERVER = new Set(['grafana']);
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '');
@@ -74,18 +71,19 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
   });
 
   await t.test('Jellyfin keeps the /emby fallback for old clients', () => {
-    assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.20:8096/);
+    assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.30:8096/);
   });
 
-  await t.test('every service goes to its own published port, on the machine that runs it', () => {
+  await t.test('every service goes to its own published port on the server', () => {
     for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
-      const host = ON_SERVER.has(service) ? SERVER : DESKTOP;
       assert.match(
         caddyfile,
-        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy ${host}:${port}\\b`),
-        `${service} must proxy to port ${port} on ${ON_SERVER.has(service) ? 'the server' : 'the desktop'}`
+        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy ${SERVER}:${port}\\b`),
+        `${service} must proxy to port ${port} on the server`
       );
     }
+    // The media services left the desktop: a name still sent there answers 502.
+    assert.doesNotMatch(caddyfile, /192\.168\.1\.20/, 'nothing is proxied to the desktop any more');
     assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051`));
   });
 

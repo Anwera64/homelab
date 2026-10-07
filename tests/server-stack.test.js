@@ -318,13 +318,13 @@ test('Server README', async (t) => {
     assert.match(readme, /## Moving to other hardware/);
   });
 
-  await t.test('says what is live on it and what still waits for the media disk', () => {
+  await t.test('says what is live on it, the media services included', () => {
     assert.match(readme, /## What is live/);
     const live = readme.match(/## What is live\n([\s\S]*?)(?=\n## )/)[1];
-    for (const service of ['Household Hub', 'SearXNG', 'Loki', 'Grafana', 'Alloy']) {
+    for (const service of ['Household Hub', 'SearXNG', 'Loki', 'Grafana', 'Alloy', 'Jellyfin', 'qBittorrent', 'Sonarr', 'Radarr']) {
       assert.ok(live.includes(service), `${service} is live on the server`);
     }
-    assert.match(live, /media/i, 'it must say the media services are still on the desktop');
+    assert.doesNotMatch(readme, /Still on the desktop|leaves them stopped here|It will run everything/, 'the media services have moved');
     assert.doesNotMatch(readme, /\*\*Not live yet\.\*\*/);
   });
 
