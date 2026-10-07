@@ -16,7 +16,7 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | The stack (Docker) | The services in [`docker-compose.yml`](docker-compose.yml), each with a memory cap. The Hub asks the desktop's Ollama for the chat model and the stack's own Ollama for embeddings; the bootstrap script pulls `bge-m3` when it is missing. |
 | Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
 | Metrics (Docker) | Prometheus keeps a year of the machine's own numbers. Three exporters report them: the node exporter (CPU, memory, disks, network, temperatures, battery), the SMART exporter (disk health and the media disk's temperature) and the GPU exporter (the GTX 1660 Ti, through nvidia-smi). None of the four has a login, so each publishes no port: only Grafana and Prometheus inside the stack reach them. |
-| Host metrics (systemd timer) | Once every minute, `server-metrics.sh` writes down what no exporter reports: when unattended upgrades last ran, whether the media disk is mounted, whether a reboot is waiting, and each disk's latest self-test. The nightly update writes when it ran and when it last applied something. The node exporter reads both from `/var/lib/node_exporter/textfile`. |
+| Host metrics (systemd timer) | Once every minute, `server-metrics.sh` writes down what no exporter reports: when unattended upgrades last ran, whether the media disk is mounted, whether a reboot is waiting, how long the CPU has been slowed down for heat, and each disk's latest self-test. The nightly update writes when it ran and when it last applied something. The node exporter reads both from `/var/lib/node_exporter/textfile`. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
 | Disk guard | Stops the media services while the media disk is unplugged. When it is plugged back in, checks the filesystem, mounts it and starts them again. |
 | smartd | Runs a short self-test on both disks every Sunday at 03:00. |
@@ -176,7 +176,7 @@ It is in Grafana (https://grafana.spicy-llama.duckdns.org), named "Server", and 
 | Section | What it shows |
 | --- | --- |
 | Power | Uptime, mains on or off, battery charge. |
-| Temperatures | CPU, GPU, media disk and SSD as gauges, with the average and maximum under each. |
+| Temperatures | CPU, GPU, media disk and SSD as gauges, with the average and maximum under each. The graph draws each as an average line inside a band from its lowest to its highest reading; the stretch of time each point covers follows the zoom and is never under a minute. Under it, how long the CPU was slowed down for heat. |
 | Load | Average CPU, memory, GPU load and GPU memory use, and graphs over time. |
 | Activity | Network traffic and disk reads and writes. |
 | Disks | SMART verdict, reallocated and pending sectors, last self-test, SSD wear, whether the media disk is mounted, free space. |

@@ -987,12 +987,14 @@
       },
       "type": "timeseries",
       "title": "Temperatures",
+      "description": "The line is the average; the band behind it runs from the lowest to the highest reading in the same stretch of time.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
         "y": 6
       },
+      "interval": "1m",
       "targets": [
         {
           "datasource": {
@@ -1002,7 +1004,7 @@
           "refId": "A",
           "editorMode": "code",
           "range": true,
-          "expr": "max(node_hwmon_temp_celsius{chip=\"platform_coretemp_0\",sensor=\"temp1\",host=\"server\"})",
+          "expr": "max(avg_over_time(node_hwmon_temp_celsius{chip=\"platform_coretemp_0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
           "legendFormat": "CPU"
         },
         {
@@ -1013,8 +1015,8 @@
           "refId": "B",
           "editorMode": "code",
           "range": true,
-          "expr": "max(nvidia_smi_temperature_gpu{host=\"server\"})",
-          "legendFormat": "GPU"
+          "expr": "min(min_over_time(node_hwmon_temp_celsius{chip=\"platform_coretemp_0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
+          "legendFormat": "CPU min"
         },
         {
           "datasource": {
@@ -1024,8 +1026,8 @@
           "refId": "C",
           "editorMode": "code",
           "range": true,
-          "expr": "max(smartctl_device_temperature{device!~\"nvme.*\",temperature_type=\"current\",host=\"server\"})",
-          "legendFormat": "Media disk"
+          "expr": "max(max_over_time(node_hwmon_temp_celsius{chip=\"platform_coretemp_0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
+          "legendFormat": "CPU max"
         },
         {
           "datasource": {
@@ -1035,8 +1037,96 @@
           "refId": "D",
           "editorMode": "code",
           "range": true,
-          "expr": "max(node_hwmon_temp_celsius{chip=\"nvme_nvme0\",sensor=\"temp1\",host=\"server\"})",
+          "expr": "max(avg_over_time(nvidia_smi_temperature_gpu{host=\"server\"}[$__interval]))",
+          "legendFormat": "GPU"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "E",
+          "editorMode": "code",
+          "range": true,
+          "expr": "min(min_over_time(nvidia_smi_temperature_gpu{host=\"server\"}[$__interval]))",
+          "legendFormat": "GPU min"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "F",
+          "editorMode": "code",
+          "range": true,
+          "expr": "max(max_over_time(nvidia_smi_temperature_gpu{host=\"server\"}[$__interval]))",
+          "legendFormat": "GPU max"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "G",
+          "editorMode": "code",
+          "range": true,
+          "expr": "max(avg_over_time(smartctl_device_temperature{device!~\"nvme.*\",temperature_type=\"current\",host=\"server\"}[$__interval]))",
+          "legendFormat": "Media disk"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "H",
+          "editorMode": "code",
+          "range": true,
+          "expr": "min(min_over_time(smartctl_device_temperature{device!~\"nvme.*\",temperature_type=\"current\",host=\"server\"}[$__interval]))",
+          "legendFormat": "Media disk min"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "I",
+          "editorMode": "code",
+          "range": true,
+          "expr": "max(max_over_time(smartctl_device_temperature{device!~\"nvme.*\",temperature_type=\"current\",host=\"server\"}[$__interval]))",
+          "legendFormat": "Media disk max"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "J",
+          "editorMode": "code",
+          "range": true,
+          "expr": "max(avg_over_time(node_hwmon_temp_celsius{chip=\"nvme_nvme0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
           "legendFormat": "SSD"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "K",
+          "editorMode": "code",
+          "range": true,
+          "expr": "min(min_over_time(node_hwmon_temp_celsius{chip=\"nvme_nvme0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
+          "legendFormat": "SSD min"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "L",
+          "editorMode": "code",
+          "range": true,
+          "expr": "max(max_over_time(node_hwmon_temp_celsius{chip=\"nvme_nvme0\",sensor=\"temp1\",host=\"server\"}[$__interval]))",
+          "legendFormat": "SSD max"
         }
       ],
       "fieldConfig": {
@@ -1053,13 +1143,217 @@
             "spanNulls": false
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^CPU( min| max)?$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7EB26D"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^GPU( min| max)?$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#EAB839"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Media disk( min| max)?$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6ED0E0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^SSD( min| max)?$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#EF843C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/ (min|max)$/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "CPU min"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 15
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "GPU max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "GPU min"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 15
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Media disk max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "Media disk min"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 15
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SSD max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "SSD min"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 15
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 37,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "type": "timeseries",
+      "title": "CPU throttling",
+      "description": "How long the CPU was slowed down because it was too hot, in each bar's stretch of time.",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "interval": "1m",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "editorMode": "code",
+          "range": true,
+          "expr": "sum(increase(server_cpu_throttled_seconds_total{host=\"server\"}[$__interval]))",
+          "legendFormat": "Throttled"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi",
@@ -1076,7 +1370,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 19
       },
       "panels": []
     },
@@ -1093,7 +1387,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 15
+        "y": 20
       },
       "targets": [
         {
@@ -1164,7 +1458,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 15
+        "y": 20
       },
       "targets": [
         {
@@ -1235,7 +1529,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "targets": [
         {
@@ -1306,7 +1600,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 19
+        "y": 24
       },
       "targets": [
         {
@@ -1376,7 +1670,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 20
       },
       "targets": [
         {
@@ -1444,7 +1738,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 28
       },
       "targets": [
         {
@@ -1538,7 +1832,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 33
       },
       "panels": []
     },
@@ -1555,7 +1849,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 34
       },
       "targets": [
         {
@@ -1635,7 +1929,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 34
       },
       "targets": [
         {
@@ -1711,7 +2005,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 41
       },
       "panels": []
     },
@@ -1727,7 +2021,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 42
       },
       "description": "One row per disk, from its SMART data. Reallocated and pending sectors should stay 0. The self-test runs on Sundays at 03:00; wear is reported by the SSD only.",
       "targets": [
@@ -2100,7 +2394,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 42
+        "y": 47
       },
       "targets": [
         {
@@ -2177,7 +2471,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 42
+        "y": 47
       },
       "targets": [
         {
@@ -2240,7 +2534,7 @@
         "h": 4,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 47
       },
       "description": "Share of each disk that is still free. / is the SSD, /data the media disk.",
       "targets": [
@@ -2309,7 +2603,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 51
       },
       "panels": []
     },
@@ -2326,7 +2620,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 47
+        "y": 52
       },
       "targets": [
         {
@@ -2388,7 +2682,7 @@
         "h": 4,
         "w": 4,
         "x": 5,
-        "y": 47
+        "y": 52
       },
       "targets": [
         {
@@ -2465,7 +2759,7 @@
         "h": 4,
         "w": 5,
         "x": 9,
-        "y": 47
+        "y": 52
       },
       "targets": [
         {
@@ -2527,7 +2821,7 @@
         "h": 4,
         "w": 5,
         "x": 14,
-        "y": 47
+        "y": 52
       },
       "targets": [
         {
@@ -2589,7 +2883,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 47
+        "y": 52
       },
       "targets": [
         {
