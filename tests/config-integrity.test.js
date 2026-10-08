@@ -354,7 +354,12 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(caddyCard, 'services.yaml must list the Pi Caddy');
     assert.match(caddyCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*caddy/);
     const containers = [...servicesYamlContent.matchAll(/^\s*container:\s*(\S+)/gm)].map((m) => m[1]).sort();
-    assert.deepEqual(containers, ['caddy', 'pihole', 'unbound']);
+    assert.deepEqual(containers, ['caddy', 'pihole', 'unbound', 'uptime-kuma']);
+    const kumaCard = servicesYamlContent.match(/- Uptime Kuma:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(kumaCard, 'services.yaml must list Uptime Kuma');
+    assert.match(kumaCard[1], /href:\s*https:\/\/uptime\.spicy-llama\.duckdns\.org\s*$/m);
+    assert.match(kumaCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*uptime-kuma/);
+    assert.doesNotMatch(kumaCard[1], /siteMonitor:/, 'it is on the Pi: Docker status, not an HTTP check');
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
       Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, Cleanuparr: 11011,

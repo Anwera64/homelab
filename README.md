@@ -12,7 +12,7 @@ A three-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house net
 
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
-| **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
+| **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Uptime Kuma + ntfy (uptime checks on the server's services, and their alerts), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
 | **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Renovate (hourly runs that open the version bump PRs), and a nightly update that applies the merged ones. The media services: Jellyfin (NVENC), Seerr, Jellystat, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, and qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard). Their files are on a USB media disk at `/data` | [`hosts/server/`](hosts/server/README.md) |
 | **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Ollama (the chat model, on the RTX 5080). Alloy ships its container logs to the server | [`hosts/desktop/`](hosts/desktop/README.md) |
 
@@ -26,7 +26,7 @@ All three addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `ho
 * **HTTPS:** `*.spicy-llama.duckdns.org` resolves to lemonpi. **Caddy on the Pi** holds a Let's Encrypt wildcard certificate (DuckDNS DNS challenge). It serves Homepage and Pi-hole itself, and forwards each service to the port its container publishes on the server. There's no reverse proxy on the server.
 * **Remote access:** **Tailscale**. lemonpi advertises the home subnet (`192.168.1.0/24`) and is the tailnet's DNS, so phones get the same names, HTTPS and ad blocking away from home. No ports are forwarded to any service. At most, Tailscale's WireGuard UDP port (41641) is forwarded to the Pi, which helps direct connections but isn't required.
 * **Desktop off:** only the chat model is unavailable, because it runs on the desktop's Ollama. DNS, DHCP, Homepage, Pi-hole, remote access, the rest of the Hub, the media services and the logs keep working, because they are on the server.
-* **Server off:** DNS, DHCP and remote access keep working. The server's names return a 502 from the Pi's Caddy until it is back.
+* **Server off:** DNS, DHCP and remote access keep working. The server's names return a 502 from the Pi's Caddy until it is back. Uptime Kuma on lemonpi notices and ntfy pushes an alert to the phones.
 
 ```mermaid
 graph TD
@@ -39,6 +39,10 @@ graph TD
         CADDY[🔒 Caddy · *.spicy-llama.duckdns.org]
         CADDY --> HOMEPAGE[📊 Homepage]
         CADDY --> PIHOLE
+        subgraph Uptime [Uptime and alerts]
+            KUMA[📟 Uptime Kuma] -->|alerts| NTFY[🔔 ntfy]
+        end
+        CADDY --> KUMA & NTFY
     end
 
     CLIENTS -->|HTTPS| CADDY
@@ -90,6 +94,8 @@ graph TD
     Server -.->|Docker socket| ALLOY
     Desktop -.->|Docker socket| DALLOY
     CADDY -->|telemetry, token checked by the hub| ALLOY
+    KUMA -.->|HTTP checks| Server & OLLAMA
+    NTFY -.->|push| CLIENTS & REMOTE
 ```
 
 ---
@@ -100,6 +106,8 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | Dashboard: HTTP checks for the server's services, Docker status for the Pi's |
 | **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | DNS, ad blocking and DHCP |
+| **Uptime Kuma** | lemonpi | `https://uptime.spicy-llama.duckdns.org` | Uptime checks on the server's services, and their history (sign-in required) |
+| **ntfy** | lemonpi | `https://ntfy.spicy-llama.duckdns.org` | Pushes Uptime Kuma's alerts to the phones (sign-in required) |
 | **Jellyfin** | Server | `https://jellyfin.spicy-llama.duckdns.org` | NVENC transcoding on the server |
 | **Seerr** | Server | `https://seerr.spicy-llama.duckdns.org` | Request & discovery portal |
 | **Jellystat** | Server | `https://stat.spicy-llama.duckdns.org` | Playback analytics |
@@ -147,7 +155,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │   ├── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
 │   │   ├── README.md                # Pi setup, DHCP switch-over, checks, backups
 │   │   ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
-│   │   ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage
+│   │   ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage, Uptime Kuma, ntfy
 │   │   ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
 │   │   ├── caddy/
 │   │   │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
@@ -295,4 +303,4 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 📄 Acknowledgments
 
-[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/) · [Grafana](https://grafana.com/) · [Loki](https://grafana.com/oss/loki/) · [Alloy](https://grafana.com/oss/alloy-opentelemetry-collector/)
+[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/) · [Grafana](https://grafana.com/) · [Loki](https://grafana.com/oss/loki/) · [Alloy](https://grafana.com/oss/alloy-opentelemetry-collector/) · [Uptime Kuma](https://github.com/louislam/uptime-kuma) · [ntfy](https://ntfy.sh/)
