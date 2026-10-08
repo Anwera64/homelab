@@ -214,7 +214,8 @@ test('Pi README: the uptime checks and their alerts', async (t) => {
 
   await t.test('lists the monitors to add: the server by its published ports, from outside', () => {
     for (const needle of [
-      'http://192.168.1.30:3051/health', 'http://192.168.1.30:8096', 'http://192.168.1.30:8080', 'http://192.168.1.30:3002',
+      // The Hub's health check is under its API prefix; a bare /health answers 404.
+      'http://192.168.1.30:3051/api/v1/health', 'http://192.168.1.30:8096', 'http://192.168.1.30:8080', 'http://192.168.1.30:3002',
       // The machine itself, the Pi's own DNS and ntfy, and the desktop's Ollama.
       'Ping', 'http://ntfy/v1/health', 'http://192.168.1.20:11434',
     ]) {

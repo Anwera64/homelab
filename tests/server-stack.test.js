@@ -191,6 +191,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(hub.includes('- EMBEDDING_MODEL=bge-m3'));
     assert.ok(hub.includes('- household_hub_data:/data'));
     assert.ok(hub.includes('- 127.0.0.1:3050:3050'));
+    // The comment on that port names the health check where it really is.
+    assert.match(hub, /127\.0\.0\.1:3050:3050\s+#[^\n]*\/api\/v1\/health/);
     // Start order only: without the embedder the Hub still answers, by keywords.
     assert.deepEqual(dependsOn(hub), ['searxng', 'ollama']);
     assert.doesNotMatch(hub, /condition:/);
