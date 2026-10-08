@@ -233,3 +233,119 @@ test('Server dashboard', async (t) => {
     }
   });
 });
+
+test('Downloads dashboard', async (t) => {
+  const file = 'config/grafana/dashboards/downloads.json';
+  const raw = read(path.join(ROOT_DIR, file));
+  let dashboard = {};
+  try { dashboard = JSON.parse(raw); } catch { /* the first check reports it */ }
+  const panels = dashboard.panels || [];
+  const exprs = (panel) => (panel.targets || []).map((target) => target.expr);
+  const titled = (title) => panels.find((p) => p.title === title) || { gridPos: {}, fieldConfig: { defaults: {} }, targets: [] };
+  const bottom = (panel) => panel.gridPos.y + panel.gridPos.h;
+  // Megabits a second, from a counter of bytes.
+  const mbit = (counter, window) => `8 * rate(${counter}{host="server"}[${window}]) / 1e6`;
+  const DOWN = 'server_qbittorrent_downloaded_bytes_total';
+  const UP = 'server_qbittorrent_uploaded_bytes_total';
+
+  await t.test('is a file in the repo that Grafana loads, opening on the last week', () => {
+    assert.ok(raw, `${file} must exist`);
+    assert.equal(dashboard.uid, 'downloads');
+    assert.equal(dashboard.title, 'Downloads');
+    assert.deepEqual(dashboard.time, { from: 'now-7d', to: 'now' });
+    assert.equal(dashboard.editable, true);
+    assert.equal(dashboard.id, null);
+    const ignored = spawnSync('git', ['check-ignore', '-q', file], { cwd: ROOT_DIR }).status === 0;
+    assert.ok(!ignored, `${file} must not be git-ignored`);
+    for (const panel of panels) assert.ok(panel.gridPos.x + panel.gridPos.w <= 24, `${panel.title} fits the grid`);
+  });
+
+  await t.test('has three numbers on top: average download, peak download, average upload', () => {
+    const tiles = panels.filter((p) => p.type === 'stat').sort((a, b) => a.gridPos.x - b.gridPos.x);
+    assert.deepEqual(tiles.map((p) => p.title), ['Average download', 'Peak download', 'Average upload']);
+    for (const tile of tiles) {
+      assert.equal(tile.gridPos.y, 0);
+      assert.equal(tile.fieldConfig.defaults.unit, 'Mbits');
+    }
+    // Over the period picked at the top, from five-minute steps: a rate over the whole
+    // period reads low while the history is shorter than the period.
+    assert.deepEqual(exprs(titled('Average download')), [`avg_over_time((${mbit(DOWN, '5m')})[$__range:5m])`]);
+    assert.deepEqual(exprs(titled('Average upload')), [`avg_over_time((${mbit(UP, '5m')})[$__range:5m])`]);
+    // The fastest two minutes: the script writes the counters once a minute.
+    assert.deepEqual(exprs(titled('Peak download')), [`max_over_time((${mbit(DOWN, '2m')})[$__range:1m])`]);
+  });
+
+  await t.test('draws download and upload side by side, in megabits a second', () => {
+    const download = titled('Download');
+    const upload = titled('Upload');
+    for (const [panel, counter] of [[download, DOWN], [upload, UP]]) {
+      assert.equal(panel.type, 'timeseries');
+      assert.equal(panel.fieldConfig.defaults.unit, 'Mbits');
+      assert.equal(panel.gridPos.w, 12);
+      // One sample a minute: a shorter step would have nothing to take a rate of.
+      assert.equal(panel.interval, '2m');
+      assert.deepEqual(exprs(panel), [mbit(counter, '$__interval')]);
+    }
+    assert.equal(download.gridPos.x, 0);
+    assert.equal(upload.gridPos.x, 12);
+    assert.equal(download.gridPos.y, upload.gridPos.y);
+    assert.equal(download.gridPos.y, bottom(titled('Average download')), 'right under the numbers');
+  });
+
+  await t.test('shows the Wi-Fi band and whether qBittorrent can be reached as two coloured strips under the graphs', () => {
+    const band = titled('Wi-Fi band');
+    const reach = titled('Connectable');
+    for (const strip of [band, reach]) {
+      assert.equal(strip.type, 'state-timeline');
+      // Coloured by thresholds, Grafana draws threshold ranges ("-∞+") instead of the states.
+      assert.equal(strip.fieldConfig.defaults.color.mode, 'fixed');
+      assert.equal(strip.fieldConfig.defaults.thresholds, undefined);
+      assert.equal(strip.gridPos.x, 0);
+      assert.equal(strip.gridPos.w, 24);
+    }
+    assert.equal(band.gridPos.y, bottom(titled('Download')));
+    assert.equal(reach.gridPos.y, bottom(band));
+    const texts = (panel) => Object.fromEntries(Object.entries(panel.fieldConfig.defaults.mappings[0].options).map(([value, { text }]) => [value, text]));
+    const colours = (panel) => Object.values(panel.fieldConfig.defaults.mappings[0].options).map(({ color }) => color);
+    // 1 above 4 GHz, 0 below: the node exporter's Wi-Fi collector gives the frequency in hertz.
+    assert.deepEqual(exprs(band), ['max(node_wifi_interface_frequency_hertz{host="server"}) > bool 4e9']);
+    assert.deepEqual(texts(band), { 0: '2.4 GHz', 1: '5 GHz' });
+    assert.deepEqual(exprs(reach), ['max(server_qbittorrent_connectable{host="server"})']);
+    assert.deepEqual(texts(reach), { 0: 'firewalled', 1: 'connected' });
+    for (const strip of [band, reach]) assert.equal(new Set(colours(strip)).size, 2, 'one colour for each state');
+  });
+
+  await t.test('draws the peer connections across the page, under the strips', () => {
+    const peers = titled('Peer connections');
+    assert.equal(peers.type, 'timeseries');
+    assert.equal(peers.gridPos.w, 24);
+    assert.equal(peers.gridPos.y, bottom(titled('Connectable')));
+    assert.deepEqual(exprs(peers), ['max(server_qbittorrent_peer_connections{host="server"})']);
+  });
+
+  await t.test('marks when the VPN connected and when port forwarding failed, from Gluetun\'s log', () => {
+    const marks = Object.fromEntries(dashboard.annotations.list.map((a) => [a.name, a]));
+    assert.deepEqual(Object.keys(marks), ['VPN connected', 'Port forwarding failed']);
+    assert.equal(marks['VPN connected'].expr, '{container="gluetun"} |= "Public IP address is"');
+    assert.equal(marks['Port forwarding failed'].expr, '{container="gluetun"} |= "adding port mapping"');
+    for (const mark of Object.values(marks)) {
+      assert.deepEqual(mark.datasource, { type: 'loki', uid: 'loki' });
+      // Each has its own switch at the top of the dashboard.
+      assert.equal(mark.enable, true);
+      assert.notEqual(mark.hide, true);
+    }
+    assert.notEqual(marks['VPN connected'].iconColor, marks['Port forwarding failed'].iconColor);
+  });
+
+  await t.test('asks only for numbers the Wi-Fi collector and the host script really report', () => {
+    const script = read(path.join(ROOT_DIR, 'hosts/server/system/server-metrics.sh'));
+    const used = new Set(panels.flatMap(exprs).flatMap((expr) => expr.match(/\b(?:node|server)_[A-Za-z0-9_]+/g) || []));
+    assert.deepEqual([...used].sort(), [
+      'node_wifi_interface_frequency_hertz', DOWN, 'server_qbittorrent_connectable', 'server_qbittorrent_peer_connections', UP,
+    ].sort());
+    for (const name of [...used].filter((n) => n.startsWith('server_'))) assert.ok(script.includes(name), `the host script must write ${name}`);
+    // The Wi-Fi collector is off unless asked for.
+    assert.ok(compose.includes('- --collector.wifi'));
+    for (const panel of panels) assert.deepEqual(panel.datasource, { type: 'prometheus', uid: 'prometheus' }, `${panel.title} must use Prometheus`);
+  });
+});

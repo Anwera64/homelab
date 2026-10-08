@@ -9,6 +9,8 @@
 #                      has been slowed down for heat
 #   server_smart.prom  each disk's latest self-test: passed or not, and the
 #                      disk's power-on hours when it ran
+#   server_qbittorrent.prom  what qBittorrent has downloaded and uploaded, its
+#                      peers and whether they can reach it (the Downloads dashboard)
 #
 # Runs every minute from server-metrics.timer, as root (smartctl needs it).
 # ==============================================================================
@@ -45,6 +47,27 @@ mkdir -p "$TEXTFILE_DIR"
     printf 'server_cpu_throttled_seconds_total %d.%03d\n' "$((ms / 1000))" "$((ms % 1000))"
   fi
 } | write_prom "$TEXTFILE_DIR/server_host.prom"
+
+# qBittorrent has Gluetun's network, and its Web UI lets Gluetun's localhost in
+# without a login while port forwarding is on. When it does not answer (a login
+# is asked for, or Gluetun is stopped) only "up 0" is written.
+{
+  state="$(timeout 10 docker exec gluetun wget -qO- http://127.0.0.1:8080/api/v2/sync/maindata 2>/dev/null \
+    | jq -c '.server_state | select(.alltime_dl != null)' 2>/dev/null || true)"
+  if [ -n "$state" ]; then
+    echo "server_qbittorrent_up 1"
+    # All-time counters, so a restart of qBittorrent does not start them again.
+    # "connected" means other peers can reach its port; "firewalled" that they cannot.
+    jq -r '
+      "server_qbittorrent_downloaded_bytes_total \(.alltime_dl)",
+      "server_qbittorrent_uploaded_bytes_total \(.alltime_ul)",
+      "server_qbittorrent_connectable \(if .connection_status == "connected" then 1 else 0 end)",
+      "server_qbittorrent_peer_connections \(.total_peer_connections)"
+    ' <<<"$state"
+  else
+    echo "server_qbittorrent_up 0"
+  fi
+} | write_prom "$TEXTFILE_DIR/server_qbittorrent.prom"
 
 # The latest self-test of one disk, as "passed hours", or nothing when it has
 # never run one. ATA disks say passed or not; NVMe gives a result code, 0 for passed.

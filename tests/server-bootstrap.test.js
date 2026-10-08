@@ -634,11 +634,19 @@ test('Server host metrics', async (t) => {
   const NVME_FAILED = JSON.stringify({ nvme_self_test_log: { table: [
     { self_test_code: { value: 1 }, self_test_result: { value: 7, string: 'Completed: failed segments' }, power_on_hours: 2107 },
   ] } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null } = {}) => {
+  // What qBittorrent's sync/maindata answers, cut down to the part the script reads.
+  const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
+    alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
+  } });
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
     fs.mkdirSync(bin);
+    // docker answers the one call the script makes; with nothing to say it fails, as it
+    // does when Gluetun is stopped or qBittorrent wants a login.
+    const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\n${answer}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
     // --scan lists the devices; a device with no answer here is asleep (exit 2).
     const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
@@ -725,6 +733,49 @@ test('Server host metrics', async (t) => {
     assert.equal(run().status, 0);
     assert.match(prom('server_smart.prom'), /^server_smart_selftest_passed\{device="sda"\} 1$/m);
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('ask qBittorrent through Gluetun\'s localhost, with no login of their own', () => {
+    // qBittorrent has Gluetun's network; its Web UI lets Gluetun's localhost in while port forwarding is on.
+    assert.match(script, /docker exec gluetun wget -qO- http:\/\/127\.0\.0\.1:8080\/api\/v2\/sync\/maindata/);
+    assert.doesNotMatch(script, /QBITTORRENT_(USERNAME|PASSWORD)|auth\/login|\.env/, 'no credentials are read');
+  });
+
+  await t.test('report what qBittorrent has downloaded and uploaded, its peers and whether it can be reached', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const qbt = prom('server_qbittorrent.prom');
+    assert.match(qbt, /^server_qbittorrent_up 1$/m);
+    // All-time counters: they keep counting across qBittorrent's restarts.
+    assert.match(qbt, /^server_qbittorrent_downloaded_bytes_total 2762556297724$/m);
+    assert.match(qbt, /^server_qbittorrent_uploaded_bytes_total 829953468616$/m);
+    assert.match(qbt, /^server_qbittorrent_connectable 1$/m);
+    assert.match(qbt, /^server_qbittorrent_peer_connections 67$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_qbittorrent.prom')).mode & 0o777, 0o644);
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun wget /m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say qBittorrent cannot be reached while its forwarded port is gone', { skip: !canRun && 'needs bash and jq' }, () => {
+    // Gluetun's port forwarding failed: qBittorrent listens on nothing and says "firewalled".
+    const { root, run, prom } = setup({ qbittorrent: maindata({ connection_status: 'firewalled', total_peer_connections: 17 }) });
+    assert.equal(run().status, 0);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 0$/m);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_peer_connections 17$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say only that qBittorrent did not answer when it wants a login or Gluetun is stopped', { skip: !canRun && 'needs bash and jq' }, () => {
+    for (const qbittorrent of [null, 'Forbidden', '']) {
+      const { root, run, prom } = setup({ qbittorrent });
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(prom('server_qbittorrent.prom'), 'server_qbittorrent_up 0\n');
+      // The rest of the host's numbers do not depend on it.
+      assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -825,16 +876,26 @@ test('Server Wi-Fi band', async (t) => {
     assert.match(script, /command -v wpa_cli/, 'a machine without wpa_supplicant is left alone');
   });
 
+  await t.test('keeps the router\'s radio addresses out of the repo', () => {
+    // A radio's address can be looked up to a street. The ones below are invented:
+    // locally administered (02:...) for our network, aa:... for the neighbours.
+    const here = read(__filename);
+    const addresses = here.match(/\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b/gi) || [];
+    assert.ok(addresses.length > 5, 'the fixtures should be found');
+    for (const address of addresses) assert.match(address, /^(02:00:00|aa:aa:aa):/, `${address} must be an invented address`);
+    assert.doesNotMatch(script + read(path.join(SERVER_DIR, 'README.md')), /\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b/i);
+  });
+
   // Behaviour, with a stub wpa_cli on PATH that answers from two files and logs its calls.
   const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
-  const OURS_24 = '5a:d3:12:10:c4:22\t2462\t-47\t[WPA2-PSK-CCMP][ESS]\tHome';
+  const OURS_24 = '02:00:00:00:00:24\t2462\t-47\t[WPA2-PSK-CCMP][ESS]\tHome';
   const setup = ({ freq = 2462, state = 'COMPLETED', scan = [], iface = 'wlan9' } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-wifi-'));
     const bin = path.join(root, 'bin');
     const log = path.join(root, 'calls.log');
     fs.mkdirSync(bin);
     fs.mkdirSync(path.join(root, 'sys'));
-    fs.writeFileSync(path.join(root, 'status'), `bssid=5a:d3:12:10:c4:22\nfreq=${freq}\nssid=Home\nwpa_state=${state}\n`);
+    fs.writeFileSync(path.join(root, 'status'), `bssid=02:00:00:00:00:24\nfreq=${freq}\nssid=Home\nwpa_state=${state}\n`);
     fs.writeFileSync(path.join(root, 'scan'), ['bssid / frequency / signal level / flags / ssid', ...scan].join('\n') + '\n');
     fs.writeFileSync(path.join(bin, 'wpa_cli'), [
       '#!/bin/sh',
@@ -865,17 +926,17 @@ test('Server Wi-Fi band', async (t) => {
   });
 
   await t.test('GIVEN 2.4 GHz and the same network on 5 GHz WHEN it runs THEN it scans, roams there and says so', { skip }, () => {
-    const { root, run, calls } = setup({ scan: [OURS_24, '5a:d3:12:10:c4:23\t5600\t-54\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    const { root, run, calls } = setup({ scan: [OURS_24, '02:00:00:00:00:50\t5600\t-54\t[WPA2-PSK-CCMP][ESS]\tHome'] });
     const result = run();
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(calls(), ['-i wlan9 status', '-i wlan9 scan', '-i wlan9 scan_results', '-i wlan9 roam 5a:d3:12:10:c4:23']);
+    assert.deepEqual(calls(), ['-i wlan9 status', '-i wlan9 scan', '-i wlan9 scan_results', '-i wlan9 roam 02:00:00:00:00:50']);
     assert.match(result.stdout, /2462 MHz -> 5600 MHz/);
     assert.match(result.stdout, /-54 dBm/);
     fs.rmSync(root, { recursive: true, force: true });
   });
 
   await t.test('GIVEN 2.4 GHz and a 5 GHz signal too weak to be worth it WHEN it runs THEN it stays', { skip }, () => {
-    const { root, run, calls } = setup({ scan: [OURS_24, '5a:d3:12:10:c4:23\t5600\t-80\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    const { root, run, calls } = setup({ scan: [OURS_24, '02:00:00:00:00:50\t5600\t-80\t[WPA2-PSK-CCMP][ESS]\tHome'] });
     assert.equal(run().status, 0);
     assert.ok(!calls().some((call) => call.includes('roam')), 'below -70 dBm it must not roam');
     fs.rmSync(root, { recursive: true, force: true });
@@ -883,7 +944,7 @@ test('Server Wi-Fi band', async (t) => {
 
   await t.test('GIVEN 2.4 GHz and only other networks on 5 GHz WHEN it runs THEN it stays', { skip }, () => {
     // A neighbour, and a network whose name merely starts with ours.
-    const { root, run, calls } = setup({ scan: [OURS_24, 'aa:aa:aa:aa:aa:01\t5180\t-40\t[WPA2-PSK-CCMP][ESS]\tNeighbour', '58:d3:12:70:c4:23\t5600\t-50\t[WPA2-SAE-CCMP][ESS]\tHome-WiFi7'] });
+    const { root, run, calls } = setup({ scan: [OURS_24, 'aa:aa:aa:aa:aa:01\t5180\t-40\t[WPA2-PSK-CCMP][ESS]\tNeighbour', '02:00:00:00:07:50\t5600\t-50\t[WPA2-SAE-CCMP][ESS]\tHome-WiFi7'] });
     assert.equal(run().status, 0);
     assert.ok(!calls().some((call) => call.includes('roam')));
     fs.rmSync(root, { recursive: true, force: true });

@@ -490,6 +490,20 @@ test('Server README', async (t) => {
     assert.match(qbit, /port forwarding/, 'the localhost box depends on port forwarding');
   });
 
+  await t.test('says what the Downloads dashboard shows, where its numbers come from and when they stop', () => {
+    const section = readme.match(/## The downloads dashboard\n([\s\S]*?)(?=\n## |(?![\s\S]))/);
+    assert.ok(section, 'the README must have a section for the downloads dashboard');
+    assert.ok(section[1].includes('config/grafana/dashboards/downloads.json'));
+    for (const shown of ['Average download', 'Peak download', 'Average upload', 'Wi-Fi band', 'Connectable', 'Peer connections']) {
+      assert.ok(section[1].includes(shown), `it must name ${shown}`);
+    }
+    assert.match(section[1], /megabits/i);
+    // The numbers are qBittorrent's own, read without a login through Gluetun.
+    assert.match(section[1], /Bypass authentication for clients on localhost/);
+    assert.match(section[1], /server_qbittorrent_up/, 'how to tell that qBittorrent stopped answering');
+    assert.match(section[1], /once a minute/);
+  });
+
   await t.test('says where the machine\'s own numbers are kept and where to look at them', () => {
     // In the "What runs here" table: the store and its exporters, and the timer behind the host's numbers.
     assert.match(readme, /^\| Metrics \(Docker\) \|.*Prometheus.*a year/m);
