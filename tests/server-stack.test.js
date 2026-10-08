@@ -434,6 +434,18 @@ test('Server README', async (t) => {
     assert.doesNotMatch(maintainerr, /answers the whole LAN/);
   });
 
+  await t.test('says why the Wi-Fi is moved to 5 GHz, how to see it and how to switch it off', () => {
+    assert.match(readme, /^\| Wi-Fi band \(systemd timer\) \|.*5 GHz/m, 'a row in "What runs here"');
+    const section = readme.match(/## Wi-Fi\n([\s\S]*?)(?=\n## |(?![\s\S]))/);
+    assert.ok(section, 'the README must have a Wi-Fi section');
+    assert.match(section[1], /2\.4 GHz/);
+    assert.match(section[1], /fallback/, '2.4 GHz stays available');
+    assert.ok(section[1].includes('journalctl -u server-wifi-band'), 'where each move is written');
+    assert.ok(section[1].includes('iw dev wlp7s0 link'), 'how to see the band');
+    assert.ok(section[1].includes('systemctl disable --now server-wifi-band.timer'), 'how to switch it off');
+    assert.doesNotMatch(section[1], /\/etc\/network\/interfaces[^.]*\bedit/, 'it changes no settings file');
+  });
+
   await t.test('says where the machine\'s own numbers are kept and where to look at them', () => {
     // In the "What runs here" table: the store and its exporters, and the timer behind the host's numbers.
     assert.match(readme, /^\| Metrics \(Docker\) \|.*Prometheus.*a year/m);

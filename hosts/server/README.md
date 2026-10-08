@@ -21,6 +21,7 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Disk guard | Stops the media services while the media disk is unplugged. When it is plugged back in, checks the filesystem, mounts it and starts them again. |
 | smartd | Runs a short self-test on both disks every Sunday at 03:00. |
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
+| Wi-Fi band (systemd timer) | Once every minute, moves the Wi-Fi back to 5 GHz when the card has settled on 2.4 GHz. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
 | Renovate (Docker, systemd timer) | Runs every hour: opens the weekly version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
 | Nightly update (systemd timer) | At 04:00, brings in what was merged on GitHub and restarts the stack when something changed. |
@@ -196,6 +197,32 @@ When a panel is empty, look at Prometheus' log and at its own target list:
 docker logs prometheus
 docker exec prometheus wget -qO- localhost:9090/api/v1/targets
 ```
+
+## Wi-Fi
+
+The laptop is on Wi-Fi, and its card (one antenna, Wi-Fi 5) is several times faster on 5 GHz than on 2.4 GHz. Measured on 2026-10-08 with eight downloads at once:
+
+| Band | Link rate | Download |
+| --- | --- | --- |
+| 2.4 GHz | 96 Mbit/s | 2 to 3 MB/s |
+| 5 GHz | 433 Mbit/s | 17 to 20 MB/s |
+
+The Livebox gives one network name on both bands. Once the card is on 2.4 GHz it stays there: `wpa_supplicant` does not leave a strong signal, and the 2.4 GHz one is strong.
+
+`server-wifi-band.timer` checks every minute. When the card is on 2.4 GHz and the same network answers on 5 GHz at -70 dBm or better, it asks `wpa_supplicant` to roam there. It excludes no band and changes no settings, so 2.4 GHz is still the fallback when 5 GHz is out of reach. While the card is on 2.4 GHz each check scans, which can stall traffic for a few seconds.
+
+```bash
+iw dev wlp7s0 link                 # the band it is on now (freq) and the link rate
+journalctl -u server-wifi-band     # one line for every move
+```
+
+If the journal shows a move every few minutes, the Livebox is sending the laptop back to 2.4 GHz. Switch the check off rather than let the two fight:
+
+```bash
+sudo systemctl disable --now server-wifi-band.timer
+```
+
+A cable to the Livebox makes all of this unnecessary: the check does nothing on a machine without a connected Wi-Fi card.
 
 ## Battery
 
