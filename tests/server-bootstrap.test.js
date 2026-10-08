@@ -11,6 +11,7 @@ const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
 const SCRIPTS = [
   'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
   'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh', 'system/server-metrics.sh',
+  'system/server-wifi-band.sh',
 ];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
@@ -789,6 +790,124 @@ test('Server Renovate runs', async (t) => {
     assert.equal(calls().trim(), `docker compose --project-directory ${serverDir} --profile renovate up --exit-code-from renovate renovate`);
     // The token is read by compose from .env; it must never be printed.
     assert.doesNotMatch(result.stdout + result.stderr, /github_pat_example/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server Wi-Fi band', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-wifi-band.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-wifi-band.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-wifi-band.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('is checked every minute, from a timer', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:30$/m, 'off the minute, beside the host metrics');
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-wifi-band\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, outside the laptop section', () => {
+    assert.match(bootstrap, /^place_unit server-wifi-band\.service/m);
+    assert.match(bootstrap, /^install_unit server-wifi-band\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-wifi-band\.service/);
+    const step = at(bootstrap, 'install_unit server-wifi-band.timer');
+    assert.ok(step > at(bootstrap, 'rfkill unblock all'), 'after the radios are on');
+    assert.ok(step < at(bootstrap, '# >>> laptop'), 'any machine on Wi-Fi wants it');
+  });
+
+  await t.test('only asks for a roam: it excludes no band and never takes the link down', () => {
+    assert.ok(script, 'server-wifi-band.sh must exist');
+    assert.match(script, /roam/);
+    assert.doesNotMatch(script, /freq_list|set_network|ifdown|ifup|reassociate|disconnect/);
+    assert.doesNotMatch(script, /\/etc\/network/, 'the Wi-Fi settings and their password are left alone');
+    assert.match(script, /command -v wpa_cli/, 'a machine without wpa_supplicant is left alone');
+  });
+
+  // Behaviour, with a stub wpa_cli on PATH that answers from two files and logs its calls.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const OURS_24 = '5a:d3:12:10:c4:22\t2462\t-47\t[WPA2-PSK-CCMP][ESS]\tHome';
+  const setup = ({ freq = 2462, state = 'COMPLETED', scan = [], iface = 'wlan9' } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-wifi-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(root, 'sys'));
+    fs.writeFileSync(path.join(root, 'status'), `bssid=5a:d3:12:10:c4:22\nfreq=${freq}\nssid=Home\nwpa_state=${state}\n`);
+    fs.writeFileSync(path.join(root, 'scan'), ['bssid / frequency / signal level / flags / ssid', ...scan].join('\n') + '\n');
+    fs.writeFileSync(path.join(bin, 'wpa_cli'), [
+      '#!/bin/sh',
+      `echo "$*" >> "${log}"`,
+      'shift 2',
+      'case "$1" in',
+      `  status) cat "${root}/status" ;;`,
+      `  scan_results) cat "${root}/scan" ;;`,
+      '  *) echo OK ;;',
+      'esac',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_WIFI_SCAN_WAIT: '0', SERVER_WIFI_SYS: path.join(root, 'sys') };
+    if (iface) env.SERVER_WIFI_IF = iface;
+    const run = () => spawnSync(path.join(SYSTEM_DIR, 'server-wifi-band.sh'), [], { encoding: 'utf8', env });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : []);
+    return { root, run, calls };
+  };
+  const skip = !canRun && 'needs bash';
+
+  await t.test('GIVEN the link is on 5 GHz WHEN it runs THEN it neither scans nor roams', { skip }, () => {
+    const { root, run, calls } = setup({ freq: 5600 });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), ['-i wlan9 status']);
+    assert.equal(result.stdout, '', 'a quiet minute leaves no line in the journal');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and the same network on 5 GHz WHEN it runs THEN it scans, roams there and says so', { skip }, () => {
+    const { root, run, calls } = setup({ scan: [OURS_24, '5a:d3:12:10:c4:23\t5600\t-54\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), ['-i wlan9 status', '-i wlan9 scan', '-i wlan9 scan_results', '-i wlan9 roam 5a:d3:12:10:c4:23']);
+    assert.match(result.stdout, /2462 MHz -> 5600 MHz/);
+    assert.match(result.stdout, /-54 dBm/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and a 5 GHz signal too weak to be worth it WHEN it runs THEN it stays', { skip }, () => {
+    const { root, run, calls } = setup({ scan: [OURS_24, '5a:d3:12:10:c4:23\t5600\t-80\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    assert.equal(run().status, 0);
+    assert.ok(!calls().some((call) => call.includes('roam')), 'below -70 dBm it must not roam');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and only other networks on 5 GHz WHEN it runs THEN it stays', { skip }, () => {
+    // A neighbour, and a network whose name merely starts with ours.
+    const { root, run, calls } = setup({ scan: [OURS_24, 'aa:aa:aa:aa:aa:01\t5180\t-40\t[WPA2-PSK-CCMP][ESS]\tNeighbour', '58:d3:12:70:c4:23\t5600\t-50\t[WPA2-SAE-CCMP][ESS]\tHome-WiFi7'] });
+    assert.equal(run().status, 0);
+    assert.ok(!calls().some((call) => call.includes('roam')));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN two 5 GHz radios of the same network WHEN it runs THEN it roams to the stronger', { skip }, () => {
+    const { root, run, calls } = setup({ scan: ['aa:aa:aa:aa:aa:02\t5180\t-66\t[ESS]\tHome', OURS_24, 'aa:aa:aa:aa:aa:03\t5500\t-51\t[ESS]\tHome'] });
+    assert.equal(run().status, 0);
+    assert.equal(calls().at(-1), '-i wlan9 roam aa:aa:aa:aa:aa:03');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN the Wi-Fi is not connected WHEN it runs THEN it leaves the connecting to wpa_supplicant', { skip }, () => {
+    const { root, run, calls } = setup({ state: 'SCANNING' });
+    assert.equal(run().status, 0);
+    assert.deepEqual(calls(), ['-i wlan9 status']);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN a machine with no Wi-Fi interface WHEN it runs THEN it does nothing', { skip }, () => {
+    const { root, run, calls } = setup({ iface: null });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), []);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

@@ -110,6 +110,10 @@ if grep -qx 1 /sys/class/rfkill/rfkill*/soft 2>/dev/null; then
   rfkill unblock all
 fi
 
+step "Wi-Fi band every minute: back to 5 GHz when the card has settled on 2.4 GHz"
+place_unit server-wifi-band.service && systemctl daemon-reload
+install_unit server-wifi-band.timer
+
 step "Docker"
 if ! command -v docker >/dev/null 2>&1; then
   install -m 0755 -d /etc/apt/keyrings

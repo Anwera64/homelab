@@ -1,0 +1,8 @@
+[Unit]
+Description=Wi-Fi band check, every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:30
+
+[Install]
+WantedBy=timers.target
