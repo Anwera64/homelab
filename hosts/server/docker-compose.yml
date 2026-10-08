@@ -389,7 +389,7 @@ services:
     volumes:
       - household_hub_data:/data
     ports:
-      - 127.0.0.1:3050:3050   # /docs and /health from the server itself
+      - 127.0.0.1:3050:3050   # /docs and /api/v1/health from the server itself
       - 3051:3050             # LAN, for the Pi's Caddy (hub.spicy-llama.duckdns.org)
     depends_on:
       - searxng

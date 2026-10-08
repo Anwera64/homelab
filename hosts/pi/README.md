@@ -86,7 +86,7 @@ Add them by hand in the Uptime Kuma page. From here Kuma reaches the server's se
 | Monitor | Type | Address |
 | --- | --- | --- |
 | The server | Ping | `192.168.1.30` |
-| Household Hub | HTTP | `http://192.168.1.30:3051/health` |
+| Household Hub | HTTP | `http://192.168.1.30:3051/api/v1/health` |
 | Jellyfin | HTTP | `http://192.168.1.30:8096` |
 | Seerr | HTTP | `http://192.168.1.30:5055` |
 | Jellystat | HTTP | `http://192.168.1.30:3005` |
