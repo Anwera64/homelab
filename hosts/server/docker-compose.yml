@@ -553,6 +553,8 @@ services:
       - --path.rootfs=/host
       # Numbers the host's own scripts leave (system/server-update.sh, system/server-metrics.sh).
       - --collector.textfile.directory=/host/var/lib/node_exporter/textfile
+      # Off by default: the Wi-Fi band and link rate (the Downloads dashboard).
+      - --collector.wifi
     volumes:
       - /:/host:ro,rslave
     mem_limit: 128m

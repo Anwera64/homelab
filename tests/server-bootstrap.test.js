@@ -634,11 +634,19 @@ test('Server host metrics', async (t) => {
   const NVME_FAILED = JSON.stringify({ nvme_self_test_log: { table: [
     { self_test_code: { value: 1 }, self_test_result: { value: 7, string: 'Completed: failed segments' }, power_on_hours: 2107 },
   ] } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null } = {}) => {
+  // What qBittorrent's sync/maindata answers, cut down to the part the script reads.
+  const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
+    alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
+  } });
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
     fs.mkdirSync(bin);
+    // docker answers the one call the script makes; with nothing to say it fails, as it
+    // does when Gluetun is stopped or qBittorrent wants a login.
+    const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\n${answer}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
     // --scan lists the devices; a device with no answer here is asleep (exit 2).
     const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
@@ -725,6 +733,49 @@ test('Server host metrics', async (t) => {
     assert.equal(run().status, 0);
     assert.match(prom('server_smart.prom'), /^server_smart_selftest_passed\{device="sda"\} 1$/m);
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('ask qBittorrent through Gluetun\'s localhost, with no login of their own', () => {
+    // qBittorrent has Gluetun's network; its Web UI lets Gluetun's localhost in while port forwarding is on.
+    assert.match(script, /docker exec gluetun wget -qO- http:\/\/127\.0\.0\.1:8080\/api\/v2\/sync\/maindata/);
+    assert.doesNotMatch(script, /QBITTORRENT_(USERNAME|PASSWORD)|auth\/login|\.env/, 'no credentials are read');
+  });
+
+  await t.test('report what qBittorrent has downloaded and uploaded, its peers and whether it can be reached', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const qbt = prom('server_qbittorrent.prom');
+    assert.match(qbt, /^server_qbittorrent_up 1$/m);
+    // All-time counters: they keep counting across qBittorrent's restarts.
+    assert.match(qbt, /^server_qbittorrent_downloaded_bytes_total 2762556297724$/m);
+    assert.match(qbt, /^server_qbittorrent_uploaded_bytes_total 829953468616$/m);
+    assert.match(qbt, /^server_qbittorrent_connectable 1$/m);
+    assert.match(qbt, /^server_qbittorrent_peer_connections 67$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_qbittorrent.prom')).mode & 0o777, 0o644);
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun wget /m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say qBittorrent cannot be reached while its forwarded port is gone', { skip: !canRun && 'needs bash and jq' }, () => {
+    // Gluetun's port forwarding failed: qBittorrent listens on nothing and says "firewalled".
+    const { root, run, prom } = setup({ qbittorrent: maindata({ connection_status: 'firewalled', total_peer_connections: 17 }) });
+    assert.equal(run().status, 0);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 0$/m);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_peer_connections 17$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say only that qBittorrent did not answer when it wants a login or Gluetun is stopped', { skip: !canRun && 'needs bash and jq' }, () => {
+    for (const qbittorrent of [null, 'Forbidden', '']) {
+      const { root, run, prom } = setup({ qbittorrent });
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(prom('server_qbittorrent.prom'), 'server_qbittorrent_up 0\n');
+      // The rest of the host's numbers do not depend on it.
+      assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

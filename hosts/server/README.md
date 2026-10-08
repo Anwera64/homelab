@@ -222,6 +222,25 @@ docker logs prometheus
 docker exec prometheus wget -qO- localhost:9090/api/v1/targets
 ```
 
+## The downloads dashboard
+
+Also in Grafana, named "Downloads", opening on the last 7 days. It shows how fast qBittorrent moves data and what around it changed. Speeds are in megabits a second.
+
+| Part | What it shows |
+| --- | --- |
+| Average download, Peak download, Average upload | Three numbers for the period picked at the top right. The peak is the fastest two minutes. |
+| Download, Upload | The speed over time, side by side. |
+| Wi-Fi band | A strip: green on 5 GHz, orange on 2.4 GHz, where the card is several times slower. |
+| Connectable | A strip: green while other peers can reach qBittorrent's forwarded port, red while they cannot ("firewalled"). |
+| Peer connections | How many peers qBittorrent is connected to. |
+| Markers | Blue when the VPN connected (or changed server), red when Gluetun's port forwarding failed. Both are read from Gluetun's log and can be switched off at the top. |
+
+The speeds, the peers and "connectable" are qBittorrent's own numbers. `server-metrics.sh` reads them once a minute through Gluetun, with no login of its own: that works while "Bypass authentication for clients on localhost" is ticked in qBittorrent (see "VPN provider"). When qBittorrent does not answer, the script writes `server_qbittorrent_up 0` and those panels stay empty. A loss of the port shorter than a minute can fall between two readings of "Connectable"; the red markers are exact.
+
+The Wi-Fi band comes from the node exporter's Wi-Fi collector.
+
+The dashboard is the file `config/grafana/dashboards/downloads.json`, and follows the same rule as the server dashboard: a change worth keeping goes back into the file.
+
 ## Wi-Fi
 
 The laptop is on Wi-Fi, and its card (one antenna, Wi-Fi 5) is several times faster on 5 GHz than on 2.4 GHz. Measured on 2026-10-08 with eight downloads at once:
