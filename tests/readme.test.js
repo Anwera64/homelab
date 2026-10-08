@@ -176,26 +176,30 @@ test('Root README matches the repository', async (t) => {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
   });
-  await t.test('the uptime checks and their alerts are on the server in the Hosts table, the graph and the endpoints', () => {
+  await t.test('the uptime checks and their alerts are on lemonpi in the Hosts table, the graph and the endpoints', () => {
+    const piRow = readme.match(/^\| \*\*lemonpi\*\*.*$/m)[0];
     const serverRow = readme.match(/^\| \*\*Server\*\*.*$/m)[0];
     for (const service of ['Uptime Kuma', 'ntfy']) {
-      assert.ok(serverRow.includes(service), `the Server row must name ${service}`);
+      assert.ok(piRow.includes(service), `the lemonpi row must name ${service}`);
+      // On the server they could not report the server's own outage.
+      assert.ok(!serverRow.includes(service), `${service} does not run on the server`);
     }
-    assert.match(readme, /^\| \*\*Uptime Kuma\*\* \| Server \| `https:\/\/uptime\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
-    assert.match(readme, /^\| \*\*ntfy\*\* \| Server \| `https:\/\/ntfy\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*Uptime Kuma\*\* \| lemonpi \| `https:\/\/uptime\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
+    assert.match(readme, /^\| \*\*ntfy\*\* \| lemonpi \| `https:\/\/ntfy\.spicy-llama\.duckdns\.org` \| [^|]+\|$/m);
 
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
-    const server = graph.match(/subgraph Server \[[^\]]*\]\n([\s\S]*?)\n    end/)[1];
-    const uptime = server.match(/subgraph Uptime \[Uptime and alerts\]\n([\s\S]*?)\n\s*end/);
-    assert.ok(uptime, 'the Uptime subgraph must be inside the server');
+    const pi = graph.match(/subgraph Pi \[[^\]]*\]\n([\s\S]*?)\n    end/)[1];
+    const uptime = pi.match(/subgraph Uptime \[Uptime and alerts\]\n([\s\S]*?)\n\s*end/);
+    assert.ok(uptime, 'the Uptime subgraph must be inside the Pi');
     assert.match(uptime[1], /KUMA\[[^\]]*Uptime Kuma[^\]]*\] -->\|alerts\| NTFY\[[^\]]*ntfy[^\]]*\]/);
-    assert.match(graph, /CADDY -->\|published LAN ports\|[^\n]*\bKUMA\b[^\n]*\bNTFY\b/, 'Caddy must route to both in the graph');
-    // What it watches outside the server; the checks inside the stack get no edges.
-    assert.match(graph, /KUMA -\.->\|HTTP checks\| PIHOLE & OLLAMA/);
+    assert.match(pi, /CADDY --> KUMA & NTFY/, 'Caddy serves both from the Pi');
+    assert.doesNotMatch(graph, /published LAN ports\|[^\n]*\b(KUMA|NTFY)\b/, 'neither is a port on the server');
+    // It watches the server from outside, and the desktop's Ollama.
+    assert.match(graph, /KUMA -\.->\|HTTP checks\| Server & OLLAMA/);
     assert.match(graph, /NTFY -\.->\|push\| CLIENTS & REMOTE/, 'ntfy must push to the phones');
 
-    // Both stop with the server, so its own outage is the one nobody is told about.
-    assert.match(readme, /\*\*Server off:\*\*[^\n]*no alert/);
+    // The outage that matters most is reported, because the watch is not on the server.
+    assert.match(readme, /\*\*Server off:\*\*[^\n]*pushes an alert/);
     const thanks = readme.match(/## 📄 Acknowledgments\n([\s\S]*)$/)[1];
     assert.match(thanks, /\[Uptime Kuma\]\(https:\/\/github\.com\/louislam\/uptime-kuma\)/);
     assert.match(thanks, /\[ntfy\]\(https:\/\/ntfy\.sh\/?\)/);

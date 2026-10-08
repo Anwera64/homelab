@@ -11,9 +11,7 @@ const PORT_TO_SERVICE = {
   '7878': 'radarr',
   '9696': 'prowlarr',
   '6767': 'bazarr',
-  '3002': 'grafana',
-  '3001': 'uptime',
-  '2586': 'ntfy'
+  '3002': 'grafana'
 };
 
 module.exports = { PORT_TO_SERVICE };

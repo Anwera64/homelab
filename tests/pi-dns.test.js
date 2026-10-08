@@ -141,11 +141,113 @@ test('Pi DNS stack: Pi-hole + Unbound', async (t) => {
     }
   });
 
+  await t.test('Uptime Kuma watches the server from here, so the server\'s own outage is reported', () => {
+    const kuma = serviceBlock(compose, 'uptime-kuma');
+    assert.match(kuma, /image:\s*louislam\/uptime-kuma:\d+\.\d+\.\d+\s*$/m, 'pinned to a release');
+    // Only the Pi's Caddy reaches it.
+    assert.match(kuma, /-\s*127\.0\.0\.1:3001:3001\b/);
+    assert.doesNotMatch(kuma, /network_mode:/, 'it reaches ntfy by name on the compose network');
+    assert.match(kuma, /-\s*\.\/data\/uptime-kuma:\/app\/data\s*$/m);
+    assert.match(kuma, /TZ:\s*\$\{TZ:-Europe\/Madrid\}/);
+    // The Pi has 1 GB; Kuma was measured at about 125 MB with 16 monitors.
+    assert.match(kuma, /^    mem_limit:\s*256m\s*$/m);
+    // It asks each service over HTTP. The socket would show it every container's secrets.
+    assert.doesNotMatch(kuma, /docker\.sock/);
+    assert.match(kuma, /depends_on:\s*\n\s+- ntfy\s*$/m);
+    assert.match(kuma, /restart:\s*unless-stopped/);
+  });
+
+  await t.test('ntfy delivers the alerts, and answers nobody without a login', () => {
+    const ntfy = serviceBlock(compose, 'ntfy');
+    assert.match(ntfy, /image:\s*binwiederhier\/ntfy:v\d+\.\d+\.\d+\s*$/m, 'pinned to a release');
+    assert.match(ntfy, /^    command:\s*serve\s*$/m);
+    assert.match(ntfy, /-\s*127\.0\.0\.1:2586:80\b/);
+    assert.doesNotMatch(ntfy, /network_mode:/);
+    for (const line of [
+      // Anonymous visitors can neither publish nor subscribe.
+      'NTFY_AUTH_DEFAULT_ACCESS: deny-all',
+      "NTFY_ENABLE_LOGIN: 'true'",
+      // Users, tokens and undelivered messages survive a rebuild.
+      'NTFY_AUTH_FILE: /var/lib/ntfy/user.db',
+      'NTFY_CACHE_FILE: /var/lib/ntfy/cache.db',
+      // The phones reach it through Caddy.
+      'NTFY_BASE_URL: https://ntfy.spicy-llama.duckdns.org',
+      "NTFY_BEHIND_PROXY: 'true'",
+    ]) {
+      assert.ok(ntfy.includes(line), `ntfy must set ${line}`);
+    }
+    assert.match(ntfy, /-\s*\.\/data\/ntfy:\/var\/lib\/ntfy\s*$/m);
+    assert.match(ntfy, /^    mem_limit:\s*128m\s*$/m);
+    assert.match(ntfy, /restart:\s*unless-stopped/);
+  });
+
   await t.test('the Pi .env and runtime data stay out of git', () => {
     const ignore = read(GITIGNORE_PATH);
     assert.match(ignore, /^\.env$/m, '.env must be ignored at every depth');
     assert.match(ignore, /^hosts\/pi\/data\/$/m, 'hosts/pi/data/ must be ignored');
     assert.match(pihole, /\.\/data\/pihole:\/etc\/pihole/);
+  });
+});
+
+test('Pi README: the uptime checks and their alerts', async (t) => {
+  const readme = read(path.join(PI_DIR, 'README.md'));
+  const section = readme.match(/^## Uptime and alerts\n([\s\S]*?)(?=\n## |(?![\s\S]))/m);
+
+  await t.test('lists both in "What runs here", each asking for a login', () => {
+    assert.match(readme, /^\| Uptime Kuma \(Docker\) \|.*https:\/\/uptime\.spicy-llama\.duckdns\.org/m);
+    assert.match(readme, /^\| ntfy \(Docker\) \|.*https:\/\/ntfy\.spicy-llama\.duckdns\.org/m);
+  });
+
+  await t.test('says how to set them up: the admin account, ntfy\'s users, the notification, the phones', () => {
+    assert.ok(section, 'the README must have an Uptime and alerts section');
+    for (const needle of [
+      // The first visitor creates the admin account; the database stays in the data folder.
+      'SQLite',
+      // ntfy's users are made with its CLI: an admin for the phones, a publisher for Kuma.
+      'ntfy user add --role=admin', 'ntfy user add kuma', 'ntfy access kuma', 'write-only', 'ntfy token add kuma',
+      // Kuma publishes inside the Pi's stack.
+      'http://ntfy',
+    ]) {
+      assert.ok(section[1].includes(needle), `Uptime and alerts must mention ${needle}`);
+    }
+  });
+
+  await t.test('lists the monitors to add: the server by its published ports, from outside', () => {
+    for (const needle of [
+      'http://192.168.1.30:3051/health', 'http://192.168.1.30:8096', 'http://192.168.1.30:8080', 'http://192.168.1.30:3002',
+      // The machine itself, the Pi's own DNS and ntfy, and the desktop's Ollama.
+      'Ping', 'http://ntfy/v1/health', 'http://192.168.1.20:11434',
+    ]) {
+      assert.ok(section[1].includes(needle), `Uptime and alerts must mention ${needle}`);
+    }
+    // Container names only resolve inside the server's stack.
+    assert.doesNotMatch(section[1], /http:\/\/(jellyfin|household-hub|gluetun|grafana):/);
+    // What publishes no port cannot be asked from here.
+    assert.match(section[1], /Loki[^\n]*publish no port/);
+  });
+
+  await t.test('keeps the nightly restart from the phones, and says what it cannot report', () => {
+    // The server's update restarts its stack at 04:00 and a reboot can follow at 05:00.
+    assert.match(section[1], /maintenance window[^\n]*04:00[^\n]*05:15/);
+    assert.match(section[1], /Retries[^\n]*3/);
+    // Both stop with the Pi, and away from home ntfy is reached over Tailscale.
+    assert.match(section[1], /lemonpi[^\n]*no alert/);
+    assert.match(section[1], /Tailscale/);
+    // The Pi ships no logs to Loki.
+    assert.match(section[1], /docker logs uptime-kuma/);
+  });
+
+  await t.test('says what the SD card and the memory were measured to take', () => {
+    assert.match(readme, /Uptime Kuma[^\n]*1 GB a day/);
+    assert.match(readme, /125 MB/);
+  });
+
+  await t.test('names both data folders under Backups, and counts six containers in the checks', () => {
+    const backups = readme.match(/## Backups\n([\s\S]*)$/)[1];
+    for (const folder of ['hosts/pi/data/uptime-kuma', 'hosts/pi/data/ntfy']) {
+      assert.ok(backups.includes(folder), `Backups must name ${folder}`);
+    }
+    assert.match(readme, /all six up/);
   });
 });
 

@@ -1,6 +1,7 @@
 # ==============================================================================
 # Caddyfile - lemonpi HTTPS ingress (*.spicy-llama.duckdns.org -> 192.168.1.35)
-# Pi-local services are served here. The rest go to the ports their containers
+# Pi-local services (Pi-hole, the dashboard, Uptime Kuma, ntfy) are served here.
+# The rest go to the ports their containers
 # publish on the server (192.168.1.30): the Hub, the logs and the media services.
 # While it is off they answer 502.
 # ==============================================================================
@@ -29,6 +30,17 @@
     @pihole host pihole.spicy-llama.duckdns.org
     handle @pihole {
         reverse_proxy 127.0.0.1:8081
+    }
+
+    # Uptime checks and the alerts they push to the phones: here, so they outlive the server
+    @uptime host uptime.spicy-llama.duckdns.org
+    handle @uptime {
+        reverse_proxy 127.0.0.1:3001
+    }
+
+    @ntfy host ntfy.spicy-llama.duckdns.org
+    handle @ntfy {
+        reverse_proxy 127.0.0.1:2586
     }
 
     # On the server: media
@@ -94,17 +106,6 @@
     @grafana host grafana.spicy-llama.duckdns.org
     handle @grafana {
         reverse_proxy 192.168.1.30:3002
-    }
-
-    # On the server: uptime checks, and the alerts they push to the phones
-    @uptime host uptime.spicy-llama.duckdns.org
-    handle @uptime {
-        reverse_proxy 192.168.1.30:3001
-    }
-
-    @ntfy host ntfy.spicy-llama.duckdns.org
-    handle @ntfy {
-        reverse_proxy 192.168.1.30:2586
     }
 
     # The app's logs, to Alloy on the server. The hub is asked whose token it is first;

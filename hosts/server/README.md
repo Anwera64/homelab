@@ -6,7 +6,6 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 
 - **The Hub and the logs:** the Household Hub, SearXNG, Loki, Grafana and Alloy. An Ollama of its own runs the embedder (`bge-m3`) on the GTX 1660 Ti: it ranks what a chat turn reads. It unloads after 30 minutes without use, and if it is down the Hub ranks by keywords instead.
 - **The media services:** Jellyfin, Seerr, Jellystat, Sonarr, Radarr, Prowlarr, Bazarr, Maintainerr, Cleanuparr, Recyclarr, and qBittorrent behind the Gluetun VPN. Their files are on the media disk at `/data`.
-- **Uptime and alerts:** Uptime Kuma checks the services and sends its alerts through ntfy, which pushes them to the phones.
 - **Routing:** lemonpi's Caddy sends every `https://` name except Pi-hole and the dashboard to this machine.
 - **Staying on the desktop:** the chat model, in Ollama on the RTX 5080. The Hub reaches it over the LAN, so the chat model needs the desktop awake. The desktop also keeps an Alloy that ships its logs to this Loki.
 
@@ -18,7 +17,6 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Logs (Docker) | Loki keeps 30 days of every container's output, from this machine and the desktop. Grafana searches it at https://grafana.spicy-llama.duckdns.org. |
 | Metrics (Docker) | Prometheus keeps a year of the machine's own numbers. Three exporters report them: the node exporter (CPU, memory, disks, network, temperatures, battery), the SMART exporter (disk health and the media disk's temperature) and the GPU exporter (the GTX 1660 Ti, through nvidia-smi). None of the four has a login, so each publishes no port: only Grafana and Prometheus inside the stack reach them. |
 | Host metrics (systemd timer) | Once every minute, `server-metrics.sh` writes down what no exporter reports: when unattended upgrades last ran, whether the media disk is mounted, whether a reboot is waiting, how long the CPU has been slowed down for heat, and each disk's latest self-test. The nightly update writes when it ran and when it last applied something. The node exporter reads both from `/var/lib/node_exporter/textfile`. |
-| Uptime and alerts (Docker) | Uptime Kuma asks each service whether it answers, every minute, and keeps the history. ntfy pushes the alerts to the phones. Both ask for a login. |
 | Firewall | The published service ports answer only the addresses in `SERVER_ALLOWED_SOURCES`. SSH answers the LAN. |
 | Disk guard | Stops the media services while the media disk is unplugged. When it is plugged back in, checks the filesystem, mounts it and starts them again. |
 | smartd | Runs a short self-test on both disks every Sunday at 03:00. |
@@ -139,8 +137,6 @@ Work through this once after the media services have moved here:
 - [ ] Seerr, Jellystat: open each in a private window and confirm the login page comes first.
 - [ ] Maintainerr has no login of its own. Caddy asks for a password on its name: `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` in lemonpi's `.env`. The password is on the name only, so the direct port (6246) must stay closed: the firewall here does that.
 - [ ] FlareSolverr has no login and no page to use. It has no `https://` name and publishes no port: Prowlarr reaches it inside the stack at `http://flaresolverr:8191`. Confirm an indexer that uses it still tests green.
-- [ ] Uptime Kuma: the first visitor to the page creates the admin account, so open https://uptime.spicy-llama.duckdns.org right after the first start.
-- [ ] ntfy: anonymous access is denied by `NTFY_AUTH_DEFAULT_ACCESS=deny-all`. Confirm that publishing without a token is refused.
 
 The dashboard's widgets keep working with the logins on: they use each app's API key, or the qBittorrent login above.
 
@@ -201,61 +197,6 @@ docker logs prometheus
 docker exec prometheus wget -qO- localhost:9090/api/v1/targets
 ```
 
-## Uptime and alerts
-
-Uptime Kuma checks the services on a schedule, keeps the history and sends an alert when one stops answering. ntfy delivers the alerts to the phones. Their names are https://uptime.spicy-llama.duckdns.org and https://ntfy.spicy-llama.duckdns.org. Nothing is in `.env`: Kuma's monitors and settings are in its database (the `uptime_kuma_data` volume) and ntfy's users are in the `ntfy_data` volume.
-
-### First run
-
-1. Open https://uptime.spicy-llama.duckdns.org right after the stack starts: the first visitor creates the admin account. Choose SQLite when it asks for the database.
-2. Make ntfy's users on the server. Each command asks for a password, and the last one prints a token starting with `tk_`:
-
-```sh
-docker exec -it ntfy ntfy user add --role=admin <you>     # your phone signs in as this user
-docker exec -it ntfy ntfy user add kuma                   # Uptime Kuma publishes as this one
-docker exec -it ntfy ntfy access kuma homelab write-only  # and may only write to the "homelab" topic
-docker exec -it ntfy ntfy token add kuma                  # prints the token for the next step
-```
-
-3. In Uptime Kuma: Settings → Notifications → Setup Notification. Choose the type ntfy, set the server URL to `http://ntfy` and the topic to `homelab`, and use authentication by access token (the `tk_` one). Press Test. Turn on "Default enabled" so new monitors use it.
-4. On each phone: install the ntfy app, set the default server to `https://ntfy.spicy-llama.duckdns.org`, sign in with the admin user and subscribe to `homelab`.
-
-### Monitors to add
-
-The monitors are added by hand in the Uptime Kuma page. Kuma reaches the stack's services by container name.
-
-| Monitor | Type | Address |
-| --- | --- | --- |
-| Household Hub | HTTP | `http://household-hub:3050/health` |
-| Jellyfin | HTTP | `http://jellyfin:8096` |
-| Seerr | HTTP | `http://seerr:5055` |
-| Jellystat | HTTP | `http://jellystat:3000` |
-| Sonarr | HTTP | `http://sonarr:8989` |
-| Radarr | HTTP | `http://radarr:7878` |
-| Prowlarr | HTTP | `http://prowlarr:9696` |
-| Bazarr | HTTP | `http://bazarr:6767` |
-| Maintainerr | HTTP | `http://maintainerr:6246` |
-| Cleanuparr | HTTP | `http://cleanuparr:11011` |
-| qBittorrent (through the VPN) | HTTP | `http://gluetun:8080` |
-| Grafana | HTTP | `http://grafana:3000` |
-| ntfy | HTTP | `http://ntfy/v1/health` |
-| lemonpi's DNS (Pi-hole) | DNS | resolver `192.168.1.35` |
-| lemonpi's Caddy | HTTP | `https://home.spicy-llama.duckdns.org` |
-| The desktop's Ollama | HTTP | `http://192.168.1.20:11434` |
-
-The desktop is off by design at times, so leave the notification off on the Ollama monitor: it is there for the history. The media services stop while the media disk is unplugged, so their monitors alert then, which is the point.
-
-### Restarts that are not outages
-
-The nightly update restarts the stack at 04:00 when a bump was merged, and a reboot for security updates can follow at 05:00. Two settings keep these from reaching the phones:
-
-- Under Maintenance, add a recurring maintenance window every day from 04:00 to 05:15, for all monitors. No alert is sent during it, so a real outage in that time alerts only once the window ends.
-- On each monitor, set Retries to 3. A service that is back within three checks is then never reported, at any hour.
-
-### What it cannot report
-
-Uptime Kuma and ntfy stop with the server, so when the server itself is down no alert is sent. Homepage on lemonpi still shows the services as down. Away from home the phone reaches ntfy over Tailscale only, so an alert arrives when the phone is on the tailnet.
-
 ## Battery
 
 The laptop's battery works as a small UPS. Conservation mode keeps it near 60% to slow its wear. On battery at 10% the watcher stops the containers and powers the laptop off. It does not power on by itself when the electricity returns: press the power button.
@@ -283,7 +224,7 @@ Jellyfin transcodes with NVENC (H.264 and HEVC). This GPU cannot encode AV1, so 
 The setup is meant to outlive the laptop:
 
 1. Install Debian on the new machine and give it the `192.168.1.30` reservation, so lemonpi and the Hub need no change.
-2. Move the media disk over. Copy `config/` and the named volumes (`household_hub_data`, `grafana_data`, `loki_data`, `uptime_kuma_data`, `ntfy_data`). `ollama_models` need not move: the bootstrap script pulls the model again.
+2. Move the media disk over. Copy `config/` and the named volumes (`household_hub_data`, `grafana_data`, `loki_data`). `ollama_models` need not move: the bootstrap script pulls the model again.
 3. In [`bootstrap.sh`](bootstrap.sh), the section between `# >>> laptop` and `# <<< laptop` is the hardware-specific part: the NVIDIA driver, the lid and the battery. Replace it for the new machine.
 4. In [`docker-compose.yml`](docker-compose.yml), the `deploy` blocks of Jellyfin and Ollama are the only GPU settings. On an Intel machine Jellyfin's becomes a `/dev/dri` device for Quick Sync, and Ollama's goes: the embedder then runs on the CPU.
 
@@ -298,4 +239,4 @@ Changing the key later has two costs:
 
 ## Backups
 
-`hosts/server/.env` is not in git. `config/` on the SSD holds every app's settings and databases; the Hub's database is in the `household_hub_data` volume. Uptime Kuma's monitors are in the `uptime_kuma_data` volume and ntfy's users in `ntfy_data`.
+`hosts/server/.env` is not in git. `config/` on the SSD holds every app's settings and databases; the Hub's database is in the `household_hub_data` volume.

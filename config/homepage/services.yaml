@@ -198,6 +198,7 @@
     - Uptime Kuma:
         icon: uptime-kuma.png
         href: https://uptime.spicy-llama.duckdns.org
-        description: Uptime Checks & Alerts (ntfy)
-        siteMonitor: http://192.168.1.30:3001
+        description: Uptime Checks & Alerts via ntfy (lemonpi)
+        server: my-docker
+        container: uptime-kuma
 

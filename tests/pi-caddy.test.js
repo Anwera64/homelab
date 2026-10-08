@@ -68,6 +68,10 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
   await t.test('Pi-local names are served from the Pi', () => {
     assert.match(caddyfile, /@pihole host pihole\.spicy-llama\.duckdns\.org\s*\n\s*handle @pihole \{\s*\n\s*reverse_proxy 127\.0\.0\.1:8081/);
     assert.match(caddyfile, /# Default[^\n]*\n\s*handle \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3000/);
+    // The uptime checks and their alerts run here, so they outlive the server.
+    assert.match(caddyfile, /@uptime host uptime\.spicy-llama\.duckdns\.org\s*\n\s*handle @uptime \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3001\s*\n/);
+    assert.match(caddyfile, /@ntfy host ntfy\.spicy-llama\.duckdns\.org\s*\n\s*handle @ntfy \{\s*\n\s*reverse_proxy 127\.0\.0\.1:2586\s*\n/);
+    assert.doesNotMatch(caddyfile, /192\.168\.1\.30:(3001|2586)\b/, 'neither is on the server');
   });
 
   await t.test('Jellyfin keeps the /emby fallback for old clients', () => {
