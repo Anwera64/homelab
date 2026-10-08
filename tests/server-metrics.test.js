@@ -297,6 +297,9 @@ test('Downloads dashboard', async (t) => {
     const reach = titled('Connectable');
     for (const strip of [band, reach]) {
       assert.equal(strip.type, 'state-timeline');
+      // Coloured by thresholds, Grafana draws threshold ranges ("-∞+") instead of the states.
+      assert.equal(strip.fieldConfig.defaults.color.mode, 'fixed');
+      assert.equal(strip.fieldConfig.defaults.thresholds, undefined);
       assert.equal(strip.gridPos.x, 0);
       assert.equal(strip.gridPos.w, 24);
     }

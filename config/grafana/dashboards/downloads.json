@@ -385,16 +385,8 @@
             }
           ],
           "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "custom": {
             "fillOpacity": 80,
@@ -468,16 +460,8 @@
             }
           ],
           "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "custom": {
             "fillOpacity": 80,
