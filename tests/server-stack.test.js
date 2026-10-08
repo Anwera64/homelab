@@ -216,6 +216,33 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.equal(portsOf(qbit), '', 'qBittorrent publishes nothing itself');
   });
 
+  await t.test('the VPN provider and port forwarding come from .env, and default to NordVPN without forwarding', () => {
+    const gluetun = block('gluetun');
+    assert.ok(gluetun.includes('- VPN_SERVICE_PROVIDER=${VPN_PROVIDER:-nordvpn}'));
+    assert.ok(gluetun.includes('- VPN_PORT_FORWARDING=${VPN_PORT_FORWARDING:-off}'));
+    // Only the providers with port forwarding have such servers; off is Gluetun's own default.
+    assert.ok(gluetun.includes('- PORT_FORWARD_ONLY=${VPN_PORT_FORWARD_ONLY:-off}'));
+    for (const [name, value] of [['VPN_PROVIDER', 'nordvpn'], ['VPN_PORT_FORWARDING', 'off'], ['VPN_PORT_FORWARD_ONLY', 'off']]) {
+      assert.match(envExample, new RegExp(`^# ${name}=${value}$`, 'm'), `.env.example must show ${name} with its default`);
+    }
+  });
+
+  await t.test('Gluetun hands the forwarded port to qBittorrent, and resets it when forwarding stops', () => {
+    const gluetun = block('gluetun');
+    const command = (name) => (gluetun.match(new RegExp(`^      - '${name}=(.*)'$`, 'm')) || ['', ''])[1];
+    const preferences = 'http://127.0.0.1:8080/api/v2/app/setPreferences';
+    // qBittorrent shares Gluetun's network, so its Web UI is Gluetun's localhost.
+    const up = command('VPN_PORT_FORWARDING_UP_COMMAND');
+    assert.ok(up.includes('\\"listen_port\\":{{PORT}}'), 'the forwarded port becomes the listening port');
+    assert.ok(up.includes('\\"current_network_interface\\":\\"{{VPN_INTERFACE}}\\"'));
+    assert.ok(up.includes(preferences));
+    // qBittorrent does not pick a forwarded port up again after a disconnect unless it was reset.
+    const down = command('VPN_PORT_FORWARDING_DOWN_COMMAND');
+    assert.ok(down.includes('\\"listen_port\\":0'));
+    assert.ok(down.includes(preferences));
+    assert.doesNotMatch(up + down, /\$/, 'nothing for compose to interpolate');
+  });
+
   await t.test('runs no Watchtower: pinned images change only through a merged PR', () => {
     assert.ok(!names.includes('watchtower'));
     assert.doesNotMatch(compose, /watchtower/i, 'no service carries a Watchtower label');
@@ -444,6 +471,23 @@ test('Server README', async (t) => {
     assert.ok(section[1].includes('iw dev wlp7s0 link'), 'how to see the band');
     assert.ok(section[1].includes('systemctl disable --now server-wifi-band.timer'), 'how to switch it off');
     assert.doesNotMatch(section[1], /\/etc\/network\/interfaces[^.]*\bedit/, 'it changes no settings file');
+  });
+
+  await t.test('says how to change the VPN provider, and what port forwarding asks of qBittorrent\'s login', () => {
+    const section = readme.match(/## VPN provider\n([\s\S]*?)(?=\n## |(?![\s\S]))/);
+    assert.ok(section, 'the README must have a VPN provider section');
+    for (const name of ['VPN_PROVIDER', 'WIREGUARD_PRIVATE_KEY', 'VPN_PORT_FORWARDING', 'VPN_PORT_FORWARD_ONLY']) {
+      assert.ok(section[1].includes(`\`${name}\``), `it must name ${name}`);
+    }
+    assert.match(section[1], /NAT-PMP/, 'the ProtonVPN key must be made with port forwarding on');
+    // qBittorrent has Gluetun's network: one recreated without the other loses it.
+    assert.match(section[1], /docker compose up -d --force-recreate gluetun qbittorrent/);
+    assert.match(section[1], /Bypass authentication for clients on localhost/);
+    // The checklist no longer says to untick both boxes whatever the VPN does.
+    const logins = readme.match(/## App logins\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    const qbit = logins.split('\n').find((line) => line.startsWith('- [ ] qBittorrent'));
+    assert.match(qbit, /whitelisted subnets/);
+    assert.match(qbit, /port forwarding/, 'the localhost box depends on port forwarding');
   });
 
   await t.test('says where the machine\'s own numbers are kept and where to look at them', () => {
