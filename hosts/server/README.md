@@ -133,13 +133,37 @@ Work through this once after the media services have moved here:
 
 - [ ] Sonarr, Radarr, Prowlarr: Settings → General → Authentication Required = **Enabled** (not "Disabled for Local Addresses").
 - [ ] Bazarr: Settings → General → Security → Authentication = **Form**. It ships with none.
-- [ ] qBittorrent: Options → Web UI: untick both "Bypass authentication" boxes (localhost and whitelisted subnets). Then check that Sonarr, Radarr and Cleanuparr have the password saved in their download client, and put `QBITTORRENT_USERNAME` and `QBITTORRENT_PASSWORD` in lemonpi's `.env` for the dashboard.
+- [ ] qBittorrent: Options → Web UI: untick "Bypass authentication for clients in whitelisted subnets". Untick the localhost box too, unless port forwarding is on (see "VPN provider" below). Then check that Sonarr, Radarr and Cleanuparr have the password saved in their download client, and put `QBITTORRENT_USERNAME` and `QBITTORRENT_PASSWORD` in lemonpi's `.env` for the dashboard.
 - [ ] Cleanuparr: Settings → General: "Disable Auth for Local Addresses" **off**. Copy the API key from its account settings to `CLEANUPARR_API_KEY` in lemonpi's `.env` for the dashboard.
 - [ ] Seerr, Jellystat: open each in a private window and confirm the login page comes first.
 - [ ] Maintainerr has no login of its own. Caddy asks for a password on its name: `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` in lemonpi's `.env`. The password is on the name only, so the direct port (6246) must stay closed: the firewall here does that.
 - [ ] FlareSolverr has no login and no page to use. It has no `https://` name and publishes no port: Prowlarr reaches it inside the stack at `http://flaresolverr:8191`. Confirm an indexer that uses it still tests green.
 
 The dashboard's widgets keep working with the logins on: they use each app's API key, or the qBittorrent login above.
+
+## VPN provider
+
+qBittorrent reaches the internet only through Gluetun. The provider and its options are in `.env`:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `VPN_PROVIDER` | `nordvpn` | The provider, by its Gluetun name. |
+| `WIREGUARD_PRIVATE_KEY` | none | That provider's WireGuard key. |
+| `VPN_COUNTRY` | `United States` | The country of the VPN server. |
+| `VPN_PORT_FORWARDING` | `off` | `on` asks the provider for a port other peers can reach qBittorrent on. |
+| `VPN_PORT_FORWARD_ONLY` | `off` | `on` uses only the servers that forward ports. |
+
+NordVPN forwards no ports. ProtonVPN does on its paid plans: generate a WireGuard configuration on its site with "NAT-PMP (Port Forwarding)" ticked and copy its `PrivateKey`.
+
+After a change, recreate both containers together, because qBittorrent has Gluetun's network:
+
+```bash
+cd ~/homelab/hosts/server && docker compose up -d --force-recreate gluetun qbittorrent
+```
+
+With port forwarding on, the port changes at every connection and Gluetun gives it to qBittorrent. For that, tick "Bypass authentication for clients on localhost" in qBittorrent (Options → Web UI): Gluetun is qBittorrent's localhost. Then confirm from another machine that the Web UI still asks for the password.
+
+Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881 and Advanced → Network interface back to "Any". Gluetun leaves them at port 0 and `lo` when forwarding stops, and nothing downloads until they are reset.
 
 ## Media disk
 
