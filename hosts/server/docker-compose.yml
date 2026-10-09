@@ -96,11 +96,14 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.2
     container_name: flaresolverr
-    # No published port: it has no login. Prowlarr reaches it inside the stack (http://flaresolverr:8191).
+    network_mode: "service:gluetun"
+    # No published port: it has no login. Prowlarr reaches it inside the stack (http://gluetun:8191).
     environment:
       - LOG_LEVEL=info
       - TZ=${TZ:-Europe/Madrid}
-    dns: *public-dns
+    depends_on:
+      gluetun:
+        condition: service_healthy
     mem_limit: 1g
     restart: unless-stopped
     logging: *default-logging

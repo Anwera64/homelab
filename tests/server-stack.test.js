@@ -216,6 +216,13 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.equal(portsOf(qbit), '', 'qBittorrent publishes nothing itself');
   });
 
+  await t.test('FlareSolverr routes through Gluetun\'s VPN network', () => {
+    const flaresolverr = block('flaresolverr');
+    assert.match(flaresolverr, /network_mode:\s*"service:gluetun"/, 'FlareSolverr must use Gluetun network');
+    assert.match(flaresolverr, /depends_on:\s*\n\s+gluetun:\s*\n\s+condition:\s*service_healthy/, 'FlareSolverr must wait for healthy Gluetun');
+    assert.doesNotMatch(flaresolverr, /dns:/, 'DNS is inherited from Gluetun');
+  });
+
   await t.test('the VPN provider and port forwarding come from .env, and default to NordVPN without forwarding', () => {
     const gluetun = block('gluetun');
     assert.ok(gluetun.includes('- VPN_SERVICE_PROVIDER=${VPN_PROVIDER:-nordvpn}'));
