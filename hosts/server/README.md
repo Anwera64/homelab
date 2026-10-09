@@ -165,6 +165,14 @@ With port forwarding on, the port changes at every connection and Gluetun gives 
 
 Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881 and Advanced → Network interface back to "Any". Gluetun leaves them at port 0 and `lo` when forwarding stops, and nothing downloads until they are reset.
 
+### HTTP proxy for indexers
+
+Gluetun runs an internal HTTP proxy at `http://gluetun:8888` through the VPN tunnel. Services in the stack (such as Prowlarr) can use it to reach indexers that are blocked by ISP-level SNI resets or Cloudflare bans (e.g. 1337x):
+
+1. In Prowlarr: **Settings → Indexers → Proxies**, click `+` and pick **HTTP**.
+2. Set **Host** to `gluetun` and **Port** to `8888`.
+3. Tag the proxy (e.g. `vpn`) and assign that tag to indexers like 1337x, or leave tags blank to route all indexers through the VPN.
+
 ## Media disk
 
 All media lives on one disk mounted at `/data`, in the TRaSH layout, so downloads and the library share a filesystem and hardlinks work:

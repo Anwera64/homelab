@@ -227,6 +227,12 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     }
   });
 
+  await t.test('Gluetun enables the HTTP proxy for stack services like Prowlarr', () => {
+    const gluetun = block('gluetun');
+    assert.ok(gluetun.includes('- HTTPPROXY=${HTTPPROXY:-on}'), 'Gluetun must enable the HTTP proxy');
+    assert.ok(gluetun.includes('- HTTPPROXY_STEALTH=${HTTPPROXY_STEALTH:-on}'), 'Gluetun must enable stealth proxying');
+  });
+
   await t.test('Gluetun hands the forwarded port to qBittorrent, and resets it when forwarding stops', () => {
     const gluetun = block('gluetun');
     const command = (name) => (gluetun.match(new RegExp(`^      - '${name}=(.*)'$`, 'm')) || ['', ''])[1];
