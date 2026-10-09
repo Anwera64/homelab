@@ -216,6 +216,13 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.equal(portsOf(qbit), '', 'qBittorrent publishes nothing itself');
   });
 
+  await t.test('FlareSolverr routes through Gluetun\'s VPN network', () => {
+    const flaresolverr = block('flaresolverr');
+    assert.match(flaresolverr, /network_mode:\s*"service:gluetun"/, 'FlareSolverr must use Gluetun network');
+    assert.match(flaresolverr, /depends_on:\s*\n\s+gluetun:\s*\n\s+condition:\s*service_healthy/, 'FlareSolverr must wait for healthy Gluetun');
+    assert.doesNotMatch(flaresolverr, /dns:/, 'DNS is inherited from Gluetun');
+  });
+
   await t.test('the VPN provider and port forwarding come from .env, and default to NordVPN without forwarding', () => {
     const gluetun = block('gluetun');
     assert.ok(gluetun.includes('- VPN_SERVICE_PROVIDER=${VPN_PROVIDER:-nordvpn}'));
@@ -225,6 +232,12 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     for (const [name, value] of [['VPN_PROVIDER', 'nordvpn'], ['VPN_PORT_FORWARDING', 'off'], ['VPN_PORT_FORWARD_ONLY', 'off']]) {
       assert.match(envExample, new RegExp(`^# ${name}=${value}$`, 'm'), `.env.example must show ${name} with its default`);
     }
+  });
+
+  await t.test('Gluetun enables the HTTP proxy for stack services like Prowlarr', () => {
+    const gluetun = block('gluetun');
+    assert.ok(gluetun.includes('- HTTPPROXY=${HTTPPROXY:-on}'), 'Gluetun must enable the HTTP proxy');
+    assert.ok(gluetun.includes('- HTTPPROXY_STEALTH=${HTTPPROXY_STEALTH:-on}'), 'Gluetun must enable stealth proxying');
   });
 
   await t.test('Gluetun hands the forwarded port to qBittorrent, and resets it when forwarding stops', () => {

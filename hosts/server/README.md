@@ -137,7 +137,7 @@ Work through this once after the media services have moved here:
 - [ ] Cleanuparr: Settings → General: "Disable Auth for Local Addresses" **off**. Copy the API key from its account settings to `CLEANUPARR_API_KEY` in lemonpi's `.env` for the dashboard.
 - [ ] Seerr, Jellystat: open each in a private window and confirm the login page comes first.
 - [ ] Maintainerr has no login of its own. Caddy asks for a password on its name: `MAINTAINERR_USER` and `MAINTAINERR_PASSWORD_HASH` in lemonpi's `.env`. The password is on the name only, so the direct port (6246) must stay closed: the firewall here does that.
-- [ ] FlareSolverr has no login and no page to use. It has no `https://` name and publishes no port: Prowlarr reaches it inside the stack at `http://flaresolverr:8191`. Confirm an indexer that uses it still tests green.
+- [ ] FlareSolverr has no login and no page to use. It has no `https://` name and publishes no port: Prowlarr reaches it inside the stack at `http://gluetun:8191` (routed through the VPN). Confirm an indexer that uses it still tests green.
 
 The dashboard's widgets keep working with the logins on: they use each app's API key, or the qBittorrent login above.
 
@@ -164,6 +164,14 @@ cd ~/homelab/hosts/server && docker compose up -d --force-recreate gluetun qbitt
 With port forwarding on, the port changes at every connection and Gluetun gives it to qBittorrent. For that, tick "Bypass authentication for clients on localhost" in qBittorrent (Options → Web UI): Gluetun is qBittorrent's localhost. Then confirm from another machine that the Web UI still asks for the password.
 
 Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881 and Advanced → Network interface back to "Any". Gluetun leaves them at port 0 and `lo` when forwarding stops, and nothing downloads until they are reset.
+
+### HTTP proxy for indexers
+
+Gluetun runs an internal HTTP proxy at `http://gluetun:8888` through the VPN tunnel. Services in the stack (such as Prowlarr) can use it to reach indexers that are blocked by ISP-level SNI resets or Cloudflare bans (e.g. 1337x):
+
+1. In Prowlarr: **Settings → Indexers → Proxies**, click `+` and pick **HTTP**.
+2. Set **Host** to `gluetun` and **Port** to `8888`.
+3. Tag the proxy (e.g. `vpn`) and assign that tag to indexers like 1337x, or leave tags blank to route all indexers through the VPN.
 
 ## Media disk
 
