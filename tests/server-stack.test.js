@@ -252,6 +252,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     // qBittorrent does not pick a forwarded port up again after a disconnect unless it was reset.
     const down = command('VPN_PORT_FORWARDING_DOWN_COMMAND');
     assert.ok(down.includes('\\"listen_port\\":0'));
+    assert.ok(!down.includes('\\"current_network_interface\\":\\"lo\\"'), 'down command must not trap qBittorrent on loopback');
     assert.ok(down.includes(preferences));
     assert.doesNotMatch(up + down, /\$/, 'nothing for compose to interpolate');
   });

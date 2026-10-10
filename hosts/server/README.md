@@ -163,7 +163,7 @@ cd ~/homelab/hosts/server && docker compose up -d --force-recreate gluetun qbitt
 
 With port forwarding on, the port changes at every connection and Gluetun gives it to qBittorrent. For that, tick "Bypass authentication for clients on localhost" in qBittorrent (Options → Web UI): Gluetun is qBittorrent's localhost. Then confirm from another machine that the Web UI still asks for the password.
 
-Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881 and Advanced → Network interface back to "Any". Gluetun leaves them at port 0 and `lo` when forwarding stops, and nothing downloads until they are reset.
+Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881. Gluetun resets the port to 0 when forwarding stops; with a fixed port provider, set it back to 6881 so inbound connections reach qBittorrent directly.
 
 ### HTTP proxy for indexers
 
