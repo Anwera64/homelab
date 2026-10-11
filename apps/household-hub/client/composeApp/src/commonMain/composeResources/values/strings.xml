@@ -520,6 +520,7 @@
     <string name="tool_reason_not_a_page">it isn’t a web page</string>
     <string name="tool_reason_unreadable">there’s no text in it to read</string>
     <string name="tool_reason_not_found">it couldn’t be found</string>
+    <string name="tool_reason_event_not_found">that event isn’t in your calendar</string>
     <string name="tool_results_show">Show results</string>
     <string name="tool_results_hide">Hide results</string>
     <string name="tool_pdf_running">Reading the document…</string>

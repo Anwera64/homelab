@@ -4,6 +4,7 @@ import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.tool_calendar_add_declined
 import com.homelab.household.app.resources.tool_calendar_add_done
+import com.homelab.household.app.resources.tool_calendar_change_failed
 import com.homelab.household.app.resources.tool_calendar_read_done
 import com.homelab.household.app.resources.tool_calendar_remove_done
 import com.homelab.household.app.resources.tool_calendar_remove_failed
@@ -11,6 +12,8 @@ import com.homelab.household.app.resources.tool_calendar_write_done
 import com.homelab.household.app.resources.tool_calendar_write_failed
 import com.homelab.household.app.resources.tool_note_replace_done
 import com.homelab.household.app.resources.tool_reason_blocked
+import com.homelab.household.app.resources.tool_reason_event_not_found
+import com.homelab.household.app.resources.tool_reason_not_found
 import com.homelab.household.app.resources.tool_reason_search_unavailable
 import com.homelab.household.app.resources.tool_reason_site_unavailable
 import com.homelab.household.app.resources.tool_reason_throttled
@@ -181,6 +184,44 @@ class ToolStepTest {
 
         assertEquals(StepWords.Failed(Res.string.tool_calendar_remove_failed, reason = null), step.words)
         assertTrue(step.failed)
+    }
+
+    @Test
+    fun `GIVEN a removal of an event the calendar does not have WHEN described THEN it says the event is not in the calendar`() {
+        val missing = ToolSummary(action = ToolAction.Delete, reason = ToolFailureReason.NotFound)
+
+        val step = toolStep(AnswerPart.ToolFailed("calendar_write", missing))
+
+        assertEquals(
+            StepWords.Failed(Res.string.tool_calendar_remove_failed, Res.string.tool_reason_event_not_found),
+            step.words,
+        )
+        assertTrue(step.failed)
+    }
+
+    @Test
+    fun `GIVEN a change to an event the calendar does not have WHEN described THEN it says the event is not in the calendar`() {
+        val missing = ToolSummary(action = ToolAction.Update, reason = ToolFailureReason.NotFound)
+
+        val step = toolStep(AnswerPart.ToolFailed("calendar_write", missing))
+
+        assertEquals(
+            StepWords.Failed(Res.string.tool_calendar_change_failed, Res.string.tool_reason_event_not_found),
+            step.words,
+        )
+        assertTrue(step.failed)
+    }
+
+    @Test
+    fun `GIVEN a page that is not found WHEN a read fails THEN the reason is still the page one`() {
+        val gone = ToolSummary(reason = ToolFailureReason.NotFound, sources = listOf(menu))
+
+        val step = toolStep(AnswerPart.ToolFailed("read_page", gone))
+
+        assertEquals(
+            StepWords.CouldNotRead(host = "lapubilla.cat", reason = Res.string.tool_reason_not_found),
+            step.words,
+        )
     }
 
     @Test

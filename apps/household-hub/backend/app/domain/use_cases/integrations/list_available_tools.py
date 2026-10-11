@@ -81,7 +81,12 @@ class ListAvailableToolsUseCase:
                         },
                         "event_id": {
                             "type": "string",
-                            "description": "Event ID required when action is 'update' or 'delete'",
+                            "description": (
+                                "Event ID, required when action is 'update' or 'delete'. It is the id "
+                                "calendar_read gave for the event, or the event_id an earlier create in this "
+                                "chat returned. Never guess one, and never send a title in its place: read "
+                                "the calendar first when you don't have it."
+                            ),
                         },
                         "repeat": {
                             "type": "object",

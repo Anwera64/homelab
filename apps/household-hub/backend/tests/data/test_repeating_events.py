@@ -525,7 +525,7 @@ async def test_removing_an_event_the_calendar_does_not_have_says_so():
     event, calendar = _stored(SHOP)
     calendar.event_by_uid.side_effect = NotFoundError("no such event")
 
-    with pytest.raises(CalendarIntegrationException, match="not found"):
+    with pytest.raises(CalendarIntegrationException, match="no event with ID"):
         await _delete(calendar, occurrence_start=SHOP_8_OCT)
 
 

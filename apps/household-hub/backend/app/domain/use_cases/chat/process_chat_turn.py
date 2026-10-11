@@ -41,6 +41,9 @@ from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 from app.domain.exceptions import (
+    READ_THE_CALENDAR_FIRST,
+    CalendarEventNotFoundException,
+    ToolFailureReason,
     EntityNotFoundException,
     ZeroLeakViolationException,
     InvalidOperationException,
@@ -992,18 +995,38 @@ class ProcessChatTurnUseCase:
                     async for event in self._run_call(turn, tc, current_user.id, auto=auto):
                         yield event
 
-            if asks:
-                for tc in asks:
-                    part = proposal_part(tc)
-                    looked_up = await self._event_on_card(tc, current_user.id, turn.timezone_name)
-                    if looked_up:
-                        # Only the card's copy: the model's call stays as it made it.
-                        part["arguments"] = {**tc.arguments, **looked_up}
-                        part["looked_up"] = looked_up
-                    turn.answer.parts.append(part)
-                    yield proposal_event(part)
+            cards = 0
+            for tc in asks:
+                looked_up, no_such_event = await self._event_on_card(tc, current_user.id, turn.timezone_name)
+                if no_such_event:
+                    self._refuse(turn, tc, no_such_event, current_user.id)
+                    continue
+                part = proposal_part(tc)
+                if looked_up:
+                    # Only the card's copy: the model's call stays as it made it.
+                    part["arguments"] = {**tc.arguments, **looked_up}
+                    part["looked_up"] = looked_up
+                turn.answer.parts.append(part)
+                yield proposal_event(part)
+                cards += 1
+            if cards:
                 turn.paused_in_round = round_number
                 return
+
+    def _refuse(self, turn: "_Turn", tc: LLMToolCall, error: str, user_id: str) -> None:
+        """
+        Turns down a remove or a change of an event the calendar doesn't have, without a card (#65):
+        the member would be asked to approve something that cannot happen. Only the model is told,
+        so it can read the calendar and ask again. The call is never run to find out, since only a
+        card may remove something.
+        """
+        result = ToolExecutionResult(
+            tool_name=tc.name, success=False, error=error, reason=ToolFailureReason.NOT_FOUND
+        )
+        _log_call(tc, result, turn.is_turn_secret, user_id, turn.session.id)
+        seen, no_room = turn.budget.fit({"error": error}, turn.llm_messages, turn.agent_tools)
+        turn.out_of_room = turn.out_of_room or no_room
+        turn.llm_messages.append(LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen))
 
     async def _run_call(
         self,
@@ -1057,17 +1080,23 @@ class ProcessChatTurnUseCase:
         turn.out_of_room = turn.out_of_room or no_room
         turn.llm_messages.append(LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen))
 
-    async def _event_on_card(self, tc: LLMToolCall, user_id: str, timezone_name: Optional[str]) -> Dict[str, Any]:
+    async def _event_on_card(
+        self, tc: LLMToolCall, user_id: str, timezone_name: Optional[str]
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """
-        The real details of the event a remove or change card is about (#63). Nothing when it can't
-        be found: the card then reads as before, and the write still waits for the member.
+        The real details of the event a remove or change card is about (#63), and, when the calendar
+        has no such event or the call names none, what to tell the model instead of showing a card
+        (#65). When the calendar can't be asked, both are empty: the card then reads as before, and
+        the write still waits for the member.
         """
         event_id = (tc.arguments or {}).get("event_id")
         action = write_action(tc.name, tc.arguments)
-        if self.event_lookup is None or tc.name != "calendar_write" or action not in ("delete", "update"):
-            return {}
+        if tc.name != "calendar_write" or action not in ("delete", "update"):
+            return {}, None
         if not isinstance(event_id, str) or not event_id:
-            return {}
+            return {}, f"'event_id' is required to {action} a calendar event. {READ_THE_CALENDAR_FIRST}"
+        if self.event_lookup is None:
+            return {}, None
         try:
             # The date of a repeating event the call names, read as the write itself will read it.
             occurrence_start = None
@@ -1080,8 +1109,10 @@ class ProcessChatTurnUseCase:
             )
         except Exception:
             logger.warning("Could not look up event %s for its card", event_id, exc_info=True)
-            return {}
-        return event_on_card(action, tc.arguments, event, timezone_name) if event else {}
+            return {}, None
+        if event is None:
+            return {}, CalendarEventNotFoundException(event_id).message
+        return event_on_card(action, tc.arguments, event, timezone_name), None
 
     async def _finish(self, turn: "_Turn"):
         """Saves the answer, and says it is done or waiting on the member."""
