@@ -11,6 +11,7 @@
 #                      disk's power-on hours when it ran
 #   server_qbittorrent.prom  what qBittorrent has downloaded and uploaded, its
 #                      peers and whether they can reach it (the Downloads dashboard)
+#   server_vpn.prom    whether Gluetun holds a forwarded port
 #
 # Runs every minute from server-metrics.timer, as root (smartctl needs it).
 # ==============================================================================
@@ -68,6 +69,11 @@ mkdir -p "$TEXTFILE_DIR"
     echo "server_qbittorrent_up 0"
   fi
 } | write_prom "$TEXTFILE_DIR/server_qbittorrent.prom"
+
+# Gluetun keeps the forwarded port in a file while it has one. qBittorrent's
+# "connected" is not that: it says so on a port nobody forwards.
+echo "server_vpn_port_forwarded $(flag timeout 10 docker exec gluetun test -s /tmp/gluetun/forwarded_port)" \
+  | write_prom "$TEXTFILE_DIR/server_vpn.prom"
 
 # The latest self-test of one disk, as "passed hours", or nothing when it has
 # never run one. ATA disks say passed or not; NVMe gives a result code, 0 for passed.

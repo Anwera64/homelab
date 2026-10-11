@@ -638,15 +638,16 @@ test('Server host metrics', async (t) => {
   const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
     alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
   } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null } = {}) => {
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null, forwarded = false } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
     fs.mkdirSync(bin);
-    // docker answers the one call the script makes; with nothing to say it fails, as it
-    // does when Gluetun is stopped or qBittorrent wants a login.
+    // docker answers the two calls the script makes. Asked for qBittorrent's numbers with
+    // nothing to say, it fails, as it does when Gluetun is stopped or qBittorrent wants a login.
+    // Asked whether Gluetun holds a forwarded port, it fails when there is none.
     const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
-    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\n${answer}\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\ncase "$*" in *forwarded_port*) exit ${forwarded ? 0 : 1} ;; esac\n${answer}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
     // --scan lists the devices; a device with no answer here is asleep (exit 2).
     const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
@@ -776,6 +777,28 @@ test('Server host metrics', async (t) => {
       assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  await t.test('GIVEN Gluetun holds a forwarded port WHEN it runs THEN it says the port is forwarded', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ forwarded: true });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 1\n');
+    assert.equal(fs.statSync(path.join(textfile, 'server_vpn.prom')).mode & 0o777, 0o644);
+    // Gluetun keeps the port in a file while it has one; no API key is needed to look.
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun test -s \/tmp\/gluetun\/forwarded_port$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no forwarded port, or Gluetun stopped WHEN it runs THEN it says there is none and writes the rest', { skip: !canRun && 'needs bash and jq' }, () => {
+    // qBittorrent says "connected" on a port nobody forwards: this number is Gluetun's own.
+    const { root, run, prom } = setup({ forwarded: false, qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 0\n');
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 1$/m);
+    assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });
 
