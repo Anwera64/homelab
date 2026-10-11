@@ -234,6 +234,15 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     }
   });
 
+  await t.test('the VPN servers Gluetun may use come from .env, and default to any server in the country', () => {
+    const gluetun = block('gluetun');
+    // Gluetun has no "all but these" filter: the servers known to hold a forwarded port are named instead.
+    // Empty is Gluetun's own default; the watchdog (system/server-vpn-watchdog.sh) empties it to widen.
+    assert.ok(gluetun.includes('- SERVER_HOSTNAMES=${VPN_SERVER_HOSTNAMES:-}'));
+    assert.match(envExample, /^# VPN_SERVER_HOSTNAMES=$/m, '.env.example must show VPN_SERVER_HOSTNAMES with its default');
+    assert.match(envExample, /comma-separated/i, 'how to name more than one server');
+  });
+
   await t.test('Gluetun enables the HTTP proxy for stack services like Prowlarr', () => {
     const gluetun = block('gluetun');
     assert.ok(gluetun.includes('- HTTPPROXY=${HTTPPROXY:-on}'), 'Gluetun must enable the HTTP proxy');
