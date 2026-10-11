@@ -9,7 +9,7 @@ from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.gossip_repository import IGossipRepository
 from app.domain.repositories.user_repository import IUserRepository
-from app.domain.use_cases.chat.current_date_line import current_date_line
+from app.domain.use_cases.chat.current_date_line import sent_at_stamp, today_line
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 
 
@@ -96,7 +96,9 @@ class AssembleAgentContextUseCase:
             f"You are speaking with {user.full_name}. Maintain helpful, attentive, and relational awareness."
         )
         # Last in the primacy zone: read early, and the recency zone's order is left alone (#39).
-        primacy_lines.append(current_date_line(self.clock(), timezone_name))
+        # The date only: the time of day comes with each message, so this line changes once a day
+        # and Ollama keeps everything cached after it (#79).
+        primacy_lines.append(today_line(self.clock(), timezone_name))
         if is_secret:
             primacy_lines.append(
                 "[CONFIDENTIALITY NOTICE - SECRET MODE ACTIVE]: This conversation is strictly private. "
@@ -157,8 +159,13 @@ class AssembleAgentContextUseCase:
             llm_messages.append(
                 LLMMessage(role="system", content=f"[Earlier in this conversation]:\n{history_summary}")
             )
+        # Each of the member's messages carries when it was sent, from its stored time, so it reads
+        # the same on every later turn and the newest one tells the model the time now (#79).
         for msg in self._newest_that_fit(recent_messages):
-            llm_messages.append(LLMMessage(role=msg.role, content=msg.content or ""))
+            content = msg.content or ""
+            if msg.role == "user":
+                content = f"[Sent {sent_at_stamp(msg.created_at, timezone_name)}] {content}"
+            llm_messages.append(LLMMessage(role=msg.role, content=content))
 
         return llm_messages
 

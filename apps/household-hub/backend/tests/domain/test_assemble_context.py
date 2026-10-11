@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from datetime import datetime, timezone, timedelta
 
@@ -218,6 +220,11 @@ def _assembler(history_tokens: int = 6000) -> AssembleAgentContextUseCase:
     )
 
 
+def _unstamped(content: str) -> str:
+    """A message as it was written, without the time it was sent in front (#79)."""
+    return re.sub(r"^\[Sent [^\]]*\] ", "", content)
+
+
 def _chat(count: int, characters: int):
     return [
         ChatMessage(id=f"m{i}", session_id="s1", role="user" if i % 2 else "assistant", content=f"{i}:" + "x" * characters)
@@ -238,7 +245,7 @@ async def test_GIVEN_a_summary_WHEN_assembled_THEN_it_sits_between_the_system_pr
     assert assembled[0].role == "system" and assembled[0].content.startswith("You are helpful.")
     assert assembled[1].role == "system"
     assert assembled[1].content == "[Earlier in this conversation]:\nAlex planned a trip to Lima."
-    assert [m.content for m in assembled[2:]] == [m.content for m in messages]
+    assert [_unstamped(m.content) for m in assembled[2:]] == [m.content for m in messages]
 
 
 @pytest.mark.asyncio
@@ -250,13 +257,13 @@ async def test_GIVEN_more_messages_than_the_budget_WHEN_assembled_THEN_the_newes
 
     assembled = await _assembler(history_tokens=1000).execute(user=user, agent=agent, recent_messages=messages)
 
-    sent = [m.content for m in assembled[1:]]
+    sent = [_unstamped(m.content) for m in assembled[1:]]
     assert sent == [m.content for m in messages[-len(sent):]]
     assert 5 <= len(sent) <= 10
     # Nothing is cut short, and no old-style snippet summary appears.
     assert all(len(content) == len(original.content) for content, original in zip(sent, messages[-len(sent):]))
     assert not any("Summary of earlier conversation" in m.content for m in assembled)
-    assert assembled[-1].content == messages[-1].content
+    assert _unstamped(assembled[-1].content) == messages[-1].content
 
 
 @pytest.mark.asyncio
@@ -268,7 +275,7 @@ async def test_GIVEN_a_question_bigger_than_the_budget_WHEN_assembled_THEN_it_is
 
     assembled = await _assembler(history_tokens=1000).execute(user=user, agent=agent, recent_messages=messages)
 
-    assert [m.content for m in assembled[1:]] == ["q" * 9000]
+    assert [_unstamped(m.content) for m in assembled[1:]] == ["q" * 9000]
 
 
 FIXED_NOW = datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
@@ -302,10 +309,11 @@ async def test_the_agent_is_told_the_date_at_the_end_of_the_primacy_zone():
     )
 
     blocks = llm_messages[0].content.split("\n\n")
-    date_line = "Today is Thursday, 24 September 2026, 14:05 (America/Mexico_City)."
     assert blocks[0] == "You are a helpful homelab coordinator."
     assert blocks[1].startswith("You are speaking with Alex Rivera.")
-    assert blocks[2] == date_line
+    # The date, never the time of day: that comes with each message (#79).
+    assert blocks[2].startswith("Today is Thursday, 24 September 2026 (America/Mexico_City).")
+    assert "14:05" not in blocks[2]
     assert blocks[3].startswith("[CONFIDENTIALITY NOTICE")
     # The recency zone keeps its order: memories, then the closing secret-mode reminder.
     assert blocks[4:] == [
@@ -326,4 +334,51 @@ async def test_without_a_timezone_the_agent_is_told_the_date_in_utc():
         recent_messages=[ChatMessage(role="user", content="Hi")],
     )
 
-    assert "Today is Thursday, 24 September 2026, 20:05 (UTC)." in llm_messages[0].content
+    assert "Today is Thursday, 24 September 2026 (UTC)." in llm_messages[0].content
+
+
+@pytest.mark.asyncio
+async def test_each_member_message_is_stamped_with_when_it_was_sent_and_answers_are_not():
+    """#79: the time reaches the model through the messages, so the system prompt stays cached."""
+    user = User(id="u1", full_name="Alex Rivera")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    messages = [
+        ChatMessage(role="user", content="Dinner tonight?", created_at=datetime(2026, 9, 24, 19, 58, tzinfo=timezone.utc)),
+        ChatMessage(role="assistant", content="Tacos at 8.", created_at=datetime(2026, 9, 24, 19, 59, tzinfo=timezone.utc)),
+        # SQLite gives created_at back without its zone; it was written in UTC.
+        ChatMessage(role="user", content="What's new?", created_at=datetime(2026, 9, 24, 20, 5)),
+    ]
+
+    llm_messages = await _dated_assembler().execute(
+        user=user, agent=agent, recent_messages=messages, timezone_name="America/Mexico_City"
+    )
+
+    assert [(m.role, m.content) for m in llm_messages[1:]] == [
+        ("user", "[Sent Thu 24 Sep 2026, 13:58] Dinner tonight?"),
+        ("assistant", "Tacos at 8."),
+        ("user", "[Sent Thu 24 Sep 2026, 14:05] What's new?"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_minute_later_the_prompt_only_grows_so_ollama_can_keep_its_cache():
+    """#79: a turn a minute later must render everything sent before exactly as it was."""
+    user = User(id="u1", full_name="Alex Rivera")
+    agent = AgentPersonality(id="a1", name="Assistant", system_prompt="You are helpful.")
+    question = ChatMessage(role="user", content="Dinner tonight?", created_at=FIXED_NOW)
+    answer = ChatMessage(role="assistant", content="Tacos at 8.", created_at=FIXED_NOW)
+    follow_up = ChatMessage(role="user", content="And dessert?", created_at=FIXED_NOW + timedelta(minutes=1))
+
+    def assembler_at(now):
+        return AssembleAgentContextUseCase(
+            memory_repo=FakeMemoryRepository(), gossip_repo=FakeGossipRepository(), clock=lambda: now
+        )
+
+    first = await assembler_at(FIXED_NOW).execute(
+        user=user, agent=agent, recent_messages=[question], timezone_name="UTC"
+    )
+    second = await assembler_at(FIXED_NOW + timedelta(minutes=1, seconds=30)).execute(
+        user=user, agent=agent, recent_messages=[question, answer, follow_up], timezone_name="UTC"
+    )
+
+    assert [(m.role, m.content) for m in second[: len(first)]] == [(m.role, m.content) for m in first]
