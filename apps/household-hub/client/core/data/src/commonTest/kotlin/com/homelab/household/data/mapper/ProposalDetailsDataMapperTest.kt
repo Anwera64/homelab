@@ -4,6 +4,7 @@ import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.RepeatChange
 import com.homelab.household.domain.model.RepeatEvery
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -253,5 +254,37 @@ class ProposalDetailsDataMapperTest {
             )
 
         assertEquals(json("""{"is_all_day": false}"""), arguments)
+    }
+
+    @Test
+    fun `GIVEN a new rule picked on the card WHEN written back THEN the hub gets the whole repeat`() {
+        val weekly =
+            ProposalDetails.CalendarEvent(
+                null,
+                null,
+                null,
+                false,
+                repeatChange =
+                    RepeatChange.To(
+                        EventRepeat(RepeatEvery.Week, weekdays = listOf(1, 3), until = EventMoment(2026, 12, 24)),
+                    ),
+            )
+        val tenDays = weekly.copy(repeatChange = RepeatChange.To(EventRepeat(RepeatEvery.Day, count = 10)))
+
+        assertEquals(
+            json("""{"frequency": "weekly", "interval": 1, "days": ["TU", "TH"], "until": "2026-12-24"}"""),
+            ProposalDetailsDataMapper.toArguments(weekly)["repeat"],
+        )
+        assertEquals(
+            json("""{"frequency": "daily", "interval": 1, "count": 10}"""),
+            ProposalDetailsDataMapper.toArguments(tenDays)["repeat"],
+        )
+    }
+
+    @Test
+    fun `GIVEN the member made it a one-off WHEN written back THEN the hub is told it does not repeat`() {
+        val oneOff = ProposalDetails.CalendarEvent(null, null, null, false, repeatChange = RepeatChange.Stop)
+
+        assertEquals(json("""{"frequency": "none"}"""), ProposalDetailsDataMapper.toArguments(oneOff)["repeat"])
     }
 }

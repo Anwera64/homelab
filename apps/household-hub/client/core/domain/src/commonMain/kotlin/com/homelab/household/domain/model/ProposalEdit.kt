@@ -2,9 +2,10 @@ package com.homelab.household.domain.model
 
 /**
  * A detail of a write the member can change before approving it (canvas: ToolEdit): an event's
- * [What], [Day] and [Time], or a note's title ([What]) and [Words].
+ * [What], [Day] and [Time], how it [Repeat]s and when that [Ends], or a note's title ([What]) and
+ * [Words].
  */
-enum class EditField { What, Day, Time, Words }
+enum class EditField { What, Day, Time, Words, Repeat, Ends }
 
 /** A calendar day picked on a card. [month] is 1 for January. */
 data class EventDate(
@@ -30,6 +31,23 @@ data class TimeOfDay(
 )
 
 /**
+ * Whether a calendar write's rule can be changed on its card: an add, or a change to a one-off, to
+ * the whole series, or to this date and the ones after it, but not to one date on its own, which
+ * can't have a rule of its own. A rule the fields have no words for (yearly, every other week) stays
+ * as proposed rather than be rewritten.
+ */
+private fun opensRepeat(
+    action: ToolAction?,
+    details: ProposalDetails.CalendarEvent,
+    scope: EventScope?,
+): Boolean {
+    val rule = details.repeat
+    val showable = rule == null || (rule.interval == 1 && rule.every != RepeatEvery.Year)
+    val writes = action == ToolAction.Create || (action == ToolAction.Update && scope != EventScope.OnlyThis)
+    return showable && writes
+}
+
+/**
  * What a card's fields hold while it is edited. [day] and [time] are null where the card has no such
  * field: a note, an event with no start, a whole day.
  */
@@ -38,7 +56,96 @@ data class EditValues(
     val words: String,
     val day: EventDate?,
     val time: TimeOfDay?,
+    val repeat: RepeatEvery? = null,
+    val weekdays: Set<Int> = emptySet(),
+    val ends: RepeatEnd = RepeatEnd.Never,
+    val lastDate: EventDate? = null,
+    val times: Int? = null,
+) {
+    /** Repeat set to [every]; picking Weekly with no day ticked ticks the start's own weekday. */
+    fun pickRepeat(every: RepeatEvery?): EditValues {
+        val startDay = day?.let { EventMoment(it.year, it.month, it.day).weekday }
+        val days = if (every == RepeatEvery.Week && weekdays.isEmpty()) setOfNotNull(startDay) else weekdays
+        return copy(repeat = every, weekdays = days)
+    }
+
+    /**
+     * Ends set to [kind]. After with no count yet starts at [DEFAULT_TIMES], as the canvas shows it,
+     * and On a date with no last date yet starts on the first date, for the member to move on.
+     */
+    fun pickEnds(kind: RepeatEnd): EditValues =
+        copy(
+            ends = kind,
+            times = if (kind == RepeatEnd.After) times ?: DEFAULT_TIMES else times,
+            lastDate = if (kind == RepeatEnd.OnDate) lastDate ?: day else lastDate,
+        )
+
+    companion object {
+        const val DEFAULT_TIMES = 10
+        val TIMES = 1..99
+    }
+}
+
+/** What a rule in the fields comes to: how many [sessions], and the [last] of them. */
+data class RepeatSummary(
+    val sessions: Int,
+    val last: EventDate,
 )
+
+/**
+ * The caption under Ends: how many times the rule in [values] puts the event on the calendar and the
+ * last date, counted day by day from the start the way a calendar does (a monthly 31st skips the
+ * months without one). Null when there is nothing to count: no repeat, no end, no start or no days.
+ */
+fun repeatSummary(values: EditValues): RepeatSummary? {
+    val every = values.repeat ?: return null
+    val start = values.day ?: return null
+    if (every == RepeatEvery.Week && values.weekdays.isEmpty()) return null
+    val first = start.toEpochDay()
+    val lastDay =
+        when (values.ends) {
+            RepeatEnd.Never -> return null
+            RepeatEnd.OnDate -> values.lastDate?.toEpochDay() ?: return null
+            RepeatEnd.After -> Long.MAX_VALUE
+        }
+    val limit = if (values.ends == RepeatEnd.After) values.times ?: return null else Int.MAX_VALUE
+    var sessions = 0
+    var last: Long? = null
+    var day = first
+    while (day <= lastDay && sessions < limit && day - first <= MAX_DAYS_COUNTED) {
+        if (falls(every, values.weekdays, start, day)) {
+            sessions++
+            last = day
+        }
+        day++
+    }
+    return last?.let { RepeatSummary(sessions, EventDate.fromEpochDay(it)) }
+}
+
+/** Whether the rule puts the event on [day] (days since 1970-01-01). */
+private fun falls(
+    every: RepeatEvery,
+    weekdays: Set<Int>,
+    start: EventDate,
+    day: Long,
+): Boolean =
+    when (every) {
+        RepeatEvery.Day -> true
+
+        // 1970-01-01 was a Thursday: 3, counting Monday as 0.
+        RepeatEvery.Week -> (day + THURSDAY).mod(DAYS_IN_WEEK) in weekdays
+
+        RepeatEvery.Month -> EventDate.fromEpochDay(day).day == start.day
+
+        RepeatEvery.Year -> EventDate.fromEpochDay(day).let { it.day == start.day && it.month == start.month }
+    }
+
+private const val THURSDAY = 3L
+private const val DAYS_IN_WEEK = 7
+private const val MAX_DAYS_COUNTED = 20 * 366L
+
+/** When a repeating event stops: never, on [OnDate] its last date, or [After] so many times. */
+enum class RepeatEnd { Never, OnDate, After }
 
 /**
  * What approving with the member's edits sends: only the details that changed in [edited], or null
@@ -51,13 +158,20 @@ data class ProposalEdit(
     val invalid: Set<EditField>,
 )
 
+/** Whether [card]'s Repeat offers None: a series can't be made a one-off again. */
+fun offersNoRepeat(card: AnswerPart.Proposal): Boolean =
+    card.action == ToolAction.Create || (card.details as? ProposalDetails.CalendarEvent)?.repeat == null
+
 /**
  * The fields Edit opens on [card], in the order they are drawn, or none when it can't be edited.
  *
  * A removal and a replacement are never edited: saying yes to losing something should be the whole
  * question. Adding to a note keeps its title, which says which note it goes into.
  */
-fun editableFields(card: AnswerPart.Proposal): List<EditField> {
+fun editableFields(
+    card: AnswerPart.Proposal,
+    scope: EventScope? = (card.details as? ProposalDetails.CalendarEvent)?.scope,
+): List<EditField> {
     if (card.action == ToolAction.Delete || card.action == ToolAction.Replace) return emptyList()
     return when (val details = card.details) {
         is ProposalDetails.CalendarEvent -> {
@@ -65,6 +179,10 @@ fun editableFields(card: AnswerPart.Proposal): List<EditField> {
                 add(EditField.What)
                 if (details.start != null) add(EditField.Day)
                 if (details.start?.isWholeDay == false && !details.allDay) add(EditField.Time)
+                if (opensRepeat(card.action, details, scope)) {
+                    add(EditField.Repeat)
+                    add(EditField.Ends)
+                }
             }
         }
 
@@ -81,11 +199,24 @@ fun editableFields(card: AnswerPart.Proposal): List<EditField> {
 /** What [card]'s fields start as: the details as proposed. */
 fun proposedValues(card: AnswerPart.Proposal): EditValues {
     val start = startOf(card)
+    val rule = (card.details as? ProposalDetails.CalendarEvent)?.repeat
+    val until = rule?.until
+    val count = rule?.count
     return EditValues(
         title = titleOf(card.details)?.trim().orEmpty(),
         words = (card.details as? ProposalDetails.Note)?.content.orEmpty(),
         day = start?.let { EventDate(it.year, it.month, it.day) },
         time = start?.timeOfDay(),
+        repeat = rule?.every,
+        weekdays = rule?.weekdays.orEmpty().toSet(),
+        ends =
+            when {
+                until != null -> RepeatEnd.OnDate
+                count != null -> RepeatEnd.After
+                else -> RepeatEnd.Never
+            },
+        lastDate = until?.let { EventDate(it.year, it.month, it.day) },
+        times = count,
     )
 }
 
@@ -93,25 +224,34 @@ fun proposedValues(card: AnswerPart.Proposal): EditValues {
  * The edit approving [card] with [values] in its fields makes.
  *
  * A new day or time moves the start, keeping its zone, and the end moves with it so the event keeps
- * its length.
+ * its length. [scope] is the dates the card's switch says the change is for.
  */
 fun editProposal(
     card: AnswerPart.Proposal,
     values: EditValues,
+    scope: EventScope? = (card.details as? ProposalDetails.CalendarEvent)?.scope,
 ): ProposalEdit {
     val proposed = proposedValues(card)
-    val fields = editableFields(card)
+    val fields = editableFields(card, scope)
     val changed =
         buildSet {
             if (values.title.trim() != proposed.title) add(EditField.What)
             if (values.words != proposed.words) add(EditField.Words)
             if (values.day != proposed.day) add(EditField.Day)
             if (values.time != proposed.time) add(EditField.Time)
+            if (repeatOf(values) != repeatOf(proposed)) add(EditField.Repeat)
+            if (endOf(values) != endOf(proposed)) add(EditField.Ends)
         }.intersect(fields.toSet())
     val invalid =
         buildSet {
             if (EditField.What in fields && values.title.isBlank()) add(EditField.What)
             if (EditField.Words in fields && values.words.isBlank()) add(EditField.Words)
+            if (values.repeat != null) {
+                if (EditField.Repeat in fields && values.repeat == RepeatEvery.Week && values.weekdays.isEmpty()) {
+                    add(EditField.Repeat)
+                }
+                if (EditField.Ends in fields && !endsAfterStart(values)) add(EditField.Ends)
+            }
         }
     if (invalid.isNotEmpty() ||
         changed.isEmpty()
@@ -135,9 +275,19 @@ fun editProposal(
                             minute = values.time?.minute,
                         )
                     val shift = moved.minutes() - start.minutes()
-                    details.copy(title = title, start = moved, end = details.end?.plusMinutes(shift))
+                    details.copy(
+                        title = title,
+                        start = moved,
+                        end = details.end?.plusMinutes(shift),
+                        repeatChange = repeatChange(details, values, changed),
+                    )
                 } else {
-                    details.copy(title = title, start = null, end = null)
+                    details.copy(
+                        title = title,
+                        start = null,
+                        end = null,
+                        repeatChange = repeatChange(details, values, changed),
+                    )
                 }
             }
 
@@ -156,7 +306,13 @@ fun editProposal(
 fun ProposalDetails.withEdit(edit: ProposalDetails): ProposalDetails =
     when {
         this is ProposalDetails.CalendarEvent && edit is ProposalDetails.CalendarEvent -> {
-            copy(title = edit.title ?: title, start = edit.start ?: start, end = edit.end ?: end)
+            val rule =
+                when (val change = edit.repeatChange) {
+                    is RepeatChange.To -> change.rule
+                    RepeatChange.Stop -> null
+                    null -> repeat
+                }
+            copy(title = edit.title ?: title, start = edit.start ?: start, end = edit.end ?: end, repeat = rule)
         }
 
         this is ProposalDetails.Note && edit is ProposalDetails.Note -> {
@@ -167,6 +323,59 @@ fun ProposalDetails.withEdit(edit: ProposalDetails): ProposalDetails =
             this
         }
     }
+
+/** Whether the end the fields give is one a rule can have: a last date from the start on, or 1 to 99 times. */
+private fun endsAfterStart(values: EditValues): Boolean =
+    when (values.ends) {
+        RepeatEnd.Never -> {
+            true
+        }
+
+        RepeatEnd.OnDate -> {
+            val last = values.lastDate
+            val start = values.day
+            last != null && (start == null || last.toEpochDay() >= start.toEpochDay())
+        }
+
+        RepeatEnd.After -> {
+            values.times in EditValues.TIMES
+        }
+    }
+
+/** How often, as the fields say it: the days only count for Weekly. */
+private fun repeatOf(values: EditValues): Pair<RepeatEvery?, Set<Int>> =
+    values.repeat to (if (values.repeat == RepeatEvery.Week) values.weekdays else emptySet())
+
+/** When it ends, as the fields say it: only the value that goes with the end picked counts. */
+private fun endOf(values: EditValues): Any? =
+    when (values.ends) {
+        RepeatEnd.Never -> RepeatEnd.Never
+        RepeatEnd.OnDate -> values.lastDate
+        RepeatEnd.After -> values.times
+    }
+
+/**
+ * The rule the member left in the fields, when they changed Repeat or Ends: the whole of it, since
+ * the hub replaces a rule rather than patching it. How many weeks or months apart stays as proposed.
+ */
+private fun repeatChange(
+    details: ProposalDetails.CalendarEvent,
+    values: EditValues,
+    changed: Set<EditField>,
+): RepeatChange? {
+    if (EditField.Repeat !in changed && EditField.Ends !in changed) return null
+    val every = values.repeat ?: return RepeatChange.Stop
+    val until = values.lastDate.takeIf { values.ends == RepeatEnd.OnDate }
+    return RepeatChange.To(
+        EventRepeat(
+            every = every,
+            interval = details.repeat?.interval ?: 1,
+            weekdays = if (every == RepeatEvery.Week) values.weekdays.sorted() else emptyList(),
+            until = until?.let { EventMoment(it.year, it.month, it.day) },
+            count = values.times.takeIf { values.ends == RepeatEnd.After },
+        ),
+    )
+}
 
 private fun titleOf(details: ProposalDetails): String? =
     when (details) {
