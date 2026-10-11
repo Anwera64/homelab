@@ -164,12 +164,13 @@ private val READS =
 @Composable
 private fun Section(
     title: String,
+    modifier: Modifier = Modifier,
     note: String? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         Text(
             title.uppercase(),
             modifier = Modifier.padding(start = HearthTheme.spacing.xs),
@@ -192,10 +193,11 @@ private fun Section(
 private fun ActionRow(
     label: String,
     caption: String,
+    modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = HearthTheme.size.touchTarget),
+        modifier = modifier.fillMaxWidth().heightIn(min = HearthTheme.size.touchTarget),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
@@ -212,9 +214,10 @@ private fun ActionRow(
 private fun WriteRow(
     approval: ToolApproval,
     onToggle: (tool: String, action: ToolAction, automatic: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val label = stringResource(toolLabel(approval.tool, approval.action).permission)
-    ActionRow(label = label, caption = stringResource(captionOf(approval))) {
+    ActionRow(label = label, caption = stringResource(captionOf(approval)), modifier = modifier) {
         if (approval.alwaysAsks) {
             HearthChip(label = stringResource(Res.string.when_agents_act_always_asks), icon = HearthIcon.SecretLocked)
         } else {
