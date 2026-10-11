@@ -3,7 +3,6 @@
   "extends": ["config:recommended"],
   "enabledManagers": ["docker-compose", "dockerfile", "gradle", "gradle-wrapper", "pip-compile"],
   "timezone": "Europe/Madrid",
-  "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
   "minimumReleaseAgeBehaviour": "timestamp-optional",
   "semanticCommits": "disabled",
@@ -19,14 +18,14 @@
   },
   "packageRules": [
     {
-      "description": "Minor and patch image bumps: one PR a week, merged once CI is green.",
+      "description": "Minor and patch image bumps: one PR, merged once CI is green.",
       "matchManagers": ["docker-compose"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "container images",
       "automerge": true
     },
     {
-      "description": "The hub client's minor and patch bumps: one PR a week, merged once its Android and iOS CI is green.",
+      "description": "The hub client's minor and patch bumps: one PR, merged once its Android and iOS CI is green.",
       "matchManagers": ["gradle", "gradle-wrapper"],
       "matchFileNames": ["apps/household-hub/client/**"],
       "matchUpdateTypes": ["minor", "patch"],
@@ -34,7 +33,7 @@
       "automerge": true
     },
     {
-      "description": "The hub backend's minor and patch bumps (its Python packages and base image): one PR a week, merged once the backend CI is green.",
+      "description": "The hub backend's minor and patch bumps (its Python packages and base image): one PR, merged once the backend CI is green.",
       "matchManagers": ["pip-compile", "dockerfile"],
       "matchFileNames": ["apps/household-hub/backend/**"],
       "matchUpdateTypes": ["minor", "patch"],
@@ -42,7 +41,7 @@
       "automerge": true
     },
     {
-      "description": "Python patch releases (3.12.x) still come in the weekly hub PR while a newer Python is waiting.",
+      "description": "Python patch releases (3.12.x) still come in the hub PR while a newer Python is waiting.",
       "matchPackageNames": ["python"],
       "separateMinorPatch": true
     },

@@ -129,7 +129,7 @@ graph TD
 | **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
 | **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
 | **Recyclarr** | Server | — | TRaSH Guides sync, daily 3 AM |
-| **Renovate** | Server | — | Version bump PRs for every host's images, the hub and its client, weekly; runs every hour |
+| **Renovate** | Server | — | Version bump PRs for every host's images, the hub and its client, opened when a release is three days old; runs every hour |
 | **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
 
 The server has a firewall, so its service ports answer lemonpi only.
@@ -146,7 +146,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
 │       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
-├── renovate.json                    # Renovate: weekly bump PRs for pinned images and the hub's and client's libraries
+├── renovate.json                    # Renovate: bump PRs for pinned images and the hub's and client's libraries
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
 ├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture, environment)

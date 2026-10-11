@@ -53,9 +53,12 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     }
   });
 
-  await t.test('opens its PRs once a week, on releases at least three days old', () => {
+  await t.test('opens its PRs whenever a bump is ready, on releases at least three days old', () => {
+    // The lock file refresh still has a schedule, read in this timezone.
     assert.equal(config.timezone, 'Europe/Madrid');
-    assert.deepEqual(config.schedule, ['before 6am on monday']);
+    assert.equal(config.schedule, undefined, 'no schedule: bumps open at any time');
+    // A weekly gate must not come back through a rule either.
+    assert.deepEqual(ruleFor((r) => r.schedule !== undefined), [], 'no rule sets a schedule');
     // A broken release is usually pulled or fixed by then.
     assert.equal(config.minimumReleaseAge, '3 days');
     // Image registries often publish no release date. Without one a bump would wait forever,
@@ -92,7 +95,7 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.ok(index >= 0, 'a rule must turn auto-merge off for Jellyfin');
     const groupIndex = rules.findIndex((r) => asList(r.matchManagers).includes('docker-compose') && r.groupName);
     assert.ok(index > groupIndex, 'the Jellyfin rule must come after the group rule, which it overrides');
-    // In the weekly group it would hold back every other bump: it gets a PR of its own.
+    // In the image group it would hold back every other bump: it gets a PR of its own.
     assert.equal(rules[index].groupName, 'Jellyfin');
   });
 
@@ -163,7 +166,7 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.doesNotMatch('latest', scheme);
   });
 
-  await t.test('groups the client\'s minor and patch bumps into a weekly PR of their own, merged once CI is green', () => {
+  await t.test('groups the client\'s minor and patch bumps into a PR of their own, merged once CI is green', () => {
     const [group] = ruleFor((r) => r.groupName === 'client dependencies');
     assert.ok(group, 'a client dependencies group must exist');
     assert.deepEqual([...group.matchManagers].sort(), ['gradle', 'gradle-wrapper']);
@@ -193,7 +196,7 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     }
   });
 
-  await t.test('groups the hub\'s minor and patch bumps into a weekly PR, merged once the backend CI is green', () => {
+  await t.test('groups the hub\'s minor and patch bumps into one PR, merged once the backend CI is green', () => {
     const index = rules.findIndex((r) => r.groupName === 'hub dependencies');
     assert.ok(index >= 0, 'a hub dependencies group must exist');
     const group = rules[index];
@@ -221,7 +224,7 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.equal(python.automerge, false);
     // Without this, a pending 3.14 hides the 3.12 patch releases, security fixes included.
     const [patches] = ruleFor((r) => asList(r.matchPackageNames).includes('python') && r.separateMinorPatch === true);
-    assert.ok(patches, 'Python patch releases must still come, in the weekly hub PR');
+    assert.ok(patches, 'Python patch releases must still come, in the hub PR');
     assert.ok(index > rules.findIndex((r) => r.groupName === 'hub dependencies'), 'it must override the hub group');
   });
 
