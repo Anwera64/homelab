@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # One Renovate run: it looks for newer versions of what this repo pins, opens
-# the weekly bump PRs and merges the ones renovate.json allows once their CI is
+# the bump PRs and merges the ones renovate.json allows once their CI is
 # green. Runs from server-renovate.timer, every hour.
 #
 # Renovate needs a GitHub token (RENOVATE_TOKEN in .env). Until it is there the

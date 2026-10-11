@@ -274,7 +274,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 
   await t.test('Renovate runs here, one run at a time, with the repo token and nothing else', () => {
     const renovate = block('renovate');
-    assert.match(imageOf(renovate), /^renovate\/renovate:\d+\.\d+\.\d+$/, 'pinned; it bumps itself in the weekly PR');
+    assert.match(imageOf(renovate), /^renovate\/renovate:\d+\.\d+\.\d+$/, 'pinned; it bumps itself in the image PR');
     // Its own profile: the stack never starts it, server-renovate.timer does.
     assert.match(renovate, /^    profiles:\s*\["renovate"\]\s*$/m);
     assert.match(renovate, /^    restart:\s*"no"\s*$/m, 'a run ends; nothing restarts it');

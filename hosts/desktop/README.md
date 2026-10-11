@@ -59,7 +59,7 @@ Remove-NetFirewallRule -DisplayName "Homelab Stack (LAN)"
 
 ## Updating
 
-Renovate pins the Ollama and Alloy versions and bumps them in the same weekly PR as the server's. After a bump is merged, run `git pull`, then `startup_homelab.ps1`. Docker fetches the newly pinned image.
+Renovate pins the Ollama and Alloy versions and bumps them in the same PR as the server's. After a bump is merged, run `git pull`, then `startup_homelab.ps1`. Docker fetches the newly pinned image.
 
 ## Disk space
 

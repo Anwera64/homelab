@@ -23,7 +23,7 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
 | Wi-Fi band (systemd timer) | Once every minute, moves the Wi-Fi back to 5 GHz when the card has settled on 2.4 GHz. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
-| Renovate (Docker, systemd timer) | Runs every hour: opens the weekly version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
+| Renovate (Docker, systemd timer) | Runs every hour: opens the version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
 | Nightly update (systemd timer) | At 04:00, brings in what was merged on GitHub and restarts the stack when something changed. |
 
 ## Fresh install
@@ -59,10 +59,10 @@ The open-source `nouveau` driver hangs this GPU when it wakes it up. That freeze
 
 ## Updating
 
-Every image in `docker-compose.yml` is pinned to a release, so the repo says what runs here. Renovate opens the bump PRs on Monday mornings:
+Every image in `docker-compose.yml` is pinned to a release, so the repo says what runs here. Renovate opens a bump PR once a release is three days old:
 
-- **Minor and patch bumps** come in one PR a week, which merges itself once CI is green.
-- **The Hub's Python packages** and its base image come in a weekly PR of their own, merged once the backend's tests and image build pass. Renovate edits `requirements.in` and regenerates the lock files; a second weekly PR refreshes the packages nobody names (the indirect ones). A new Python version (3.12 to 3.13) waits for you.
+- **Minor and patch bumps** come in one PR, which merges itself once CI is green.
+- **The Hub's Python packages** and its base image come in a PR of their own, merged once the backend's tests and image build pass. Renovate edits `requirements.in` and regenerates the lock files; on Mondays a weekly PR refreshes the packages nobody names (the indirect ones). A new Python version (3.12 to 3.13) waits for you.
 - **Major bumps** get a PR each and wait for you. So does **Jellyfin**, whose upgrades migrate the library database. **Postgres** majors are never proposed: they need a dump and restore by hand.
 
 `server-update.timer` applies what was merged at 04:00. It fast-forwards the checkout and, if anything changed, rebuilds and restarts the stack and removes the old images. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
@@ -81,7 +81,7 @@ To undo a bad bump, revert its PR on GitHub. The timer applies the revert the ne
 
 ### Renovate runs on this machine
 
-Renovate is the `renovate` service in `docker-compose.yml`. It is not part of the running stack: `server-renovate.timer` starts one run every hour, and the container exits when the run ends. A run on Monday morning opens the PRs; later runs merge them once CI is green. The rules are in [`renovate.json`](../../renovate.json).
+Renovate is the `renovate` service in `docker-compose.yml`. It is not part of the running stack: `server-renovate.timer` starts one run every hour, and the container exits when the run ends. A run opens the PRs that are due; later runs merge them once CI is green. The rules are in [`renovate.json`](../../renovate.json).
 
 It needs a GitHub token, as `RENOVATE_TOKEN` in `.env`. Until that is set, every run is skipped. Create a fine-grained token for the `Anwera64/homelab` repository only, with these repository permissions, which are the ones Renovate's documentation lists:
 

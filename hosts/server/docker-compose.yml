@@ -503,7 +503,7 @@ services:
 
   # ==============================================================================
   # 11. Version bumps (Renovate)
-  # Opens the weekly bump PRs for the pinned versions in this repo and merges the
+  # Opens the bump PRs for the pinned versions in this repo and merges the
   # ones renovate.json allows once CI is green. One run, then it exits:
   # server-renovate.timer starts it every hour. To see what a run would do:
   #   docker compose --profile renovate run --rm -e RENOVATE_DRY_RUN=full renovate

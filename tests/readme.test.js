@@ -59,6 +59,8 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /`git pull`[^\n]*`startup_homelab\.ps1`/, 'README must say how a merged bump reaches the desktop');
     // Self-hosted: a container on the server, not the GitHub app.
     assert.match(readme, /^\| \*\*Renovate\*\* \| Server \| — \| [^|]*the hub[^|]*\|$/m);
+    // Bump PRs open whenever a release is old enough, not on a weekly schedule.
+    assert.doesNotMatch(readme.match(/^\| \*\*Renovate\*\* .*$/m)[0], /weekly/i, 'the Renovate row must not say weekly');
     assert.match(serverRow, /Renovate/, 'the Server row must name Renovate');
     assert.match(readme, /^\| \*\*Nightly update\*\* \| Server \| — \| [^|]*4 AM[^|]*\|$/m);
     const paths = treePaths(readme);
@@ -78,6 +80,10 @@ test('Root README matches the repository', async (t) => {
     for (const needle of ['Renovate', 'server-update.timer', 'journalctl -u server-update', 'sudo hosts/server/bootstrap.sh', 'Jellyfin', 'Postgres', "The Hub's Python packages"]) {
       assert.ok(updating[1].includes(needle), `Updating must mention ${needle}`);
     }
+    // Bump PRs open whenever a release is old enough; only the lock file refresh is weekly.
+    assert.doesNotMatch(updating[1], /Monday morning/, 'bump PRs no longer wait for Monday morning');
+    assert.doesNotMatch(updating[1], /one PR a week/, 'bump PRs are not weekly');
+    assert.match(updating[1], /weekly PR refreshes/, 'the lock file refresh is still weekly');
     // Renovate runs here: the token it needs, how to run it by hand, and how to rehearse a run.
     assert.match(server, /^\| Renovate \(Docker, systemd timer\) \| [^|]*every hour[^|]*\|$/m);
     for (const needle of [
