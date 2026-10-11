@@ -41,10 +41,23 @@
         "enable": true,
         "hide": false,
         "iconColor": "red",
-        "expr": "{container=\"gluetun\"} |= \"adding port mapping\"",
+        "expr": "{container=\"gluetun\"} |~ \"ERROR \\\\[(port forwarding|vpn)\\\\].*(port mapping|port forwarding service)\"",
         "instant": false,
         "titleFormat": "Port forwarding failed",
         "textFormat": "{{__line__}}"
+      },
+      {
+        "name": "Watchdog recreated the VPN",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "orange",
+        "expr": "changes(server_vpn_watchdog_recreations_total{host=\"server\"}[2m]) > 0",
+        "step": "1m",
+        "titleFormat": "Watchdog recreated the VPN"
       }
     ]
   },
@@ -419,7 +432,7 @@
       },
       "type": "state-timeline",
       "title": "Connectable",
-      "description": "Whether other peers can reach qBittorrent's forwarded port. Read once a minute: a shorter loss can fall between two readings; the red markers are exact.",
+      "description": "Whether qBittorrent says other peers reach it. It can say so on a port nobody forwards: \"Port forwarded\" below is the VPN's own answer. Read once a minute.",
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -487,6 +500,81 @@
       }
     },
     {
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "type": "state-timeline",
+      "title": "Port forwarded",
+      "description": "Whether Gluetun holds a forwarded port from the VPN provider. Read once a minute: a shorter loss can fall between two readings; the red markers are exact.",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "interval": "1m",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "editorMode": "code",
+          "expr": "max(server_vpn_port_forwarded{host=\"server\"})",
+          "range": true,
+          "legendFormat": "Gluetun"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "no port",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "forwarded",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "left",
+        "rowHeight": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 8,
       "datasource": {
         "type": "prometheus",
@@ -499,7 +587,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 21
       },
       "interval": "1m",
       "targets": [

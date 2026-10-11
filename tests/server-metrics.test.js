@@ -292,10 +292,11 @@ test('Downloads dashboard', async (t) => {
     assert.equal(download.gridPos.y, bottom(titled('Average download')), 'right under the numbers');
   });
 
-  await t.test('shows the Wi-Fi band and whether qBittorrent can be reached as two coloured strips under the graphs', () => {
+  await t.test('shows the Wi-Fi band, whether qBittorrent can be reached and whether a port is forwarded as coloured strips under the graphs', () => {
     const band = titled('Wi-Fi band');
     const reach = titled('Connectable');
-    for (const strip of [band, reach]) {
+    const forwarded = titled('Port forwarded');
+    for (const strip of [band, reach, forwarded]) {
       assert.equal(strip.type, 'state-timeline');
       // Coloured by thresholds, Grafana draws threshold ranges ("-∞+") instead of the states.
       assert.equal(strip.fieldConfig.defaults.color.mode, 'fixed');
@@ -305,6 +306,7 @@ test('Downloads dashboard', async (t) => {
     }
     assert.equal(band.gridPos.y, bottom(titled('Download')));
     assert.equal(reach.gridPos.y, bottom(band));
+    assert.equal(forwarded.gridPos.y, bottom(reach));
     const texts = (panel) => Object.fromEntries(Object.entries(panel.fieldConfig.defaults.mappings[0].options).map(([value, { text }]) => [value, text]));
     const colours = (panel) => Object.values(panel.fieldConfig.defaults.mappings[0].options).map(({ color }) => color);
     // 1 above 4 GHz, 0 below: the node exporter's Wi-Fi collector gives the frequency in hertz.
@@ -312,38 +314,75 @@ test('Downloads dashboard', async (t) => {
     assert.deepEqual(texts(band), { 0: '2.4 GHz', 1: '5 GHz' });
     assert.deepEqual(exprs(reach), ['max(server_qbittorrent_connectable{host="server"})']);
     assert.deepEqual(texts(reach), { 0: 'firewalled', 1: 'connected' });
-    for (const strip of [band, reach]) assert.equal(new Set(colours(strip)).size, 2, 'one colour for each state');
+    // qBittorrent says "connected" on a port nobody forwards; this strip is Gluetun's own answer.
+    assert.deepEqual(exprs(forwarded), ['max(server_vpn_port_forwarded{host="server"})']);
+    assert.deepEqual(texts(forwarded), { 0: 'no port', 1: 'forwarded' });
+    assert.doesNotMatch(reach.description, /forwarded port/, 'Connectable does not tell whether a port is forwarded');
+    for (const strip of [band, reach, forwarded]) assert.equal(new Set(colours(strip)).size, 2, 'one colour for each state');
   });
 
   await t.test('draws the peer connections across the page, under the strips', () => {
     const peers = titled('Peer connections');
     assert.equal(peers.type, 'timeseries');
     assert.equal(peers.gridPos.w, 24);
-    assert.equal(peers.gridPos.y, bottom(titled('Connectable')));
+    assert.equal(peers.gridPos.y, bottom(titled('Port forwarded')));
     assert.deepEqual(exprs(peers), ['max(server_qbittorrent_peer_connections{host="server"})']);
   });
 
-  await t.test('marks when the VPN connected and when port forwarding failed, from Gluetun\'s log', () => {
-    const marks = Object.fromEntries(dashboard.annotations.list.map((a) => [a.name, a]));
-    assert.deepEqual(Object.keys(marks), ['VPN connected', 'Port forwarding failed']);
+  const marks = Object.fromEntries(((dashboard.annotations || {}).list || []).map((a) => [a.name, a]));
+
+  await t.test('marks when the VPN connected, when port forwarding failed and when the watchdog recreated the VPN', () => {
+    assert.deepEqual(Object.keys(marks), ['VPN connected', 'Port forwarding failed', 'Watchdog recreated the VPN']);
     assert.equal(marks['VPN connected'].expr, '{container="gluetun"} |= "Public IP address is"');
-    assert.equal(marks['Port forwarding failed'].expr, '{container="gluetun"} |= "adding port mapping"');
+    // The first two are read from Gluetun's log; the watchdog leaves a count for the node exporter.
+    for (const name of ['VPN connected', 'Port forwarding failed']) assert.deepEqual(marks[name].datasource, { type: 'loki', uid: 'loki' });
+    const watchdog = marks['Watchdog recreated the VPN'];
+    assert.deepEqual(watchdog.datasource, { type: 'prometheus', uid: 'prometheus' });
+    assert.equal(watchdog.expr, 'changes(server_vpn_watchdog_recreations_total{host="server"}[2m]) > 0');
     for (const mark of Object.values(marks)) {
-      assert.deepEqual(mark.datasource, { type: 'loki', uid: 'loki' });
       // Each has its own switch at the top of the dashboard.
       assert.equal(mark.enable, true);
       assert.notEqual(mark.hide, true);
     }
-    assert.notEqual(marks['VPN connected'].iconColor, marks['Port forwarding failed'].iconColor);
+    assert.equal(new Set(Object.values(marks).map((mark) => mark.iconColor)).size, 3, 'one colour for each marker');
   });
 
-  await t.test('asks only for numbers the Wi-Fi collector and the host script really report', () => {
-    const script = read(path.join(ROOT_DIR, 'hosts/server/system/server-metrics.sh'));
-    const used = new Set(panels.flatMap(exprs).flatMap((expr) => expr.match(/\b(?:node|server)_[A-Za-z0-9_]+/g) || []));
+  await t.test('GIVEN each way Gluetun says port forwarding failed WHEN the red marker reads the log THEN it finds them all, and no success', () => {
+    const expr = (marks['Port forwarding failed'] || {}).expr || '';
+    const found = expr.match(/^\{container="gluetun"\} \|~ "(.*)"$/);
+    assert.ok(found, 'one regular expression over the log of Gluetun');
+    // In LogQL's double quotes a backslash is written twice.
+    const failed = new RegExp(found[1].replace(/\\\\/g, '\\'));
+    const refused = 'executing remote procedure call: reading from udp connection: read udp 10.2.0.2:50568->10.2.0.1:5351: recvfrom: connection refused';
+    const failures = [
+      `ERROR [port forwarding] adding port mapping: ${refused}`,
+      'ERROR [port forwarding] adding port mapping: executing remote procedure call: connection timeout: failed attempts: read udp 10.2.0.2:44096->10.2.0.1:5351: i/o timeout (tries 1, 2, 3)',
+      `ERROR [port forwarding] starting port forwarding service: port forwarding for the first time: getting external IPv4 address: ${refused} - retrying in 5s`,
+      `ERROR [port forwarding] starting port forwarding service: port forwarding for the first time: adding TCP port mapping: ${refused} - retrying in 5s`,
+      // At Gluetun's start the same refusal comes from the VPN loop, and is not tried again.
+      `ERROR [vpn] starting port forwarding service: port forwarding for the first time: adding UDP port mapping: ${refused}`,
+    ];
+    for (const line of failures) assert.match(`2026-10-10T03:20:35+02:00 ${line}`, failed);
+    const fine = [
+      // wget's report of the port reaching qBittorrent, which Gluetun logs as an error.
+      'ERROR [port forwarding] 2026-10-10 03:15:13 URL:http://127.0.0.1:8080/api/v2/app/setPreferences [0/0] -> "-" [1]',
+      'INFO [port forwarding] port forwarded is 51413',
+      'INFO [port forwarding] starting',
+      'INFO [port forwarding] clearing port file /tmp/gluetun/forwarded_port',
+      'WARN [vpn] restarting VPN because it failed to pass the healthcheck: startup check: all check tries failed',
+    ];
+    for (const line of fine) assert.doesNotMatch(`2026-10-10T03:15:13+02:00 ${line}`, failed);
+  });
+
+  await t.test('asks only for numbers the Wi-Fi collector and the host scripts really report', () => {
+    const script = ['server-metrics.sh', 'server-vpn-watchdog.sh'].map((name) => read(path.join(ROOT_DIR, 'hosts/server/system', name))).join('\n');
+    const asked = [...panels.flatMap(exprs), (marks['Watchdog recreated the VPN'] || {}).expr || ''];
+    const used = new Set(asked.flatMap((expr) => expr.match(/\b(?:node|server)_[A-Za-z0-9_]+/g) || []));
     assert.deepEqual([...used].sort(), [
       'node_wifi_interface_frequency_hertz', DOWN, 'server_qbittorrent_connectable', 'server_qbittorrent_peer_connections', UP,
+      'server_vpn_port_forwarded', 'server_vpn_watchdog_recreations_total',
     ].sort());
-    for (const name of [...used].filter((n) => n.startsWith('server_'))) assert.ok(script.includes(name), `the host script must write ${name}`);
+    for (const name of [...used].filter((n) => n.startsWith('server_'))) assert.ok(script.includes(name), `a host script must write ${name}`);
     // The Wi-Fi collector is off unless asked for.
     assert.ok(compose.includes('- --collector.wifi'));
     for (const panel of panels) assert.deepEqual(panel.datasource, { type: 'prometheus', uid: 'prometheus' }, `${panel.title} must use Prometheus`);
