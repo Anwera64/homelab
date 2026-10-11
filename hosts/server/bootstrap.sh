@@ -171,8 +171,17 @@ if printf '[Login]\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\
   | write_if_changed /etc/systemd/logind.conf.d/lid.conf; then
   systemctl restart systemd-logind
 fi
-if ! grep -q consoleblank /etc/default/grub; then
-  sed -i -E 's/^(GRUB_CMDLINE_LINUX_DEFAULT=")([^"]*)"/\1\2 consoleblank=60"/' /etc/default/grub
+# consoleblank blanks the console after a minute. The EFI console can only paint
+# the panel black: its backlight stays lit. With the NVIDIA driver driving the
+# console (the nvidia-drm options), blanking powers the panel off.
+GRUB_CHANGED=0
+for option in consoleblank=60 nvidia-drm.modeset=1 nvidia-drm.fbdev=1; do
+  if ! grep -qF -- "${option%%=*}=" /etc/default/grub; then
+    sed -i -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\")([^\"]*)\"/\1\2 $option\"/" /etc/default/grub
+    GRUB_CHANGED=1
+  fi
+done
+if [ "$GRUB_CHANGED" -eq 1 ]; then
   update-grub
   REBOOT_PENDING=1
 fi
