@@ -256,6 +256,10 @@ install -d -m 0755 /var/lib/node_exporter/textfile
 place_unit server-metrics.service && systemctl daemon-reload
 install_unit server-metrics.timer
 
+step "VPN watchdog every minute: another server when this one does not hold a forwarded port"
+place_unit server-vpn-watchdog.service && systemctl daemon-reload
+install_unit server-vpn-watchdog.timer
+
 step "App settings folders"
 # Created here, owned by the apps' user: Docker would create a missing one as
 # root, and the apps that run as user 1000 could not write to it.
