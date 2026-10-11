@@ -1,8 +1,9 @@
 # ==============================================================================
-# Raspberry Pi 5 (lemonpi): the house DNS
+# Raspberry Pi 5 (lemonpi): the house DNS, and the watch on the server
 #   Pi-hole  -> blocks ads/trackers, answers every device on the LAN and tailnet
 #   Unbound  -> Pi-hole's only upstream; resolves from the root servers with DNSSEC
-# Both use host networking: Pi-hole owns :53 and :80/:443, Unbound 127.0.0.1:5335.
+#   Uptime Kuma + ntfy -> check the server's services and push an alert to the phones
+# The first two use host networking: Pi-hole owns :53, Unbound 127.0.0.1:5335.
 # Run through bootstrap.sh; see README.md.
 # ==============================================================================
 
@@ -57,7 +58,7 @@ services:
     restart: unless-stopped
 
   # HTTPS entry point for *.spicy-llama.duckdns.org (DuckDNS points at this Pi). Pi-local
-  # services are served here; desktop services go to the desktop Caddy's LAN ports.
+  # services are served here; the rest go to the ports the server's containers publish.
   # The image (Caddy + DuckDNS DNS plugin) is built by .github/workflows/caddy-image.yml.
   caddy:
     image: ghcr.io/anwera64/caddy-duckdns:2.11.4
@@ -65,13 +66,16 @@ services:
     network_mode: host
     environment:
       DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in hosts/pi/.env}
+      # The password on maintainerr.spicy-llama.duckdns.org. Caddy does not start without them.
+      MAINTAINERR_USER: ${MAINTAINERR_USER:?set MAINTAINERR_USER in hosts/pi/.env}
+      MAINTAINERR_PASSWORD_HASH: ${MAINTAINERR_PASSWORD_HASH:?set MAINTAINERR_PASSWORD_HASH in hosts/pi/.env}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./data/caddy:/data
     restart: unless-stopped
 
   # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
-  # the sparse checkout by bootstrap.sh); desktop services are reached on 192.168.1.20.
+  # the sparse checkout by bootstrap.sh); the server's services are reached on 192.168.1.30.
   homepage:
     image: ghcr.io/gethomepage/homepage:v2.4.0
     container_name: homepage
@@ -88,9 +92,51 @@ services:
       HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
       HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
       HOMEPAGE_VAR_GLUETUN_API_KEY: ${GLUETUN_API_KEY:-}
+      HOMEPAGE_VAR_CLEANUPARR_API_KEY: ${CLEANUPARR_API_KEY:-}
+      HOMEPAGE_VAR_QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-}
+      HOMEPAGE_VAR_QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-}
     volumes:
       - ../../config/homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     tmpfs:
       - /app/config/logs
+    restart: unless-stopped
+
+  # Asks each service on the server whether it answers, keeps the history and sends an
+  # alert through ntfy. It runs here so that the server's own outage is reported.
+  # Monitors and the ntfy notification are set in its web UI (README.md).
+  uptime-kuma:
+    image: louislam/uptime-kuma:2.5.5
+    container_name: uptime-kuma
+    ports:
+      - 127.0.0.1:3001:3001   # for Caddy (uptime.spicy-llama.duckdns.org)
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - ./data/uptime-kuma:/app/data
+    depends_on:
+      - ntfy
+    # The Pi has 1 GB. Measured with 16 monitors: about 125 MB, and 1 GB written a day.
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # Pushes Uptime Kuma's alerts to the phones. Its users are made with its CLI (README.md).
+  ntfy:
+    image: binwiederhier/ntfy:v2.28.0
+    container_name: ntfy
+    command: serve
+    ports:
+      - 127.0.0.1:2586:80   # for Caddy (ntfy.spicy-llama.duckdns.org)
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+      NTFY_BASE_URL: https://ntfy.spicy-llama.duckdns.org
+      NTFY_BEHIND_PROXY: 'true'
+      # Nobody publishes or subscribes without a user or a token.
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_ENABLE_LOGIN: 'true'
+      NTFY_AUTH_FILE: /var/lib/ntfy/user.db
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+    volumes:
+      - ./data/ntfy:/var/lib/ntfy
+    mem_limit: 128m
     restart: unless-stopped

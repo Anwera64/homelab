@@ -3,13 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { SERVICE_PORTS, PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const DOCKER_COMPOSE_PATH = path.join(ROOT_DIR, 'docker-compose.yml');
+const DESKTOP_DIR = path.join(ROOT_DIR, 'hosts/desktop');
+const DOCKER_COMPOSE_PATH = path.join(DESKTOP_DIR, 'docker-compose.yml');
+const SERVER_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/server/docker-compose.yml');
+const SERVER_HOST = '192.168.1.30';
 const SERVICES_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/services.yaml');
 const BOOKMARKS_YAML_PATH = path.join(ROOT_DIR, 'config/homepage/bookmarks.yaml');
-const ENV_EXAMPLE_PATH = path.join(ROOT_DIR, '.env.example');
+const ENV_EXAMPLE_PATH = path.join(DESKTOP_DIR, '.env.example');
 const SEARXNG_SETTINGS_PATH = path.join(ROOT_DIR, 'config/searxng/settings.yml');
 const OLLAMA_MODELS_DIR = path.join(ROOT_DIR, 'config/ollama-models');
 
@@ -19,6 +22,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
   const bookmarksYamlContent = fs.readFileSync(BOOKMARKS_YAML_PATH, 'utf8');
   const envExampleContent = fs.readFileSync(ENV_EXAMPLE_PATH, 'utf8');
   const searxngSettingsContent = fs.readFileSync(SEARXNG_SETTINGS_PATH, 'utf8');
+  const serverComposeContent = fs.readFileSync(SERVER_COMPOSE_PATH, 'utf8').replace(/\r\n/g, '\n');
 
   // A tracked config file; a missing one reads as empty so its case fails with its own message.
   const readConfig = (file) => {
@@ -26,22 +30,23 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     return fs.existsSync(full) ? fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n') : '';
   };
 
-  // Body of one root compose service.
-  const composeService = (name) => {
-    const block = dockerComposeContent.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z]|(?![\\s\\S]))`, 'm'));
-    assert.ok(block, `docker-compose.yml must define ${name}`);
+  // Body of one compose service: the desktop's file unless another is given.
+  const composeService = (name, content = dockerComposeContent) => {
+    const block = content.match(new RegExp(`^  ${name}:\\r?\\n([\\s\\S]*?)(?=^  [a-z0-9_-]+:\\r?\\n|^[a-z]|(?![\\s\\S]))`, 'm'));
+    assert.ok(block, `the compose file must define ${name}`);
     return block[1];
   };
+  const serverService = (name) => composeService(name, serverComposeContent);
 
-  // Ports block of one root compose service.
-  const composePorts = (name) => {
-    const ports = composeService(name).match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
+  // Ports block of one compose service.
+  const composePorts = (name, content = dockerComposeContent) => {
+    const ports = composeService(name, content).match(/ports:\s*\r?\n((?:\s+-[^\n]*\n)+)/);
     return ports ? ports[1] : '';
   };
 
   // A named volume declared at the root with a fixed name.
-  const declaresVolume = (name) =>
-    new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${name}:\\s*\\n\\s+name:\\s*${name}\\s*$`, 'm').test(dockerComposeContent);
+  const declaresVolume = (name, content = dockerComposeContent) =>
+    new RegExp(`^volumes:\\s*\\n[\\s\\S]*?^  ${name}:\\s*\\n\\s+name:\\s*${name}\\s*$`, 'm').test(content);
 
   await t.test('The desktop runs no Caddy: the Pi terminates HTTPS and the containers publish their own ports', () => {
     assert.doesNotMatch(dockerComposeContent, /^\s*caddy:\s*$/m, 'no caddy service on the desktop');
@@ -52,29 +57,25 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Each desktop service publishes its own LAN port, the ones the Pi and Homepage use', () => {
-    const expected = {
-      jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
-      sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
-      flaresolverr: ['8191:8191'], gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
-      grafana: ['3002:3000'],
-    };
-    for (const [service, mappings] of Object.entries(expected)) {
-      const ports = composePorts(service);
-      for (const mapping of mappings) {
-        assert.match(ports, new RegExp(`-\\s*${mapping}\\b`), `${service} must publish ${mapping}`);
-      }
+  await t.test('The desktop runs Ollama and Alloy, and nothing else: the media services moved to the server', () => {
+    const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
+    const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(names, ['alloy', 'ollama']);
+    assert.doesNotMatch(dockerComposeContent, /MEDIA_ROOT|MOVIES_PATH|SHOWS_PATH|WIREGUARD|watchtower|profiles:/i);
+    // The desktop's files live with the other hosts'; the root keeps none of them.
+    for (const file of ['docker-compose.yml', '.env.example', 'startup_homelab.ps1', 'stop_homelab.ps1', 'compact_docker_disk.ps1', 'enable_virtualization.ps1']) {
+      assert.ok(!fs.existsSync(path.join(ROOT_DIR, file)), `${file} must not be in the repo root`);
+      assert.ok(fs.existsSync(path.join(DESKTOP_DIR, file)), `${file} must be in hosts/desktop`);
     }
-    // Every port the link adapter knows is covered by the table above.
-    const published = Object.values(expected).flat().map((m) => m.split(':')[0]);
-    for (const port of Object.keys(PORT_TO_SERVICE)) {
-      assert.ok(published.includes(port), `port ${port} must be published by its service`);
+    // Every port in the service table is published by the server.
+    for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
+      const owner = { qbit: 'gluetun', stat: 'jellystat' }[service] || service;
+      assert.match(composePorts(owner, serverComposeContent), new RegExp(`-\\s*${port}:`), `the server must publish ${port}`);
     }
   });
+
   await t.test('Cleanuparr cleans the download queue and sees the torrents at qBittorrent\'s own path', () => {
-    const block = dockerComposeContent.match(/^  cleanuparr:\r?\n([\s\S]*?)(?=^  [a-z0-9_-]+:\r?\n|^[a-z]|(?![\s\S]))/m);
-    assert.ok(block, 'docker-compose.yml must define cleanuparr');
-    const svc = block[1];
+    const svc = serverService('cleanuparr');
     assert.match(svc, /image:\s*ghcr\.io\/cleanuparr\/cleanuparr:/);
     assert.match(svc, /-\s*\$\{CONFIG_PATH\}\/cleanuparr:\/config/);
     // Hardlink detection needs the same path qBittorrent downloads to.
@@ -83,17 +84,46 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(svc, /-\s*PUID=1000/);
     assert.match(svc, /-\s*PGID=1000/);
     assert.match(svc, /-\s*TZ=\$\{TZ/);
-    assert.match(svc, /com\.centurylinklabs\.watchtower\.enable=true/);
     assert.match(svc, /restart:\s*unless-stopped/);
     for (const dep of ['sonarr', 'radarr', 'qbittorrent']) {
       assert.match(svc, new RegExp(`depends_on:[\\s\\S]*-\\s*${dep}\\b`), `cleanuparr must start after ${dep}`);
     }
   });
 
-  await t.test('Logs outlive their containers: Loki, Alloy and Grafana run beside the stack', () => {
-    const loki = composeService('loki');
+  await t.test('The Hub, its search and the log store moved to the server: the desktop runs none of them', () => {
+    for (const name of ['household-hub', 'searxng', 'loki', 'grafana', 'grafana-renderer']) {
+      assert.doesNotMatch(dockerComposeContent, new RegExp(`^  ${name}:\\s*$`, 'm'), `${name} now runs on the server`);
+    }
+    for (const volume of ['household_hub_data', 'loki_data', 'grafana_data']) {
+      assert.ok(!declaresVolume(volume), `the desktop no longer declares ${volume}`);
+    }
+    assert.doesNotMatch(dockerComposeContent, /SEARXNG_SECRET|GOOGLE_OAUTH|GF_SECURITY|GRAFANA_/);
+    for (const port of ['3002', '3051', '3050', '4318']) {
+      assert.doesNotMatch(dockerComposeContent, new RegExp(`^\\s+-\\s*(?:127\\.0\\.0\\.1:)?${port}:`, 'm'), `nothing on the desktop publishes ${port} any more`);
+    }
+  });
+
+  await t.test('The desktop keeps Alloy, which ships its containers\' logs to the server\'s Loki', () => {
+    // Ollama stays here for good, so the desktop always needs a collector.
     const alloy = composeService('alloy');
-    const grafana = composeService('grafana');
+    assert.match(alloy, /image:\s*grafana\/alloy:v\d+\.\d+\.\d+\s*$/m);
+    assert.doesNotMatch(alloy, /profiles:/, 'logs are always collected');
+    assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
+    assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
+    assert.ok(alloy.includes('- /var/run/docker.sock:/var/run/docker.sock:ro'), 'Alloy only reads the Docker socket');
+    assert.ok(alloy.includes('- alloy_data:/var/lib/alloy/data'));
+    assert.ok(declaresVolume('alloy_data'));
+    assert.ok(alloy.includes('- LOG_HOST=desktop'));
+    assert.ok(alloy.includes(`- LOKI_URL=\${LOKI_URL:-http://${SERVER_HOST}:3100/loki/api/v1/push}`));
+    assert.doesNotMatch(alloy, /depends_on:/, 'there is no Loki here to wait for');
+    assert.equal(composePorts('alloy'), '', 'the phones\' app logs go to the server\'s Alloy');
+    assert.equal((alloy.match(/image:\s*(\S+)/) || [])[1], (serverService('alloy').match(/image:\s*(\S+)/) || [])[1], 'both Alloys run the same version');
+  });
+
+  await t.test('On the server, logs outlive their containers: Loki, Alloy and Grafana', () => {
+    const loki = serverService('loki');
+    const alloy = serverService('alloy');
+    const grafana = serverService('grafana');
 
     // Pinned to a release and bumped in a PR, so Watchtower leaves them alone.
     assert.match(loki, /image:\s*grafana\/loki:\d+\.\d+\.\d+\s*$/m);
@@ -101,8 +131,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(grafana, /image:\s*grafana\/grafana:\d+\.\d+\.\d+\s*$/m);
     for (const [name, svc] of Object.entries({ loki, alloy, grafana })) {
       assert.doesNotMatch(svc, /watchtower\.enable/, `${name} is pinned; Watchtower must not update it`);
-      // Logs are collected whatever is started: -NoAI and -ArrOnly included.
-      assert.doesNotMatch(svc, /profiles:/, `${name} must be in the default profile`);
+      assert.doesNotMatch(svc, /profiles:/, `${name} must always run`);
       assert.match(svc, new RegExp(`container_name:\\s*${name}\\s*$`, 'm'));
       assert.match(svc, /restart:\s*unless-stopped/);
     }
@@ -110,6 +139,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(loki, /command:\s*-config\.file=\/etc\/loki\/loki-config\.yaml/);
     assert.ok(loki.includes('- ${CONFIG_PATH}/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro'));
     assert.ok(loki.includes('- loki_data:/loki'), 'Loki must keep its logs in the loki_data volume');
+    // Loki has no login of its own. The port is for the desktop's Alloy, and the server's
+    // firewall admits nobody else (SERVER_PORT_SOURCES).
+    assert.match(composePorts('loki', serverComposeContent), /^\s+-\s*3100:3100\b[^\n]*\n$/, 'Loki must publish 3100 and nothing else');
 
     assert.match(alloy, /command:\s*run --storage\.path=\/var\/lib\/alloy\/data \/etc\/alloy\/config\.alloy/);
     assert.ok(alloy.includes('- ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro'));
@@ -117,6 +149,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // Read positions: a restart of Alloy neither re-sends nor skips lines.
     assert.ok(alloy.includes('- alloy_data:/var/lib/alloy/data'));
     assert.match(alloy, /depends_on:\s*\n\s+- loki\b/);
+    assert.ok(alloy.includes('- LOG_HOST=server'));
+    assert.ok(alloy.includes('- LOKI_URL=http://loki:3100/loki/api/v1/push'));
+    // Alloy publishes only the OTLP receiver, for the app's telemetry through the Pi's Caddy.
+    assert.match(composePorts('alloy', serverComposeContent), /^\s+-\s*4318:4318\b[^\n]*\n$/, 'Alloy must publish 4318 and nothing else');
 
     // Only the data sources folder: mounting all of provisioning/ hides the image's other
     // folders and Grafana logs an error for each one at every start.
@@ -129,15 +165,10 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.match(grafana, /-\s*TZ=\$\{TZ/);
     assert.match(grafana, /depends_on:\s*\n\s+- loki\b/);
 
-    // Only Grafana is reachable, and it asks for a login; Loki has none of its own.
-    assert.equal(composePorts('loki'), '', 'Loki must not publish a port');
-    assert.equal(composePorts('alloy'), '', 'Alloy must not publish a port');
-
     for (const volume of ['loki_data', 'alloy_data', 'grafana_data']) {
-      assert.ok(declaresVolume(volume), `docker-compose.yml must declare the ${volume} volume with a fixed name`);
+      assert.ok(declaresVolume(volume, serverComposeContent), `the server must declare the ${volume} volume with a fixed name`);
     }
   });
-
   await t.test('Loki keeps 30 days on its volume and drops a runaway stream instead of filling the disk', () => {
     const loki = readConfig('config/loki/loki-config.yaml');
     assert.match(loki, /^auth_enabled:\s*false\s*$/m);
@@ -171,9 +202,74 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     // The container's name without Docker's leading slash is the label to search by.
     assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_name"\]\s*\n\s*regex\s*=\s*"\/\(\.\*\)"\s*\n\s*target_label\s*=\s*"container"/);
     assert.match(alloy, /source_labels\s*=\s*\["__meta_docker_container_label_logs"\]\s*\n\s*regex\s*=\s*"off"\s*\n\s*action\s*=\s*"drop"/);
-    assert.match(alloy, /url\s*=\s*"http:\/\/loki:3100\/loki\/api\/v1\/push"/);
-    // The Pi's logs slot in later under their own host.
-    assert.match(alloy, /host\s*=\s*"desktop"/);
+    // One config for both machines: each compose file says where Loki is and which host this is.
+    assert.match(alloy, /url\s*=\s*sys\.env\("LOKI_URL"\)/);
+    assert.match(alloy, /host\s*=\s*sys\.env\("LOG_HOST"\)/);
+    assert.doesNotMatch(alloy, /"desktop"|loki:3100/, 'nothing about one machine may be fixed in the shared config');
+  });
+
+  await t.test('Alloy receives the app\'s logs over OTLP and stores them with the member Caddy vouched for', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    const receiver = alloy.match(/otelcol\.receiver\.otlp "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(receiver, 'config.alloy must have an otelcol.receiver.otlp');
+    assert.match(receiver[1], /http \{[\s\S]*?endpoint\s*=\s*"0\.0\.0\.0:4318"/);
+    // The member ID arrives as a request header set by Caddy; without this it is thrown away.
+    assert.match(receiver[1], /include_metadata\s*=\s*true/);
+    assert.match(receiver[1], /output \{\s*\n\s*logs\s*=/);
+    // Logs only: nothing stores traces or metrics yet.
+    assert.doesNotMatch(receiver[1], /\b(traces|metrics)\s*=/);
+    assert.doesNotMatch(receiver[1], /grpc\s*\{/, 'only OTLP over HTTP is published');
+    assert.match(alloy, /key\s*=\s*"member\.id"\s*\n\s*action\s*=\s*"upsert"\s*\n\s*from_context\s*=\s*"metadata\.x-member-id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.attribute\.labels"[\s\S]*?value\s*=\s*"member\.id"/);
+    assert.match(alloy, /key\s*=\s*"loki\.resource\.labels"[\s\S]*?value\s*=\s*"service\.name"/);
+    assert.match(alloy, /otelcol\.exporter\.loki "[a-z_]+" \{\s*\n\s*forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+  });
+
+  await t.test('Alloy drops the hub lines that only say a probe was answered', () => {
+    const alloy = readConfig('config/alloy/config.alloy');
+    // Docker's health check and Caddy's token check for each telemetry batch would drown the rest.
+    assert.match(alloy, /loki\.source\.docker "[a-z_]+" \{[\s\S]*?forward_to\s*=\s*\[loki\.process\.[a-z_]+\.receiver\]/);
+    const process = alloy.match(/loki\.process "[a-z_]+" \{\n([\s\S]*?)\n\}/);
+    assert.ok(process, 'config.alloy must have a loki.process stage');
+    assert.match(process[1], /forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
+    const selector = process[1].match(/selector\s*=\s*"((?:[^"\\]|\\.)*)"/);
+    assert.ok(selector, 'the drop must be a stage.match with a selector');
+    assert.match(process[1], /action\s*=\s*"drop"/);
+    const logql = JSON.parse('"' + selector[1] + '"');
+    assert.match(logql, /^\{container="household-hub"\} \|~ /, 'only the hub is filtered');
+    const filter = new RegExp(JSON.parse(logql.replace(/^\{[^}]*\} \|~ /, '')));
+    const line = (request, status) => `INFO:     127.0.0.1:41642 - "${request} HTTP/1.1" ${status}`;
+    assert.ok(filter.test(line('GET /api/v1/health', '200 OK')), 'an answered health check is dropped');
+    assert.ok(filter.test(line('GET /api/v1/auth/verify', '204 No Content')), 'an accepted token check is dropped');
+    // The failures are the lines worth keeping.
+    assert.ok(!filter.test(line('GET /api/v1/health', '500 Internal Server Error')));
+    assert.ok(!filter.test(line('GET /api/v1/auth/verify', '401 Unauthorized')));
+    assert.ok(!filter.test(line('GET /api/v1/users', '200 OK')));
+  });
+
+  await t.test('Grafana can draw a dashboard as an image, with a renderer that only runs when asked for', () => {
+    const renderer = serverService('grafana-renderer');
+    const grafana = serverService('grafana');
+
+    assert.match(renderer, /image:\s*grafana\/grafana-image-renderer:v\d+\.\d+\.\d+\s*$/m, 'the renderer must be pinned to a release');
+    assert.doesNotMatch(renderer, /watchtower\.enable/, 'pinned; Watchtower must not update it');
+    // A headless browser: too heavy to keep running, so it is started on demand.
+    assert.match(renderer, /profiles:\s*\["render"\]/);
+    assert.match(renderer, /mem_limit:\s*2g\s*$/m);
+    assert.ok(renderer.includes('- GOMEMLIMIT=256MiB'), 'Go must stay well under the container limit');
+    assert.equal(composePorts('grafana-renderer', serverComposeContent), '', 'only Grafana talks to the renderer');
+    assert.match(renderer, /container_name:\s*grafana-renderer\s*$/m);
+    assert.match(renderer, /restart:\s*unless-stopped/);
+
+    // The renderer refuses requests without the secret Grafana sends; both read it from one place.
+    const secret = '${GRAFANA_RENDERER_TOKEN:-homelab-renderer}';
+    assert.ok(renderer.includes(`- AUTH_TOKEN=${secret}`));
+    assert.ok(grafana.includes(`- GF_RENDERING_RENDERER_TOKEN=${secret}`));
+    assert.ok(grafana.includes('- GF_RENDERING_SERVER_URL=http://grafana-renderer:8081/render'));
+    // The renderer loads the page from Grafana inside the compose network, not through the Pi.
+    assert.ok(grafana.includes('- GF_RENDERING_CALLBACK_URL=http://grafana:3000/'));
+    // Grafana must start without it.
+    assert.doesNotMatch(grafana, /depends_on:\s*\n(?:\s+- [\w-]+\s*\n)*?\s+- grafana-renderer\b/);
   });
 
   await t.test('Grafana gets Loki as its data source from the repo, and no password is tracked', () => {
@@ -190,6 +286,34 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
+  await t.test('Grafana gets Prometheus as a second data source, and its dashboards, from the repo', () => {
+    const grafana = serverService('grafana');
+    const datasource = readConfig('config/grafana/provisioning/datasources/prometheus.yaml');
+    assert.match(datasource, /^apiVersion:\s*1\s*$/m);
+    assert.match(datasource, /type:\s*prometheus\s*$/m);
+    // The dashboards name it by this uid.
+    assert.match(datasource, /uid:\s*prometheus\s*$/m);
+    assert.match(datasource, /url:\s*http:\/\/prometheus:9090\s*$/m);
+    // Loki stays the default: Explore opens on the logs, as before.
+    assert.match(datasource, /isDefault:\s*false/);
+    assert.doesNotMatch(datasource, /password|secret|token/i);
+
+    const provider = readConfig('config/grafana/provisioning/dashboards/dashboards.yaml');
+    assert.match(provider, /^apiVersion:\s*1\s*$/m);
+    assert.match(provider, /type:\s*file\s*$/m);
+    assert.match(provider, /path:\s*\/etc\/grafana\/dashboards\s*$/m);
+    // The dashboards can be changed and saved in Grafana; the file wins again when it changes.
+    assert.match(provider, /allowUiUpdates:\s*true/);
+    // Above 10 seconds Grafana polls the folder. At 10 or less it waits for the filesystem to
+    // announce a change, which a bind-mounted folder does not always do.
+    assert.match(provider, /updateIntervalSeconds:\s*30\s*$/m);
+
+    // One folder at a time, never all of provisioning/ (see the Loki check above).
+    assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro'));
+    assert.ok(grafana.includes('- ${CONFIG_PATH}/grafana/dashboards:/etc/grafana/dashboards:ro'));
+    assert.match(grafana, /depends_on:\s*\n(?:\s+- [\w-]+\s*\n)*?\s+- prometheus\b/);
+  });
+
   await t.test('Docker keeps a capped local log for every service, now that Loki holds the history', () => {
     const anchor = dockerComposeContent.match(/^x-logging:\s*&default-logging\s*\n([\s\S]*?)(?=^[a-z])/m);
     assert.ok(anchor, 'docker-compose.yml must define x-logging: &default-logging');
@@ -199,7 +323,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
 
     const services = dockerComposeContent.match(/^services:\s*\n([\s\S]*?)(?=^[a-z]|(?![\s\S]))/m)[1];
     const names = [...services.matchAll(/^  ([a-z0-9_-]+):\s*$/gm)].map((m) => m[1]);
-    assert.ok(names.length >= 20, 'the service list should be readable');
+    assert.equal(names.length, 2, 'the service list should be readable');
     for (const name of names) {
       assert.match(composeService(name), /^    logging:\s*\*default-logging\s*$/m, `${name} must use the capped logging block`);
     }
@@ -213,48 +337,66 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.doesNotMatch(envExampleContent, /^TS_[A-Z_]+=/m, '.env.example must not document TS_* variables');
   });
 
-  await t.test('Homepage (on the Pi) reaches desktop services by LAN IP, never by container name', () => {
+  await t.test('Homepage (on the Pi) reaches the server\'s services by LAN IP, never by container name', () => {
     const urls = [...servicesYamlContent.matchAll(/^\s*(?:url|ping|siteMonitor):\s*(\S+)/gm)].map((m) => m[1]);
     assert.ok(urls.length > 0, 'services.yaml should declare service URLs');
     for (const url of urls) {
       const host = new URL(url).hostname;
       assert.ok(host.includes('.') || host === 'localhost', `${url} uses a bare container name the Pi can't resolve`);
     }
+    // The media services left the desktop: a card still pointed there shows as down.
+    assert.doesNotMatch(servicesYamlContent, /192\.168\.1\.20/, 'no card reads from the desktop any more');
+    assert.match(servicesYamlContent, /type:\s*gluetun\s*\r?\n\s*url:\s*http:\/\/192\.168\.1\.30:8000\s*$/m, 'the VPN widget reads the server\'s Gluetun');
   });
 
-  await t.test('Desktop services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
+  await t.test('The server\'s services are checked over HTTP; only the Pi\'s own containers use Docker status', () => {
     const caddyCard = servicesYamlContent.match(/- Caddy[^:]*:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
     assert.ok(caddyCard, 'services.yaml must list the Pi Caddy');
     assert.match(caddyCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*caddy/);
     const containers = [...servicesYamlContent.matchAll(/^\s*container:\s*(\S+)/gm)].map((m) => m[1]).sort();
-    assert.deepEqual(containers, ['caddy', 'pihole', 'unbound']);
+    assert.deepEqual(containers, ['caddy', 'pihole', 'unbound', 'uptime-kuma']);
+    const kumaCard = servicesYamlContent.match(/- Uptime Kuma:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(kumaCard, 'services.yaml must list Uptime Kuma');
+    assert.match(kumaCard[1], /href:\s*https:\/\/uptime\.spicy-llama\.duckdns\.org\s*$/m);
+    assert.match(kumaCard[1], /server:\s*my-docker\s*\r?\n\s*container:\s*uptime-kuma/);
+    assert.doesNotMatch(kumaCard[1], /siteMonitor:/, 'it is on the Pi: Docker status, not an HTTP check');
     const expectedMonitors = {
       Jellyfin: 8096, Seerr: 5055, Jellystat: 3005, Sonarr: 8989, Radarr: 7878, Prowlarr: 9696,
-      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, FlareSolverr: 8191, Cleanuparr: 11011,
+      Bazarr: 6767, Maintainerr: 6246, qBittorrent: 8080, Cleanuparr: 11011,
       Grafana: 3002,
     };
+    // No name and no port to open: FlareSolverr has no card.
+    assert.doesNotMatch(servicesYamlContent, /flaresolverr/i);
     for (const [name, port] of Object.entries(expectedMonitors)) {
       const block = servicesYamlContent.match(new RegExp(`- ${name}:\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*- [A-Z]|$)`));
       assert.ok(block, `services.yaml must list ${name}`);
-      const monitor = `http://192.168.1.20:${port}`;
+      const monitor = `http://${SERVER_HOST}:${port}`;
       assert.match(block[1], new RegExp(`siteMonitor:\\s*${monitor.replace(/\./g, '\\.')}/?\\s*$`, 'm'), `${name} must be monitored at ${monitor}`);
     }
   });
 
-  await t.test('The Cleanuparr card shows what it did to the queue, read keyless from its stats API', () => {
+  await t.test('The Cleanuparr card shows what it did to the queue, read from its stats API with its key', () => {
     const card = servicesYamlContent.match(/- Cleanuparr:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
     assert.ok(card, 'services.yaml must list Cleanuparr');
     // Homepage has no native cleanuparr widget, so the card maps /api/v2/stats itself.
     assert.match(card[1], /type:\s*customapi/);
-    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.20:11011\/api\/v2\/stats\s*$/m);
+    assert.match(card[1], /url:\s*http:\/\/192\.168\.1\.30:11011\/api\/v2\/stats\s*$/m);
     const mappings = {
       'strikes.total': 'Strikes', 'removals.total': 'Removed', 'cleaned.total': 'Cleaned', 'searches.grabbed': 'Grabbed',
     };
     for (const [field, label] of Object.entries(mappings)) {
       assert.match(card[1], new RegExp(`-\\s*field:\\s*${field.replace('.', '\\.')}\\s*\\r?\\n\\s*label:\\s*${label}\\s*$`, 'm'), `${field} must show as ${label}`);
     }
-    // Cleanuparr asks for no key on the LAN, so the Pi .env stays untouched.
-    assert.doesNotMatch(card[1], /HOMEPAGE_VAR_/, 'the Cleanuparr widget needs no API key');
+    // Cleanuparr's login is on for local addresses too (#99), so the widget sends its API key.
+    assert.match(card[1], /headers:\s*\r?\n\s*X-Api-Key:\s*"\{\{HOMEPAGE_VAR_CLEANUPARR_API_KEY\}\}"\s*$/m, 'the Cleanuparr widget must send its API key');
+  });
+
+  await t.test('The qBittorrent widget signs in: the login is on for local addresses too', () => {
+    const card = servicesYamlContent.match(/- qBittorrent:\r?\n([\s\S]*?)(?=\r?\n\s*- [A-Z]|$)/);
+    assert.ok(card, 'services.yaml must list qBittorrent');
+    assert.match(card[1], /type:\s*qbittorrent/);
+    assert.match(card[1], /username:\s*"\{\{HOMEPAGE_VAR_QBITTORRENT_USERNAME\}\}"\s*$/m);
+    assert.match(card[1], /password:\s*"\{\{HOMEPAGE_VAR_QBITTORRENT_PASSWORD\}\}"\s*$/m);
   });
 
   await t.test('The Grafana card opens the log search and holds no credentials', () => {
@@ -288,6 +430,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
         `.env.example must define or document variable ${varName}`
       );
     }
+    // What the media services needed is in hosts/server/.env now.
+    assert.doesNotMatch(envExampleContent, /MEDIA_ROOT|MOVIES_PATH|SHOWS_PATH|DOWNLOADS_PATH|WIREGUARD|VPN_COUNTRY|_API_KEY|JELLYSTAT|WATCHTOWER|COMPOSE_PROFILES|WEBUI_SECRET/);
+    assert.match(envExampleContent, /^CONFIG_PATH=\.\.\/\.\.\/config$/m, 'config/ stays in the repo root, shared with the other hosts');
   });
 
   await t.test('Homepage services.yaml internal container URLs point to valid services in docker-compose.yml', () => {
@@ -308,8 +453,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     }
   });
 
-  await t.test('Recyclarr service receives Sonarr and Radarr API keys in docker-compose.yml', () => {
-    const recyclarrMatch = dockerComposeContent.match(/container_name:\s*recyclarr[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*depends_on:|$)/);
+  await t.test('Recyclarr service receives Sonarr and Radarr API keys in the server\'s compose file', () => {
+    const recyclarrMatch = serverComposeContent.match(/container_name:\s*recyclarr[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|\n\s*volumes:|\n\s*depends_on:|$)/);
     assert.ok(recyclarrMatch, 'docker-compose.yml must contain a recyclarr service with environment section');
     const recyclarrEnv = recyclarrMatch[1];
     assert.ok(recyclarrEnv.includes('SONARR_API_KEY'), 'Recyclarr service must receive SONARR_API_KEY');
@@ -323,17 +468,8 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('SearXNG service receives SEARXNG_SECRET in docker-compose.yml', () => {
-    const searxngMatch = dockerComposeContent.match(/container_name:\s*searxng[\s\S]*?environment:\s*\n([\s\S]*?)(?=\n\s*[a-z_]+:|$)/);
-    assert.ok(searxngMatch, 'docker-compose.yml must contain a searxng service with environment section');
-    assert.ok(
-      searxngMatch[1].includes('SEARXNG_SECRET=${SEARXNG_SECRET}'),
-      'SearXNG service must receive SEARXNG_SECRET=${SEARXNG_SECRET}'
-    );
-  });
-
-  await t.test('qBittorrent service enforces healthy Gluetun dependency in docker-compose.yml', () => {
-    const qbitMatch = dockerComposeContent.match(/container_name:\s*qbittorrent[\s\S]*?depends_on:\s*\n([\s\S]*?)(?=\n\s{4}[a-z_]+:|\n\s{2}[a-z_]+:|\n\s*restart:|$)/);
+  await t.test('qBittorrent service enforces healthy Gluetun dependency in the server\'s compose file', () => {
+    const qbitMatch = serverComposeContent.match(/container_name:\s*qbittorrent[\s\S]*?depends_on:\s*\n([\s\S]*?)(?=\n\s{4}[a-z_]+:|\n\s{2}[a-z_]+:|\n\s*restart:|$)/);
     assert.ok(qbitMatch, 'docker-compose.yml must contain a qbittorrent service with depends_on section');
     const qbitDepends = qbitMatch[1];
     assert.ok(qbitDepends.includes('gluetun'), 'qBittorrent must depend on gluetun');
@@ -348,35 +484,18 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(!malformedPattern.test(bookmarksYamlContent), 'bookmarks.yaml must not have separate array items for icon and href');
   });
 
-  await t.test('docker-compose.yml pins Jellyfin to 12.0 and defines Seerr with init: true', () => {
-    assert.ok(
-      /container_name:\s*jellyfin[\s\S]*?image:\s*jellyfin\/jellyfin:12\.0(\.0)?/.test(dockerComposeContent) ||
-      /image:\s*jellyfin\/jellyfin:12\.0(\.0)?[\s\S]*?container_name:\s*jellyfin/.test(dockerComposeContent),
-      'docker-compose.yml must pin jellyfin to jellyfin/jellyfin:12.0'
-    );
-
-    assert.ok(
-      /container_name:\s*seerr/.test(dockerComposeContent),
-      'docker-compose.yml must contain container_name: seerr'
-    );
-    assert.ok(
-      /image:\s*ghcr\.io\/seerr-team\/seerr:latest/.test(dockerComposeContent),
-      'docker-compose.yml must use image ghcr.io/seerr-team/seerr:latest'
-    );
-    assert.ok(
-      /init:\s*true/.test(dockerComposeContent),
-      'docker-compose.yml must specify init: true for seerr'
-    );
-    assert.ok(
-      /\$\{CONFIG_PATH\}\/seerr:\/app\/config/.test(dockerComposeContent),
-      'docker-compose.yml must map ${CONFIG_PATH}/seerr:/app/config'
-    );
+  await t.test('The server defines Seerr with init: true and its settings folder', () => {
+    const seerr = serverService('seerr');
+    assert.match(seerr, /container_name:\s*seerr/);
+    assert.match(seerr, /image:\s*ghcr\.io\/seerr-team\/seerr:v\d/);
+    assert.match(seerr, /init:\s*true/, 'Seerr needs an init process to reap its children');
+    assert.ok(seerr.includes('- ${CONFIG_PATH}/seerr:/app/config'));
   });
 
   await t.test('Homepage services.yaml configures native Seerr widget and Jellyfin version: 2', () => {
     assert.ok(
-      /url:\s*http:\/\/192\.168\.1\.20:5055/.test(servicesYamlContent),
-      'Homepage services.yaml must point the Seerr widget at the desktop (192.168.1.20:5055)'
+      /url:\s*http:\/\/192\.168\.1\.30:5055/.test(servicesYamlContent),
+      'Homepage services.yaml must point the Seerr widget at the server (192.168.1.30:5055)'
     );
     assert.ok(
       /type:\s*seerr/.test(servicesYamlContent),
@@ -420,7 +539,7 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(rvn, 'manifest must provision qwen3.8-rvn, the household default');
     assert.equal(rvn.sha256, 'a0f64d73d2ccfb5333a2e9dde9b079200d2a3e46f9ebaf19bc1a3cf14489d06b');
     const rvnModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, rvn.modelfile), 'utf8');
-    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 28672']) {
+    for (const line of ['RENDERER qwen3.8', 'PARSER qwen3.5', 'PARAMETER num_ctx 40960']) {
       assert.ok(rvnModelfile.includes(line), `qwen3.8-rvn Modelfile must contain: ${line}`);
     }
 
@@ -430,12 +549,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(hubWindow, 'the hub must declare LLM_CONTEXT_TOKENS');
     assert.equal(hubWindow[1], rvnModelfile.match(/PARAMETER num_ctx (\d+)/)[1], 'LLM_CONTEXT_TOKENS must match the Modelfile num_ctx');
 
-    // The embedder runs on the CPU so the chat model keeps the whole GPU.
-    const embedder = manifest.models.find((m) => m.name === 'bge-m3-cpu');
-    assert.ok(embedder, 'manifest must provision bge-m3-cpu, the source index embedder');
-    assert.equal(embedder.ollama_pull, 'bge-m3', 'bge-m3-cpu is built from the Ollama library bge-m3');
-    const embedderModelfile = fs.readFileSync(path.join(OLLAMA_MODELS_DIR, embedder.modelfile), 'utf8');
-    assert.ok(embedderModelfile.includes('PARAMETER num_gpu 0'), 'bge-m3-cpu must run on the CPU (num_gpu 0)');
+    // The embedder runs on the server's own Ollama (#106), which pulls bge-m3 itself; the desktop provisions none.
+    assert.deepEqual(manifest.models.filter((m) => /bge/.test(m.name)), [], 'the desktop manifest must not provision an embedder');
+    assert.ok(!fs.existsSync(path.join(OLLAMA_MODELS_DIR, 'bge-m3-cpu.Modelfile')), 'bge-m3-cpu.Modelfile must be gone');
   });
 
   await t.test('Every tool the hub offers has words of its own in the app', () => {
@@ -476,20 +592,35 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     );
   });
 
-  await t.test('Household Hub runs in compose with its data in a named volume', () => {
-    // On the host the backend could not resolve searxng:8080; inside compose every service name resolves.
-    const hubMatch = dockerComposeContent.match(/^  household-hub:\s*\n([\s\S]*?)(?=^  [a-z][\w-]*:\s*\n|^[a-z]+:\s*\n)/m);
-    assert.ok(hubMatch, 'docker-compose.yml must declare a household-hub service');
-    const hub = hubMatch[1];
-    assert.match(hub, /profiles:\s*\["ai"\]/, 'household-hub must be in the ai profile so an arr-only start leaves it off');
-    assert.match(hub, /context:\s*\.\/apps\/household-hub\/backend/, 'household-hub must build from the backend folder');
-    assert.ok(hub.includes('- household_hub_data:/data'), 'household-hub must keep its SQLite database in the household_hub_data volume');
-    assert.ok(hub.includes('- 127.0.0.1:3050:3050'), 'household-hub must keep 3050 on loopback for /docs from the PC');
-    assert.match(hub, /-\s*3051:3050\b/, 'household-hub must publish 3051 on the LAN for the Pi\'s Caddy');
-    assert.match(hub, /depends_on:\s*\n\s+- ollama\s*\n\s+- searxng/, 'household-hub must start after ollama and searxng');
+  await t.test('Ollama keeps the KV cache at q8_0, half the f16 size', () => {
+    // At f16 the chat model's 28k cache took 1,792 MiB and left the RTX 5080 nearly full (#82).
     assert.ok(
-      /^volumes:\s*\n[\s\S]*?^  household_hub_data:\s*\n\s+name:\s*household_hub_data\s*$/m.test(dockerComposeContent),
-      'docker-compose.yml must declare the household_hub_data volume with a fixed name'
+      composeService('ollama').includes('- OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}'),
+      'ollama must default OLLAMA_KV_CACHE_TYPE to q8_0'
     );
+    assert.match(envExampleContent, /^OLLAMA_KV_CACHE_TYPE=q8_0$/m, '.env.example must set OLLAMA_KV_CACHE_TYPE=q8_0');
+    assert.match(
+      envExampleContent,
+      /^#[^\n]*\bf16\b[^\n]*\nOLLAMA_KV_CACHE_TYPE=/m,
+      '.env.example must name f16 as the way back, just above OLLAMA_KV_CACHE_TYPE'
+    );
+  });
+
+  await t.test('Ollama answers the server\'s Hub over the LAN', () => {
+    const ollama = composeService('ollama');
+    // The Windows firewall admits only the server on this port (see README).
+    assert.match(composePorts('ollama'), /^\s+-\s*11434:11434\s*\n$/, 'Ollama must publish 11434 on the LAN and nothing else');
+    assert.doesNotMatch(ollama, /127\.0\.0\.1:11434/);
+  });
+
+  await t.test('Ollama is pinned to the server\'s version and always runs', () => {
+    const ollama = composeService('ollama');
+    const image = (ollama.match(/image:\s*(\S+)/) || [])[1];
+    assert.match(image, /^ollama\/ollama:\d+\.\d+\.\d+$/, 'pinned to a release, bumped by Renovate');
+    // The chat model here and the embedder there are bumped in one PR.
+    assert.equal(image, (serverService('ollama').match(/image:\s*(\S+)/) || [])[1], 'both Ollamas run the same version');
+    assert.doesNotMatch(ollama, /profiles:/, 'the desktop has no optional modules left');
+    assert.doesNotMatch(ollama, /watchtower/);
+    assert.doesNotMatch(servicesYamlContent, /watchtower/i, 'nothing runs Watchtower, so the dashboard has no card for it');
   });
 });

@@ -9,7 +9,7 @@ class OllamaEmbedder(IEmbedder):
     def __init__(
         self,
         base_url: str = "http://ollama:11434",
-        model: str = "bge-m3-cpu",
+        model: str = "bge-m3",
         timeout_seconds: float = 60.0,
         client: Optional[httpx.AsyncClient] = None,
     ):

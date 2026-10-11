@@ -108,5 +108,42 @@ class DataLayerBoundaryTest {
         )
     }
 
+    /**
+     * The OpenTelemetry SDK is a detail of how logs leave the phone. Everything else logs through
+     * Kermit and never learns where a line ends up, so swapping the SDK touches `telemetry/` and the
+     * Koin wiring in `di/` and nothing else. Every production source set of every module is read,
+     * platform ones included, because an `actual` is as good a place to leak it as any.
+     */
+    @Test
+    fun `GIVEN the production sources of every module WHEN their imports are read THEN OpenTelemetry appears only in the data layer's telemetry and di packages`() {
+        // GIVEN
+        val allowed = setOf("telemetry", "di")
+        val modules =
+            listOf("core/domain", "core/data", "core/presentation", "shared", "composeApp", "androidApp", "iosApp")
+        val productionFiles =
+            modules
+                .map { File(clientRootDir, "$it/src") }
+                .flatMap { src ->
+                    (src.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name.endsWith("ain") }
+                }.flatMap { it.kotlinFiles() }
+
+        // WHEN
+        val violations =
+            productionFiles
+                .filter { file -> file.readLines().any { it.trim().startsWith("import io.opentelemetry") } }
+                .map { it.relativeTo(clientRootDir).invariantSeparatorsPath }
+                .filterNot { path ->
+                    path.startsWith("core/data/src/") &&
+                        path.substringAfter("/com/homelab/household/data/", "").substringBefore('/') in allowed
+                }
+
+        // THEN
+        assertTrue(productionFiles.isNotEmpty(), "No production sources found under ${clientRootDir.absolutePath}")
+        assertTrue(
+            violations.isEmpty(),
+            "OpenTelemetry has leaked out of :core:data's telemetry/ and di/:\n" + violations.joinToString("\n"),
+        )
+    }
+
     private fun File.kotlinFiles(): List<File> = walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
 }

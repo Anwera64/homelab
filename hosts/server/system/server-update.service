@@ -1,0 +1,8 @@
+[Unit]
+Description=Nightly update: merged image bumps reach the stack
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@SERVER_DIR@/system/server-update.sh

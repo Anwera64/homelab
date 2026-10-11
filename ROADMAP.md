@@ -11,7 +11,7 @@ This document serves as the persistent architectural roadmap for your self-hoste
 | **Caddy** | Reverse Proxy | Port 80/443 ingress, routing `homelab.local` & subdomains |
 | **Gluetun** | VPN Gateway | NordVPN WireGuard (NordLynx) tunnel with automatic kill-switch |
 | **qBittorrent** | Download Client | Routed strictly through Gluetun container network |
-| **FlareSolverr** | Cloudflare Bypass | Standalone challenge bypass with direct DNS (1.1.1.1) to avoid VPN blacklisting |
+| **FlareSolverr** | Cloudflare Bypass | Solves Cloudflare challenges through Gluetun's VPN network |
 | **Prowlarr** | Indexer Proxy | Public trackers (TorrentGalaxy, 1337x, BitSearch, Knaben, ShowRSS) |
 | **Sonarr** | TV Automation | Series monitoring, custom Latin American audio formatting |
 | **Radarr** | Movie Automation | Film monitoring, Extended/Special Edition scoring rules |
@@ -22,8 +22,7 @@ This document serves as the persistent architectural roadmap for your self-hoste
 | **Jellyfin** | Media Server | Hardware-accelerated (NVIDIA RTX 5080 NVENC/NVDEC) |
 | **Homepage** | Unified Dashboard | Single-pane-of-glass status and telemetry |
 | **Tailscale** | Remote Mesh VPN | Secure, encrypted zero-port-forwarding remote access |
-| **Watchtower** | Automated Updates | Daily 4 AM cron & 24h boot gate with image cleanup |
-| **Control Scripts** | Orchestration | [`startup_homelab.ps1`](./startup_homelab.ps1) & [`stop_homelab.ps1`](./stop_homelab.ps1) |
+| **Control Scripts** | Orchestration | [`startup_homelab.ps1`](./hosts/desktop/startup_homelab.ps1) & [`stop_homelab.ps1`](./hosts/desktop/stop_homelab.ps1) |
 
 ---
 
@@ -44,7 +43,7 @@ graph TD
 
     subgraph ArrSuite [Arr Automation & Discovery]
         PROW[🔍 Prowlarr] --> RAD[🎬 Radarr] & SON[📺 Sonarr]
-        FLARE[⚡ FlareSolverr - Direct DNS] --> PROW
+        FLARE[⚡ FlareSolverr] --> PROW
         SEERR[✨ Jellyseerr] --> RAD & SON
         RAD & SON --> QBIT
         BAZ[📝 Bazarr] --> RAD & SON
@@ -71,27 +70,10 @@ graph TD
   .\startup_homelab.ps1
   ```
 
-* **Fast Start (Bypass Update Check for Instant Boot):**
-  ```powershell
-  .\startup_homelab.ps1 -SkipUpdate
-  ```
-
-* **Force Immediate Update Check on Boot:**
-  ```powershell
-  .\startup_homelab.ps1 -ForceUpdate
-  ```
-
 * **Stop Entire Stack:**
   ```powershell
   .\stop_homelab.ps1
   ```
-
-* **Watchtower Automated Updates:**
-  * **Daily Cron:** Runs at `0 0 4 * * *` (4:00 AM) to update labeled automation tools while you sleep.
-  * **Manual Run-Once Check:**
-    ```powershell
-    docker compose run --rm watchtower --run-once
-    ```
 
 * **View Service Logs:**
   ```powershell
@@ -115,8 +97,7 @@ graph TD
 | **Bazarr** | [https://bazarr.spicy-llama.duckdns.org](https://bazarr.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:6767](http://desktop-kujo8mp:6767) | Subtitles sync |
 | **Maintainerr** | [https://maintainerr.spicy-llama.duckdns.org](https://maintainerr.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:6246](http://desktop-kujo8mp:6246) | Automated media lifecycle & cleanup |
 | **Recyclarr** | Container (Cron `0 3 * * *`) | N/A | TRaSH Guides quality & format sync |
-| **Watchtower** | Container (Cron `0 0 4 * * *`) | N/A | Automated image updates & stale image pruning |
-| **FlareSolverr** | [https://flaresolverr.spicy-llama.duckdns.org](https://flaresolverr.spicy-llama.duckdns.org) | [http://localhost:8191](http://localhost:8191) | Cloudflare bypass API |
+| **FlareSolverr** | — | — | Cloudflare bypass API |
 | **Open WebUI (AI)** | [https://ai.spicy-llama.duckdns.org](https://ai.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3080](http://desktop-kujo8mp:3080) | Local LLM Assistant (RTX 5080 GPU accelerated) |
 | **Household Hub** | [https://hub.spicy-llama.duckdns.org](https://hub.spicy-llama.duckdns.org) | [http://desktop-kujo8mp:3050](http://desktop-kujo8mp:3050) | Household Hub (Stages 1-4 complete; KMP Shared Client Core `:shared` verified with 20 test suites; Stage 5 Compose Multiplatform next) |
 

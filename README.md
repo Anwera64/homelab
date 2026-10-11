@@ -4,7 +4,7 @@
 [![Hub client](https://github.com/Anwera64/homelab/actions/workflows/household-hub-client.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/household-hub-client.yml)
 [![Caddy image](https://github.com/Anwera64/homelab/actions/workflows/caddy-image.yml/badge.svg)](https://github.com/Anwera64/homelab/actions/workflows/caddy-image.yml)
 
-A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house network services: DNS and DHCP, the HTTPS entry point, the dashboard and remote access. **The desktop** (Windows + Docker Desktop, RTX 5080) runs the heavy work: the media server, the *arr automation pipeline behind a VPN kill-switch, and the local AI stack with the Household Hub. When the desktop is off, the network, the dashboard and remote access keep working.
+A three-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house network services: DNS and DHCP, the HTTPS entry point, the dashboard and remote access. **The server**, an always-on laptop, runs everything else except the chat model: the Household Hub, the logs and all the media services. **The desktop** (Windows + Docker Desktop, RTX 5080) runs only Ollama, the chat model, and a log shipper. When the desktop is off, everything works except the Hub's chat model.
 
 ---
 
@@ -12,19 +12,21 @@ A two-host homelab. **lemonpi**, an always-on Raspberry Pi, runs the house netwo
 
 | Host | Address | Always on | Runs | Config |
 | :--- | :--- | :--- | :--- | :--- |
-| **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
-| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Jellyfin (NVENC), Seerr, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, Jellystat, qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard), Watchtower, Loki + Alloy + Grafana (container logs), and the AI profile: Ollama, SearXNG, Household Hub | root [`docker-compose.yml`](docker-compose.yml) |
+| **lemonpi** (Raspberry Pi 5, 1 GB, wired) | `192.168.1.35` · `lemonpi.lan` | Yes | Pi-hole (DNS, ad blocking, DHCP), Unbound (DNSSEC resolver), Caddy (HTTPS for `*.spicy-llama.duckdns.org`), Homepage (dashboard), Uptime Kuma + ntfy (uptime checks on the server's services, and their alerts), Tailscale (subnet router) | [`hosts/pi/`](hosts/pi/README.md) |
+| **Server** (Lenovo Legion laptop, Debian 13, Wi-Fi) | `192.168.1.30` · `server.lan` | Yes | Household Hub, SearXNG, an Ollama for the Hub's embedder (GTX 1660 Ti), Loki + Alloy + Grafana (all logs), Grafana's image renderer (on demand), Renovate (hourly runs that open the version bump PRs), and a nightly update that applies the merged ones. The media services: Jellyfin (NVENC), Seerr, Jellystat, Sonarr, Radarr, Prowlarr, Bazarr, Recyclarr, Maintainerr, Cleanuparr, and qBittorrent + FlareSolverr behind Gluetun (NordVPN WireGuard). Their files are on a USB media disk at `/data` | [`hosts/server/`](hosts/server/README.md) |
+| **Desktop** (Windows, RTX 5080, Wi-Fi) | `192.168.1.20` · `desktop-kujo8mp.lan` | No | Ollama (the chat model, on the RTX 5080). Alloy ships its container logs to the server | [`hosts/desktop/`](hosts/desktop/README.md) |
 
-Both addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names, which Pi-hole resolves for every DHCP client.
+All three addresses are DHCP reservations in Pi-hole (`PIHOLE_DHCP_HOSTS` in `hosts/pi/.env`). Elsewhere this README uses the `.lan` names (`lemonpi.lan`, `server.lan`, `desktop-kujo8mp.lan`), which Pi-hole resolves for every DHCP client.
 
 ---
 
 ## 🧭 Network Flow
 
 * **DNS and DHCP:** the router (Orange Livebox 7) won't let you change the DNS it hands out, so its DHCP server is off and **Pi-hole serves DHCP**, naming itself as DNS. Pi-hole blocks ads and trackers, then resolves through **Unbound** straight from the root servers with DNSSEC. Unbound exempts `spicy-llama.duckdns.org` from DNS-rebinding protection, because that domain points at the LAN on purpose.
-* **HTTPS:** `*.spicy-llama.duckdns.org` resolves to lemonpi. **Caddy on the Pi** holds a Let's Encrypt wildcard certificate (DuckDNS DNS challenge). It serves Homepage and Pi-hole itself, and forwards every desktop service to the port that service's container publishes on the desktop. There's no reverse proxy on the desktop.
+* **HTTPS:** `*.spicy-llama.duckdns.org` resolves to lemonpi. **Caddy on the Pi** holds a Let's Encrypt wildcard certificate (DuckDNS DNS challenge). It serves Homepage and Pi-hole itself, and forwards each service to the port its container publishes on the server. There's no reverse proxy on the server.
 * **Remote access:** **Tailscale**. lemonpi advertises the home subnet (`192.168.1.0/24`) and is the tailnet's DNS, so phones get the same names, HTTPS and ad blocking away from home. No ports are forwarded to any service. At most, Tailscale's WireGuard UDP port (41641) is forwarded to the Pi, which helps direct connections but isn't required.
-* **Desktop off:** DNS, DHCP, Homepage, Pi-hole and remote access keep working. Desktop services return a 502 from the Pi's Caddy until the desktop is back.
+* **Desktop off:** only the chat model is unavailable, because it runs on the desktop's Ollama. DNS, DHCP, Homepage, Pi-hole, remote access, the rest of the Hub, the media services and the logs keep working, because they are on the server.
+* **Server off:** DNS, DHCP and remote access keep working. The server's names return a 502 from the Pi's Caddy until it is back. Uptime Kuma on lemonpi notices and ntfy pushes an alert to the phones.
 
 ```mermaid
 graph TD
@@ -37,12 +39,23 @@ graph TD
         CADDY[🔒 Caddy · *.spicy-llama.duckdns.org]
         CADDY --> HOMEPAGE[📊 Homepage]
         CADDY --> PIHOLE
+        subgraph Uptime [Uptime and alerts]
+            KUMA[📟 Uptime Kuma] -->|alerts| NTFY[🔔 ntfy]
+        end
+        CADDY --> KUMA & NTFY
     end
 
     CLIENTS -->|HTTPS| CADDY
     TS --> CADDY
 
-    subgraph Desktop [Desktop - RTX 5080]
+    subgraph Server [server - always on]
+        HUB[🏠 Household Hub]
+        HUB --> SEARX[🔍 SearXNG]
+
+        subgraph Logs [Logs - kept 30 days]
+            ALLOY[🚚 Alloy] --> LOKI[🗄️ Loki · 30 days] --> GRAFANA[📈 Grafana]
+        end
+
         subgraph VPNNet [Gluetun VPN kill-switch]
             GLUETUN[🛡️ Gluetun · NordVPN WireGuard]
             QBIT[📥 qBittorrent]
@@ -59,58 +72,67 @@ graph TD
             CLEAN[🧽 Cleanuparr] --> RAD & SON & QBIT
         end
 
-        subgraph MediaStorage [Unified /data - atomic hardlinks]
-            QBIT -->|1. Downloads| DOWN["/data/Downloads/complete"]
-            RAD -->|2. Hardlink| MOVIES["/data/Videos/Movies"]
-            SON -->|2. Hardlink| SHOWS["/data/Videos/Shows"]
+        subgraph MediaStorage [Media disk at /data - atomic hardlinks]
+            QBIT -->|1. Downloads| DOWN["/data/torrents"]
+            RAD -->|2. Hardlink| MOVIES["/data/media/movies"]
+            SON -->|2. Hardlink| SHOWS["/data/media/tv"]
             MOVIES & SHOWS --> JELLY[🍿 Jellyfin · NVENC]
             JELLY --> JSTAT[📊 Jellystat]
             JELLY --> MAINT
         end
-
-        subgraph AIStack [AI profile]
-            HUB[🏠 Household Hub] --> OLLAMA[🦙 Ollama · RTX 5080]
-            HUB --> SEARX[🔍 SearXNG]
-        end
-
-        subgraph Logs [Logs - kept 30 days]
-            ALLOY[🚚 Alloy] --> LOKI[🗄️ Loki · 30 days] --> GRAFANA[📈 Grafana]
-        end
     end
 
+    subgraph Desktop [Desktop - RTX 5080]
+        DALLOY[🚚 Alloy]
+        OLLAMA[🦙 Ollama · RTX 5080]
+    end
+
+    HUB -->|LAN| OLLAMA
+    DALLOY[🚚 Alloy] -->|ships logs| LOKI
     CADDY -->|published LAN ports| JELLY & SEERR & ArrSuite & QBIT & JSTAT & HUB & GRAFANA
-    HOMEPAGE -.->|HTTP checks + widgets| Desktop
-    Desktop -.->|Docker socket| ALLOY
+    HOMEPAGE -.->|HTTP checks + widgets| Server
+    Server -.->|Docker socket| ALLOY
+    Desktop -.->|Docker socket| DALLOY
+    CADDY -->|telemetry, token checked by the hub| ALLOY
+    KUMA -.->|HTTP checks| Server & OLLAMA
+    NTFY -.->|push| CLIENTS & REMOTE
 ```
 
 ---
 
 ## 🌐 Service Endpoints
 
-| Service | Host | HTTPS (home + Tailscale) | Local HTTP | Role |
-| :--- | :--- | :--- | :--- | :--- |
-| **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | `http://lemonpi.lan` | Dashboard: HTTP checks for desktop services, Docker status for the Pi's |
-| **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | `http://lemonpi.lan:8081/admin` | DNS, ad blocking and DHCP |
-| **Jellyfin** | Desktop | `https://jellyfin.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8096` | Media server with NVENC transcoding |
-| **Seerr** | Desktop | `https://seerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:5055` | Request & discovery portal |
-| **Jellystat** | Desktop | `https://stat.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3005` | Playback analytics |
-| **qBittorrent** | Desktop | `https://qbit.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8080` | Download client (VueTorrent), published through Gluetun |
-| **Sonarr** | Desktop | `https://sonarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8989` | TV series |
-| **Radarr** | Desktop | `https://radarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:7878` | Movies |
-| **Prowlarr** | Desktop | `https://prowlarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:9696` | Indexer proxy |
-| **Bazarr** | Desktop | `https://bazarr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6767` | Subtitles |
-| **Maintainerr** | Desktop | `https://maintainerr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:6246` | Media lifecycle & cleanup |
-| **Cleanuparr** | Desktop | `https://cleanuparr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:11011` | Download queue cleanup: fakes, failed imports, seeding limits |
-| **FlareSolverr** | Desktop | `https://flaresolverr.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:8191` | Cloudflare challenge solver |
-| **Household Hub** | Desktop (AI profile) | `https://hub.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3051` (`/docs` on the PC: `http://127.0.0.1:3050`) | Family assistant backend |
-| **Grafana** | Desktop | `https://grafana.spicy-llama.duckdns.org` | `http://desktop-kujo8mp.lan:3002` | Log search (sign-in required) |
-| **Gluetun API** | Desktop | — | `http://desktop-kujo8mp.lan:8000` (API key) | VPN status for Homepage |
-| **SearXNG** | Desktop (AI profile) | — | internal `http://searxng:8080` | Private search for the hub |
-| **Ollama** | Desktop (AI profile) | — | `http://127.0.0.1:11434` (PC only) | Local LLM inference |
-| **Loki** | Desktop | — | internal `http://loki:3100` | Log store, 30 days |
-| **Alloy** | Desktop | — | — | Ships every container's output to Loki |
-| **Recyclarr** | Desktop | — | — | TRaSH Guides sync, daily 3 AM |
-| **Watchtower** | Desktop | — | — | Image updates, daily 4 AM |
+| Service | Host | HTTPS (home + Tailscale) | Role |
+| :--- | :--- | :--- | :--- |
+| **Homepage** | lemonpi | `https://home.spicy-llama.duckdns.org` | Dashboard: HTTP checks for the server's services, Docker status for the Pi's |
+| **Pi-hole** | lemonpi | `https://pihole.spicy-llama.duckdns.org/admin` | DNS, ad blocking and DHCP |
+| **Uptime Kuma** | lemonpi | `https://uptime.spicy-llama.duckdns.org` | Uptime checks on the server's services, and their history (sign-in required) |
+| **ntfy** | lemonpi | `https://ntfy.spicy-llama.duckdns.org` | Pushes Uptime Kuma's alerts to the phones (sign-in required) |
+| **Jellyfin** | Server | `https://jellyfin.spicy-llama.duckdns.org` | NVENC transcoding on the server |
+| **Seerr** | Server | `https://seerr.spicy-llama.duckdns.org` | Request & discovery portal |
+| **Jellystat** | Server | `https://stat.spicy-llama.duckdns.org` | Playback analytics |
+| **qBittorrent** | Server | `https://qbit.spicy-llama.duckdns.org` | Download client (VueTorrent), published through Gluetun |
+| **Sonarr** | Server | `https://sonarr.spicy-llama.duckdns.org` | TV series |
+| **Radarr** | Server | `https://radarr.spicy-llama.duckdns.org` | Movies |
+| **Prowlarr** | Server | `https://prowlarr.spicy-llama.duckdns.org` | Indexer proxy |
+| **Bazarr** | Server | `https://bazarr.spicy-llama.duckdns.org` | Subtitles |
+| **Maintainerr** | Server | `https://maintainerr.spicy-llama.duckdns.org` | Media lifecycle & cleanup |
+| **Cleanuparr** | Server | `https://cleanuparr.spicy-llama.duckdns.org` | Download queue cleanup: fakes, failed imports, seeding limits |
+| **FlareSolverr** | Server | — | Cloudflare challenge solver. No login, so no name and no port: only Prowlarr reaches it |
+| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org` | Family assistant backend (`/docs` at `http://127.0.0.1:3050` on the server itself) |
+| **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | Log search (sign-in required) |
+| **Gluetun API** | Server | — | VPN status for Homepage (port 8000, API key) |
+| **SearXNG** | Server | — | Private search for the hub (internal `http://searxng:8080`) |
+| **Ollama** | Desktop | — | The chat model, local LLM inference (port 11434, the server only) |
+| **Ollama (embedder)** | Server | — | `bge-m3`, ranks what a chat turn reads (internal `http://ollama:11434`) |
+| **Loki** | Server | — | Log store, 30 days (port 3100, the desktop's Alloy only) |
+| **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
+| **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
+| **Recyclarr** | Server | — | TRaSH Guides sync, daily 3 AM |
+| **Renovate** | Server | — | Version bump PRs for every host's images, the hub and its client, weekly; runs every hour |
+| **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
+
+The server has a firewall, so its service ports answer lemonpi only.
 
 ---
 
@@ -122,35 +144,44 @@ graph TD
 │   └── workflows/
 │       ├── test.yml                 # CI: node tests + compose validation
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
+│       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
+├── renovate.json                    # Renovate: weekly bump PRs for pinned images and the hub's and client's libraries
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
-├── docker-compose.yml               # Desktop stack
-├── .env.example                     # Desktop environment template
-├── startup_homelab.ps1              # Desktop: start with update check and health checks
-├── stop_homelab.ps1                 # Desktop: clean shutdown
-├── compact_docker_disk.ps1          # Desktop: shrink Docker's virtual disk
-├── enable_virtualization.ps1        # Desktop: Hyper-V / WSL2 setup helper
-├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture)
+├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture, environment)
 ├── ROADMAP.md                       # Roadmap
 ├── hosts/
-│   └── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
-│       ├── README.md                # Pi setup, DHCP switch-over, checks, backups
-│       ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
-│       ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage
-│       ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
-│       ├── caddy/
-│       │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
-│       │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
-│       └── unbound/
-│           └── unbound.conf         # Recursive DNSSEC resolver on 127.0.0.1:5335
+│   ├── pi/                          # lemonpi, checked out alone on the Pi (sparse clone)
+│   │   ├── README.md                # Pi setup, DHCP switch-over, checks, backups
+│   │   ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
+│   │   ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage, Uptime Kuma, ntfy
+│   │   ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
+│   │   ├── caddy/
+│   │   │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
+│   │   │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
+│   │   └── unbound/
+│   │       └── unbound.conf         # Recursive DNSSEC resolver on 127.0.0.1:5335
+│   ├── desktop/                     # The Windows PC: the chat model (Ollama) and its log shipper
+│   │   ├── README.md                # Setup, PATH, firewall, updating
+│   │   ├── docker-compose.yml       # Ollama and Alloy
+│   │   ├── .env.example             # Desktop settings template
+│   │   ├── startup_homelab.ps1      # Start the stack and register the models
+│   │   ├── stop_homelab.ps1         # Stop the stack
+│   │   ├── compact_docker_disk.ps1  # Shrink Docker virtual disk
+│   │   └── enable_virtualization.ps1 # Hyper-V / WSL2 setup helper
+│   └── server/                      # The always-on app server (laptop): everything but the chat model
+│       ├── README.md                # Install, bootstrap, firewall, media disk, moving hardware
+│       ├── bootstrap.sh             # Idempotent setup: NVIDIA, Docker, SSH, firewall, disk guard, stack
+│       ├── docker-compose.yml       # The media services, the Hub, the logs and the embedder, with memory caps
+│       ├── .env.example             # Server settings template (paths, allowed addresses, secrets)
+│       └── system/                  # Firewall, disk guard, battery, nightly update and Renovate scripts with their units
 ├── apps/
 │   └── household-hub/               # Household Hub: backend (FastAPI) and client (KMP)
 ├── config/
 │   ├── homepage/                    # Homepage config, served from the Pi
 │   │   ├── services.yaml            # Services, widgets and HTTP checks
-│   │   ├── adapt-links.js           # Link adapter: HTTPS names remotely, LAN ports locally
-│   │   ├── custom.js                # The adapter, running in the browser
+│   │   ├── custom.js                # GPS weather badge in the header
 │   │   ├── custom.css               # Styling overrides
 │   │   ├── settings.yaml            # Layout
 │   │   ├── widgets.yaml             # Header widgets
@@ -162,16 +193,21 @@ graph TD
 │   ├── loki/
 │   │   └── loki-config.yaml         # Loki: filesystem storage, 30-day retention, rate limits
 │   ├── alloy/
-│   │   └── config.alloy             # Alloy: Docker socket -> Loki, logs=off opt-out
+│   │   └── config.alloy             # Alloy: Docker socket -> Loki, logs=off opt-out (shared by server and desktop)
 │   └── grafana/
 │       └── provisioning/
 │           └── datasources/
 │               └── loki.yaml        # Loki as Grafana's data source
 └── tests/
-    ├── adapt-links.test.js          # Link adapter
-    ├── config-integrity.test.js     # Desktop compose, Homepage and env cross-checks
+    ├── service-ports.js             # The port each service publishes, shared by the suites
+    ├── homepage-custom.test.js      # Homepage's custom.js and its https:// links
+    ├── config-integrity.test.js     # Compose files, Homepage and env cross-checks
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
+    ├── server-stack.test.js         # Server compose, env template, CI gates and server README
+    ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
+    ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
+    ├── backend-workflow.test.js     # Hub backend CI workflow
     ├── ci-workflow.test.js          # Hub client CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
@@ -184,34 +220,27 @@ graph TD
 ### lemonpi
 See [`hosts/pi/README.md`](hosts/pi/README.md): a sparse clone of `hosts/pi` (plus `config/homepage`), then `sudo hosts/pi/bootstrap.sh`. It covers the DHCP switch-over from the Livebox, Tailscale, and pointing DuckDNS at the Pi.
 
+### Server
+See [`hosts/server/README.md`](hosts/server/README.md): a Debian 13 install on the laptop, then `sudo hosts/server/bootstrap.sh`. It runs the Household Hub, the logs and the media services.
+
 ### Desktop
-Prerequisites: Docker Desktop (WSL2 backend), the NVIDIA Container Toolkit (GPU transcoding and Ollama), and Node.js 18+ (tests).
+Prerequisites: Docker Desktop (WSL2 backend), the NVIDIA Container Toolkit (GPU access for Ollama), and Node.js 18+ (tests).
 
 ```powershell
 git clone git@github.com:Anwera64/homelab.git
 cd homelab
-Copy-Item .env.example .env
 git config core.hooksPath .githooks
 ```
 
-Edit `.env` for your paths and VPN key:
-```ini
-MEDIA_ROOT=C:/Users/<Username>
-MOVIES_PATH=C:/Users/<Username>/Videos/Movies
-SHOWS_PATH=C:/Users/<Username>/Videos/Shows
-CONFIG_PATH=C:/Users/<Username>/Documents/Repos/Homelab/config
+Then see [`hosts/desktop/README.md`](hosts/desktop/README.md) for the settings file, the PATH entry and the firewall.
 
-WIREGUARD_PRIVATE_KEY=your_nordvpn_wireguard_private_key
-VPN_COUNTRY=United States
-
-DOMAIN_NAME=spicy-llama.duckdns.org
-```
-
-Then start it with `.\startup_homelab.ps1`.
-
-The Windows network profile is **Private**, and a manual firewall rule, **"Homelab Stack (LAN)"**, admits the published ports. Any new desktop port that the Pi (Caddy, Homepage) or LAN devices need must be added to it from an admin PowerShell:
+The Windows network profile is **Private**. Ollama is published for the server's Hub alone, with a rule that names the server's address:
 ```powershell
-Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005,3051,5055,6246,6767,7878,8000,8080,8096,8191,8989,9696
+New-NetFirewallRule -DisplayName "Homelab Ollama (server)" -Direction Inbound -Protocol TCP -LocalPort 11434 -RemoteAddress 192.168.1.30 -Action Allow
+```
+The old media rule is no longer needed. Remove it from an admin PowerShell:
+```powershell
+Remove-NetFirewallRule -DisplayName "Homelab Stack (LAN)"
 ```
 
 ---
@@ -219,22 +248,26 @@ Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005
 ## 🛠️ Operations
 
 **Desktop**
-* **Start (24h update check and prune):** `.\startup_homelab.ps1`. This also downloads, SHA256-checks and registers the models in `config/ollama-models/models.json` that Ollama is missing.
-* **Start without the AI profile:** `.\startup_homelab.ps1 -NoAI`. For the media stack only: `.\startup_homelab.ps1 -ArrOnly`.
-* **Skip or force the update check:** `.\startup_homelab.ps1 -SkipUpdate` or `.\startup_homelab.ps1 -ForceUpdate`.
-* **Stop:** `.\stop_homelab.ps1`
+* **Start:** `startup_homelab.ps1`, from any folder (`hosts\desktop` is on the PATH). It takes no flags. It checks Docker and starts Docker Desktop if needed, creates `.env` from `.env.example` on the first run, runs `docker compose up -d` and reports failed containers. It also downloads, SHA256-checks and registers the models in `config/ollama-models/models.json` that Ollama is missing.
+* **Stop:** `stop_homelab.ps1`
+* **Updates:** Renovate pins the two images; after a bump is merged, run `git pull` and then `startup_homelab.ps1`.
 * **Ollama models:** they live in the `ollama_models` Docker volume. Keys stay in `config/ollama`, and the tracked Modelfiles in `config/ollama-models`.
-* **Switching the chat model:** add it to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the hub, and restart both.
-* **Reclaim disk after removing models or images** (admin): `.\compact_docker_disk.ps1`
-* **Logs:** every container's output is kept for 30 days in Loki and survives a rebuild.
-* **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org` or `http://desktop-kujo8mp.lan:3002`. Try `{container="household-hub"}`, or `{container="household-hub"} |= "tool"` to filter by text.
-* **Grafana sign-in:** admin / admin on first start (Grafana asks for a new password), or `GRAFANA_ADMIN_PASSWORD` in `.env`.
-* **Leave a container out:** label it `logs=off`.
+* **Switching the chat model:** add it to `config/ollama-models/models.json` (GGUF URL, SHA256, Modelfile), set `DEFAULT_LLM_MODEL` for the hub in `hosts/server/.env`, and restart both.
+* **Reclaim disk after removing models or images** (admin): `compact_docker_disk.ps1`
 * **Recent lines:** `docker compose logs -f <service>` still works. Docker's own copy is capped at 10 MB x 3 files per container.
-* **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki itself publishes no port.
+
+**Server**
+* **Update:** `cd ~/homelab && git pull && sudo hosts/server/bootstrap.sh`
+* **Logs:** every container's output is kept for 30 days in Loki and survives a rebuild. This covers the server's containers and the desktop's.
+* **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org`. Try `{container="household-hub"}`, or `{container="household-hub"} |= "tool"` to filter by text. The desktop's lines carry `host="desktop"`: `{host="desktop", container="ollama"}`.
+* **Grafana sign-in:** admin / admin on first start (Grafana asks for a new password), or `GRAFANA_ADMIN_PASSWORD` in `hosts/server/.env`.
+* **Leave a container out:** label it `logs=off`.
+* **Dashboards as images:** Grafana can draw a dashboard or a panel as a PNG, which is how a dashboard change gets checked without a browser. The renderer is a headless browser and does not run by itself. On the server, in `~/homelab/hosts/server`, start it with `docker compose --profile render up -d grafana-renderer` and stop it with `docker compose --profile render stop grafana-renderer`.
+* **The app's logs:** `{service_name="household-hub-app"}`, or add `member_id="..."` for one member. The app posts them to `https://telemetry.spicy-llama.duckdns.org/v1/logs` with its sign-in token; Caddy asks the hub whose token it is before passing them to Alloy.
+* **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki's port is open to the desktop's Alloy only.
 
 **lemonpi**
-* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; bump them in a PR.
+* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; Renovate opens the bump PRs.
 * **Caddy image:** CI builds it monthly and on changes to `hosts/pi/caddy/Dockerfile`. Bump the pinned tag to roll it out.
 * **Checks, backups and rollback:** see [`hosts/pi/README.md`](hosts/pi/README.md).
 
@@ -244,10 +277,10 @@ Set-NetFirewallRule -DisplayName "Homelab Stack (LAN)" -LocalPort 3000,3002,3005
 
 ## 🍿 Streaming Notes
 
-Jellyfin uses **NVIDIA NVENC/NVDEC** (RTX 5080) for HEVC/AV1 encoding and HDR tone mapping:
+Jellyfin on the server uses **NVIDIA NVENC/NVDEC** (GTX 1660 Ti) for transcoding and HDR tone mapping. The GPU encodes H.264 and HEVC. It cannot encode AV1:
 
 * **At home:** clients direct-play full 4K HDR remuxes (80–100+ Mbps) without transcoding.
-* **Away:** the server caps remote streams at **40 Mbps**. With the client quality on **Auto**, the player picks a transcode tier to fit the connection, and the GPU transcodes far faster than real time.
+* **Away:** the server caps remote streams at **40 Mbps**. With the client quality on **Auto**, the player picks a transcode tier to fit the connection, and the GPU does the transcoding.
 
 Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Google TV.
 
@@ -255,10 +288,10 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 🧪 Quality Gate
 
-* **Tests (`node --test`):** about 115 checks across seven suites (see `tests/` above). They keep the desktop compose file, the Pi compose file and Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
+* **Tests (`node --test`):** about 190 checks across nine suites (see `tests/` above). They keep the compose files, the Pi's Caddyfile, Homepage, the scripts, the workflows and this README consistent with each other.
 * **Pre-commit hook (`.githooks/pre-commit`):**
   * the test suite
-  * `docker compose config` for both the desktop and Pi stacks
+  * `docker compose config` for the desktop, Pi and server stacks
   * the hub backend's Clean Architecture boundary tests
   * for hub client changes, ktlint and the architecture tests
 * **CI (`.github/workflows/`):**
@@ -270,4 +303,4 @@ Recommended client settings: bitrate **Auto**, and **ExoPlayer** on Android / Go
 
 ## 📄 Acknowledgments
 
-[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/) · [Grafana](https://grafana.com/) · [Loki](https://grafana.com/oss/loki/) · [Alloy](https://grafana.com/oss/alloy-opentelemetry-collector/)
+[Pi-hole](https://pi-hole.net/) · [Unbound](https://nlnetlabs.nl/projects/unbound/) · [Caddy](https://caddyserver.com/) · [Homepage](https://gethomepage.dev/) · [Tailscale](https://tailscale.com/) · [Jellyfin](https://jellyfin.org/) · [LinuxServer.io](https://www.linuxserver.io/) · [VueTorrent](https://github.com/VueTorrent/VueTorrent) · [TRaSH Guides](https://trash-guides.info/) · [Gluetun](https://github.com/qdm12/gluetun) · [Ollama](https://ollama.com/) · [SearXNG](https://searxng.org/) · [Grafana](https://grafana.com/) · [Loki](https://grafana.com/oss/loki/) · [Alloy](https://grafana.com/oss/alloy-opentelemetry-collector/) · [Uptime Kuma](https://github.com/louislam/uptime-kuma) · [ntfy](https://ntfy.sh/)

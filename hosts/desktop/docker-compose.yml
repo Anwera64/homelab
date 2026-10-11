@@ -1,0 +1,71 @@
+# ==============================================================================
+# The desktop's stack: the chat model, and a log shipper beside it. Everything
+# else runs on the server (hosts/server). config/ stays in the repo root, shared
+# with the other hosts.
+# ==============================================================================
+
+# Docker's own copy of each container's log, capped: the server's Loki holds the history.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ==============================================================================
+  # 1. Local AI & LLM Inference (Ollama)
+  # The chat model, on the RTX 5080. The Household Hub runs on the server and
+  # reaches it over the LAN. Pinned to the server's Ollama version: Renovate
+  # bumps both in one PR.
+  # ==============================================================================
+  ollama:
+    image: ollama/ollama:0.35.1
+    container_name: ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-15m}
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      - OLLAMA_ORIGINS=*
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - ${CONFIG_PATH}/ollama:/root/.ollama
+      # Models stay inside Docker's own disk: loading them over the Windows share took minutes.
+      - ollama_models:/root/.ollama/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # LAN, for the server's Hub. The Windows firewall admits only the server (README).
+    ports:
+      - 11434:11434
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ==============================================================================
+  # 2. Logs (Alloy)
+  # Loki and Grafana run on the server. Alloy reads every container's output
+  # through the Docker socket (label a container logs=off to leave it out) and
+  # ships it to the server's Loki. Pinned to the server's Alloy version.
+  # ==============================================================================
+  alloy:
+    image: grafana/alloy:v1.20.1
+    container_name: alloy
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    environment:
+      - LOG_HOST=desktop
+      - LOKI_URL=${LOKI_URL:-http://192.168.1.30:3100/loki/api/v1/push}
+    volumes:
+      - ${CONFIG_PATH}/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Read positions, so a restart neither re-sends nor skips lines.
+      - alloy_data:/var/lib/alloy/data
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  ollama_models:
+    name: ollama_models
+  alloy_data:
+    name: alloy_data

@@ -18,25 +18,33 @@ if [ $TEST_EXIT_CODE -ne 0 ]; then
 fi
 
 # 2. Validate Docker Compose Configuration
-echo "  [+] Validating docker-compose.yml configuration..."
+echo "  [+] Validating hosts/desktop/docker-compose.yml configuration..."
 if command -v docker >/dev/null 2>&1; then
-  ENV_FILE=".env"
+  ENV_FILE="hosts/desktop/.env"
   if [ ! -f "$ENV_FILE" ]; then
-    ENV_FILE=".env.example"
+    ENV_FILE="hosts/desktop/.env.example"
   fi
-  docker compose -f docker-compose.yml --env-file "$ENV_FILE" config -q
+  docker compose -f hosts/desktop/docker-compose.yml --env-file "$ENV_FILE" config -q
   COMPOSE_EXIT_CODE=$?
   if [ $COMPOSE_EXIT_CODE -ne 0 ]; then
     echo ""
-    echo "❌ [Pre-Commit FAILED] docker-compose.yml validation failed! Commit aborted."
+    echo "❌ [Pre-Commit FAILED] hosts/desktop/docker-compose.yml validation failed! Commit aborted."
     exit 1
   fi
 
   echo "  [+] Validating hosts/pi/docker-compose.yml configuration..."
-  PIHOLE_PASSWORD=validate DUCKDNS_TOKEN=validate docker compose -f hosts/pi/docker-compose.yml --env-file hosts/pi/.env.example config -q
+  PIHOLE_PASSWORD=validate DUCKDNS_TOKEN=validate MAINTAINERR_USER=validate MAINTAINERR_PASSWORD_HASH=validate docker compose -f hosts/pi/docker-compose.yml --env-file hosts/pi/.env.example config -q
   if [ $? -ne 0 ]; then
     echo ""
     echo "[Pre-Commit FAILED] hosts/pi/docker-compose.yml validation failed! Commit aborted."
+    exit 1
+  fi
+
+  echo "  [+] Validating hosts/server/docker-compose.yml configuration..."
+  JELLYSTAT_DB_PASSWORD=validate JELLYSTAT_JWT_SECRET=validate HUB_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "[Pre-Commit FAILED] hosts/server/docker-compose.yml validation failed! Commit aborted."
     exit 1
   fi
 fi

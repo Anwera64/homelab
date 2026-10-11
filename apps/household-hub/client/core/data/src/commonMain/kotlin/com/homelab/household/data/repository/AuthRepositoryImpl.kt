@@ -1,5 +1,6 @@
 package com.homelab.household.data.repository
 
+import co.touchlab.kermit.Logger
 import com.homelab.household.data.datasource.local.AuthEventsLocalDataSource
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.AuthRemoteDataSource
@@ -24,12 +25,16 @@ import kotlinx.coroutines.sync.withLock
  * Orchestration and mapping. Every call goes out through [remote], every DTO becomes a domain model
  * here, and what this phone keeps — its token and the member it belongs to — lives in [storage].
  * Nothing in this file knows that the hub speaks HTTP.
+ *
+ * Signing in and signing out are logged through [log], and those lines are sent off the phone. They
+ * say that it happened and never who: the collector reads the member off the token itself.
  */
 class AuthRepositoryImpl(
     private val remote: AuthRemoteDataSource,
     private val storage: StoredSessionLocalDataSource,
     private val events: AuthEventsLocalDataSource,
     private val hubConfig: HubConfig,
+    private val log: Logger = Logger.withTag("Auth"),
 ) : AuthRepository {
     private val refreshMutex = Mutex()
     private var activeRefresh: CompletableDeferred<String>? = null
@@ -37,25 +42,25 @@ class AuthRepositoryImpl(
     override suspend fun login(
         memberId: String,
         pin: String,
-    ): User = signedIn(remote.login(memberId, pin))
+    ): User = signedIn(remote.login(memberId, pin)).alsoLogged()
 
     override suspend fun onboard(
         name: String,
         pin: String,
         avatarColor: String,
-    ): User = signedIn(remote.onboard(name, pin, avatarColor))
+    ): User = signedIn(remote.onboard(name, pin, avatarColor)).alsoLogged()
 
     override suspend fun joinHousehold(
         code: String,
         fullName: String,
         pin: String,
         avatarColor: String,
-    ): User = signedIn(remote.joinHousehold(code, fullName, pin, avatarColor))
+    ): User = signedIn(remote.joinHousehold(code, fullName, pin, avatarColor)).alsoLogged()
 
     override suspend fun redeemPinReset(
         code: String,
         pin: String,
-    ): User = signedIn(remote.redeemPinReset(code, pin))
+    ): User = signedIn(remote.redeemPinReset(code, pin)).alsoLogged()
 
     override suspend fun lookUpInvite(code: String): InvitePreview =
         InviteDataMapper.toPreview(remote.lookUpInvite(code))
@@ -86,7 +91,10 @@ class AuthRepositoryImpl(
     override fun hasStoredSession(): Boolean = storage.getAccessToken() != null
 
     /** One call: the token and the member it belongs to are kept in the same place. */
-    override suspend fun logout() = storage.clear()
+    override suspend fun logout() {
+        storage.clear()
+        log.i { "Signed out" }
+    }
 
     override fun observeSignedOut(): Flow<Unit> = events.observeSignedOut()
 
@@ -135,4 +143,7 @@ class AuthRepositoryImpl(
         storage.saveUser(user)
         return UserDataMapper.toDomain(user)
     }
+
+    /** Somebody signed in — as opposed to a renewal, which keeps a token the same way and is not one. */
+    private fun User.alsoLogged(): User = also { log.i { "Signed in" } }
 }

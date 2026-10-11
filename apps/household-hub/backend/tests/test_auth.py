@@ -331,3 +331,58 @@ def test_production_security_validation():
         SECRET_KEY="a-very-strong-production-secret-key-with-over-32-characters!",
     )
     assert valid_prod.ENVIRONMENT == "production"
+
+
+# --- GET /auth/verify: the Pi's Caddy asks this before it lets telemetry through ---
+
+@pytest.mark.asyncio
+async def test_verify_accepts_a_signed_in_member_and_names_them_in_a_header(client: httpx.AsyncClient):
+    token, user_id = await register_admin(client)
+
+    resp = await client.get("/api/v1/auth/verify", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 204, resp.text
+    assert resp.headers["X-Member-Id"] == user_id
+    assert resp.content == b""
+
+
+@pytest.mark.asyncio
+async def test_verify_refuses_a_request_without_a_token(client: httpx.AsyncClient):
+    await register_admin(client)
+
+    resp = await client.get("/api/v1/auth/verify")
+
+    assert resp.status_code == 401
+    assert resp.headers["WWW-Authenticate"] == "Bearer"
+    assert "X-Member-Id" not in resp.headers
+
+
+@pytest.mark.asyncio
+async def test_verify_refuses_an_expired_token(client: httpx.AsyncClient):
+    _, user_id = await register_admin(client)
+    expired = _token_for(user_id, lasts=timedelta(seconds=-1))
+
+    resp = await client.get("/api/v1/auth/verify", headers={"Authorization": f"Bearer {expired}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_refuses_a_token_from_before_the_version_changed(client: httpx.AsyncClient):
+    token, user_id = await register_admin(client)
+    await bump_token_version(user_id)
+
+    resp = await client.get("/api/v1/auth/verify", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_refuses_an_inactive_member(client: httpx.AsyncClient):
+    admin_token, _ = await register_admin(client)
+    token, member_id = await add_signed_in_member(client, admin_token)
+    await deactivate(member_id)
+
+    resp = await client.get("/api/v1/auth/verify", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401

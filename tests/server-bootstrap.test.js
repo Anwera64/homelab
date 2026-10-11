@@ -1,0 +1,1261 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+const SERVER_DIR = path.join(ROOT_DIR, 'hosts/server');
+const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
+const SCRIPTS = [
+  'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
+  'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh', 'system/server-metrics.sh',
+  'system/server-wifi-band.sh', 'system/server-vpn-watchdog.sh',
+];
+
+// Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
+const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '');
+const at = (text, needle) => {
+  const index = needle instanceof RegExp ? text.search(needle) : text.indexOf(needle);
+  assert.ok(index >= 0, `the script must contain ${needle}`);
+  return index;
+};
+
+test('Server bootstrap script', async (t) => {
+  const script = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('is strict bash and refuses to run without root', () => {
+    assert.match(script, /^#!\/usr\/bin\/env bash\n/);
+    assert.match(script, /^set -euo pipefail$/m);
+    assert.match(script, /id -u\)?"?\s*-ne\s*0/, 'must check for root');
+  });
+
+  await t.test('checks before each install, so reruns change nothing', () => {
+    assert.match(script, /dpkg -s nvidia-kernel-dkms/, 'the NVIDIA driver guarded by dpkg -s');
+    assert.match(script, /command -v docker/, 'Docker guarded by command -v');
+    assert.match(script, /command -v nvidia-ctk/, 'the container toolkit guarded by command -v');
+    // Files are only rewritten, and their services only restarted, when the content differs.
+    assert.match(script, /^write_if_changed\(\) \{$/m);
+    assert.match(script, /cmp -s/);
+  });
+
+  await t.test('enables the non-free package sections the NVIDIA driver lives in', () => {
+    assert.match(script, /contrib/);
+    assert.match(script, /non-free/);
+    assert.match(script, /\/etc\/apt\/sources\.list/);
+  });
+
+  await t.test('blocks nouveau and stops for a reboot before the NVIDIA packages go in', () => {
+    // nouveau hangs this GPU on resume, which froze lspci and the driver install (Oct 2026).
+    const blacklist = at(script, 'blacklist nouveau');
+    const initramfs = at(script, 'update-initramfs -u');
+    const stillLoaded = at(script, /lsmod \| grep -q '\^nouveau'/);
+    const install = at(script, /apt-get install[^\n]*nvidia-kernel-dkms/);
+    assert.ok(blacklist < initramfs && initramfs < stillLoaded && stillLoaded < install, 'blacklist, rebuild the boot image, check, then install');
+    const stop = script.slice(stillLoaded, install);
+    assert.match(stop, /exit 0/, 'must stop there while nouveau is still loaded');
+  });
+
+  await t.test('installs the driver set that was proven on the machine, without a desktop stack', () => {
+    for (const pkg of ['linux-headers-amd64', 'nvidia-kernel-dkms', 'nvidia-smi', 'libnvidia-encode1', 'libnvcuvid1', 'firmware-misc-nonfree']) {
+      assert.match(script, new RegExp(`\\b${pkg}\\b`), `must install ${pkg}`);
+    }
+    assert.doesNotMatch(script, /apt-get install[^\n]*\bnvidia-driver\b/, 'the full nvidia-driver package pulls in Xorg');
+  });
+
+  await t.test('installs Docker and the NVIDIA Container Toolkit from their own repositories', () => {
+    assert.match(script, /download\.docker\.com\/linux\/debian/);
+    assert.match(script, /docker-ce docker-ce-cli containerd\.io docker-buildx-plugin docker-compose-plugin/);
+    assert.match(script, /nvidia\.github\.io\/libnvidia-container/);
+    assert.match(script, /nvidia-ctk runtime configure --runtime=docker/);
+    assert.match(script, /usermod -aG docker "\$TARGET_USER"/);
+  });
+
+  await t.test('merges Docker\'s daemon.json so the NVIDIA runtime entry survives', () => {
+    assert.match(script, /jq /, 'daemon.json must be merged with jq, not overwritten');
+    assert.match(script, /"log-driver":\s*"json-file"/);
+    assert.match(script, /"max-size":\s*"10m"/);
+    assert.doesNotMatch(script, /echo[^\n]*>\s*"?\$DAEMON_JSON"?\s*$/m, 'never write daemon.json from a literal');
+  });
+
+  await t.test('keeps Debian and Docker patched, rebooting at 05:00 when an update needs it', () => {
+    assert.match(script, /APT::Periodic::Unattended-Upgrade "1"/);
+    assert.match(script, /"origin=Docker"/, 'Docker\'s repository must be an allowed origin');
+    assert.match(script, /Unattended-Upgrade::Automatic-Reboot "true"/);
+    assert.match(script, /Unattended-Upgrade::Automatic-Reboot-Time "05:00"/);
+  });
+
+  await t.test('unblocks the radios, which came up in airplane mode after the install', () => {
+    assert.match(script, /rfkill unblock all/);
+  });
+
+  await t.test('a closed lid changes nothing and the panel goes dark after a minute', () => {
+    for (const key of ['HandleLidSwitch', 'HandleLidSwitchExternalPower', 'HandleLidSwitchDocked']) {
+      assert.match(script, new RegExp(`${key}=ignore`));
+    }
+    assert.match(script, /\/etc\/systemd\/logind\.conf\.d\//);
+    assert.match(script, /consoleblank=60/);
+    assert.match(script, /grep -q consoleblank \/etc\/default\/grub/, 'the kernel option is added once');
+    assert.match(script, /update-grub/);
+  });
+
+  await t.test('SSH takes keys only, and never locks out a user without one', () => {
+    const guard = at(script, /-s "\$USER_HOME\/\.ssh\/authorized_keys"/);
+    const harden = at(script, 'PasswordAuthentication no');
+    assert.ok(guard < harden, 'the authorized_keys check comes first');
+    assert.match(script, /PermitRootLogin no/);
+    assert.match(script, /sshd -t/, 'the config is validated before the reload');
+  });
+
+  await t.test('keeps the laptop-only steps in one marked section', () => {
+    const start = at(script, '# >>> laptop');
+    const end = at(script, '# <<< laptop');
+    const section = script.slice(start, end);
+    const outside = script.slice(0, start) + script.slice(end);
+    for (const marker of ['nouveau', 'nvidia-kernel-dkms', 'HandleLidSwitch', 'consoleblank', 'server-battery']) {
+      assert.ok(section.includes(marker), `${marker} belongs in the laptop section`);
+      assert.ok(!outside.includes(marker), `${marker} must not appear outside the laptop section`);
+    }
+  });
+
+  await t.test('mounts the media disk by UUID, and nothing can fill the SSD while it is away', () => {
+    assert.match(script, /DATA_DISK_UUID/);
+    assert.match(script, /UUID=\$DATA_DISK_UUID \/data ext4 [^\n]*nofail/);
+    assert.match(script, /x-systemd\.device-timeout=/, 'a missing disk must not hold the boot for long');
+    assert.match(script, /grep -q '\[\[:space:\]\]\/data\[\[:space:\]\]' \/etc\/fstab/, 'the fstab line is added once');
+    // An immutable empty folder: a container started without the disk cannot write into it.
+    const notMounted = at(script, /mountpoint -q \/data \|\|/);
+    assert.match(script.slice(notMounted), /chattr \+i \/data/);
+  });
+
+  await t.test('installs the firewall, disk guard and battery units with the repo path filled in', () => {
+    for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service', 'server-update.timer', 'server-renovate.timer']) {
+      assert.ok(script.includes(unit), `must install ${unit}`);
+    }
+    assert.match(script, /s\|@SERVER_DIR@\|\$SERVER_DIR\|g/);
+    assert.match(script, /systemctl daemon-reload/);
+    assert.match(script, /systemctl enable --now/);
+  });
+
+  await t.test('creates the app settings folders itself, before Docker would create them as root', () => {
+    // Seerr, Maintainerr and Recyclarr run as user 1000 and cannot write to a root-owned folder.
+    const folders = (script.match(/^APP_FOLDERS=\(([^)]*)\)$/m) || ['', ''])[1].split(/\s+/).filter(Boolean);
+    for (const app of ['seerr', 'maintainerr', 'recyclarr', 'sonarr', 'radarr', 'jellyfin/config', 'jellyfin/cache']) {
+      assert.ok(folders.includes(app), `${app} must be in APP_FOLDERS`);
+    }
+    const create = at(script, 'install -d -o 1000 -g 1000 "$CONFIG_PATH/$app"');
+    assert.match(script, /\[ -d "\$CONFIG_PATH\/\$app" \] \|\|/, 'existing folders keep their owner');
+    assert.ok(create < at(script, '"$SERVER_DIR/system/server-stack-up.sh"'));
+  });
+
+  await t.test('seeds .env on the first run and leaves the secrets to a human', () => {
+    assert.match(script, /cp "\$SERVER_DIR\/\.env\.example" "\$SERVER_DIR\/\.env"/);
+    assert.match(script, /chmod 600 "\$SERVER_DIR\/\.env"/);
+    assert.doesNotMatch(script, /WIREGUARD_PRIVATE_KEY=\S/);
+  });
+
+  await t.test('builds and starts the stack from its own folder, then lets the disk guard decide', () => {
+    // One script starts the stack, for bootstrap and the nightly update alike, so the two cannot drift.
+    const stackUp = read(path.join(SYSTEM_DIR, 'server-stack-up.sh'));
+    assert.match(script, /^  "\$SERVER_DIR\/system\/server-stack-up\.sh"$/m);
+    assert.doesNotMatch(script, /docker compose/, 'bootstrap leaves compose to server-stack-up.sh');
+    const build = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" build');
+    const up = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans');
+    const guard = at(stackUp, /server-media\.sh" --once/);
+    assert.ok(build < up && up < guard);
+    // Without the disk the media services are left out; they cannot mount /data.
+    assert.match(stackUp, /if mountpoint -q \/data; then/);
+    assert.match(stackUp, /COMPOSE_PROFILES="" docker compose --project-directory "\$SERVER_DIR" up -d --remove-orphans/);
+    // Host setup alone, for the days before the data is migrated.
+    assert.match(script, /--no-stack/);
+  });
+
+  await t.test('pulls the embedding model once the stack is up, and only when it is missing', () => {
+    const up = at(script, '"$SERVER_DIR/system/server-stack-up.sh"');
+    const pull = at(script, 'docker exec ollama ollama pull "$EMBEDDING_MODEL"');
+    assert.ok(up < pull, 'Ollama must be running before the pull');
+    assert.match(script, /^EMBEDDING_MODEL="bge-m3"$/m);
+    // Ollama takes a moment to answer after it starts; the wait is bounded.
+    assert.match(script, /for _ in \$\(seq 1 30\); do\n\s+docker exec ollama ollama list/);
+    // Braced: shellcheck reads "$EMBEDDING_MODEL[" as an array index (SC1087).
+    assert.match(script, /ollama list[^\n]*\| grep -q "\^\$\{EMBEDDING_MODEL\}\[:\[:space:\]\]"/, 'checks before it pulls');
+    // Without the model the Hub still answers, by keywords: a failed pull must not stop the script.
+    assert.match(script, /ollama pull "\$EMBEDDING_MODEL" \|\| echo/);
+    // The model it pulls is the one the Hub asks for.
+    const compose = read(path.join(SERVER_DIR, 'docker-compose.yml'));
+    assert.ok(compose.includes('- EMBEDDING_MODEL=bge-m3'));
+  });
+
+  await t.test('reminds about a pending reboot and the temporary sudo rule', () => {
+    assert.match(script, /^finish\(\) \{$/m);
+    assert.match(script, /\/sys\/module\/nvidia/);
+    assert.match(script, /\/etc\/sudoers\.d\/90-setup-temp/);
+    assert.doesNotMatch(script, /rm[^\n]*90-setup-temp/, 'removing it is the owner\'s call');
+  });
+});
+
+test('Server stack start: Jellyfin\'s settings belong to the user it runs as', async (t) => {
+  const stackUp = read(path.join(SYSTEM_DIR, 'server-stack-up.sh'));
+
+  await t.test('re-owns the folder between the build and the start, with Jellyfin stopped', () => {
+    // Jellyfin ran as root before it got a user of its own, and left root-owned files behind.
+    // The nightly update starts the stack through this script too, without bootstrap.sh.
+    assert.match(stackUp, /^APP_UID="\$\{SERVER_APP_UID:-1000\}"$/m, 'user 1000 unless a test says otherwise');
+    const build = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" build');
+    const stop = at(stackUp, 'docker stop jellyfin');
+    const chown = at(stackUp, 'chown -R "$APP_UID:$APP_UID" "$JELLYFIN_DIR"');
+    const up = at(stackUp, 'docker compose --project-directory "$SERVER_DIR" up -d --remove-orphans');
+    assert.ok(build < stop && stop < chown && chown < up);
+    assert.match(stackUp, /find "\$JELLYFIN_DIR" ! -uid "\$APP_UID" -print -quit/, 'only when something has another owner');
+  });
+
+  // Behaviour, in a throwaway server folder. docker, chown, mountpoint and the disk guard are stubs.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = ({ env = true, folder = true } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-stack-up-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    const system = path.join(root, 'server/system');
+    const jellyfin = path.join(root, 'config/jellyfin');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(system, { recursive: true });
+    for (const name of ['docker', 'chown', 'mountpoint']) {
+      fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $*" >> "${log}"\n`, { mode: 0o755 });
+    }
+    fs.writeFileSync(path.join(system, 'server-media.sh'), `#!/bin/sh\necho "server-media.sh $*" >> "${log}"\n`, { mode: 0o755 });
+    const target = path.join(system, 'server-stack-up.sh');
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-stack-up.sh'), target);
+    fs.chmodSync(target, 0o755);
+    if (env) fs.writeFileSync(path.join(root, 'server/.env'), `TZ=Europe/Madrid\nCONFIG_PATH=${path.join(root, 'config')}\n`);
+    if (folder) {
+      fs.mkdirSync(path.join(jellyfin, 'config/log'), { recursive: true });
+      fs.writeFileSync(path.join(jellyfin, 'config/log/log.log'), '');
+    }
+    const run = (uid) => spawnSync(target, [], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_APP_UID: String(uid) },
+    });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : []);
+    return { root, jellyfin, serverDir: path.join(root, 'server'), run, calls };
+  };
+  // The files a test creates belong to whoever runs it.
+  const mine = canRun ? process.getuid() : 0;
+  const someoneElse = mine + 4242;
+
+  await t.test('GIVEN files of another owner WHEN the stack starts THEN Jellyfin is stopped and the folder re-owned first', { skip: !canRun && 'needs bash' }, () => {
+    const { root, jellyfin, serverDir, run, calls } = setup();
+    const result = run(someoneElse);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), [
+      `docker compose --project-directory ${serverDir} build`,
+      'docker stop jellyfin',
+      `chown -R ${someoneElse}:${someoneElse} ${jellyfin}`,
+      'mountpoint -q /data',
+      `docker compose --project-directory ${serverDir} up -d --remove-orphans`,
+      'server-media.sh --once',
+    ]);
+    assert.match(result.stdout, /Jellyfin/, 'says what it did');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN every file already belongs to the apps\' user WHEN the stack starts THEN nothing is stopped or re-owned', { skip: !canRun && 'needs bash' }, () => {
+    const { root, serverDir, run, calls } = setup();
+    const result = run(mine);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), [
+      `docker compose --project-directory ${serverDir} build`,
+      'mountpoint -q /data',
+      `docker compose --project-directory ${serverDir} up -d --remove-orphans`,
+      'server-media.sh --once',
+    ]);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no .env or no Jellyfin folder WHEN the stack starts THEN it starts as before', { skip: !canRun && 'needs bash' }, () => {
+    for (const missing of [{ env: false }, { folder: false }]) {
+      const { root, run, calls } = setup(missing);
+      const result = run(someoneElse);
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(!calls().some((call) => /^(chown|docker stop)/.test(call)), 'nothing to re-own');
+      assert.ok(calls().some((call) => / up -d --remove-orphans$/.test(call)), 'the stack still starts');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+test('Server firewall', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-firewall.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-firewall.service'));
+
+  await t.test('filters published container ports in DOCKER-USER, where Docker looks first', () => {
+    // Docker forwards published ports before the host's own input rules ever see them.
+    const flush = at(script, 'iptables -F DOCKER-USER');
+    const established = at(script, /iptables -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN/);
+    const allow = at(script, /iptables -A DOCKER-USER -i "\$iface" -s "\$source" -j RETURN/);
+    const drop = at(script, /iptables -A DOCKER-USER -i "\$iface" -j DROP/);
+    assert.ok(flush < established && established < allow && allow < drop, 'flush, established, allowed sources, then drop');
+    assert.match(script, /LAN_IFACES=\(en\+ wl\+\)/, 'only traffic arriving from the LAN is filtered, not the containers\' own');
+  });
+
+  await t.test('takes the allowed sources from .env, lemonpi by default', () => {
+    assert.match(script, /SERVER_ALLOWED_SOURCES/);
+    assert.match(script, /192\.168\.1\.35/);
+    assert.doesNotMatch(script, /192\.168\.1\.20/, 'the desktop is allowed through .env, not the script');
+  });
+
+  await t.test('admits one port for one address, matched on the port the caller dialled', () => {
+    // SERVER_PORT_SOURCES="3100=192.168.1.20": the desktop's Alloy reaches Loki and nothing else.
+    assert.match(script, /SERVER_PORT_SOURCES/);
+    const perPort = at(script, /iptables -A DOCKER-USER -i "\$iface" -s "\$address" -p tcp -m conntrack --ctorigdstport "\$port" -j RETURN/);
+    const drop = at(script, /iptables -A DOCKER-USER -i "\$iface" -j DROP/);
+    assert.ok(perPort < drop, 'the per-port accepts come before the drop');
+    assert.doesNotMatch(script, /3100/, 'ports come from .env, not the script');
+  });
+
+  await t.test('drops everything else aimed at the host, IPv6 included, but keeps SSH for the LAN', () => {
+    assert.match(script, /table inet server_host/);
+    assert.match(script, /type filter hook input priority 0; policy drop;/);
+    assert.match(script, /iif lo accept/);
+    assert.match(script, /ct state established,related accept/);
+    assert.match(script, /ip saddr 192\.168\.1\.0\/24 tcp dport 22 accept/);
+    assert.match(script, /udp dport 68 accept/, 'the DHCP lease must keep renewing');
+    assert.match(script, /iifname "docker0" accept/);
+    assert.match(script, /iifname "br-\*" accept/);
+  });
+
+  await t.test('can be tried with an automatic rollback, so a mistake cannot lock SSH out', () => {
+    assert.match(script, /--try\)/);
+    assert.match(script, /--confirm\)/);
+    assert.match(script, /--clear\)/);
+    assert.match(script, /systemd-run --on-active=120/);
+    assert.match(script, /nft delete table inet server_host/);
+  });
+
+  await t.test('is applied after Docker starts and again whenever Docker restarts', () => {
+    assert.match(unit, /^After=docker\.service$/m);
+    assert.match(unit, /^PartOf=docker\.service$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^RemainAfterExit=yes$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-firewall\.sh$/m);
+    assert.match(unit, /^WantedBy=multi-user\.target docker\.service$/m);
+  });
+});
+
+test('Server disk guard', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-media.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-media.service'));
+  const compose = read(path.join(SERVER_DIR, 'docker-compose.yml'));
+
+  await t.test('guards exactly the services in the compose file\'s media profile', () => {
+    const inProfile = [...compose.matchAll(/^  ([a-z0-9_-]+):\n    profiles: \["media"\]$/gm)].map((m) => m[1]).sort();
+    const listed = (script.match(/^MEDIA_SERVICES=\(([^)]*)\)$/m) || ['', ''])[1].split(/\s+/).filter(Boolean).sort();
+    assert.ok(inProfile.length > 0, 'the compose file must have a media profile');
+    assert.deepEqual(listed, inProfile);
+  });
+
+  await t.test('counts the disk as present only while its device is still there', () => {
+    // A USB disk that drops out leaves a dead mount behind; mountpoint alone would say "fine".
+    assert.match(script, /mountpoint -q \/data/);
+    assert.match(script, /findmnt -no SOURCE \/data/);
+    assert.match(script, /\[ -b "\$source" \]/);
+  });
+
+  await t.test('stops the media services when the disk goes, and only restarts what already existed', () => {
+    assert.match(script, /docker stop "\$\{MEDIA_SERVICES\[@\]\}"/);
+    assert.match(script, /umount -l \/data/, 'the dead mount is released so a replugged disk can mount again');
+    // `docker start` never creates a container: bootstrap.sh decides what runs, the guard only resumes it.
+    assert.match(script, /docker start "\$\{MEDIA_SERVICES\[@\]\}"/);
+    // By container name, not through compose: a half-filled .env must not stop the guard working.
+    assert.doesNotMatch(script, /docker compose/, 'the guard must not depend on the compose file resolving');
+  });
+
+  await t.test('mounts a disk that was plugged back in, after checking its filesystem', () => {
+    // fstab only mounts at boot. Without this a dropout leaves the media services down until a reboot.
+    assert.match(script, /findmnt --fstab --evaluate -no SOURCE \/data/, 'the device comes from fstab, not .env');
+    assert.match(script, /^\s+returned\)$/m, 'a state for "the device is back but not mounted"');
+    const returned = script.slice(at(script, /^\s+returned\)$/m));
+    // A pulled disk has an unfinished journal: e2fsck replays it. 4 and up means errors it left alone.
+    assert.ok(at(returned, 'e2fsck -p') < at(returned, 'mount /data'), 'the check runs before the mount');
+    assert.match(returned, /-ge 4/, 'uncorrected errors keep the disk unmounted');
+    assert.match(returned, /needs a manual check/);
+  });
+
+  await t.test('watches in a loop and only acts on a change', () => {
+    assert.match(script, /--once\)/, 'bootstrap.sh runs a single pass');
+    assert.match(script, /while true; do/);
+    assert.match(script, /\[ "\$state" != "\$last" \]/);
+    assert.match(unit, /^After=docker\.service$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-media\.sh$/m);
+    assert.match(unit, /^Restart=always$/m);
+    assert.match(unit, /^WantedBy=multi-user\.target$/m);
+  });
+});
+
+test('Server battery watcher', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-battery.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-battery.service'));
+
+  await t.test('holds the charge at 60% to slow the battery\'s wear', () => {
+    assert.match(script, /conservation_mode/);
+    assert.match(script, /echo 1 > "\$CONSERVATION"/);
+  });
+
+  await t.test('shuts down cleanly at 10%, and only while running on battery', () => {
+    assert.match(script, /BATTERY_SHUTDOWN_PERCENT:-10/);
+    assert.match(script, /\[ "\$online" = "0" \] && \[ "\$capacity" -le "\$THRESHOLD" \]/);
+    // Every container, by ID: this must work whatever state .env is in.
+    const stop = at(script, /docker stop \$\(docker ps -q\)/);
+    const poweroff = at(script, 'systemctl poweroff');
+    assert.ok(stop < poweroff, 'the containers stop before the power goes');
+  });
+
+  await t.test('can be rehearsed without shutting anything down', () => {
+    assert.match(script, /DRY_RUN/);
+    assert.match(script, /--once\)/);
+  });
+
+  await t.test('runs as a service that restarts if it dies', () => {
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-battery\.sh$/m);
+    assert.match(unit, /^Restart=always$/m);
+    assert.match(unit, /^WantedBy=multi-user\.target$/m);
+  });
+});
+
+test('Server nightly update', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-update.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-update.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-update.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('runs at 04:00, and catches up on a night the server was off', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* 04:00:00$/m);
+    assert.match(timer, /^Persistent=true$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-update\.sh$/m);
+    assert.match(unit, /^After=docker\.service network-online\.target$/m);
+    assert.match(unit, /^Wants=network-online\.target$/m);
+    // The timer starts it; enabling the service itself would run an update on every boot.
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, and the service without starting it', () => {
+    assert.match(bootstrap, /^place_unit server-update\.service/m);
+    assert.match(bootstrap, /^install_unit server-update\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-update\.service/);
+  });
+
+  await t.test('only fast-forwards, as the checkout\'s owner', () => {
+    // git refuses a root-run command in a checkout someone else owns.
+    assert.match(script, /runuser -u "\$OWNER" -- git -C "\$REPO_DIR"/);
+    assert.match(script, /merge --ff-only/);
+    assert.doesNotMatch(script, /reset --hard|push|rebase|git pull(?! --ff-only)/);
+  });
+
+  // Behaviour, against a throwaway origin and checkout. docker and runuser are stubs on PATH.
+  const bash = spawnSync('bash', ['-c', 'command -v git'], { encoding: 'utf8' });
+  const canRun = process.platform !== 'win32' && !bash.error && bash.status === 0;
+  const git = (cwd, ...args) => {
+    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=master', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const setup = () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-update-'));
+    const origin = path.join(root, 'origin.git');
+    const seed = path.join(root, 'seed');
+    const checkout = path.join(root, 'homelab');
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${log}"\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'runuser'), '#!/bin/sh\n[ "$1" = "-u" ] && [ "$3" = "--" ] || exit 2\nshift 3\nexec "$@"\n', { mode: 0o755 });
+    git(root, 'init', '-q', '--bare', origin);
+    git(root, 'clone', '-q', origin, seed);
+    const system = path.join(seed, 'hosts/server/system');
+    fs.mkdirSync(system, { recursive: true });
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-update.sh'), path.join(system, 'server-update.sh'));
+    fs.chmodSync(path.join(system, 'server-update.sh'), 0o755);
+    fs.writeFileSync(path.join(system, 'server-stack-up.sh'), `#!/bin/sh\necho "stack-up" >> "${log}"\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(seed, 'hosts/server/docker-compose.yml'), 'image: app:1.0.0\n');
+    fs.writeFileSync(path.join(seed, 'hosts/server/bootstrap.sh'), '#!/bin/sh\n');
+    git(seed, 'add', '-A');
+    git(seed, 'commit', '-qm', 'first');
+    git(seed, 'push', '-q', 'origin', 'HEAD:master');
+    git(root, 'clone', '-q', origin, checkout);
+    const textfile = path.join(root, 'textfile');
+    const run = () => spawnSync(path.join(checkout, 'hosts/server/system/server-update.sh'), [], {
+      encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_TEXTFILE_DIR: textfile },
+    });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    // What the run left for the node exporter, as { metric: value }.
+    const prom = () => {
+      const file = path.join(textfile, 'server_update.prom');
+      const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
+      return Object.fromEntries(lines.filter((l) => l && !l.startsWith('#')).map((l) => l.split(' ')).map(([k, v]) => [k, Number(v)]));
+    };
+    const upstream = (file, content) => {
+      fs.writeFileSync(path.join(seed, file), content);
+      git(seed, 'commit', '-qam', `change ${file}`);
+      git(seed, 'push', '-q', 'origin', 'HEAD:master');
+    };
+    return { root, seed, checkout, run, calls, upstream, prom, textfile };
+  };
+
+  await t.test('leaves its numbers where the node exporter reads them', () => {
+    assert.match(script, /^TEXTFILE_DIR="\$\{SERVER_TEXTFILE_DIR:-\/var\/lib\/node_exporter\/textfile\}"$/m);
+    // The exporter does not run as root, and must never read a half-written file.
+    assert.match(script, /chmod 644/);
+    assert.match(script, /mv "\$tmp" "\$PROM"/);
+  });
+
+  await t.test('a quiet night records that it ran, and no update', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, prom } = setup();
+    const started = Math.floor(Date.now() / 1000);
+    assert.equal(run().status, 0);
+    assert.ok(prom().server_update_last_run_timestamp_seconds >= started);
+    assert.equal(prom().server_update_last_run_success, 1);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, undefined, 'nothing was applied yet');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('an applied bump records when, and later quiet nights keep that time', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, prom, upstream, textfile } = setup();
+    const started = Math.floor(Date.now() / 1000);
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    assert.equal(run().status, 0);
+    const applied = prom().server_update_last_applied_timestamp_seconds;
+    assert.ok(applied >= started);
+    assert.equal(run().status, 0);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, applied);
+    // The exporter runs as nobody; only finished .prom files are in the folder.
+    assert.deepEqual(fs.readdirSync(textfile), ['server_update.prom']);
+    assert.equal(fs.statSync(path.join(textfile, 'server_update.prom')).mode & 0o777, 0o644);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('a refused run is recorded as failed', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, prom, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'hosts/server/bootstrap.sh'), '#!/bin/sh\necho edited by hand\n');
+    assert.notEqual(run().status, 0);
+    assert.equal(prom().server_update_last_run_success, 0);
+    assert.equal(prom().server_update_last_applied_timestamp_seconds, undefined);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('does nothing when nothing was merged', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, calls } = setup();
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(calls(), '', 'the stack is left alone');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('applies a merged bump: fast-forwards, restarts the stack, prunes old images', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(checkout, 'hosts/server/docker-compose.yml'), 'utf8'), 'image: app:1.0.1\n');
+    assert.deepEqual(calls().trim().split('\n'), ['stack-up', 'docker image prune -f']);
+    assert.doesNotMatch(result.stdout, /bootstrap/, 'no host change, no reminder');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('says when a merge changed the host setup, which only bootstrap applies', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, upstream } = setup();
+    upstream('hosts/server/bootstrap.sh', '#!/bin/sh\necho new step\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /sudo hosts\/server\/bootstrap\.sh/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('changes nothing in a checkout with local edits', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'hosts/server/bootstrap.sh'), '#!/bin/sh\necho edited by hand\n');
+    const before = git(checkout, 'rev-parse', 'HEAD');
+    const result = run();
+    assert.notEqual(result.status, 0);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('changes nothing in a checkout that has diverged from origin', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, checkout, run, calls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    fs.writeFileSync(path.join(checkout, 'local.txt'), 'x\n');
+    git(checkout, 'add', 'local.txt');
+    git(checkout, 'commit', '-qm', 'local commit');
+    const before = git(checkout, 'rev-parse', 'HEAD');
+    const result = run();
+    assert.notEqual(result.status, 0);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(calls(), '');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server host metrics', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-metrics.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-metrics.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-metrics.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('run every minute, from a timer', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:00$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-metrics\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap creates the folder the exporter reads, and installs the timer', () => {
+    assert.match(bootstrap, /install -d -m 0755 \/var\/lib\/node_exporter\/textfile/);
+    assert.match(bootstrap, /^place_unit server-metrics\.service/m);
+    assert.match(bootstrap, /^install_unit server-metrics\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-metrics\.service/);
+  });
+
+  await t.test('never wakes a sleeping disk to ask about its self-test', () => {
+    assert.match(script, /smartctl -n standby -l selftest -j/);
+  });
+
+  // Behaviour, in a throwaway folder. mountpoint and smartctl are stubs on PATH.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'command -v jq']).status;
+  const ATA_PASSED = JSON.stringify({ ata_smart_self_test_log: { standard: { table: [
+    { type: { string: 'Short offline' }, status: { string: 'Completed without error', passed: true }, lifetime_hours: 20 },
+    { type: { string: 'Short offline' }, status: { string: 'Completed: read failure', passed: false }, lifetime_hours: 3 },
+  ] } } });
+  const NVME_FAILED = JSON.stringify({ nvme_self_test_log: { table: [
+    { self_test_code: { value: 1 }, self_test_result: { value: 7, string: 'Completed: failed segments' }, power_on_hours: 2107 },
+  ] } });
+  // What qBittorrent's sync/maindata answers, cut down to the part the script reads.
+  const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
+    alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
+  } });
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null, forwarded = false } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
+    const bin = path.join(root, 'bin');
+    const textfile = path.join(root, 'textfile');
+    fs.mkdirSync(bin);
+    // docker answers the two calls the script makes. Asked for qBittorrent's numbers with
+    // nothing to say, it fails, as it does when Gluetun is stopped or qBittorrent wants a login.
+    // Asked whether Gluetun holds a forwarded port, it fails when there is none.
+    const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\ncase "$*" in *forwarded_port*) exit ${forwarded ? 0 : 1} ;; esac\n${answer}\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
+    // --scan lists the devices; a device with no answer here is asleep (exit 2).
+    const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
+    const scan = Object.keys(selftests).map((dev) => `/dev/${dev} -d x # ${dev}`).join('\n');
+    fs.writeFileSync(path.join(bin, 'smartctl'), `#!/bin/sh\nif [ "$1" = "--scan" ]; then cat <<'SCAN'\n${scan}\nSCAN\nexit 0; fi\nfor last; do :; done\ncase "$last" in\n${cases}\n  *) exit 2 ;;\nesac\n`, { mode: 0o755 });
+    const stampFile = path.join(root, 'unattended-upgrades-stamp');
+    if (stamp) {
+      fs.writeFileSync(stampFile, '');
+      fs.utimesSync(stampFile, 1790000000, 1790000000);
+    }
+    const rebootFlag = path.join(root, 'reboot-required');
+    if (reboot) fs.writeFileSync(rebootFlag, '');
+    const throttleFile = path.join(root, 'package_throttle_total_time_ms');
+    if (throttleMs !== null) fs.writeFileSync(throttleFile, `${throttleMs}\n`);
+    const run = () => spawnSync(path.join(SYSTEM_DIR, 'server-metrics.sh'), [], {
+      encoding: 'utf8',
+      env: {
+        ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        SERVER_TEXTFILE_DIR: textfile, SERVER_APT_STAMP: stampFile, SERVER_REBOOT_FLAG: rebootFlag,
+        SERVER_CPU_THROTTLE_FILE: throttleFile,
+      },
+    });
+    const prom = (name) => (fs.existsSync(path.join(textfile, name)) ? fs.readFileSync(path.join(textfile, name), 'utf8') : '');
+    return { root, bin, textfile, run, prom };
+  };
+
+  await t.test('say when unattended upgrades last ran, whether the disk is mounted and a reboot is waiting', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ mounted: true, reboot: false });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const host = prom('server_host.prom');
+    assert.match(host, /^server_unattended_upgrade_last_run_timestamp_seconds 1790000000$/m);
+    assert.match(host, /^server_media_disk_mounted 1$/m);
+    assert.match(host, /^server_reboot_required 0$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_host.prom')).mode & 0o777, 0o644);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say so when the disk is gone and a reboot is waiting, and nothing about upgrades that never ran', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup({ mounted: false, stamp: false, reboot: true });
+    assert.equal(run().status, 0);
+    const host = prom('server_host.prom');
+    assert.match(host, /^server_media_disk_mounted 0$/m);
+    assert.match(host, /^server_reboot_required 1$/m);
+    assert.doesNotMatch(host, /server_unattended_upgrade/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say how long the CPU has been slowed down for heat, in seconds', { skip: !canRun && 'needs bash and jq' }, () => {
+    // The kernel counts milliseconds since boot.
+    const { root, run, prom } = setup({ throttleMs: 304600 });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(prom('server_host.prom'), /^server_cpu_throttled_seconds_total 304\.600$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say nothing about throttling on a machine that does not count it', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup();
+    assert.equal(run().status, 0);
+    assert.doesNotMatch(prom('server_host.prom'), /server_cpu_throttled/);
+    assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('report each disk\'s latest self-test under the name the SMART exporter uses', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup({ selftests: { sda: ATA_PASSED, nvme0: NVME_FAILED } });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const smart = prom('server_smart.prom');
+    assert.match(smart, /^server_smart_selftest_passed\{device="sda"\} 1$/m);
+    assert.match(smart, /^server_smart_selftest_power_on_hours\{device="sda"\} 20$/m);
+    assert.match(smart, /^server_smart_selftest_passed\{device="nvme0"\} 0$/m);
+    assert.match(smart, /^server_smart_selftest_power_on_hours\{device="nvme0"\} 2107$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('keep a sleeping disk\'s last answer, and say nothing of a disk never tested', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, bin, run, prom } = setup({ selftests: { sda: ATA_PASSED, nvme0: '{}' } });
+    assert.equal(run().status, 0);
+    assert.doesNotMatch(prom('server_smart.prom'), /nvme0/);
+    // The disk goes to sleep: smartctl answers 2 and prints nothing.
+    fs.writeFileSync(path.join(bin, 'smartctl'), '#!/bin/sh\nif [ "$1" = "--scan" ]; then echo "/dev/sda -d x # sda"; exit 0; fi\nexit 2\n', { mode: 0o755 });
+    assert.equal(run().status, 0);
+    assert.match(prom('server_smart.prom'), /^server_smart_selftest_passed\{device="sda"\} 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('ask qBittorrent through Gluetun\'s localhost, with no login of their own', () => {
+    // qBittorrent has Gluetun's network; its Web UI lets Gluetun's localhost in while port forwarding is on.
+    assert.match(script, /docker exec gluetun wget -qO- http:\/\/127\.0\.0\.1:8080\/api\/v2\/sync\/maindata/);
+    assert.doesNotMatch(script, /QBITTORRENT_(USERNAME|PASSWORD)|auth\/login|\.env/, 'no credentials are read');
+  });
+
+  await t.test('report what qBittorrent has downloaded and uploaded, its peers and whether it can be reached', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const qbt = prom('server_qbittorrent.prom');
+    assert.match(qbt, /^server_qbittorrent_up 1$/m);
+    // All-time counters: they keep counting across qBittorrent's restarts.
+    assert.match(qbt, /^server_qbittorrent_downloaded_bytes_total 2762556297724$/m);
+    assert.match(qbt, /^server_qbittorrent_uploaded_bytes_total 829953468616$/m);
+    assert.match(qbt, /^server_qbittorrent_connectable 1$/m);
+    assert.match(qbt, /^server_qbittorrent_peer_connections 67$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_qbittorrent.prom')).mode & 0o777, 0o644);
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun wget /m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say qBittorrent cannot be reached while its forwarded port is gone', { skip: !canRun && 'needs bash and jq' }, () => {
+    // Gluetun's port forwarding failed: qBittorrent listens on nothing and says "firewalled".
+    const { root, run, prom } = setup({ qbittorrent: maindata({ connection_status: 'firewalled', total_peer_connections: 17 }) });
+    assert.equal(run().status, 0);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 0$/m);
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_peer_connections 17$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('say only that qBittorrent did not answer when it wants a login or Gluetun is stopped', { skip: !canRun && 'needs bash and jq' }, () => {
+    for (const qbittorrent of [null, 'Forbidden', '']) {
+      const { root, run, prom } = setup({ qbittorrent });
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(prom('server_qbittorrent.prom'), 'server_qbittorrent_up 0\n');
+      // The rest of the host's numbers do not depend on it.
+      assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('GIVEN Gluetun holds a forwarded port WHEN it runs THEN it says the port is forwarded', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ forwarded: true });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 1\n');
+    assert.equal(fs.statSync(path.join(textfile, 'server_vpn.prom')).mode & 0o777, 0o644);
+    // Gluetun keeps the port in a file while it has one; no API key is needed to look.
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun test -s \/tmp\/gluetun\/forwarded_port$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no forwarded port, or Gluetun stopped WHEN it runs THEN it says there is none and writes the rest', { skip: !canRun && 'needs bash and jq' }, () => {
+    // qBittorrent says "connected" on a port nobody forwards: this number is Gluetun's own.
+    const { root, run, prom } = setup({ forwarded: false, qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 0\n');
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 1$/m);
+    assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server VPN watchdog', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('runs every minute, from a timer bootstrap installs', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:45$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-vpn-watchdog\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+    assert.match(bootstrap, /^place_unit server-vpn-watchdog\.service/m);
+    assert.match(bootstrap, /^install_unit server-vpn-watchdog\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-vpn-watchdog\.service/);
+  });
+
+  await t.test('looks at Gluetun\'s port file and log, with no key or login of its own', () => {
+    assert.match(script, /docker exec gluetun test -s \/tmp\/gluetun\/forwarded_port/);
+    assert.match(script, /docker logs --since 1h gluetun/);
+    assert.doesNotMatch(script, /GLUETUN_API_KEY|WIREGUARD|PASSWORD/);
+  });
+
+  // Behaviour, in a throwaway folder. docker and mountpoint are stubs on PATH; the clock is given.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const skip = !canRun && 'needs bash';
+  const NOON = Date.UTC(2026, 9, 12, 12, 0, 0) / 1000;
+  const MIN = 60;
+  const ALLOWED = 'node-nl-01.example.net,node-nl-02.example.net';
+  const setup = ({ forwarding = 'on', allowlist = ALLOWED, port = false, losses = 0, mounted = true } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-vpn-'));
+    const bin = path.join(root, 'bin');
+    const textfile = path.join(root, 'textfile');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(log, '');
+    fs.writeFileSync(path.join(root, '.env'), `VPN_PROVIDER=protonvpn\nVPN_PORT_FORWARDING=${forwarding}\n${allowlist ? `VPN_SERVER_HOSTNAMES=${allowlist}\n` : ''}`);
+    // The port file is there or not; the log holds one line for each port Gluetun lost.
+    // A recreate is written down with the server list it was given ("unset": the one in .env).
+    fs.writeFileSync(path.join(bin, 'docker'), [
+      '#!/bin/sh',
+      'case "$1" in',
+      `  exec) [ -e "${root}/port" ]; exit $? ;;`,
+      `  logs) cat "${root}/gluetun.log"; exit 0 ;;`,
+      `  compose) echo "$* [servers=\${VPN_SERVER_HOSTNAMES-unset}]" >> "${log}"; exit 0 ;;`,
+      'esac',
+      'exit 1',
+    ].join('\n') + '\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
+    const setPort = (has) => (has ? fs.writeFileSync(path.join(root, 'port'), '51413\n') : fs.rmSync(path.join(root, 'port'), { force: true }));
+    const setLosses = (n) => fs.writeFileSync(path.join(root, 'gluetun.log'), 'INFO [port forwarding] clearing port file /tmp/gluetun/forwarded_port\n'.repeat(n));
+    setPort(port);
+    setLosses(losses);
+    const run = (now) => {
+      const result = spawnSync(path.join(SYSTEM_DIR, 'server-vpn-watchdog.sh'), [], {
+        encoding: 'utf8',
+        env: {
+          ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, TZ: 'UTC', SERVER_NOW: String(now),
+          SERVER_ENV_FILE: path.join(root, '.env'), SERVER_VPN_STATE_DIR: path.join(root, 'state'), SERVER_TEXTFILE_DIR: textfile,
+        },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      return result;
+    };
+    // One run a minute, from minute `from` to minute `to` after noon.
+    const minutes = (from, to) => { for (let m = from; m <= to; m += 1) run(NOON + m * MIN); };
+    const recreates = () => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+    const prom = () => (fs.existsSync(path.join(textfile, 'server_vpn_watchdog.prom')) ? fs.readFileSync(path.join(textfile, 'server_vpn_watchdog.prom'), 'utf8') : '');
+    const done = () => fs.rmSync(root, { recursive: true, force: true });
+    return { root, textfile, run, minutes, recreates, prom, setPort, setLosses, done };
+  };
+  const TOGETHER = /^compose --project-directory \S+ up -d --force-recreate gluetun flaresolverr qbittorrent \[servers=unset\]$/;
+
+  await t.test('GIVEN port forwarding is off in .env WHEN it runs THEN it does nothing', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ forwarding: 'off' });
+    minutes(0, 30);
+    assert.deepEqual(recreates(), []);
+    assert.equal(prom(), '', 'a provider without forwarding has nothing to report');
+    done();
+  });
+
+  await t.test('GIVEN a forwarded port and a few losses WHEN it runs THEN nothing is recreated', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ port: true, losses: 6 });
+    minutes(0, 30);
+    assert.deepEqual(recreates(), []);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 0$/m);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    done();
+  });
+
+  await t.test('GIVEN no forwarded port WHEN ten minutes have passed THEN gluetun, flaresolverr and qbittorrent are recreated together', { skip }, () => {
+    const { textfile, minutes, recreates, prom, done } = setup();
+    minutes(0, 9);
+    assert.deepEqual(recreates(), [], 'nine minutes is not yet ten');
+    minutes(10, 10);
+    assert.equal(recreates().length, 1);
+    // The three share Gluetun's network; the server list is the one in .env.
+    assert.match(recreates()[0], TOGETHER);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 1$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_vpn_watchdog.prom')).mode & 0o777, 0o644);
+    // The new container gets ten minutes of its own.
+    minutes(11, 19);
+    assert.equal(recreates().length, 1);
+    done();
+  });
+
+  await t.test('GIVEN a port that was lost more than six times in the hour WHEN it runs THEN the containers are recreated', { skip }, () => {
+    const { minutes, recreates, done } = setup({ port: true, losses: 7 });
+    minutes(0, 0);
+    assert.equal(recreates().length, 1);
+    assert.match(recreates()[0], TOGETHER);
+    done();
+  });
+
+  await t.test('GIVEN the media disk is not mounted WHEN it recreates THEN qBittorrent is left out', { skip }, () => {
+    // qBittorrent cannot mount /data; the disk guard starts it when the disk is back.
+    const { minutes, recreates, done } = setup({ mounted: false });
+    minutes(0, 10);
+    assert.match(recreates()[0], /--force-recreate gluetun flaresolverr \[servers=unset\]$/);
+    done();
+  });
+
+  await t.test('GIVEN three recreations that brought no port WHEN it recreates again THEN any server in the country may be used', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup();
+    minutes(0, 30);
+    assert.equal(recreates().length, 3);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/, 'the first three stay on the named servers');
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    minutes(31, 40);
+    assert.equal(recreates().length, 4);
+    // An empty list overrides the one in .env.
+    assert.match(recreates()[3], /\[servers=\]$/);
+    assert.match(prom(), /^server_vpn_watchdog_widened 1$/m);
+    done();
+  });
+
+  await t.test('GIVEN no servers are named in .env WHEN recreations bring no port THEN there is nothing to widen', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ allowlist: '' });
+    minutes(0, 50);
+    assert.equal(recreates().length, 5);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    done();
+  });
+
+  await t.test('GIVEN two failed recreations WHEN a port then holds for ten minutes THEN the count starts again', { skip }, () => {
+    const { minutes, recreates, setPort, done } = setup();
+    minutes(0, 20);
+    assert.equal(recreates().length, 2);
+    setPort(true);
+    minutes(21, 31);
+    setPort(false);
+    // Three more on the named servers before widening, not one.
+    minutes(32, 62);
+    assert.equal(recreates().length, 5);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/);
+    done();
+  });
+
+  await t.test('GIVEN six recreations in a row brought no port WHEN it goes on THEN it waits an hour between tries', { skip }, () => {
+    // Each recreate restarts qBittorrent: when no server gives a port, downloading matters more.
+    const { minutes, recreates, done } = setup();
+    minutes(0, 60);
+    assert.equal(recreates().length, 6);
+    minutes(61, 119);
+    assert.equal(recreates().length, 6);
+    minutes(120, 120);
+    assert.equal(recreates().length, 7);
+    done();
+  });
+
+  await t.test('GIVEN it has widened WHEN the clock passes 04:00 THEN it goes back to the named servers', { skip }, () => {
+    const { run, minutes, recreates, prom, setPort, done } = setup();
+    minutes(0, 40);
+    setPort(true);
+    minutes(41, 60);
+    assert.equal(recreates().length, 4);
+    assert.match(prom(), /^server_vpn_watchdog_widened 1$/m);
+    // Still the same day: it stays where a port was found.
+    run(NOON + 11 * 60 * MIN);
+    assert.equal(recreates().length, 4);
+    // 04:00 the next morning.
+    run(NOON + 16 * 60 * MIN);
+    assert.equal(recreates().length, 5);
+    assert.match(recreates()[4], TOGETHER);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 5$/m);
+    // Once: the next minute changes nothing.
+    run(NOON + 16 * 60 * MIN + MIN);
+    assert.equal(recreates().length, 5);
+    done();
+  });
+});
+
+test('Server Renovate runs', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-renovate.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-renovate.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-renovate.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('start every hour: one run opens the PRs, a later one merges them once CI is green', () => {
+    // Not on the hour: the registries answer 429 in the first minute of every hour.
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:52:00$/m);
+    assert.match(timer, /^Persistent=true$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-renovate\.sh$/m);
+    assert.match(unit, /^After=docker\.service network-online\.target$/m);
+    assert.match(unit, /^Wants=network-online\.target$/m);
+    // The timer starts it; enabling the service itself would run it on every boot.
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, and the service without starting it', () => {
+    assert.match(bootstrap, /^place_unit server-renovate\.service/m);
+    assert.match(bootstrap, /^install_unit server-renovate\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-renovate\.service/);
+  });
+
+  // Behaviour, in a throwaway server folder. docker is a stub on PATH.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = (envFile) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-renovate-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(root, 'server/system'), { recursive: true });
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${log}"\n`, { mode: 0o755 });
+    const target = path.join(root, 'server/system/server-renovate.sh');
+    fs.copyFileSync(path.join(SYSTEM_DIR, 'server-renovate.sh'), target);
+    fs.chmodSync(target, 0o755);
+    if (envFile !== null) fs.writeFileSync(path.join(root, 'server/.env'), envFile);
+    const run = () => spawnSync(target, [], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
+    return { root, run, calls };
+  };
+
+  await t.test('skips the run, and says why, until the token is in .env', { skip: !canRun && 'needs bash' }, () => {
+    for (const envFile of ['RENOVATE_TOKEN=\n', 'TZ=Europe/Madrid\n', null]) {
+      const { root, run, calls } = setup(envFile);
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /RENOVATE_TOKEN is not set/);
+      assert.equal(calls(), '', 'Renovate must not start without a token');
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('runs Renovate once through compose and reports how it ended', { skip: !canRun && 'needs bash' }, () => {
+    const { root, run, calls } = setup('TZ=Europe/Madrid\nRENOVATE_TOKEN=github_pat_example\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const serverDir = path.join(root, 'server');
+    assert.equal(calls().trim(), `docker compose --project-directory ${serverDir} --profile renovate up --exit-code-from renovate renovate`);
+    // The token is read by compose from .env; it must never be printed.
+    assert.doesNotMatch(result.stdout + result.stderr, /github_pat_example/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server Wi-Fi band', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-wifi-band.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-wifi-band.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-wifi-band.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('is checked every minute, from a timer', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:30$/m, 'off the minute, beside the host metrics');
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-wifi-band\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+  });
+
+  await t.test('bootstrap installs the timer, outside the laptop section', () => {
+    assert.match(bootstrap, /^place_unit server-wifi-band\.service/m);
+    assert.match(bootstrap, /^install_unit server-wifi-band\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-wifi-band\.service/);
+    const step = at(bootstrap, 'install_unit server-wifi-band.timer');
+    assert.ok(step > at(bootstrap, 'rfkill unblock all'), 'after the radios are on');
+    assert.ok(step < at(bootstrap, '# >>> laptop'), 'any machine on Wi-Fi wants it');
+  });
+
+  await t.test('only asks for a roam: it excludes no band and never takes the link down', () => {
+    assert.ok(script, 'server-wifi-band.sh must exist');
+    assert.match(script, /roam/);
+    assert.doesNotMatch(script, /freq_list|set_network|ifdown|ifup|reassociate|disconnect/);
+    assert.doesNotMatch(script, /\/etc\/network/, 'the Wi-Fi settings and their password are left alone');
+    assert.match(script, /command -v wpa_cli/, 'a machine without wpa_supplicant is left alone');
+  });
+
+  await t.test('keeps the router\'s radio addresses out of the repo', () => {
+    // A radio's address can be looked up to a street. The ones below are invented:
+    // locally administered (02:...) for our network, aa:... for the neighbours.
+    const here = read(__filename);
+    const addresses = here.match(/\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b/gi) || [];
+    assert.ok(addresses.length > 5, 'the fixtures should be found');
+    for (const address of addresses) assert.match(address, /^(02:00:00|aa:aa:aa):/, `${address} must be an invented address`);
+    assert.doesNotMatch(script + read(path.join(SERVER_DIR, 'README.md')), /\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b/i);
+  });
+
+  // Behaviour, with a stub wpa_cli on PATH that answers from two files and logs its calls.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const OURS_24 = '02:00:00:00:00:24\t2462\t-47\t[WPA2-PSK-CCMP][ESS]\tHome';
+  const setup = ({ freq = 2462, state = 'COMPLETED', scan = [], iface = 'wlan9' } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-wifi-'));
+    const bin = path.join(root, 'bin');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.join(root, 'sys'));
+    fs.writeFileSync(path.join(root, 'status'), `bssid=02:00:00:00:00:24\nfreq=${freq}\nssid=Home\nwpa_state=${state}\n`);
+    fs.writeFileSync(path.join(root, 'scan'), ['bssid / frequency / signal level / flags / ssid', ...scan].join('\n') + '\n');
+    fs.writeFileSync(path.join(bin, 'wpa_cli'), [
+      '#!/bin/sh',
+      `echo "$*" >> "${log}"`,
+      'shift 2',
+      'case "$1" in',
+      `  status) cat "${root}/status" ;;`,
+      `  scan_results) cat "${root}/scan" ;;`,
+      '  *) echo OK ;;',
+      'esac',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SERVER_WIFI_SCAN_WAIT: '0', SERVER_WIFI_SYS: path.join(root, 'sys') };
+    if (iface) env.SERVER_WIFI_IF = iface;
+    const run = () => spawnSync(path.join(SYSTEM_DIR, 'server-wifi-band.sh'), [], { encoding: 'utf8', env });
+    const calls = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : []);
+    return { root, run, calls };
+  };
+  const skip = !canRun && 'needs bash';
+
+  await t.test('GIVEN the link is on 5 GHz WHEN it runs THEN it neither scans nor roams', { skip }, () => {
+    const { root, run, calls } = setup({ freq: 5600 });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), ['-i wlan9 status']);
+    assert.equal(result.stdout, '', 'a quiet minute leaves no line in the journal');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and the same network on 5 GHz WHEN it runs THEN it scans, roams there and says so', { skip }, () => {
+    const { root, run, calls } = setup({ scan: [OURS_24, '02:00:00:00:00:50\t5600\t-54\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), ['-i wlan9 status', '-i wlan9 scan', '-i wlan9 scan_results', '-i wlan9 roam 02:00:00:00:00:50']);
+    assert.match(result.stdout, /2462 MHz -> 5600 MHz/);
+    assert.match(result.stdout, /-54 dBm/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and a 5 GHz signal too weak to be worth it WHEN it runs THEN it stays', { skip }, () => {
+    const { root, run, calls } = setup({ scan: [OURS_24, '02:00:00:00:00:50\t5600\t-80\t[WPA2-PSK-CCMP][ESS]\tHome'] });
+    assert.equal(run().status, 0);
+    assert.ok(!calls().some((call) => call.includes('roam')), 'below -70 dBm it must not roam');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN 2.4 GHz and only other networks on 5 GHz WHEN it runs THEN it stays', { skip }, () => {
+    // A neighbour, and a network whose name merely starts with ours.
+    const { root, run, calls } = setup({ scan: [OURS_24, 'aa:aa:aa:aa:aa:01\t5180\t-40\t[WPA2-PSK-CCMP][ESS]\tNeighbour', '02:00:00:00:07:50\t5600\t-50\t[WPA2-SAE-CCMP][ESS]\tHome-WiFi7'] });
+    assert.equal(run().status, 0);
+    assert.ok(!calls().some((call) => call.includes('roam')));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN two 5 GHz radios of the same network WHEN it runs THEN it roams to the stronger', { skip }, () => {
+    const { root, run, calls } = setup({ scan: ['aa:aa:aa:aa:aa:02\t5180\t-66\t[ESS]\tHome', OURS_24, 'aa:aa:aa:aa:aa:03\t5500\t-51\t[ESS]\tHome'] });
+    assert.equal(run().status, 0);
+    assert.equal(calls().at(-1), '-i wlan9 roam aa:aa:aa:aa:aa:03');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN the Wi-Fi is not connected WHEN it runs THEN it leaves the connecting to wpa_supplicant', { skip }, () => {
+    const { root, run, calls } = setup({ state: 'SCANNING' });
+    assert.equal(run().status, 0);
+    assert.deepEqual(calls(), ['-i wlan9 status']);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN a machine with no Wi-Fi interface WHEN it runs THEN it does nothing', { skip }, () => {
+    const { root, run, calls } = setup({ iface: null });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls(), []);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server scripts are safe to run from a Windows checkout', async (t) => {
+  await t.test('keep LF line endings', () => {
+    for (const file of SCRIPTS) {
+      const full = path.join(SERVER_DIR, file);
+      assert.ok(fs.existsSync(full), `${file} must exist`);
+      assert.doesNotMatch(fs.readFileSync(full, 'utf8'), /\r/, `${file} must use LF`);
+    }
+    const attributes = read(path.join(ROOT_DIR, '.gitattributes'));
+    assert.match(attributes, /^hosts\/server\/\*\*\/\*\.sh text eol=lf$/m);
+    assert.match(attributes, /^hosts\/server\/system\/\*\.service text eol=lf$/m);
+    assert.match(attributes, /^hosts\/server\/system\/\*\.timer text eol=lf$/m);
+  });
+
+  await t.test('are marked executable in git', () => {
+    for (const file of SCRIPTS) {
+      const listed = spawnSync('git', ['ls-files', '-s', `hosts/server/${file}`], { cwd: ROOT_DIR, encoding: 'utf8' }).stdout;
+      assert.match(listed, /^100755 /, `hosts/server/${file} must be committed with the executable bit`);
+    }
+  });
+
+  await t.test('pass bash -n (and shellcheck when installed)', (st) => {
+    // On Windows plain `bash` is WSL's, which may have no shell; use Git Bash.
+    const bashCmd = process.platform === 'win32'
+      ? path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe')
+      : 'bash';
+    for (const file of SCRIPTS) {
+      const source = read(path.join(SERVER_DIR, file));
+      assert.ok(source, `${file} must exist`);
+      const bash = spawnSync(bashCmd, ['-n'], { input: source, encoding: 'utf8' });
+      if (bash.error) return st.skip('bash not installed');
+      assert.equal(bash.status, 0, `${file}: ${bash.stderr}`);
+      const shellcheck = spawnSync('shellcheck', ['-s', 'bash', '-'], { input: source, encoding: 'utf8' });
+      if (!shellcheck.error) assert.equal(shellcheck.status, 0, `${file}: ${shellcheck.stdout}`);
+    }
+  });
+});
+
+test('Server disk health checks', async (t) => {
+  const script = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+  const readme = read(path.join(SERVER_DIR, 'README.md'));
+
+  await t.test('installs smartmontools and schedules a short self-test every week', () => {
+    assert.match(script, /apt-get install -y -q .*\bsmartmontools\b/);
+    const conf = (script.match(/write_if_changed \/etc\/smartd\.conf <<'EOF'\n([\s\S]*?)\nEOF/) || ['', ''])[1];
+    // Sundays at 03:00. DEVICESCAN covers the SSD and the media disk without naming either.
+    assert.match(conf, /^DEVICESCAN .*-s S\/\.\.\/\.\.\/7\/03( |$)/m);
+    assert.match(conf, /-d removable/, 'smartd must keep running while the USB disk is unplugged');
+    // The extended test reads the whole surface: 12 hours at over 60 C on this disk.
+    assert.doesNotMatch(conf, /L\//, 'no scheduled extended self-test');
+    // Debian's unit is smartmontools; "smartd" is an alias, and systemctl refuses to enable an alias.
+    assert.match(script, /systemctl restart smartmontools$/m);
+    assert.match(script, /systemctl enable -q smartmontools$/m);
+    assert.doesNotMatch(script, /systemctl \w+( -q)? smartd$/m);
+  });
+
+  await t.test('keeps the disks\' serial numbers out of the repo', () => {
+    for (const file of ['bootstrap.sh', 'system/server-media.sh', 'README.md']) {
+      assert.doesNotMatch(read(path.join(SERVER_DIR, file)), /usb-WD_|by-id\//, `${file} must not name a disk by its ID`);
+    }
+  });
+
+  await t.test('the README says what happens after a dropout and how to read the self-tests', () => {
+    const disk = (readme.match(/## Media disk\n([\s\S]*?)(?=\n## )/) || ['', ''])[1];
+    assert.match(disk, /plugged back in/);
+    assert.match(disk, /checks the filesystem/);
+    assert.match(disk, /smartctl -l selftest/);
+    assert.match(disk, /Sunday/);
+  });
+});

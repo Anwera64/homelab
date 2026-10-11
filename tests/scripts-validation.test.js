@@ -4,84 +4,50 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const STARTUP_SCRIPT_PATH = path.join(ROOT_DIR, 'startup_homelab.ps1');
-const STOP_SCRIPT_PATH = path.join(ROOT_DIR, 'stop_homelab.ps1');
-const VIRT_SCRIPT_PATH = path.join(ROOT_DIR, 'enable_virtualization.ps1');
-const COMPACT_SCRIPT_PATH = path.join(ROOT_DIR, 'compact_docker_disk.ps1');
+const DESKTOP_DIR = path.join(ROOT_DIR, 'hosts/desktop');
+const STARTUP_SCRIPT_PATH = path.join(DESKTOP_DIR, 'startup_homelab.ps1');
+const STOP_SCRIPT_PATH = path.join(DESKTOP_DIR, 'stop_homelab.ps1');
+const VIRT_SCRIPT_PATH = path.join(DESKTOP_DIR, 'enable_virtualization.ps1');
+const COMPACT_SCRIPT_PATH = path.join(DESKTOP_DIR, 'compact_docker_disk.ps1');
 
 test('PowerShell Automation Scripts Suite', async (t) => {
   const startupContent = fs.readFileSync(STARTUP_SCRIPT_PATH, 'utf8');
   const stopContent = fs.readFileSync(STOP_SCRIPT_PATH, 'utf8');
   const virtContent = fs.readFileSync(VIRT_SCRIPT_PATH, 'utf8');
 
-  await t.test('startup_homelab.ps1 validates Docker CLI and handles .env fallback', () => {
-    // Verifies Docker command check exists
+  await t.test('startup_homelab.ps1 checks Docker, seeds .env and starts the two containers', () => {
+    assert.ok(startupContent.includes('Get-Command docker'), 'must check that Docker is installed');
+    assert.ok(startupContent.includes('Docker Desktop.exe'), 'must start Docker Desktop when the engine is down');
     assert.ok(
-      startupContent.includes('Get-Command docker'),
-      'startup_homelab.ps1 must check for Docker installation'
+      startupContent.includes('Copy-Item "$PSScriptRoot\\.env.example" "$PSScriptRoot\\.env"'),
+      'must seed .env from .env.example, both beside the script'
     );
+    // Its own folder, whatever the caller's: it is on PATH and run from anywhere.
+    assert.match(
+      startupContent,
+      /docker compose -f "\$PSScriptRoot\\docker-compose\.yml" --env-file "\$PSScriptRoot\\\.env" up -d\s*$/m,
+      'must start the stack from the compose file beside it'
+    );
+    assert.ok(startupContent.includes('$failedContainers'), 'must report a container that failed to start');
+  });
 
-    // Verifies .env fallback copy from .env.example
-    assert.ok(
-      startupContent.includes('.env.example') && startupContent.includes('.env'),
-      'startup_homelab.ps1 must check and fallback-copy .env from .env.example'
-    );
-
-    // Verifies docker compose up invocation
-    assert.ok(
-      /docker\s+compose.*up\s+-d/i.test(startupContent),
-      'startup_homelab.ps1 must invoke docker compose up -d'
-    );
-
-    // The hub is built from source, so a restart must rebuild it to pick up code changes
-    assert.ok(
-      /docker\s+compose @profileArg.*up\s+-d\s+--build/i.test(startupContent),
-      'startup_homelab.ps1 must rebuild local images when bringing the stack up'
-    );
-
-    // The hub is AI-only like ollama and searxng, so an arr-only start must not flag it as failed
-    assert.ok(
-      startupContent.includes('$cName -eq "household-hub"'),
-      'startup_homelab.ps1 must skip household-hub in the health audit when AI is off'
-    );
-
-    // Verifies update parameters, persistent timestamp gate, and image prune
-    assert.ok(
-      startupContent.includes('[switch]$SkipUpdate') && startupContent.includes('[switch]$ForceUpdate'),
-      'startup_homelab.ps1 must declare SkipUpdate and ForceUpdate switches'
-    );
-    assert.ok(
-      startupContent.includes('[switch]$NoAI') && startupContent.includes('[switch]$ArrOnly'),
-      'startup_homelab.ps1 must declare NoAI and ArrOnly switches'
-    );
-    assert.ok(
-      startupContent.includes('.last_update'),
-      'startup_homelab.ps1 must manage persistent .last_update state'
-    );
-    assert.ok(
-      startupContent.includes('docker image prune -f'),
-      'startup_homelab.ps1 must invoke docker image prune -f after update'
-    );
-
-    // Verifies active DuckDNS HTTPS endpoint banner and absence of deprecated Tailscale URL
-    assert.ok(
-      !startupContent.includes('homelab.llama-porbeagle.ts.net'),
-      'startup_homelab.ps1 must not contain deprecated Tailscale URL homelab.llama-porbeagle.ts.net'
-    );
-    assert.ok(
-      startupContent.includes('DuckDNS HTTPS') && startupContent.includes('$domain'),
-      'startup_homelab.ps1 must display DuckDNS HTTPS endpoints'
-    );
-    assert.ok(
-      startupContent.includes('https://grafana.$domain'),
-      'startup_homelab.ps1 must list Grafana, where the logs are searched'
-    );
+  await t.test('startup_homelab.ps1 has nothing left of the media stack', () => {
+    for (const gone of ['gluetun', 'qbittorrent', 'Jellyfin', 'Sonarr', 'WIREGUARD', '.last_update', '--profile', '$NoAI', '$ArrOnly', '$SkipUpdate', '$ForceUpdate', '--build', 'household-hub']) {
+      assert.ok(!startupContent.toLowerCase().includes(gone.toLowerCase()), `startup_homelab.ps1 must not mention ${gone}`);
+    }
+    assert.doesNotMatch(startupContent, /\[switch\]/, 'no switches are left: there is one way to start');
+    assert.ok(!startupContent.includes('homelab.llama-porbeagle.ts.net'), 'no deprecated Tailscale URL');
   });
 
   await t.test('startup_homelab.ps1 provisions the Ollama models listed in the manifest', () => {
+    // config/ stays in the repo root, two folders up from the script.
     assert.ok(
-      startupContent.includes('config\\ollama-models\\models.json'),
-      'startup_homelab.ps1 must read the tracked model manifest config/ollama-models/models.json'
+      startupContent.includes('$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path'),
+      'must find the repo root from its own folder'
+    );
+    assert.ok(
+      startupContent.includes('Join-Path $repoRoot "config\\ollama-models\\models.json"'),
+      'must read the tracked model manifest config/ollama-models/models.json'
     );
     assert.ok(
       startupContent.includes('Get-FileHash') && startupContent.includes('SHA256'),
@@ -103,21 +69,14 @@ test('PowerShell Automation Scripts Suite', async (t) => {
     }
   });
 
-  await t.test('stop_homelab.ps1 terminates Docker stack and legacy processes', () => {
-    // Verifies docker compose down invocation
-    assert.ok(
-      /docker\s+compose.*down/i.test(stopContent),
-      'stop_homelab.ps1 must invoke docker compose down'
+  await t.test('stop_homelab.ps1 stops the stack and nothing else', () => {
+    assert.match(
+      stopContent,
+      /docker compose -f "\$PSScriptRoot\\docker-compose\.yml" --env-file "\$PSScriptRoot\\\.env" down\s*$/m,
+      'must stop the stack from the compose file beside it'
     );
-
-    // Verifies process names to clean up
-    const expectedProcesses = ['Sonarr', 'Radarr', 'Prowlarr', 'qbittorrent', 'jellyfin', 'flaresolverr'];
-    for (const proc of expectedProcesses) {
-      assert.ok(
-        stopContent.includes(`"${proc}"`) || stopContent.includes(`'${proc}'`) || stopContent.includes(proc),
-        `stop_homelab.ps1 cleanup list must include process: ${proc}`
-      );
-    }
+    // The list of Windows processes dates from before Docker; none of those apps is installed here now.
+    assert.doesNotMatch(stopContent, /Stop-Process|Get-Process/, 'must not kill host processes');
   });
 
   await t.test('compact_docker_disk.ps1 trims and compacts the Docker data disk', () => {

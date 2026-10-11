@@ -1,0 +1,6 @@
+[Unit]
+Description=Wi-Fi band: back to 5 GHz when the card has settled on 2.4 GHz
+
+[Service]
+Type=oneshot
+ExecStart=@SERVER_DIR@/system/server-wifi-band.sh

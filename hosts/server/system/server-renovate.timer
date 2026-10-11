@@ -1,0 +1,10 @@
+[Unit]
+Description=Renovate, every hour
+
+[Timer]
+# Not on the hour: lscr.io and ghcr.io answer 429 in the first minute of every hour.
+OnCalendar=*-*-* *:52:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

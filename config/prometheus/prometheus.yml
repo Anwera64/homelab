@@ -1,0 +1,37 @@
+# =============================================================================
+# Prometheus - asks each exporter for its numbers and keeps a year of them
+# (the retention is a flag in hosts/server/docker-compose.yml).
+#
+# Every exporter's numbers carry host=server, so another machine can be added
+# later without the two mixing.
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # The host itself: CPU, memory, disks, network, temperatures, battery. The node
+  # exporter is on the host's network, so it is reached through the host's name.
+  - job_name: node
+    static_configs:
+      - targets: [host.docker.internal:9100]
+        labels:
+          host: server
+
+  # The disks' SMART data. The exporter asks the disks once a minute.
+  - job_name: smart
+    scrape_interval: 60s
+    static_configs:
+      - targets: [smartctl-exporter:9633]
+        labels:
+          host: server
+
+  - job_name: gpu
+    static_configs:
+      - targets: [nvidia-gpu-exporter:9835]
+        labels:
+          host: server
+
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]

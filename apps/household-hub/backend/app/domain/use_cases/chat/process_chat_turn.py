@@ -54,25 +54,35 @@ logger = logging.getLogger(__name__)
 LOGGED_ARGUMENTS = 500
 
 
-def _log_call(tc: LLMToolCall, result: ToolExecutionResult, is_turn_secret: bool) -> None:
+def _log_call(
+    tc: LLMToolCall,
+    result: ToolExecutionResult,
+    is_turn_secret: bool,
+    user_id: str,
+    session_id: Optional[str] = None,
+) -> None:
     """
     Says in the hub's log what a tool was asked, and why it failed if it did. The phone is only shown
     that a step ran, so without this neither a failure nor a step that did the wrong thing can be
     read back afterwards. What the tool gave back is not logged: a calendar read is the member's
     week. A secret turn leaves out what was asked too: its content must not outlive it in a log.
+    Who asked and in which session are ids, not content: they let these lines be matched with
+    the app's own in the log store.
     """
+    who = f"member={user_id} session={session_id or 'none'}"
     name = " ".join(tc.name.split())[:60]
     asked = "left out (secret turn)" if is_turn_secret else json.dumps(tc.arguments, default=str)[:LOGGED_ARGUMENTS]
     if result.success:
-        logger.info("Tool %s ok | arguments: %s", name, asked)
+        logger.info("Tool %s ok | arguments: %s | %s", name, asked, who)
         return
     reason = getattr(result, "reason", None)
     logger.warning(
-        "Tool %s failed: %s | reason: %s | arguments: %s",
+        "Tool %s failed: %s | reason: %s | arguments: %s | %s",
         name,
         result.error,
         getattr(reason, "value", reason) or "none",
         asked,
+        who,
     )
 
 
@@ -292,6 +302,7 @@ class ProcessChatTurnUseCase:
             raise ZeroLeakViolationException(
                 "Zero-Leak Privacy violation: You cannot chat in another member's session."
             )
+        logger.info("Turn started | member=%s session=%s", current_user.id, session_id)
 
         if session.is_archived or session.agent_id is None:
             raise InvalidOperationException("Cannot send messages to an archived conversation session.")
@@ -434,6 +445,7 @@ class ProcessChatTurnUseCase:
                         sources=None,
                         offered=agent_tools,
                         timezone_name=timezone_name,
+                        session_id=session_id,
                     )
                     exec_info = {
                         "tool": tc.name,
@@ -497,6 +509,7 @@ class ProcessChatTurnUseCase:
             raise ZeroLeakViolationException(
                 "Zero-Leak Privacy violation: You cannot chat in another member's session."
             )
+        logger.info("Turn started | member=%s session=%s", current_user.id, session_id)
 
         if session.is_archived or session.agent_id is None:
             raise InvalidOperationException("Cannot send messages to an archived conversation session.")
@@ -669,6 +682,7 @@ class ProcessChatTurnUseCase:
         sources: Optional[TurnSources],
         offered: List[Dict[str, Any]],
         timezone_name: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> ToolExecutionResult:
         """
         Runs one tool call. A name the agent can't use - misspelled, or garbled with tool-call markup,
@@ -693,7 +707,7 @@ class ProcessChatTurnUseCase:
                 success=False,
                 error=f"There is no tool '{shown}'. Your tools are: {names}.",
             )
-        _log_call(tc, result, is_turn_secret)
+        _log_call(tc, result, is_turn_secret, user_id, session_id)
         return result
 
     @staticmethod
@@ -1017,6 +1031,7 @@ class ProcessChatTurnUseCase:
             sources=turn.sources,
             offered=turn.agent_tools,
             timezone_name=turn.timezone_name,
+            session_id=turn.session.id,
         )
         summary = summarize_tool(tc.name, shown or tc.arguments, tool_result)
         exec_info = {

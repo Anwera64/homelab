@@ -2,13 +2,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { PORT_TO_SERVICE } = require('../config/homepage/adapt-links.js');
+const { PORT_TO_SERVICE } = require('./service-ports.js');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const WORKFLOW_PATH = path.join(ROOT_DIR, '.github/workflows/caddy-image.yml');
 const PI_COMPOSE_PATH = path.join(ROOT_DIR, 'hosts/pi/docker-compose.yml');
 const PI_CADDYFILE_PATH = path.join(ROOT_DIR, 'hosts/pi/caddy/Caddyfile');
 const PI_ENV_EXAMPLE_PATH = path.join(ROOT_DIR, 'hosts/pi/.env.example');
+const PRE_COMMIT_PATH = path.join(ROOT_DIR, '.githooks/pre-commit');
+const SERVER = '192\\.168\\.1\\.30';
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '');
@@ -66,28 +68,78 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
   await t.test('Pi-local names are served from the Pi', () => {
     assert.match(caddyfile, /@pihole host pihole\.spicy-llama\.duckdns\.org\s*\n\s*handle @pihole \{\s*\n\s*reverse_proxy 127\.0\.0\.1:8081/);
     assert.match(caddyfile, /# Default[^\n]*\n\s*handle \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3000/);
+    // The uptime checks and their alerts run here, so they outlive the server.
+    assert.match(caddyfile, /@uptime host uptime\.spicy-llama\.duckdns\.org\s*\n\s*handle @uptime \{\s*\n\s*reverse_proxy 127\.0\.0\.1:3001\s*\n/);
+    assert.match(caddyfile, /@ntfy host ntfy\.spicy-llama\.duckdns\.org\s*\n\s*handle @ntfy \{\s*\n\s*reverse_proxy 127\.0\.0\.1:2586\s*\n/);
+    assert.doesNotMatch(caddyfile, /192\.168\.1\.30:(3001|2586)\b/, 'neither is on the server');
   });
 
   await t.test('Jellyfin keeps the /emby fallback for old clients', () => {
-    assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.20:8096/);
+    assert.match(caddyfile, /handle @jellyfin \{[\s\S]*?handle_path \/emby\/\* \{\s*\n\s*reverse_proxy 192\.168\.1\.30:8096/);
   });
 
-  await t.test('every desktop service goes to its own published port on the desktop', () => {
+  await t.test('every service goes to its own published port on the server', () => {
     for (const [port, service] of Object.entries(PORT_TO_SERVICE)) {
       assert.match(
         caddyfile,
-        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy 192\\.168\\.1\\.20:${port}\\b`),
-        `${service} must proxy to 192.168.1.20:${port}`
+        new RegExp(`@${service} host ${service}\\.spicy-llama\\.duckdns\\.org[^\\n]*\\n\\s*handle @${service} \\{[\\s\\S]*?reverse_proxy ${SERVER}:${port}\\b`),
+        `${service} must proxy to port ${port} on the server`
       );
     }
-    assert.match(caddyfile, /@hub host hub\.spicy-llama\.duckdns\.org\s*\n\s*handle @hub \{\s*\n\s*reverse_proxy 192\.168\.1\.20:3051/);
+    // The media services left the desktop: a name still sent there answers 502.
+    assert.doesNotMatch(caddyfile, /192\.168\.1\.20/, 'nothing is proxied to the desktop any more');
+    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051`));
   });
 
-  await t.test('plain HTTP on the Pi shows Homepage', () => {
-    assert.match(caddyfile, /http:\/\/192\.168\.1\.35, http:\/\/lemonpi[^{]*\{[^}]*reverse_proxy 127\.0\.0\.1:3000/);
+  await t.test('FlareSolverr, which has no login and no page to use, has no name', () => {
+    assert.doesNotMatch(caddyfile, /flaresolverr/i);
+    assert.doesNotMatch(caddyfile, /:8191\b/);
+  });
+  await t.test('telemetry goes to Alloy only after the hub accepts the sender\'s token', () => {
+    const block = caddyfile.match(/@telemetry host telemetry\.spicy-llama\.duckdns\.org\s*\n\s*handle @telemetry \{\n([\s\S]*?)\n    \}/);
+    assert.ok(block, 'the Caddyfile must route telemetry.spicy-llama.duckdns.org');
+    const body = block[1];
+    // Only log batches: nothing stores traces or metrics, and nothing else of Alloy is exposed.
+    assert.match(body, /@logs \{\s*\n\s*method POST\s*\n\s*path \/v1\/logs\s*\n\s*\}/);
+    // `route` keeps the written order. Without it Caddy runs request_header after forward_auth
+    // and removes the member the hub just named.
+    const guarded = body.match(/handle @logs \{\n(?:\s*#[^\n]*\n)?\s*route \{\n([\s\S]*?)\n            \}\n        \}/);
+    assert.ok(guarded, 'log batches must be handled by an ordered route');
+    const steps = guarded[1];
+    // A sender cannot name the member itself: the header is removed, then set from the hub's answer.
+    const strip = steps.indexOf('request_header -X-Member-Id');
+    // Both the Hub and Alloy are on the server now.
+    const auth = steps.search(/forward_auth 192\.168\.1\.30:3051 \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
+    const proxy = steps.indexOf('reverse_proxy 192.168.1.30:4318');
+    assert.ok(strip >= 0 && auth >= 0 && proxy >= 0, 'strip, forward_auth and reverse_proxy must all be present');
+    assert.ok(strip < auth && auth < proxy, 'strip the header, then ask the hub, then pass to Alloy');
+    assert.match(body, /handle \{\s*\n\s*respond 404\s*\n\s*\}/, 'anything else on this name is refused');
+  });
+
+  await t.test('plain HTTP on the Pi\'s own names redirects to the dashboard\'s HTTPS name', () => {
+    const plain = caddyfile.match(/^http:\/\/192\.168\.1\.35, http:\/\/lemonpi, http:\/\/lemonpi\.lan, http:\/\/lemonpi\.local \{\n([\s\S]*?)\n\}/m);
+    assert.ok(plain, 'the plain HTTP block must cover the Pi\'s address and names');
+    assert.match(plain[1], /^\s*redir https:\/\/home\.spicy-llama\.duckdns\.org\{uri\}\s*$/m);
+    assert.ok(!plain[1].includes('reverse_proxy'), 'plain HTTP must not serve the dashboard itself');
   });
 
   await t.test('.env.example declares the DuckDNS token, empty', () => {
     assert.match(read(PI_ENV_EXAMPLE_PATH), /^DUCKDNS_TOKEN=$/m);
+  });
+
+  await t.test('Maintainerr, which has no login of its own, is behind a Caddy password', () => {
+    const block = caddyfile.match(/handle @maintainerr \{\n([\s\S]*?)\n    \}/);
+    assert.ok(block, 'the Caddyfile must route maintainerr.spicy-llama.duckdns.org');
+    const guard = block[1].search(/basic_auth \{\s*\n\s*\{\$MAINTAINERR_USER\} \{\$MAINTAINERR_PASSWORD_HASH\}\s*\n\s*\}/);
+    const proxy = block[1].indexOf('reverse_proxy');
+    assert.ok(guard >= 0, 'the name must ask for the user and password hash from the Pi\'s .env');
+    assert.ok(guard < proxy, 'the password comes before the proxy');
+    // Caddy does not start on an empty user or hash, so compose refuses first, with a message.
+    for (const name of ['MAINTAINERR_USER', 'MAINTAINERR_PASSWORD_HASH']) {
+      assert.match(caddy, new RegExp(`${name}:\\s*\\$\\{${name}:\\?`), `the caddy service must require ${name}`);
+      assert.match(read(PI_ENV_EXAMPLE_PATH), new RegExp(`^${name}=$`, 'm'), `.env.example must declare ${name}, empty`);
+      assert.match(read(PRE_COMMIT_PATH), new RegExp(`${name}=validate[^\\n]*hosts/pi/docker-compose\\.yml`), `the pre-commit hook must set ${name} to validate the Pi stack`);
+    }
+    assert.match(read(PI_ENV_EXAMPLE_PATH), /caddy hash-password/, '.env.example must say how to make the hash');
   });
 });
