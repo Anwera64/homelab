@@ -673,6 +673,48 @@ async def test_GIVEN_the_server_refuses_the_password_WHEN_an_event_is_changed_or
                 await connector.delete_event(_icloud_credential(), "revoked", "event-123")
 
 
+async def _change_or_remove(operation: str, lookup_error: Exception):
+    """Changes or removes 'test-event-1' on a calendar whose lookup of it raises [lookup_error]."""
+    from app.data.connectors.caldav_calendar_connector import CalDavCalendarConnector
+
+    connector = CalDavCalendarConnector()
+    calendar = MagicMock()
+    calendar.event_by_uid.side_effect = lookup_error
+    with patch.object(connector, "_sync_get_client"), patch.object(connector, "_sync_get_target_calendar", return_value=calendar):
+        if operation == "update":
+            await connector.update_event(_icloud_credential(), "secret", "test-event-1", title="Dentist")
+        else:
+            await connector.delete_event(_icloud_credential(), "secret", "test-event-1")
+
+
+# A made-up ID used to fail with no reason, so the phone had nothing to say about it (#65).
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["update", "delete"])
+async def test_GIVEN_no_event_with_that_id_WHEN_it_is_changed_or_removed_THEN_the_reason_is_not_found(operation):
+    from caldav.lib.error import NotFoundError
+    from app.domain.exceptions import CalendarEventNotFoundException
+
+    with pytest.raises(CalendarEventNotFoundException) as raised:
+        await _change_or_remove(operation, NotFoundError("test-event-1 not found on server"))
+
+    assert raised.value.reason == "not_found"
+    # Written for the model: which ID it was, and where a real one comes from.
+    assert "test-event-1" in raised.value.message
+    assert "calendar_read" in raised.value.message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["update", "delete"])
+async def test_GIVEN_the_lookup_fails_another_way_WHEN_an_event_is_changed_or_removed_THEN_it_is_not_called_missing(operation):
+    from app.domain.exceptions import CalendarEventNotFoundException, CalendarIntegrationException
+
+    with pytest.raises(CalendarIntegrationException) as raised:
+        await _change_or_remove(operation, ConnectionError("connection reset"))
+
+    assert not isinstance(raised.value, CalendarEventNotFoundException)
+    assert getattr(raised.value, "reason", None) is None
+
+
 # A remove or change card names the event it is about, so the hub has to read one event by its ID (#63).
 def _calendar_holding(ical: str) -> MagicMock:
     event = MagicMock()

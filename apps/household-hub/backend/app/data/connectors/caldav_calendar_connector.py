@@ -11,6 +11,7 @@ from app.domain.entities.calendar_event import ALL, THIS_AND_FOLLOWING, Calendar
 from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
+    CalendarEventNotFoundException,
     CalendarIntegrationException,
     CalendarUnreachableException,
     CalendarWriteNotConfirmedException,
@@ -81,6 +82,20 @@ def _real_occurrence(cal_obj: ICalendar, occurrence_start: Optional[datetime], e
             f"Its dates around then: {real or 'none'}. Use one of those as occurrence_start."
         )
     return ical_series.as_moment(found)
+
+
+def _find_event(target_cal, event_id: str, credential: CalendarCredential):
+    """The event a change or a remove is for. One the calendar doesn't have is said as such, with its reason."""
+    try:
+        event = target_cal.event_by_uid(event_id)
+    except NotFoundError:
+        raise CalendarEventNotFoundException(event_id)
+    except Exception as e:
+        _raise_if_refused(e, credential)
+        raise CalendarIntegrationException(f"Could not look up event '{event_id}' on the CalDAV calendar: {str(e)}")
+    if not event:
+        raise CalendarEventNotFoundException(event_id)
+    return event
 
 
 def _read_back(target_cal, uid: str) -> Optional[ICalendar]:
@@ -371,14 +386,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         client = self._sync_get_client(credential, secret)
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
-            try:
-                event = target_cal.event_by_uid(event_id)
-            except Exception as e:
-                _raise_if_refused(e, credential)
-                raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
-
-            if not event:
-                raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar.")
+            event = _find_event(target_cal, event_id, credential)
 
             cal_obj = ICalendar.from_ical(event.data)
             if ical_series.repeats(cal_obj):
@@ -593,11 +601,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         client = self._sync_get_client(credential, secret)
         try:
             target_cal = self._sync_get_target_calendar(client, credential)
-            try:
-                event = target_cal.event_by_uid(event_id)
-            except Exception as e:
-                _raise_if_refused(e, credential)
-                raise CalendarIntegrationException(f"Event '{event_id}' not found on CalDAV calendar: {str(e)}")
+            event = _find_event(target_cal, event_id, credential)
             cal_obj = ICalendar.from_ical(event.data)
             if scope == ALL or not ical_series.repeats(cal_obj):
                 return _remove_whole(target_cal, event, event_id)

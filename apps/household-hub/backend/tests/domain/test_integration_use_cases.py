@@ -621,6 +621,17 @@ async def test_list_available_tools_openai_schemas():
         assert "properties" in t.parameters_schema
 
 
+def test_GIVEN_the_tool_catalog_WHEN_calendar_write_is_offered_THEN_the_model_is_told_where_an_event_id_comes_from():
+    write = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "calendar_write")
+
+    said = write.parameters_schema["properties"]["event_id"]["description"]
+
+    # A model made an ID up, and another time sent a title in its place (#65).
+    assert "calendar_read" in said
+    assert "create" in said
+    assert "guess" in said
+
+
 def test_GIVEN_the_tool_catalog_WHEN_searxng_search_is_offered_THEN_the_model_can_choose_general_or_science():
     search = next(t for t in ListAvailableToolsUseCase().execute() if t.name == "searxng_search")
 

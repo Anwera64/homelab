@@ -140,6 +140,27 @@ class CalendarNotConnectedException(CalendarIntegrationException):
     reason = ToolFailureReason.CALENDAR_NOT_CONNECTED
 
 
+# Said to a model that names an event the calendar doesn't have, or names none (#65).
+READ_THE_CALENDAR_FIRST = (
+    "Never guess an ID: read the calendar with calendar_read and use the id it gives for the event you mean."
+)
+
+
+class CalendarEventNotFoundException(CalendarIntegrationException):
+    """
+    The calendar has no event with the ID a change or a remove named: a model has made one up (#65).
+    The message is for the model, so it says where a real ID comes from.
+    """
+
+    reason = ToolFailureReason.NOT_FOUND
+
+    def __init__(self, event_id: str):
+        super().__init__(
+            f"There is no event with ID '{event_id}' in the calendar, so nothing was changed. "
+            + READ_THE_CALENDAR_FIRST
+        )
+
+
 class CalendarUnreachableException(CalendarIntegrationException):
     """The calendar server could not be reached, or did not answer like a CalDAV server."""
     pass

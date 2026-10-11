@@ -447,7 +447,7 @@ async def test_GIVEN_a_change_with_no_title_WHEN_its_card_is_shown_THEN_it_names
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("lookup", [FakeEventLookup(fails=True), FakeEventLookup(), None])
+@pytest.mark.parametrize("lookup", [FakeEventLookup(fails=True), None])
 async def test_GIVEN_the_event_cannot_be_looked_up_WHEN_its_card_is_shown_THEN_it_is_the_card_as_proposed(lookup):
     use_case, _, _, _ = _setup([[LLMResponseChunk(tool_calls=[REMOVE])]], event_lookup=lookup)
 
@@ -456,6 +456,100 @@ async def test_GIVEN_the_event_cannot_be_looked_up_WHEN_its_card_is_shown_THEN_i
     [proposal] = [ev for ev in events if ev["type"] == "tool_approval_proposal"]
     assert proposal["arguments"] == REMOVE.arguments
     assert events[-1]["type"] == "awaiting_approval"
+
+
+# A remove or a change of an event the calendar doesn't have never reaches a card (#65): the member
+# was asked to approve a made-up ID, and then asked again for the real one.
+GHOST_REMOVE = LLMToolCall(id="g1", name="calendar_write", arguments={"action": "delete", "event_id": "test-event-1"})
+GHOST_MOVE = LLMToolCall(
+    id="g2",
+    name="calendar_write",
+    arguments={"action": "update", "event_id": "test-event-1", "start_time": "2026-10-01T10:00:00"},
+)
+NAMELESS_REMOVE = LLMToolCall(id="g3", name="calendar_write", arguments={"action": "delete", "title": "Test Event"})
+
+
+def _told(llm_client, round_index, tool_call_id):
+    """What the model reads in [round_index] as the result of the call [tool_call_id]."""
+    [message] = [
+        m for m in llm_client.stream_calls[round_index]["messages"] if m.role == "tool" and m.tool_call_id == tool_call_id
+    ]
+    return json.loads(message.content)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ghost", [GHOST_REMOVE, GHOST_MOVE])
+async def test_GIVEN_an_event_the_calendar_does_not_have_WHEN_it_is_removed_or_changed_THEN_no_card_is_shown_and_the_model_is_told(ghost):
+    use_case, session_repo, llm_client, tool_executor = _setup(
+        [[LLMResponseChunk(tool_calls=[ghost])], [LLMResponseChunk(delta_content="Let me look that up.")]],
+        event_lookup=FakeEventLookup([_test_event()]),
+    )
+
+    events = await _ask_from(use_case, "Europe/Madrid")
+
+    # Nothing for the member: no card to answer, and no step saying something failed.
+    assert not [ev for ev in events if ev["type"] in ("tool_approval_proposal", "awaiting_approval")]
+    assert not [ev for ev in events if ev["type"].startswith("tool_")]
+    assert events[-1]["type"] == "done"
+    [answer] = _answers(session_repo)
+    assert [part["type"] for part in answer.metadata_json["parts"]] == ["text"]
+    # Never run to find out: only a card may remove something.
+    assert tool_executor.executed_calls == []
+    # The model is told, and goes on in the same turn.
+    error = _told(llm_client, 1, ghost.id)["error"]
+    assert "test-event-1" in error and "calendar_read" in error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lookup", [FakeEventLookup([_test_event()]), None])
+async def test_GIVEN_a_remove_that_names_no_id_WHEN_the_model_asks_for_it_THEN_no_card_is_shown_and_the_model_is_told(lookup):
+    use_case, _, llm_client, tool_executor = _setup(
+        [[LLMResponseChunk(tool_calls=[NAMELESS_REMOVE])], [LLMResponseChunk(delta_content="Let me look that up.")]],
+        event_lookup=lookup,
+    )
+
+    events = await _ask_from(use_case, "Europe/Madrid")
+
+    assert not [ev for ev in events if ev["type"] in ("tool_approval_proposal", "awaiting_approval")]
+    assert tool_executor.executed_calls == []
+    error = _told(llm_client, 1, "g3")["error"]
+    assert "event_id" in error and "calendar_read" in error
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_real_write_and_one_for_no_event_WHEN_the_real_one_is_approved_THEN_the_model_reads_a_result_for_both():
+    use_case, session_repo, llm_client, tool_executor = _setup(
+        [[LLMResponseChunk(tool_calls=[GHOST_REMOVE, DINNER])], [LLMResponseChunk(delta_content="Dinner is in.")]],
+        event_lookup=FakeEventLookup([_test_event()]),
+    )
+
+    events = await _ask_from(use_case, "Europe/Madrid")
+
+    assert [ev["tool_call_id"] for ev in events if ev["type"] == "tool_approval_proposal"] == ["c1"]
+    assert events[-1]["type"] == "awaiting_approval"
+    [answer] = _answers(session_repo)
+    assert [part["type"] for part in answer.metadata_json["parts"]] == ["proposal"]
+
+    await _decide(use_case, "c1", approved=True)
+
+    assert [call["args"] for call in tool_executor.executed_calls] == [DINNER.arguments]
+    assert "test-event-1" in _told(llm_client, 1, "g1")["error"]
+    assert _told(llm_client, 1, "c1") == {"result": "ok"}
+
+
+def test_GIVEN_a_write_for_no_event_WHEN_it_is_refused_THEN_the_hubs_log_says_why(caplog):
+    import asyncio
+
+    use_case, _, _, _ = _setup(
+        [[LLMResponseChunk(tool_calls=[GHOST_REMOVE])], [LLMResponseChunk(delta_content="Let me look that up.")]],
+        event_lookup=FakeEventLookup([_test_event()]),
+    )
+
+    with caplog.at_level("WARNING"):
+        asyncio.run(_ask_from(use_case, "Europe/Madrid"))
+
+    [line] = [record.getMessage() for record in caplog.records if "calendar_write failed" in record.getMessage()]
+    assert "reason: not_found" in line and "test-event-1" in line
 
 
 @pytest.mark.asyncio
