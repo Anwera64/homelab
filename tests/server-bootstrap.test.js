@@ -95,9 +95,18 @@ test('Server bootstrap script', async (t) => {
       assert.match(script, new RegExp(`${key}=ignore`));
     }
     assert.match(script, /\/etc\/systemd\/logind\.conf\.d\//);
-    assert.match(script, /consoleblank=60/);
-    assert.match(script, /grep -q consoleblank \/etc\/default\/grub/, 'the kernel option is added once');
+    assert.match(script, /^for option in [^\n]*\bconsoleblank=60\b[^\n]*; do$/m);
     assert.match(script, /update-grub/);
+  });
+
+  await t.test('the NVIDIA driver drives the console, so a blank panel is powered off', () => {
+    // The EFI console only paints the panel black: its backlight stayed lit (Oct 2026).
+    const loop = at(script, /^for option in [^\n]*\bnvidia-drm\.modeset=1 nvidia-drm\.fbdev=1; do$/m);
+    const regenerate = script.indexOf('update-grub', loop);
+    const block = script.slice(loop, regenerate);
+    assert.match(block, /grep -qF -- "\$\{option%%=\*\}=" \/etc\/default\/grub/, 'each kernel option is added once');
+    assert.match(block, /GRUB_CMDLINE_LINUX_DEFAULT[^\n]* \$option\\"/, 'the options go on the kernel command line');
+    assert.match(script.slice(regenerate, script.indexOf('\nfi\n', regenerate)), /REBOOT_PENDING=1/, 'the options only apply after a reboot');
   });
 
   await t.test('SSH takes keys only, and never locks out a user without one', () => {
@@ -113,7 +122,7 @@ test('Server bootstrap script', async (t) => {
     const end = at(script, '# <<< laptop');
     const section = script.slice(start, end);
     const outside = script.slice(0, start) + script.slice(end);
-    for (const marker of ['nouveau', 'nvidia-kernel-dkms', 'HandleLidSwitch', 'consoleblank', 'server-battery']) {
+    for (const marker of ['nouveau', 'nvidia-kernel-dkms', 'HandleLidSwitch', 'consoleblank', 'nvidia-drm.modeset', 'server-battery']) {
       assert.ok(section.includes(marker), `${marker} belongs in the laptop section`);
       assert.ok(!outside.includes(marker), `${marker} must not appear outside the laptop section`);
     }

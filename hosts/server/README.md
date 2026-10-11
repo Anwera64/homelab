@@ -57,6 +57,10 @@ If the network is down after the install, the radios are probably in airplane mo
 
 The open-source `nouveau` driver hangs this GPU when it wakes it up. That freezes `lspci`, and with it the NVIDIA package install, until the machine is reset. So the script blocks `nouveau`, stops and asks for a reboot, and only installs the NVIDIA packages on the next run.
 
+### Why the NVIDIA driver drives the console
+
+The laptop stays open so it can ventilate, and `consoleblank=60` blanks the console after a minute. On the plain EFI console that only paints the panel black: its backlight stays lit. So the script also puts `nvidia-drm.modeset=1 nvidia-drm.fbdev=1` on the kernel command line. The NVIDIA driver then drives the console, and a blank console powers the panel off. To check, `cat /proc/fb` shows `nvidia-drmdrmfb` instead of `EFI VGA`.
+
 ## Updating
 
 Every image in `docker-compose.yml` is pinned to a release, so the repo says what runs here. Renovate opens a bump PR once a release is three days old:
