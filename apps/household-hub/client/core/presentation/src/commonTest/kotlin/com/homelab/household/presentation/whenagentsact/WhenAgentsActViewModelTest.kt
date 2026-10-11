@@ -179,6 +179,7 @@ class WhenAgentsActViewModelTest {
             val state = viewModel.uiState.value
             assertEquals(true, state.approval(HubTool.CALENDAR_WRITE, ToolAction.Create).automatic)
             assertEquals(SaveFailure.Unreachable, state.saveFailure)
+            assertEquals(ToolGroup.Calendar, state.saveFailureIn, "said beside the switch that went back")
         }
 
     @Test

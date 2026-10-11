@@ -56,14 +56,19 @@ class WhenAgentsActViewModel(
         if (alwaysAsks(action)) return
         val before = _uiState.value.groups
         _uiState.update { state ->
-            state.copy(groups = state.groups.withSwitch(tool, action, automatic), saveFailure = null)
+            state.copy(
+                groups = state.groups.withSwitch(tool, action, automatic),
+                saveFailure = null,
+                saveFailureIn = null,
+            )
         }
         viewModelScope.launch {
             runCatchingSafe { setToolApproval(tool, action, automatic) }.fold(
                 onSuccess = { approvals -> _uiState.update { it.copy(groups = groupsOf(approvals)) } },
                 onFailure = { error ->
                     val failure = if (error is ServerOfflineException) SaveFailure.Unreachable else SaveFailure.Failed
-                    _uiState.update { it.copy(groups = before, saveFailure = failure) }
+                    val group = before.firstOrNull { card -> card.approvals.any { it.tool == tool } }?.group
+                    _uiState.update { it.copy(groups = before, saveFailure = failure, saveFailureIn = group) }
                 },
             )
         }

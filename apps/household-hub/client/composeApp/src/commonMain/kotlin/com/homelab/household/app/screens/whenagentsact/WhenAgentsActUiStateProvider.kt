@@ -42,6 +42,7 @@ class WhenAgentsActUiStateProvider : PreviewParameterProvider<WhenAgentsActUiSta
                     status = WhenAgentsActStatus.Ready,
                     groups = groups,
                     saveFailure = SaveFailure.Unreachable,
+                    saveFailureIn = ToolGroup.Calendar,
                 ),
         )
 

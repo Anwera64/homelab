@@ -8,6 +8,8 @@ data class WhenAgentsActUiState(
     val groups: List<ToolApprovalGroup> = emptyList(),
     /** The last switch the hub wouldn't save. It has already gone back to what the hub has. */
     val saveFailure: SaveFailure? = null,
+    /** The card holding that switch, so the line is said beside it rather than at the foot of the page. */
+    val saveFailureIn: ToolGroup? = null,
 )
 
 enum class WhenAgentsActStatus {

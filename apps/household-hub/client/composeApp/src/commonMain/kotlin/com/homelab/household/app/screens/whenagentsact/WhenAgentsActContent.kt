@@ -121,16 +121,16 @@ fun WhenAgentsActContent(
             }
 
             state.groups.forEach { group ->
-                Section(title = stringResource(group.group.title())) {
+                val failure = state.saveFailure?.takeIf { state.saveFailureIn == group.group }
+                Section(
+                    title = stringResource(group.group.title()),
+                    failure = failure?.let { stringResource(it.words()) },
+                ) {
                     group.approvals.forEachIndexed { index, approval ->
                         if (index > 0) HorizontalDivider(color = colors.outlineSoft)
                         WriteRow(approval = approval, onToggle = onToggle)
                     }
                 }
-            }
-
-            state.saveFailure?.let { failure ->
-                Text(stringResource(failure.words()), style = type.caption, color = colors.error)
             }
 
             if (state.status == WhenAgentsActStatus.Unreachable || state.status == WhenAgentsActStatus.Failed) {
@@ -166,6 +166,7 @@ private fun Section(
     title: String,
     modifier: Modifier = Modifier,
     note: String? = null,
+    failure: String? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = HearthTheme.colors
@@ -184,6 +185,14 @@ private fun Section(
                 modifier = Modifier.padding(start = HearthTheme.spacing.xs),
                 style = type.caption,
                 color = colors.textMuted,
+            )
+        }
+        if (failure != null) {
+            Text(
+                failure,
+                modifier = Modifier.padding(start = HearthTheme.spacing.xs),
+                style = type.caption,
+                color = colors.error,
             )
         }
     }
