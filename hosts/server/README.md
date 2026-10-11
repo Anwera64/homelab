@@ -152,18 +152,31 @@ qBittorrent reaches the internet only through Gluetun. The provider and its opti
 | `VPN_COUNTRY` | `United States` | The country of the VPN server. |
 | `VPN_PORT_FORWARDING` | `off` | `on` asks the provider for a port other peers can reach qBittorrent on. |
 | `VPN_PORT_FORWARD_ONLY` | `off` | `on` uses only the servers that forward ports. |
+| `VPN_SERVER_HOSTNAMES` | empty | The servers to use within the country, by hostname, comma-separated (for example `node-nl-01.protonvpn.net,node-nl-02.protonvpn.net`). Empty means any server. |
 
 NordVPN forwards no ports. ProtonVPN does on its paid plans: generate a WireGuard configuration on its site with "NAT-PMP (Port Forwarding)" ticked and copy its `PrivateKey`.
 
-After a change, recreate both containers together, because qBittorrent has Gluetun's network:
+After a change, recreate the containers together, because qBittorrent and FlareSolverr have Gluetun's network:
 
 ```bash
-cd ~/homelab/hosts/server && docker compose up -d --force-recreate gluetun qbittorrent
+cd ~/homelab/hosts/server && docker compose up -d --force-recreate gluetun flaresolverr qbittorrent
 ```
 
 With port forwarding on, the port changes at every connection and Gluetun gives it to qBittorrent. For that, tick "Bypass authentication for clients on localhost" in qBittorrent (Options → Web UI): Gluetun is qBittorrent's localhost. Then confirm from another machine that the Web UI still asks for the password.
 
-Going back to a provider without port forwarding: untick that box again, and in qBittorrent set the listening port back to 6881. Gluetun resets the port to 0 when forwarding stops; with a fixed port provider, set it back to 6881 so inbound connections reach qBittorrent directly.
+Going back to a provider without port forwarding: untick that box again, in qBittorrent set Advanced → Network interface back to "Any" (the up command leaves it on the VPN's interface), and set the listening port back to 6881. Gluetun resets the port to 0 when forwarding stops; with a fixed port provider, set it back to 6881 so inbound connections reach qBittorrent directly.
+
+### The VPN watchdog
+
+Some ProtonVPN servers refuse the forwarded port or lose it every few minutes, and Gluetun does not retry after a refusal at its start. Gluetun cannot leave servers out, so the good ones are named in `VPN_SERVER_HOSTNAMES`. `server-vpn-watchdog.timer` runs `server-vpn-watchdog.sh` every minute. It does nothing unless `VPN_PORT_FORWARDING` is `on` in `.env`.
+
+| It sees | It does |
+|---|---|
+| No forwarded port for ten minutes, or the port lost more than six times in an hour | Recreates gluetun, flaresolverr and qbittorrent together (qbittorrent only while the media disk is mounted). Gluetun then picks a server again. |
+| After three recreations that brought no port | Lets Gluetun use any server in the country, ignoring `VPN_SERVER_HOSTNAMES`. It goes back to the named servers at 04:00. |
+| Six recreations in a row without a port | Tries only once an hour, because each recreate restarts qBittorrent. |
+
+Each recreate is one line in the journal: `journalctl -u server-vpn-watchdog.service`. The Downloads dashboard counts them. To switch it off: `sudo systemctl disable --now server-vpn-watchdog.timer`.
 
 ### HTTP proxy for indexers
 
@@ -239,11 +252,12 @@ Also in Grafana, named "Downloads", opening on the last 7 days. It shows how fas
 | Average download, Peak download, Average upload | Three numbers for the period picked at the top right. The peak is the fastest two minutes. |
 | Download, Upload | The speed over time, side by side. |
 | Wi-Fi band | A strip: green on 5 GHz, orange on 2.4 GHz, where the card is several times slower. |
-| Connectable | A strip: green while other peers can reach qBittorrent's forwarded port, red while they cannot ("firewalled"). |
+| Connectable | A strip: what qBittorrent says about being reachable, green or red ("firewalled"). It can stay green on a port nobody forwards. |
+| Port forwarded | A strip: green while Gluetun holds a forwarded port, red while it has none. |
 | Peer connections | How many peers qBittorrent is connected to. |
-| Markers | Blue when the VPN connected (or changed server), red when Gluetun's port forwarding failed. Both are read from Gluetun's log and can be switched off at the top. |
+| Markers | Blue when the VPN connected (or changed server), red when port forwarding failed (every failure Gluetun logs), orange when the watchdog recreated the VPN. They can be switched off at the top. |
 
-The speeds, the peers and "connectable" are qBittorrent's own numbers. `server-metrics.sh` reads them once a minute through Gluetun, with no login of its own: that works while "Bypass authentication for clients on localhost" is ticked in qBittorrent (see "VPN provider"). When qBittorrent does not answer, the script writes `server_qbittorrent_up 0` and those panels stay empty. A loss of the port shorter than a minute can fall between two readings of "Connectable"; the red markers are exact.
+The speeds, the peers and "connectable" are qBittorrent's own numbers. `server-metrics.sh` reads them once a minute through Gluetun, with no login of its own: that works while "Bypass authentication for clients on localhost" is ticked in qBittorrent (see "VPN provider"). When qBittorrent does not answer, the script writes `server_qbittorrent_up 0` and those panels stay empty. "Port forwarded" is Gluetun's own answer (its port file), read once a minute by `server-metrics.sh`. A loss of the port shorter than a minute can fall between two readings of "Connectable"; the red markers are exact.
 
 The Wi-Fi band comes from the node exporter's Wi-Fi collector.
 

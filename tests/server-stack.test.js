@@ -503,9 +503,12 @@ test('Server README', async (t) => {
       assert.ok(section[1].includes(`\`${name}\``), `it must name ${name}`);
     }
     assert.match(section[1], /NAT-PMP/, 'the ProtonVPN key must be made with port forwarding on');
-    // qBittorrent has Gluetun's network: one recreated without the other loses it.
-    assert.match(section[1], /docker compose up -d --force-recreate gluetun qbittorrent/);
+    // qBittorrent and FlareSolverr have Gluetun's network: one recreated without the others loses it.
+    assert.match(section[1], /docker compose up -d --force-recreate gluetun flaresolverr qbittorrent/);
+    assert.doesNotMatch(section[1], /--force-recreate gluetun qbittorrent/);
     assert.match(section[1], /Bypass authentication for clients on localhost/);
+    // Going back to a provider without forwarding: the up command left qBittorrent on the VPN's interface.
+    assert.match(section[1], /Network interface[^\n]*"Any"/);
     // The checklist no longer says to untick both boxes whatever the VPN does.
     const logins = readme.match(/## App logins\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
     const qbit = logins.split('\n').find((line) => line.startsWith('- [ ] qBittorrent'));
@@ -513,11 +516,43 @@ test('Server README', async (t) => {
     assert.match(qbit, /port forwarding/, 'the localhost box depends on port forwarding');
   });
 
+  await t.test('says which VPN servers are used, and what the watchdog does when one does not hold a port', () => {
+    const section = readme.match(/## VPN provider\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    assert.ok(section.includes('`VPN_SERVER_HOSTNAMES`'), 'the variable that names the servers');
+    const watchdog = section.match(/### The VPN watchdog\n([\s\S]*?)(?=\n### |(?![\s\S]))/);
+    assert.ok(watchdog, 'the VPN provider section must have a part for the watchdog');
+    assert.ok(watchdog[1].includes('server-vpn-watchdog'));
+    // What sets it off, what it does, how it widens and comes back, and how it slows down.
+    assert.match(watchdog[1], /ten minutes/);
+    assert.match(watchdog[1], /six times/);
+    assert.match(watchdog[1], /gluetun.*flaresolverr.*qbittorrent/s);
+    assert.match(watchdog[1], /three/);
+    assert.match(watchdog[1], /04:00/);
+    assert.match(watchdog[1], /once an hour/);
+    // How to switch it off, and that a provider without forwarding does so by itself.
+    assert.match(watchdog[1], /systemctl disable --now server-vpn-watchdog\.timer/);
+    assert.match(watchdog[1], /`VPN_PORT_FORWARDING`/);
+  });
+
+  await t.test('.env.example says the HTTP proxy is on unless switched off', () => {
+    const envExample = read(path.join(SERVER_DIR, '.env.example'));
+    assert.match(envExample, /^# HTTPPROXY=on$/m);
+    assert.doesNotMatch(envExample, /^# Optional\. HTTP proxy/m, 'it is not something to opt into');
+    assert.match(envExample, /On by default[^\n]*\n# [^\n]*off/i);
+  });
+
+  await t.test('the roadmap no longer says FlareSolverr runs outside the VPN', () => {
+    const roadmap = read(path.join(ROOT_DIR, 'ROADMAP.md'));
+    assert.ok(roadmap.includes('FlareSolverr'));
+    assert.doesNotMatch(roadmap, /avoid VPN blacklisting|FlareSolverr - Direct DNS/);
+  });
+
   await t.test('says what the Downloads dashboard shows, where its numbers come from and when they stop', () => {
     const section = readme.match(/## The downloads dashboard\n([\s\S]*?)(?=\n## |(?![\s\S]))/);
     assert.ok(section, 'the README must have a section for the downloads dashboard');
     assert.ok(section[1].includes('config/grafana/dashboards/downloads.json'));
-    for (const shown of ['Average download', 'Peak download', 'Average upload', 'Wi-Fi band', 'Connectable', 'Peer connections']) {
+    assert.match(section[1], /watchdog/i, 'the marker for the watchdog');
+    for (const shown of ['Average download', 'Peak download', 'Average upload', 'Wi-Fi band', 'Connectable', 'Port forwarded', 'Peer connections']) {
       assert.ok(section[1].includes(shown), `it must name ${shown}`);
     }
     assert.match(section[1], /megabits/i);
