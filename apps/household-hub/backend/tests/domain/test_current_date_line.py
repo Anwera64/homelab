@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.domain.use_cases.chat.current_date_line import current_date_line, sent_at_stamp
+from app.domain.use_cases.chat.current_date_line import current_date_line, sent_at_stamp, today_line
 
 
 NOW = datetime(2026, 9, 24, 20, 5, 42, tzinfo=timezone.utc)
@@ -52,3 +52,30 @@ def test_a_time_stored_without_a_zone_is_read_as_utc():
 def test_a_stamp_with_an_unusable_timezone_is_in_utc():
     sent = datetime(2026, 9, 21, 14, 14, tzinfo=timezone.utc)
     assert sent_at_stamp(sent, "Mars/Olympus") == "Mon 21 Sep 2026, 14:14"
+
+
+STAMP_NOTE = (
+    "Each of the member's messages begins with when it was sent, and the newest one is the time now. "
+    "Don't begin your own replies with a time."
+)
+
+
+def test_today_line_gives_the_date_without_the_time():
+    """The time changes every minute and would throw away the cached prompt after it (#79)."""
+    assert today_line(NOW, "America/Mexico_City") == (
+        f"Today is Thursday, 24 September 2026 (America/Mexico_City). {STAMP_NOTE}"
+    )
+
+
+def test_today_line_moves_with_the_timezone():
+    assert today_line(NOW, "Asia/Tokyo").startswith("Today is Friday, 25 September 2026 (Asia/Tokyo).")
+
+
+def test_today_line_falls_back_to_utc_and_says_so():
+    assert today_line(NOW, "Mars/Olympus").startswith("Today is Thursday, 24 September 2026 (UTC).")
+
+
+def test_today_line_stays_the_same_all_day():
+    first_thing = NOW.replace(hour=0, minute=0, second=0)
+    last_thing = NOW.replace(hour=23, minute=59, second=59)
+    assert today_line(first_thing, "UTC") == today_line(last_thing, "UTC")

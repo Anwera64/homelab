@@ -39,7 +39,8 @@ def _local(when: datetime, timezone_name: Optional[str]) -> Tuple[datetime, str]
 
 def current_date_line(now: datetime, timezone_name: Optional[str]) -> str:
     """
-    Today's date and time as the phone's owner would read it, for the top of a prompt.
+    Today's date and time as the phone's owner would read it, for the top of a one-off prompt.
+    A chat uses today_line instead, which leaves the time out so its cache survives the minute.
 
     Without it the model answers from its training cutoff (#39). The timezone is the one the phone
     sent; one the hub can't resolve becomes UTC, and the line says so rather than passing UTC off
@@ -49,6 +50,22 @@ def current_date_line(now: datetime, timezone_name: Optional[str]) -> str:
     return (
         f"Today is {_WEEKDAYS[local.weekday()]}, {local.day} {_MONTHS[local.month - 1]} {local.year}, "
         f"{local:%H:%M} ({label})."
+    )
+
+
+def today_line(now: datetime, timezone_name: Optional[str]) -> str:
+    """
+    Today's date without the time, for the top of a chat's system prompt.
+
+    The time of day changed every minute, and Ollama re-read everything cached after it (#79). The
+    chat tells the model the time through its messages instead, each stamped with when it was
+    sent, so this line only changes once a day.
+    """
+    local, label = _local(now, timezone_name)
+    return (
+        f"Today is {_WEEKDAYS[local.weekday()]}, {local.day} {_MONTHS[local.month - 1]} {local.year} "
+        f"({label}). Each of the member's messages begins with when it was sent, and the newest one "
+        "is the time now. Don't begin your own replies with a time."
     )
 
 
