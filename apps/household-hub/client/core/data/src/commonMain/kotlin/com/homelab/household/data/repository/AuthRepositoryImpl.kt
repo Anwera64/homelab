@@ -20,14 +20,20 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
+
+/** How long signing out waits for the hub before the phone forgets the member anyway. */
+private val SIGN_OUT_WAIT = 3.seconds
 
 /**
  * Orchestration and mapping. Every call goes out through [remote], every DTO becomes a domain model
  * here, and what this phone keeps — its token and the member it belongs to — lives in [storage].
  * Nothing in this file knows that the hub speaks HTTP.
  *
- * Signing in and signing out are logged through [log], and those lines are sent off the phone. They
- * say that it happened and never who: the collector reads the member off the token itself.
+ * Signing in is logged through [log], and that line is sent off the phone. It says that it happened
+ * and never who: the collector reads the member off the token itself. Signing out is not logged
+ * here — by the time the line could be sent the token is gone — so the hub logs it when it is told.
  */
 class AuthRepositoryImpl(
     private val remote: AuthRemoteDataSource,
@@ -90,10 +96,21 @@ class AuthRepositoryImpl(
 
     override fun hasStoredSession(): Boolean = storage.getAccessToken() != null
 
-    /** One call: the token and the member it belongs to are kept in the same place. */
+    /**
+     * The hub is told first, while the token is still here to say who is asking: that is what stops
+     * the hub accepting it, and the hub logs the sign-out. Then the phone forgets — one call, because
+     * the token and the member it belongs to are kept in the same place.
+     *
+     * The phone forgets whatever the hub says, and after [SIGN_OUT_WAIT] if it says nothing: signing
+     * out has to work with no hub in reach. The token then lasts until it expires.
+     */
     override suspend fun logout() {
-        storage.clear()
-        log.i { "Signed out" }
+        try {
+            val kept = storage.getAccessToken() ?: return
+            withTimeoutOrNull(SIGN_OUT_WAIT) { runCatchingSafe { remote.signOut(kept) } }
+        } finally {
+            storage.clear()
+        }
     }
 
     override fun observeSignedOut(): Flow<Unit> = events.observeSignedOut()

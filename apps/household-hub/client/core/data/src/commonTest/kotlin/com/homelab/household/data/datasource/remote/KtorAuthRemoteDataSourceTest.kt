@@ -558,6 +558,50 @@ class KtorAuthRemoteDataSourceTest {
             assertFailsWith<ServerOfflineException> { dataSource(engine).renew("kept-token") }
         }
 
+    // ---- signOut -----------------------------------------------------------
+
+    @Test
+    fun `GIVEN a token kept on this phone WHEN it signs out THEN the hub is told with that token`() =
+        runTest {
+            // GIVEN
+            var path: String? = null
+            var sentWith: String? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    sentWith = request.headers[HttpHeaders.Authorization]
+                    respond("", HttpStatusCode.NoContent)
+                }
+
+            // WHEN
+            dataSource(engine).signOut("kept-token")
+
+            // THEN
+            assertEquals("/api/v1/auth/logout", path)
+            assertEquals("Bearer kept-token", sentWith)
+        }
+
+    @Test
+    fun `GIVEN a token the hub has stopped accepting WHEN it signs out THEN it is unauthorized`() =
+        runTest {
+            // GIVEN
+            val engine =
+                MockEngine { respondJson("""{"detail": "Invalid or expired token."}""", HttpStatusCode.Unauthorized) }
+
+            // WHEN / THEN
+            assertFailsWith<UnauthorizedException> { dataSource(engine).signOut("revoked-token") }
+        }
+
+    @Test
+    fun `GIVEN the hub cannot be reached WHEN a phone signs out THEN it is reported as offline`() =
+        runTest {
+            // GIVEN
+            val engine = unreachableHub()
+
+            // WHEN / THEN
+            assertFailsWith<ServerOfflineException> { dataSource(engine).signOut("kept-token") }
+        }
+
     // ---- fetchCurrentUser --------------------------------------------------
 
     @Test
