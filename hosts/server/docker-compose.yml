@@ -75,7 +75,7 @@ services:
   # ==============================================================================
   qbittorrent:
     profiles: ["media"]
-    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls479
+    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480
     container_name: qbittorrent
     network_mode: "service:gluetun"
     environment:
@@ -115,7 +115,7 @@ services:
   # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
   # ==============================================================================
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls162
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls163
     container_name: prowlarr
     ports:
       - 9696:9696
@@ -132,7 +132,7 @@ services:
 
   radarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls319
+    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls320
     container_name: radarr
     ports:
       - 7878:7878
@@ -150,7 +150,7 @@ services:
 
   sonarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls326
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls327
     container_name: sonarr
     ports:
       - 8989:8989
@@ -168,7 +168,7 @@ services:
 
   bazarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/bazarr:v1.6.2-ls366
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls367
     container_name: bazarr
     ports:
       - 6767:6767
@@ -306,7 +306,7 @@ services:
   # ==============================================================================
   cleanuparr:
     profiles: ["media"]
-    image: ghcr.io/cleanuparr/cleanuparr:2.10.8
+    image: ghcr.io/cleanuparr/cleanuparr:2.10.9
     container_name: cleanuparr
     ports:
       - 11011:11011
@@ -353,7 +353,7 @@ services:
   # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
-    image: searxng/searxng:2026.10.4-d48c4b555
+    image: searxng/searxng:2026.10.11-ad46ebd7d
     container_name: searxng
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
@@ -367,7 +367,7 @@ services:
   # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
   # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
   ollama:
-    image: ollama/ollama:0.35.1
+    image: ollama/ollama:0.40.3
     container_name: ollama
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -510,7 +510,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.141.0
+    image: renovate/renovate:44.151.0
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -572,7 +572,7 @@ services:
 
   # SMART needs the raw devices, hence privileged. A disk in standby is not woken.
   smartctl-exporter:
-    image: prometheuscommunity/smartctl-exporter:v0.14.0
+    image: prometheuscommunity/smartctl-exporter:v0.15.0
     container_name: smartctl-exporter
     privileged: true
     user: root
