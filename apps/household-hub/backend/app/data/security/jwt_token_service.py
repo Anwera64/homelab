@@ -18,6 +18,7 @@ class JwtTokenService(ITokenService):
         is_admin: bool,
         token_version: int,
         expires_delta: Optional[timedelta] = None,
+        session_id: Optional[str] = None,
     ) -> str:
         now = datetime.now(timezone.utc)
         if expires_delta:
@@ -32,6 +33,9 @@ class JwtTokenService(ITokenService):
             "exp": expire,
             "iat": now,
         }
+        # The device this token was signed in on. Tokens from before #94 have none.
+        if session_id:
+            to_encode["sid"] = session_id
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
     def decode_token(self, token: str) -> Dict[str, Any]:

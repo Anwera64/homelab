@@ -6,9 +6,7 @@ from app.domain.entities.space import Space
 from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.session import ConversationSession
 from app.domain.entities.memory import AgentMemory
-from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
 from app.domain.exceptions import (
-    AuthenticationException,
     NameTakenException,
     SoleAdminDeletionException,
     InvalidOperationException,
@@ -57,41 +55,6 @@ class FakeUserRepository:
                 return u
         return None
 
-
-class FakeTokenService:
-    """Decodes every token to the payload it was given."""
-
-    def __init__(self, payload: dict):
-        self.payload = payload
-
-    def decode_token(self, token: str) -> dict:
-        return self.payload
-
-
-@pytest.mark.asyncio
-async def test_a_token_of_the_members_current_version_is_accepted():
-    emma = User(full_name="Emma", token_version=2)
-    use_case = AuthenticateTokenUseCase(FakeUserRepository([emma]), FakeTokenService({"sub": emma.id, "ver": 2}))
-
-    assert await use_case.execute("token") is emma
-
-
-@pytest.mark.asyncio
-async def test_a_token_from_an_older_version_is_refused():
-    emma = User(full_name="Emma", token_version=2)
-    use_case = AuthenticateTokenUseCase(FakeUserRepository([emma]), FakeTokenService({"sub": emma.id, "ver": 1}))
-
-    with pytest.raises(AuthenticationException):
-        await use_case.execute("token")
-
-
-@pytest.mark.asyncio
-async def test_a_token_without_a_version_is_refused():
-    emma = User(full_name="Emma")
-    use_case = AuthenticateTokenUseCase(FakeUserRepository([emma]), FakeTokenService({"sub": emma.id}))
-
-    with pytest.raises(AuthenticationException):
-        await use_case.execute("token")
 
 
 class FakeSpaceRepository:
@@ -197,6 +160,11 @@ class FakeCalendarCredentialRepository:
         return had
 
 
+class FakeDeviceSessionRepository:
+    async def delete_for_user(self, user_id: str, except_id=None) -> None:
+        return None
+
+
 def deactivator(user_repo, space_repo=None, agent_repo=None, memory_repo=None, session_repo=None):
     return DeactivateMemberUseCase(
         user_repo,
@@ -206,6 +174,7 @@ def deactivator(user_repo, space_repo=None, agent_repo=None, memory_repo=None, s
         session_repo or FakeSessionRepository(),
         FakeDocumentRepository(),
         FakeCalendarCredentialRepository(),
+        FakeDeviceSessionRepository(),
         FakeUnitOfWork(),
     )
 

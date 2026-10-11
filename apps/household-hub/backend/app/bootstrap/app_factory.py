@@ -13,6 +13,7 @@ from app.bootstrap.di import setup_dependency_injection, get_container
 from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUseCase
 from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCase
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
+from app.domain.use_cases.auth.purge_expired_device_sessions import PurgeExpiredDeviceSessionsUseCase
 from app import __version__
 
 logger = logging.getLogger("household_hub.bootstrap")
@@ -46,6 +47,7 @@ async def periodic_trash_purger(interval_seconds: int = 3600):
                 purged_ids = await container[PurgeExpiredTrashAgentsUseCase].execute()
                 if purged_ids:
                     logger.info("Periodic trash purger archived & cleaned up %d expired agents: %s", len(purged_ids), purged_ids)
+                await container[PurgeExpiredDeviceSessionsUseCase].execute()
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -64,6 +66,7 @@ async def lifespan(app: FastAPI):
             await container[SeedBuiltinAgentsUseCase].execute()
             await container[pres_deps.get_shared_space_use_case].execute()
             await container[PurgeExpiredTrashAgentsUseCase].execute()
+            await container[PurgeExpiredDeviceSessionsUseCase].execute()
         bg_task = asyncio.create_task(periodic_trash_purger())
 
     try:

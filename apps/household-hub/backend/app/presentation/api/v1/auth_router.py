@@ -12,15 +12,19 @@ from app.domain.use_cases.auth.get_auth_status import GetAuthStatusUseCase
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.auth.login import LoginUseCase
+from app.domain.use_cases.auth.authenticate_token import SignedInMember
 from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
 from app.domain.use_cases.auth.redeem_pin_reset import RedeemPinResetUseCase
+from app.domain.use_cases.auth.sign_out import SignOutUseCase
 from app.presentation.api.deps import (
     get_auth_status_use_case,
     get_list_public_members_use_case,
     get_register_initial_admin_use_case,
     get_login_use_case,
     get_refresh_token_use_case,
+    get_sign_out_use_case,
     get_redeem_pin_reset_use_case,
+    get_current_sign_in,
     get_current_user,
 )
 
@@ -77,14 +81,28 @@ async def login(
 @router.post("/refresh", response_model=Token)
 async def refresh(
     use_case: RefreshTokenUseCase = Depends(get_refresh_token_use_case),
-    current_user: User = Depends(get_current_user),
+    signed_in: SignedInMember = Depends(get_current_sign_in),
 ):
     """
-    A fresh token for a member still signed in. The token sent must still be accepted: expired,
-    issued before the member's token version changed, or for an inactive member answers 401.
+    A fresh token for a member still signed in, on the same device. The token sent must still be
+    accepted: expired, issued before the member's token version changed, from a device that signed
+    out, or for an inactive member answers 401.
     """
-    token_dict = await use_case.execute(current_user)
+    token_dict = await use_case.execute(signed_in)
     return AuthPresentationMapper.to_token_response(token_dict)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    use_case: SignOutUseCase = Depends(get_sign_out_use_case),
+    signed_in: SignedInMember = Depends(get_current_sign_in),
+):
+    """
+    Sign out on this device. Every token this device was given stops being accepted, the one sent
+    and any it was refreshed from; the member's other devices stay signed in.
+    """
+    await use_case.execute(signed_in)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/verify", status_code=status.HTTP_204_NO_CONTENT)

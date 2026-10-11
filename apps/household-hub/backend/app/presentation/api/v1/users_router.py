@@ -12,6 +12,7 @@ from app.presentation.mappers.pin_reset_presentation_mapper import PinResetPrese
 from app.presentation.mappers.user_presentation_mapper import UserPresentationMapper
 from app.presentation.mappers.tool_approval_presentation_mapper import ToolApprovalPresentationMapper
 from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
+from app.domain.use_cases.auth.authenticate_token import SignedInMember
 from app.domain.use_cases.users.change_pin import ChangePinUseCase
 from app.domain.use_cases.users.leave_household import LeaveHouseholdUseCase
 from app.domain.use_cases.users.approve_pin_reset import ApprovePinResetUseCase
@@ -20,6 +21,7 @@ from app.domain.use_cases.users.get_member import GetMemberUseCase
 from app.domain.use_cases.users.update_profile import UpdateProfileUseCase
 from app.domain.use_cases.users.deactivate_member import DeactivateMemberUseCase
 from app.presentation.api.deps import (
+    get_current_sign_in,
     get_current_user,
     get_current_admin_user,
     get_change_pin_use_case,
@@ -65,16 +67,17 @@ async def update_my_profile(
 async def change_my_pin(
     payload: ChangePinRequest,
     use_case: ChangePinUseCase = Depends(get_change_pin_use_case),
-    current_user: User = Depends(get_current_user),
+    signed_in: SignedInMember = Depends(get_current_sign_in),
 ):
     """
     Change your PIN. Every other device is signed out; this one gets the token in the answer.
     A wrong current PIN answers 403 with `attempts_left`, and 429 once it locks, as sign-in does.
     """
     token_dict = await use_case.execute(
-        user_id=current_user.id,
+        user_id=signed_in.user.id,
         current_pin=payload.current_pin,
         new_pin=payload.new_pin,
+        device_session_id=signed_in.device_session_id,
     )
     return AuthPresentationMapper.to_token_response(token_dict)
 
