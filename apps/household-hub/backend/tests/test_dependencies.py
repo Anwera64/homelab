@@ -15,6 +15,8 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 # A marker may follow: the lock is universal, and some packages are for one platform only.
 PINNED = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*==[0-9][A-Za-z0-9.+!-]*( ; .+)?$")
+# An exact release, so a rebuild gets the Python that was tested. Which release is Renovate's business.
+PINNED_PYTHON_IMAGE = re.compile(r"FROM python:\d+\.\d+\.\d+-slim")
 TEST_TOOLS = {"pytest", "pytest-asyncio", "pytest-cov"}
 
 
@@ -89,5 +91,19 @@ def test_the_dev_lock_is_the_image_lock_plus_the_test_tools():
 
 def test_the_image_installs_the_lock_on_a_pinned_python():
     dockerfile = (BACKEND_ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines()
-    assert re.fullmatch(r"FROM python:3\.12\.\d+-slim", dockerfile[0]), dockerfile[0]
+    assert PINNED_PYTHON_IMAGE.fullmatch(dockerfile[0]), dockerfile[0]
     assert "RUN pip install --no-cache-dir -r requirements.txt" in [line.strip() for line in dockerfile]
+
+
+def test_the_image_tag_is_an_exact_python_release_whichever_it_is():
+    for exact in ("FROM python:3.12.15-slim", "FROM python:3.14.8-slim"):
+        assert PINNED_PYTHON_IMAGE.fullmatch(exact), exact
+    # A tag that moves: the next rebuild would get a Python nobody tested.
+    for moving in (
+        "FROM python:latest",
+        "FROM python:slim",
+        "FROM python:3-slim",
+        "FROM python:3.14-slim",
+        "FROM python:3.14.8",
+    ):
+        assert not PINNED_PYTHON_IMAGE.fullmatch(moving), moving
