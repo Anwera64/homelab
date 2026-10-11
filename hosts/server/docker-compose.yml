@@ -38,6 +38,9 @@ services:
       - VPN_TYPE=wireguard
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
       - SERVER_COUNTRIES=${VPN_COUNTRY:-United States}
+      # The servers to use within the country; empty for any of them. Gluetun cannot leave
+      # servers out, so the ones known to hold a forwarded port are named (README.md, "VPN provider").
+      - SERVER_HOSTNAMES=${VPN_SERVER_HOSTNAMES:-}
       # Port forwarding, for the providers that have it (NordVPN does not).
       - VPN_PORT_FORWARDING=${VPN_PORT_FORWARDING:-off}
       - PORT_FORWARD_ONLY=${VPN_PORT_FORWARD_ONLY:-off}

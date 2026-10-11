@@ -11,7 +11,7 @@ const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
 const SCRIPTS = [
   'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
   'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh', 'system/server-metrics.sh',
-  'system/server-wifi-band.sh',
+  'system/server-wifi-band.sh', 'system/server-vpn-watchdog.sh',
 ];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
@@ -638,15 +638,16 @@ test('Server host metrics', async (t) => {
   const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
     alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
   } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null } = {}) => {
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null, forwarded = false } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
     fs.mkdirSync(bin);
-    // docker answers the one call the script makes; with nothing to say it fails, as it
-    // does when Gluetun is stopped or qBittorrent wants a login.
+    // docker answers the two calls the script makes. Asked for qBittorrent's numbers with
+    // nothing to say, it fails, as it does when Gluetun is stopped or qBittorrent wants a login.
+    // Asked whether Gluetun holds a forwarded port, it fails when there is none.
     const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
-    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\n${answer}\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\ncase "$*" in *forwarded_port*) exit ${forwarded ? 0 : 1} ;; esac\n${answer}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
     // --scan lists the devices; a device with no answer here is asleep (exit 2).
     const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
@@ -776,6 +777,222 @@ test('Server host metrics', async (t) => {
       assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  await t.test('GIVEN Gluetun holds a forwarded port WHEN it runs THEN it says the port is forwarded', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom, textfile } = setup({ forwarded: true });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 1\n');
+    assert.equal(fs.statSync(path.join(textfile, 'server_vpn.prom')).mode & 0o777, 0o644);
+    // Gluetun keeps the port in a file while it has one; no API key is needed to look.
+    assert.match(fs.readFileSync(path.join(root, 'docker.log'), 'utf8'), /^docker exec gluetun test -s \/tmp\/gluetun\/forwarded_port$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no forwarded port, or Gluetun stopped WHEN it runs THEN it says there is none and writes the rest', { skip: !canRun && 'needs bash and jq' }, () => {
+    // qBittorrent says "connected" on a port nobody forwards: this number is Gluetun's own.
+    const { root, run, prom } = setup({ forwarded: false, qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 0\n');
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 1$/m);
+    assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server VPN watchdog', async (t) => {
+  const script = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.sh'));
+  const unit = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.service'));
+  const timer = read(path.join(SYSTEM_DIR, 'server-vpn-watchdog.timer'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('runs every minute, from a timer bootstrap installs', () => {
+    assert.match(timer, /^OnCalendar=\*-\*-\* \*:\*:45$/m);
+    assert.match(timer, /^WantedBy=timers\.target$/m);
+    assert.match(unit, /^Type=oneshot$/m);
+    assert.match(unit, /^ExecStart=@SERVER_DIR@\/system\/server-vpn-watchdog\.sh$/m);
+    assert.doesNotMatch(unit, /^\[Install\]$/m);
+    assert.match(bootstrap, /^place_unit server-vpn-watchdog\.service/m);
+    assert.match(bootstrap, /^install_unit server-vpn-watchdog\.timer$/m);
+    assert.doesNotMatch(bootstrap, /install_unit server-vpn-watchdog\.service/);
+  });
+
+  await t.test('looks at Gluetun\'s port file and log, with no key or login of its own', () => {
+    assert.match(script, /docker exec gluetun test -s \/tmp\/gluetun\/forwarded_port/);
+    assert.match(script, /docker logs --since 1h gluetun/);
+    assert.doesNotMatch(script, /GLUETUN_API_KEY|WIREGUARD|PASSWORD/);
+  });
+
+  // Behaviour, in a throwaway folder. docker and mountpoint are stubs on PATH; the clock is given.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const skip = !canRun && 'needs bash';
+  const NOON = Date.UTC(2026, 9, 12, 12, 0, 0) / 1000;
+  const MIN = 60;
+  const ALLOWED = 'node-nl-01.example.net,node-nl-02.example.net';
+  const setup = ({ forwarding = 'on', allowlist = ALLOWED, port = false, losses = 0, mounted = true } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-vpn-'));
+    const bin = path.join(root, 'bin');
+    const textfile = path.join(root, 'textfile');
+    const log = path.join(root, 'calls.log');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(log, '');
+    fs.writeFileSync(path.join(root, '.env'), `VPN_PROVIDER=protonvpn\nVPN_PORT_FORWARDING=${forwarding}\n${allowlist ? `VPN_SERVER_HOSTNAMES=${allowlist}\n` : ''}`);
+    // The port file is there or not; the log holds one line for each port Gluetun lost.
+    // A recreate is written down with the server list it was given ("unset": the one in .env).
+    fs.writeFileSync(path.join(bin, 'docker'), [
+      '#!/bin/sh',
+      'case "$1" in',
+      `  exec) [ -e "${root}/port" ]; exit $? ;;`,
+      `  logs) cat "${root}/gluetun.log"; exit 0 ;;`,
+      `  compose) echo "$* [servers=\${VPN_SERVER_HOSTNAMES-unset}]" >> "${log}"; exit 0 ;;`,
+      'esac',
+      'exit 1',
+    ].join('\n') + '\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
+    const setPort = (has) => (has ? fs.writeFileSync(path.join(root, 'port'), '51413\n') : fs.rmSync(path.join(root, 'port'), { force: true }));
+    const setLosses = (n) => fs.writeFileSync(path.join(root, 'gluetun.log'), 'INFO [port forwarding] clearing port file /tmp/gluetun/forwarded_port\n'.repeat(n));
+    setPort(port);
+    setLosses(losses);
+    const run = (now) => {
+      const result = spawnSync(path.join(SYSTEM_DIR, 'server-vpn-watchdog.sh'), [], {
+        encoding: 'utf8',
+        env: {
+          ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, TZ: 'UTC', SERVER_NOW: String(now),
+          SERVER_ENV_FILE: path.join(root, '.env'), SERVER_VPN_STATE_DIR: path.join(root, 'state'), SERVER_TEXTFILE_DIR: textfile,
+        },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      return result;
+    };
+    // One run a minute, from minute `from` to minute `to` after noon.
+    const minutes = (from, to) => { for (let m = from; m <= to; m += 1) run(NOON + m * MIN); };
+    const recreates = () => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+    const prom = () => (fs.existsSync(path.join(textfile, 'server_vpn_watchdog.prom')) ? fs.readFileSync(path.join(textfile, 'server_vpn_watchdog.prom'), 'utf8') : '');
+    const done = () => fs.rmSync(root, { recursive: true, force: true });
+    return { root, textfile, run, minutes, recreates, prom, setPort, setLosses, done };
+  };
+  const TOGETHER = /^compose --project-directory \S+ up -d --force-recreate gluetun flaresolverr qbittorrent \[servers=unset\]$/;
+
+  await t.test('GIVEN port forwarding is off in .env WHEN it runs THEN it does nothing', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ forwarding: 'off' });
+    minutes(0, 30);
+    assert.deepEqual(recreates(), []);
+    assert.equal(prom(), '', 'a provider without forwarding has nothing to report');
+    done();
+  });
+
+  await t.test('GIVEN a forwarded port and a few losses WHEN it runs THEN nothing is recreated', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ port: true, losses: 6 });
+    minutes(0, 30);
+    assert.deepEqual(recreates(), []);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 0$/m);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    done();
+  });
+
+  await t.test('GIVEN no forwarded port WHEN ten minutes have passed THEN gluetun, flaresolverr and qbittorrent are recreated together', { skip }, () => {
+    const { textfile, minutes, recreates, prom, done } = setup();
+    minutes(0, 9);
+    assert.deepEqual(recreates(), [], 'nine minutes is not yet ten');
+    minutes(10, 10);
+    assert.equal(recreates().length, 1);
+    // The three share Gluetun's network; the server list is the one in .env.
+    assert.match(recreates()[0], TOGETHER);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 1$/m);
+    assert.equal(fs.statSync(path.join(textfile, 'server_vpn_watchdog.prom')).mode & 0o777, 0o644);
+    // The new container gets ten minutes of its own.
+    minutes(11, 19);
+    assert.equal(recreates().length, 1);
+    done();
+  });
+
+  await t.test('GIVEN a port that was lost more than six times in the hour WHEN it runs THEN the containers are recreated', { skip }, () => {
+    const { minutes, recreates, done } = setup({ port: true, losses: 7 });
+    minutes(0, 0);
+    assert.equal(recreates().length, 1);
+    assert.match(recreates()[0], TOGETHER);
+    done();
+  });
+
+  await t.test('GIVEN the media disk is not mounted WHEN it recreates THEN qBittorrent is left out', { skip }, () => {
+    // qBittorrent cannot mount /data; the disk guard starts it when the disk is back.
+    const { minutes, recreates, done } = setup({ mounted: false });
+    minutes(0, 10);
+    assert.match(recreates()[0], /--force-recreate gluetun flaresolverr \[servers=unset\]$/);
+    done();
+  });
+
+  await t.test('GIVEN three recreations that brought no port WHEN it recreates again THEN any server in the country may be used', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup();
+    minutes(0, 30);
+    assert.equal(recreates().length, 3);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/, 'the first three stay on the named servers');
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    minutes(31, 40);
+    assert.equal(recreates().length, 4);
+    // An empty list overrides the one in .env.
+    assert.match(recreates()[3], /\[servers=\]$/);
+    assert.match(prom(), /^server_vpn_watchdog_widened 1$/m);
+    done();
+  });
+
+  await t.test('GIVEN no servers are named in .env WHEN recreations bring no port THEN there is nothing to widen', { skip }, () => {
+    const { minutes, recreates, prom, done } = setup({ allowlist: '' });
+    minutes(0, 50);
+    assert.equal(recreates().length, 5);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    done();
+  });
+
+  await t.test('GIVEN two failed recreations WHEN a port then holds for ten minutes THEN the count starts again', { skip }, () => {
+    const { minutes, recreates, setPort, done } = setup();
+    minutes(0, 20);
+    assert.equal(recreates().length, 2);
+    setPort(true);
+    minutes(21, 31);
+    setPort(false);
+    // Three more on the named servers before widening, not one.
+    minutes(32, 62);
+    assert.equal(recreates().length, 5);
+    for (const call of recreates()) assert.match(call, /\[servers=unset\]$/);
+    done();
+  });
+
+  await t.test('GIVEN six recreations in a row brought no port WHEN it goes on THEN it waits an hour between tries', { skip }, () => {
+    // Each recreate restarts qBittorrent: when no server gives a port, downloading matters more.
+    const { minutes, recreates, done } = setup();
+    minutes(0, 60);
+    assert.equal(recreates().length, 6);
+    minutes(61, 119);
+    assert.equal(recreates().length, 6);
+    minutes(120, 120);
+    assert.equal(recreates().length, 7);
+    done();
+  });
+
+  await t.test('GIVEN it has widened WHEN the clock passes 04:00 THEN it goes back to the named servers', { skip }, () => {
+    const { run, minutes, recreates, prom, setPort, done } = setup();
+    minutes(0, 40);
+    setPort(true);
+    minutes(41, 60);
+    assert.equal(recreates().length, 4);
+    assert.match(prom(), /^server_vpn_watchdog_widened 1$/m);
+    // Still the same day: it stays where a port was found.
+    run(NOON + 11 * 60 * MIN);
+    assert.equal(recreates().length, 4);
+    // 04:00 the next morning.
+    run(NOON + 16 * 60 * MIN);
+    assert.equal(recreates().length, 5);
+    assert.match(recreates()[4], TOGETHER);
+    assert.match(prom(), /^server_vpn_watchdog_widened 0$/m);
+    assert.match(prom(), /^server_vpn_watchdog_recreations_total 5$/m);
+    // Once: the next minute changes nothing.
+    run(NOON + 16 * 60 * MIN + MIN);
+    assert.equal(recreates().length, 5);
+    done();
   });
 });
 
