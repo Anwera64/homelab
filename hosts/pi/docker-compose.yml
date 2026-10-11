@@ -77,7 +77,7 @@ services:
   # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
   # the sparse checkout by bootstrap.sh); the server's services are reached on 192.168.1.30.
   homepage:
-    image: ghcr.io/gethomepage/homepage:v2.4.0
+    image: ghcr.io/gethomepage/homepage:v2.5.0
     container_name: homepage
     ports:
       - 3000:3000
@@ -122,7 +122,7 @@ services:
 
   # Pushes Uptime Kuma's alerts to the phones. Its users are made with its CLI (README.md).
   ntfy:
-    image: binwiederhier/ntfy:v2.28.0
+    image: binwiederhier/ntfy:v2.29.0
     container_name: ntfy
     command: serve
     ports:

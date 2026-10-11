@@ -119,7 +119,7 @@ test('Pi DNS stack: Pi-hole + Unbound', async (t) => {
 
   await t.test('Homepage runs on the Pi from the repo config, pinned, with logs in RAM', () => {
     const homepage = serviceBlock(compose, 'homepage');
-    assert.match(homepage, /image:\s*ghcr\.io\/gethomepage\/homepage:v2\.4\.0\s*$/m);
+    assert.match(homepage, /image:\s*ghcr\.io\/gethomepage\/homepage:v\d+\.\d+\.\d+\s*$/m, 'pinned to a release');
     assert.match(homepage, /-\s*['"]?3000:3000['"]?/);
     assert.match(homepage, /-\s*\.\.\/\.\.\/config\/homepage:\/app\/config\s*$/m);
     assert.match(homepage, /-\s*\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
