@@ -55,5 +55,11 @@ private fun WriteStepsPreview() {
         )
         ToolStepLine(AnswerPart.ToolDone("document_writer", ToolSummary(action = ToolAction.Replace)))
         ToolStepLine(AnswerPart.ToolFailed("calendar_write", ToolSummary(action = ToolAction.Delete)))
+        ToolStepLine(
+            AnswerPart.ToolFailed(
+                "calendar_write",
+                ToolSummary(action = ToolAction.Delete, reason = ToolFailureReason.NotFound),
+            ),
+        )
     }
 }

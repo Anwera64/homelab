@@ -3,6 +3,7 @@ package com.homelab.household.app.screens.conversation
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.tool_reason_blocked
+import com.homelab.household.app.resources.tool_reason_event_not_found
 import com.homelab.household.app.resources.tool_reason_forbidden
 import com.homelab.household.app.resources.tool_reason_not_a_page
 import com.homelab.household.app.resources.tool_reason_not_found
@@ -131,7 +132,8 @@ private fun toolStep(
 
 /**
  * Why a step failed, in words. The search service is the hub's own, so its outage is said as such;
- * the same outage while reading is the site's. An unknown cause says nothing rather than guess.
+ * the same outage while reading is the site's. A calendar step that can't find its event says so in
+ * the calendar's words. An unknown cause says nothing rather than guess.
  */
 private fun reasonWords(
     tool: String,
@@ -173,7 +175,13 @@ private fun reasonWords(
         }
 
         ToolFailureReason.NotFound -> {
-            Res.string.tool_reason_not_found
+            if (tool ==
+                HubTool.CALENDAR_WRITE
+            ) {
+                Res.string.tool_reason_event_not_found
+            } else {
+                Res.string.tool_reason_not_found
+            }
         }
 
         // The fix card under the step says these, with the button that fixes them.
