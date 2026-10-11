@@ -22,6 +22,7 @@ import com.homelab.household.presentation.profilepicker.ProfilePickerViewModel
 import com.homelab.household.presentation.removemember.RemoveMemberViewModel
 import com.homelab.household.presentation.resetpin.NewPinViewModel
 import com.homelab.household.presentation.resetpin.ResetCodeViewModel
+import com.homelab.household.presentation.whenagentsact.WhenAgentsActViewModel
 import org.koin.dsl.module
 
 val presentationModule =
@@ -49,7 +50,8 @@ val presentationModule =
         factory { FirstRunViewModel(get()) }
         factory { ProfilePickerViewModel(get()) }
         factory { InviteCodeViewModel(get()) }
-        factory { ProfileViewModel(get(), get(), get(), get(), get()) }
+        factory { ProfileViewModel(get(), get(), get(), get(), get(), get()) }
+        factory { WhenAgentsActViewModel(get(), get()) }
         factory { MembersViewModel(get(), get()) }
         factory { InviteCreateViewModel(get()) }
         factory { params -> PinApproveViewModel(member = params.get(), approvePinReset = get()) }

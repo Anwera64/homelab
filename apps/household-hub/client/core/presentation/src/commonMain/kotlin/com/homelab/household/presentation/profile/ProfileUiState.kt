@@ -9,4 +9,6 @@ data class ProfileUiState(
     val calendar: CalendarRow = CalendarRow.Loading,
     val calendarDisconnect: CalendarDisconnect = CalendarDisconnect.Idle,
     val status: ProfileStatus = ProfileStatus.Loading,
+    /** How many writes agents do without asking, for the "When agents act" row. Null makes no claim. */
+    val automaticWrites: Int? = null,
 )

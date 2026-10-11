@@ -6,6 +6,7 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
+import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.RemoveCalendarUseCase
@@ -29,6 +30,7 @@ class ProfileViewModel(
     private val logout: LogoutUseCase,
     private val getCalendar: GetCalendarUseCase,
     private val removeCalendar: RemoveCalendarUseCase,
+    private val getToolApprovals: GetToolApprovalsUseCase,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -83,6 +85,17 @@ class ProfileViewModel(
                     onFailure = { CalendarRow.Unknown },
                 )
             _uiState.update { it.copy(calendar = row) }
+        }
+    }
+
+    /**
+     * Counted each time the profile is shown, so coming back from "When agents act" shows what was
+     * just switched. A failure leaves the caption out rather than guessing.
+     */
+    fun loadAutomaticWrites() {
+        viewModelScope.launch {
+            val count = runCatchingSafe { getToolApprovals() }.getOrNull()?.count { it.automatic }
+            _uiState.update { it.copy(automaticWrites = count) }
         }
     }
 
