@@ -43,6 +43,7 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.members_failed
 import com.homelab.household.app.resources.members_unreachable
 import com.homelab.household.app.resources.profile_admin
+import com.homelab.household.app.resources.profile_agents
 import com.homelab.household.app.resources.profile_back
 import com.homelab.household.app.resources.profile_calendar
 import com.homelab.household.app.resources.profile_calendar_checked_days
@@ -61,6 +62,9 @@ import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
+import com.homelab.household.app.resources.profile_when_agents_act
+import com.homelab.household.app.resources.profile_when_agents_act_automatic
+import com.homelab.household.app.resources.profile_when_agents_act_none
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderMark
 import com.homelab.household.app.screens.calendarprovider.providerName
 import com.homelab.household.app.theme.HearthShapes
@@ -93,6 +97,7 @@ fun ProfileContent(
     modifier: Modifier = Modifier,
     onDisconnectCalendar: () -> Unit = {},
     onCalendarSignInAgain: () -> Unit = {},
+    onWhenAgentsAct: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -159,6 +164,8 @@ fun ProfileContent(
                 onCalendarOptions = { sheet = CalendarSheetStep.Options },
                 onSignInAgain = onCalendarSignInAgain,
             )
+
+            AgentsSection(automaticWrites = state.automaticWrites, onWhenAgentsAct = onWhenAgentsAct)
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
@@ -278,6 +285,51 @@ private fun CalendarSection(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * What agents may do for you. Its caption counts the writes that run without asking; until the hub
+ * has said, or if it couldn't, the row makes no claim.
+ */
+@Composable
+private fun AgentsSection(
+    automaticWrites: Int?,
+    onWhenAgentsAct: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+        Text(
+            stringResource(Res.string.profile_agents).uppercase(),
+            modifier = Modifier.padding(start = HearthTheme.spacing.xs),
+            style = HearthTheme.typography.overline,
+            color = HearthTheme.colors.textMuted,
+        )
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+            SettingsRow(
+                label = stringResource(Res.string.profile_when_agents_act),
+                icon = HearthIcon.Settings,
+                caption =
+                    when (automaticWrites) {
+                        null -> {
+                            null
+                        }
+
+                        0 -> {
+                            stringResource(Res.string.profile_when_agents_act_none)
+                        }
+
+                        else -> {
+                            pluralStringResource(
+                                Res.plurals.profile_when_agents_act_automatic,
+                                automaticWrites,
+                                automaticWrites,
+                            )
+                        }
+                    },
+                onClick = onWhenAgentsAct,
+            )
         }
     }
 }

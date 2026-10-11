@@ -69,6 +69,9 @@ sealed interface Destination : NavKey {
 
     data object Profile : Destination
 
+    /** Which writes agents do for you without asking: the same settings as an approval card's box. */
+    data object WhenAgentsAct : Destination
+
     data object Members : Destination
 
     data object InviteCreate : Destination

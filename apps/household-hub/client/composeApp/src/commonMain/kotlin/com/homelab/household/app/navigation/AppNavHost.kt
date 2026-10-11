@@ -159,7 +159,11 @@ fun AppNavHost(
                         onSignedOut = { backStack.startOver(Destination.SignIn) },
                         onCalendar = { backStack.add(Destination.CalendarPicker) },
                         onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
+                        onWhenAgentsAct = { backStack.add(Destination.WhenAgentsAct) },
                     )
+                }
+                entry<Destination.WhenAgentsAct> {
+                    screens.WhenAgentsAct(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Members> {
                     screens.Members(

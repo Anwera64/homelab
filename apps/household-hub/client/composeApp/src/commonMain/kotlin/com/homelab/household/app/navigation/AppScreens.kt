@@ -23,6 +23,7 @@ import com.homelab.household.app.screens.profilepicker.ProfilePickerScreen
 import com.homelab.household.app.screens.removemember.RemoveMemberScreen
 import com.homelab.household.app.screens.resetpin.NewPinScreen
 import com.homelab.household.app.screens.resetpin.ResetCodeScreen
+import com.homelab.household.app.screens.whenagentsact.WhenAgentsActScreen
 import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.domain.model.Member
@@ -121,7 +122,10 @@ interface AppScreens {
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
+        onWhenAgentsAct: () -> Unit,
     )
+
+    @Composable fun WhenAgentsAct(onBack: () -> Unit)
 
     @Composable fun Members(
         onBack: () -> Unit,
@@ -301,6 +305,7 @@ object RealAppScreens : AppScreens {
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
+        onWhenAgentsAct: () -> Unit,
     ) {
         ProfileScreen(
             onBack = onBack,
@@ -310,7 +315,13 @@ object RealAppScreens : AppScreens {
             onSignedOut = onSignedOut,
             onCalendar = onCalendar,
             onCalendarSignInAgain = onCalendarSignInAgain,
+            onWhenAgentsAct = onWhenAgentsAct,
         )
+    }
+
+    @Composable
+    override fun WhenAgentsAct(onBack: () -> Unit) {
+        WhenAgentsActScreen(onBack = onBack)
     }
 
     @Composable

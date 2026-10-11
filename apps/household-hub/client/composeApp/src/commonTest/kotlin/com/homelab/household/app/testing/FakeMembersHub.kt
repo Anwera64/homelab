@@ -14,7 +14,7 @@ import io.ktor.http.headersOf
 
 /**
  * The hub as the members screens need it: who lives here, invites, PIN resets, changing a PIN,
- * removing someone and leaving, and the profile's calendar. Every body it was sent is kept, so a
+ * removing someone and leaving, the profile's calendar, and which writes agents do without asking. Every body it was sent is kept, so a
  * test can check what was asked.
  */
 class FakeMembersHub {
@@ -37,6 +37,24 @@ class FakeMembersHub {
         private set
     private var write: suspend MockRequestHandleScope.() -> HttpResponseData = { json("""{"message":"done"}""") }
     private var offline = false
+
+    /** The member's write settings as the hub keeps them: (tool, action) to automatic. */
+    private val approvals =
+        linkedMapOf(
+            ("calendar_write" to "create") to false,
+            ("calendar_write" to "update") to false,
+            ("calendar_write" to "delete") to false,
+            ("document_writer" to "create") to false,
+            ("document_writer" to "append") to false,
+            ("document_writer" to "replace") to false,
+        )
+    private var refusesSettings = false
+
+    /** Whether agents add events without asking, as the hub now has it. */
+    fun isAutomatic(
+        tool: String,
+        action: String,
+    ): Boolean = approvals[tool to action] == true
 
     val engine: HttpClientEngine =
         MockEngine { request ->
@@ -61,6 +79,19 @@ class FakeMembersHub {
                 path == "/api/v1/integrations/calendars/me" -> {
                     calendar?.let { json(it) }
                         ?: json("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound)
+                }
+
+                path == "/api/v1/users/me/tool-approvals" && request.method == HttpMethod.Get -> {
+                    json(approvalsJson())
+                }
+
+                path == "/api/v1/users/me/tool-approvals" && request.method == HttpMethod.Put -> {
+                    if (refusesSettings) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    val body = (request.body as TextContent).text
+                    val tool = Regex("\"tool\":\"([a-z_]+)\"").find(body)!!.groupValues[1]
+                    val action = Regex("\"action\":\"([a-z]+)\"").find(body)!!.groupValues[1]
+                    approvals[tool to action] = body.contains("\"auto\":true")
+                    json(approvalsJson())
                 }
 
                 path == "/api/v1/integrations/calendars" && request.method == HttpMethod.Delete -> {
@@ -92,6 +123,23 @@ class FakeMembersHub {
             "auth_kind":"oauth","needs_reconnect":true,
             "created_at":"2026-09-26T20:04:00","updated_at":"2026-09-26T20:04:00"}"""
     }
+
+    /** Agents already add events for Emma without asking. */
+    fun addsEventsAutomatically() {
+        approvals["calendar_write" to "create"] = true
+    }
+
+    /** The settings still list, but a change never reaches the hub. */
+    fun refusesSettingChanges() {
+        refusesSettings = true
+    }
+
+    private fun approvalsJson() =
+        approvals.entries.joinToString(prefix = "[", postfix = "]") { (key, auto) ->
+            val (tool, action) = key
+            val always = action == "delete" || action == "replace"
+            """{"tool":"$tool","action":"$action","auto":$auto,"always_asks":$always}"""
+        }
 
     fun livesAlone() {
         household = listOf(household.first())
