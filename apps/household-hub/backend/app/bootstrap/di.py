@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import timedelta
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,7 @@ from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.gossip_data_source import SqliteGossipDataSource
 from app.data.datasources.invite_data_source import SqliteInviteDataSource
 from app.data.datasources.pin_reset_data_source import SqlitePinResetDataSource
+from app.data.datasources.device_session_data_source import SqliteDeviceSessionDataSource
 
 # Data Mappers
 from app.data.mappers.user_data_mapper import UserDataMapper
@@ -42,6 +44,7 @@ from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.gossip_data_mapper import GossipDataMapper
 from app.data.mappers.invite_data_mapper import InviteDataMapper
 from app.data.mappers.pin_reset_data_mapper import PinResetDataMapper
+from app.data.mappers.device_session_data_mapper import DeviceSessionDataMapper
 
 # Repositories
 from app.data.repositories.user_repository_impl import UserRepositoryImpl
@@ -57,6 +60,7 @@ from app.data.repositories.document_repository_impl import DocumentRepositoryImp
 from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
 from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
 from app.data.repositories.pin_reset_repository_impl import PinResetRepositoryImpl
+from app.data.repositories.device_session_repository_impl import DeviceSessionRepositoryImpl
 
 # Connectors
 from app.data.connectors.searxng_search_connector import SearXNGSearchConnector
@@ -87,6 +91,9 @@ from app.domain.use_cases.auth.guard_code_guesses import CodeGuessLock, GuardCod
 from app.domain.use_cases.auth.look_up_invite import LookUpInviteUseCase
 from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
 from app.domain.use_cases.auth.redeem_pin_reset import RedeemPinResetUseCase
+from app.domain.use_cases.auth.sign_in_device import SignInDeviceUseCase
+from app.domain.use_cases.auth.sign_out import SignOutUseCase
+from app.domain.use_cases.auth.purge_expired_device_sessions import PurgeExpiredDeviceSessionsUseCase
 
 from app.domain.use_cases.users.list_members import ListMembersUseCase
 from app.domain.use_cases.users.get_member import GetMemberUseCase
@@ -198,6 +205,7 @@ _document_mapper = DocumentDataMapper()
 _gossip_mapper = GossipDataMapper()
 _invite_mapper = InviteDataMapper()
 _pin_reset_mapper = PinResetDataMapper()
+_device_session_mapper = DeviceSessionDataMapper()
 
 _secret_cipher = SecretCipherImpl(secret_key=settings.SECRET_KEY)
 _searxng_connector = SearXNGSearchConnector(
@@ -256,6 +264,7 @@ def get_container(session: AsyncSession):
     gossip_ds = SqliteGossipDataSource(session)
     invite_ds = SqliteInviteDataSource(session)
     pin_reset_ds = SqlitePinResetDataSource(session)
+    device_session_ds = SqliteDeviceSessionDataSource(session)
 
     user_repo = UserRepositoryImpl(user_ds, _user_mapper)
     space_repo = SpaceRepositoryImpl(space_ds, _space_mapper)
@@ -271,6 +280,7 @@ def get_container(session: AsyncSession):
     gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
     invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
     pin_reset_repo = PinResetRepositoryImpl(pin_reset_ds, _pin_reset_mapper)
+    device_session_repo = DeviceSessionRepositoryImpl(device_session_ds, _device_session_mapper)
 
     uow = SqliteUnitOfWork(session)
     drop_proposals_uc = DropPendingProposalsUseCase(session_repo, uow)
@@ -278,6 +288,7 @@ def get_container(session: AsyncSession):
 
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
+    sign_in_device_uc = SignInDeviceUseCase(device_session_repo, _jwt_token_service, uow)
     deactivate_member_uc = DeactivateMemberUseCase(
         user_repo,
         space_repo,
@@ -286,6 +297,7 @@ def get_container(session: AsyncSession):
         session_repo,
         document_repo,
         calendar_cred_repo,
+        device_session_repo,
         uow,
     )
 
@@ -485,17 +497,22 @@ def get_container(session: AsyncSession):
         pres_deps.get_register_initial_admin_use_case: RegisterInitialAdminUseCase(user_repo, space_repo, system_setting_repo, _password_hasher, uow),
         pres_deps.get_login_use_case: LoginUseCase(
             VerifyMemberPinUseCase(user_repo, _password_hasher, uow, _dummy_pin_hash, _pin_locks),
-            _jwt_token_service,
+            sign_in_device_uc,
         ),
-        pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(user_repo, _jwt_token_service),
+        pres_deps.get_authenticate_token_use_case: AuthenticateTokenUseCase(
+            user_repo, _jwt_token_service, device_session_repo
+        ),
         pres_deps.get_list_public_members_use_case: ListPublicMembersUseCase(user_repo),
-        pres_deps.get_refresh_token_use_case: RefreshTokenUseCase(_jwt_token_service),
+        pres_deps.get_refresh_token_use_case: RefreshTokenUseCase(
+            _jwt_token_service, device_session_repo, sign_in_device_uc, uow
+        ),
+        pres_deps.get_sign_out_use_case: SignOutUseCase(device_session_repo, uow),
         pres_deps.get_look_up_invite_use_case: LookUpInviteUseCase(invite_repo, user_repo, guard_code_guesses_uc),
         pres_deps.get_redeem_pin_reset_use_case: RedeemPinResetUseCase(
-            pin_reset_repo, user_repo, _password_hasher, uow, _jwt_token_service, guard_code_guesses_uc
+            pin_reset_repo, user_repo, _password_hasher, uow, sign_in_device_uc, guard_code_guesses_uc, device_session_repo
         ),
         pres_deps.get_redeem_invite_use_case: RedeemInviteUseCase(
-            invite_repo, user_repo, create_member_uc, _jwt_token_service, guard_code_guesses_uc
+            invite_repo, user_repo, create_member_uc, sign_in_device_uc, guard_code_guesses_uc
         ),
 
         # Users
@@ -510,6 +527,8 @@ def get_container(session: AsyncSession):
             _password_hasher,
             uow,
             _jwt_token_service,
+            device_session_repo,
+            sign_in_device_uc,
         ),
         pres_deps.get_leave_household_use_case: LeaveHouseholdUseCase(
             user_repo,
@@ -615,6 +634,9 @@ def get_container(session: AsyncSession):
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
         SyncDefaultModelUseCase: SyncDefaultModelUseCase(llm_model_repo, uow),
         PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
+        PurgeExpiredDeviceSessionsUseCase: PurgeExpiredDeviceSessionsUseCase(
+            device_session_repo, uow, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        ),
     }
 
 
@@ -637,6 +659,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_authenticate_token_use_case,
         pres_deps.get_list_public_members_use_case,
         pres_deps.get_refresh_token_use_case,
+        pres_deps.get_sign_out_use_case,
         pres_deps.get_look_up_invite_use_case,
         pres_deps.get_redeem_invite_use_case,
         pres_deps.get_approve_pin_reset_use_case,

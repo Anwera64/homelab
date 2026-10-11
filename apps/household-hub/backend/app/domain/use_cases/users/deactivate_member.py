@@ -8,6 +8,7 @@ from app.domain.exceptions import (
 )
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
+from app.domain.repositories.device_session_repository import IDeviceSessionRepository
 from app.domain.repositories.document_repository import IDocumentRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
@@ -23,7 +24,8 @@ class DeactivateMemberUseCase:
     and their PIN — while what they shared with the household keeps their name on it. Agents they
     made pass to an admin, because an agent needs a living owner to stay editable.
 
-    The token version moves on, so the phone they are holding stops working.
+    The token version moves on, so the phone they are holding stops working, and the devices they were
+    signed in on are forgotten.
     """
 
     def __init__(
@@ -35,6 +37,7 @@ class DeactivateMemberUseCase:
         session_repo: ISessionRepository,
         document_repo: IDocumentRepository,
         calendar_repo: ICalendarCredentialRepository,
+        device_session_repo: IDeviceSessionRepository,
         uow: IUnitOfWork,
     ):
         self.user_repo = user_repo
@@ -44,6 +47,7 @@ class DeactivateMemberUseCase:
         self.session_repo = session_repo
         self.document_repo = document_repo
         self.calendar_repo = calendar_repo
+        self.device_session_repo = device_session_repo
         self.uow = uow
 
     async def execute(self, user_id_to_remove: str, current_admin: User) -> None:
@@ -81,5 +85,6 @@ class DeactivateMemberUseCase:
             member.pin_locked_until = None
             member.token_version += 1
             await self.user_repo.update(member)
+            await self.device_session_repo.delete_for_user(member.id)
 
             await self.uow.commit()

@@ -10,6 +10,7 @@ import com.homelab.household.data.dto.TokenResponseDto
 import com.homelab.household.data.dto.UserLoginRequestDto
 import com.homelab.household.data.dto.UserOnboardRequestDto
 import com.homelab.household.data.dto.UserReadDto
+import com.homelab.household.data.network.SIGN_OUT_PATH
 import com.homelab.household.data.network.codeGuessesLocked
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub
@@ -143,4 +144,17 @@ class KtorAuthRemoteDataSource(
             }
             response.ensureJsonSuccess().body()
         }
+
+    override suspend fun signOut(accessToken: String) {
+        reachingHub {
+            val response =
+                client.post("$baseUrl$SIGN_OUT_PATH") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            if (response.status == HttpStatusCode.Unauthorized) {
+                throw UnauthorizedException("The hub no longer accepts this token")
+            }
+            response.ensureJsonSuccess()
+        }
+    }
 }

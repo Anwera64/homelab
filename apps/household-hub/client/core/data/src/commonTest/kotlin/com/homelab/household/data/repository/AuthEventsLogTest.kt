@@ -19,8 +19,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Signing in and out are logged, and those lines leave the phone. They say that it happened and
- * never who: the collector works out the member from the token the batch arrives with.
+ * Signing in is logged, and so is being signed out by the hub; those lines leave the phone. They say
+ * that it happened and never who: the collector works out the member from the token the batch
+ * arrives with. The member's own sign-out is not among them — the hub logs that one.
  */
 class AuthEventsLogTest {
     private val emmaDto =
@@ -95,18 +96,21 @@ class AuthEventsLogTest {
             assertTrue(writer.lines.isEmpty())
         }
 
+    /** The hub logs a sign-out itself, with the member, when the phone tells it (#94). */
     @Test
-    fun `GIVEN a signed-in phone WHEN the member signs out THEN it is logged once`() =
+    fun `GIVEN a signed-in phone WHEN the member signs out THEN the phone logs nothing of its own`() =
         runTest {
             // GIVEN
             val writer = RecordingLogWriter()
             val tokens = InMemorySessionStorage().apply { saveTokens("jwt-token-123") }
+            val remote = mock<AuthRemoteDataSource>()
+            everySuspend { remote.signOut("jwt-token-123") } returns Unit
 
             // WHEN
-            repository(mock<AuthRemoteDataSource>(), writer, tokens).logout()
+            repository(remote, writer, tokens).logout()
 
             // THEN
-            assertEquals(listOf(Line(Severity.Info, "Auth", "Signed out")), writer.lines)
+            assertTrue(writer.lines.isEmpty())
         }
 
     @Test

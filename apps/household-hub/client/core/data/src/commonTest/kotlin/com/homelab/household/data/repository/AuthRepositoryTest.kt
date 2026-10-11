@@ -29,7 +29,9 @@ import dev.mokkery.verifySuspend
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -357,6 +359,7 @@ class AuthRepositoryTest {
             // GIVEN
             val remote = mock<AuthRemoteDataSource>()
             everySuspend { remote.login("emma", "482913") } returns signedIn()
+            everySuspend { remote.signOut(any()) } returns Unit
             val tokens = InMemorySessionStorage()
             val repository = repository(remote, tokens)
             repository.login("emma", "482913")
@@ -367,6 +370,83 @@ class AuthRepositoryTest {
             // THEN
             assertNull(tokens.getAccessToken())
             assertNull(tokens.getUser())
+        }
+
+    @Test
+    fun `GIVEN a token kept on this phone WHEN the member signs out THEN the hub is told with that token while it is still kept`() =
+        runTest {
+            // GIVEN
+            val remote = mock<AuthRemoteDataSource>()
+            val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
+            var keptWhenTold: String? = null
+            everySuspend { remote.signOut("kept-token") } calls { keptWhenTold = tokens.getAccessToken() }
+
+            // WHEN
+            repository(remote, tokens).logout()
+
+            // THEN
+            assertEquals("kept-token", keptWhenTold)
+            verifySuspend(VerifyMode.exactly(1)) { remote.signOut("kept-token") }
+            assertNull(tokens.getAccessToken())
+        }
+
+    @Test
+    fun `GIVEN the hub cannot be reached WHEN the member signs out THEN the phone forgets them all the same`() =
+        runTest {
+            // GIVEN
+            val remote = mock<AuthRemoteDataSource>()
+            everySuspend { remote.signOut(any()) } throws ServerOfflineException(message = "No route to the hub")
+            val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
+
+            // WHEN
+            repository(remote, tokens).logout()
+
+            // THEN
+            assertNull(tokens.getAccessToken())
+        }
+
+    @Test
+    fun `GIVEN a token the hub had already dropped WHEN the member signs out THEN the phone forgets them without an error`() =
+        runTest {
+            // GIVEN
+            val remote = mock<AuthRemoteDataSource>()
+            everySuspend { remote.signOut(any()) } throws UnauthorizedException("The hub no longer accepts this token")
+            val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
+
+            // WHEN
+            repository(remote, tokens).logout()
+
+            // THEN
+            assertNull(tokens.getAccessToken())
+        }
+
+    @Test
+    fun `GIVEN a hub that does not answer WHEN the member signs out THEN the phone waits three seconds and forgets them`() =
+        runTest {
+            // GIVEN
+            val remote = mock<AuthRemoteDataSource>()
+            everySuspend { remote.signOut(any()) } calls { awaitCancellation() }
+            val tokens = InMemorySessionStorage().apply { saveTokens("kept-token") }
+
+            // WHEN
+            repository(remote, tokens).logout()
+
+            // THEN
+            assertEquals(3_000, currentTime)
+            assertNull(tokens.getAccessToken())
+        }
+
+    @Test
+    fun `GIVEN nobody signed in on this phone WHEN a sign-out is asked for THEN the hub is not told`() =
+        runTest {
+            // GIVEN
+            val remote = mock<AuthRemoteDataSource>()
+
+            // WHEN
+            repository(remote).logout()
+
+            // THEN
+            verifyNoMoreCalls(remote)
         }
 
     @Test

@@ -3,11 +3,13 @@ from typing import Callable
 
 from app.domain.entities.one_time_code import normalise_code
 from app.domain.exceptions import InviteInvalidException
+from app.domain.repositories.device_session_repository import IDeviceSessionRepository
 from app.domain.repositories.pin_reset_repository import IPinResetRepository
-from app.domain.repositories.security_service import IPasswordHasher, ITokenService
+from app.domain.repositories.security_service import IPasswordHasher
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.auth.guard_code_guesses import GuardCodeGuessesUseCase
+from app.domain.use_cases.auth.sign_in_device import SignInDeviceUseCase
 
 
 def _utc_now() -> datetime:
@@ -18,7 +20,8 @@ class RedeemPinResetUseCase:
     """
     The member reads out the code they were given and chooses a new PIN. Their misses are forgiven —
     the lockout is what sent them here — and the token version moves on, because a PIN they no longer
-    know may be on another device.
+    know may be on another device. Every device they were signed in on is forgotten; the one redeeming
+    the code is signed in afresh.
     """
 
     def __init__(
@@ -27,16 +30,18 @@ class RedeemPinResetUseCase:
         user_repo: IUserRepository,
         hasher: IPasswordHasher,
         uow: IUnitOfWork,
-        token_service: ITokenService,
+        sign_in_device: SignInDeviceUseCase,
         guard: GuardCodeGuessesUseCase,
+        device_session_repo: IDeviceSessionRepository,
         clock: Callable[[], datetime] = _utc_now,
     ):
         self.pin_reset_repo = pin_reset_repo
         self.user_repo = user_repo
         self.hasher = hasher
         self.uow = uow
-        self.token_service = token_service
+        self.sign_in_device = sign_in_device
         self.guard = guard
+        self.device_session_repo = device_session_repo
         self.clock = clock
 
     async def execute(self, code: str, pin: str) -> dict:
@@ -63,13 +68,7 @@ class RedeemPinResetUseCase:
         user.token_version += 1
         async with self.uow:
             await self.user_repo.update(user)
+            await self.device_session_repo.delete_for_user(user.id)
             await self.uow.commit()
 
-        token = self.token_service.create_access_token(
-            subject=user.id, is_admin=user.is_admin, token_version=user.token_version
-        )
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "user": user,
-        }
+        return await self.sign_in_device.execute(user)

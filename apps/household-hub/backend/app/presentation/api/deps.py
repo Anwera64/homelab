@@ -9,9 +9,10 @@ from app.domain.exceptions import DomainException, EntityNotFoundException
 from app.domain.use_cases.auth.get_auth_status import GetAuthStatusUseCase
 from app.domain.use_cases.auth.register_initial_admin import RegisterInitialAdminUseCase
 from app.domain.use_cases.auth.login import LoginUseCase
-from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase
+from app.domain.use_cases.auth.authenticate_token import AuthenticateTokenUseCase, SignedInMember
 from app.domain.use_cases.auth.list_public_members import ListPublicMembersUseCase
 from app.domain.use_cases.auth.refresh_token import RefreshTokenUseCase
+from app.domain.use_cases.auth.sign_out import SignOutUseCase
 from app.domain.use_cases.auth.look_up_invite import LookUpInviteUseCase
 from app.domain.use_cases.auth.redeem_invite import RedeemInviteUseCase
 
@@ -119,6 +120,9 @@ def get_list_public_members_use_case() -> ListPublicMembersUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_refresh_token_use_case() -> RefreshTokenUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_sign_out_use_case() -> SignOutUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_look_up_invite_use_case() -> LookUpInviteUseCase:
@@ -348,10 +352,11 @@ def get_llm_client() -> ILLMClient:
 # =========================================================================
 # Presentation Auth Providers
 # =========================================================================
-async def get_current_user(
+async def get_current_sign_in(
     token: Optional[str] = Depends(reusable_oauth2),
     auth_use_case: AuthenticateTokenUseCase = Depends(get_authenticate_token_use_case),
-) -> User:
+) -> SignedInMember:
+    """The member and the device their token was given to. Most routes only need `get_current_user`."""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -359,13 +364,19 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        return await auth_use_case.execute(token)
+        return await auth_use_case.authenticate(token)
     except (DomainException, Exception):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+async def get_current_user(
+    sign_in: SignedInMember = Depends(get_current_sign_in),
+) -> User:
+    return sign_in.user
 
 
 async def get_current_admin_user(

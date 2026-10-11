@@ -3,10 +3,10 @@ from typing import Callable, Optional
 
 from app.domain.exceptions import InviteInvalidException
 from app.domain.repositories.invite_repository import IInviteRepository
-from app.domain.repositories.security_service import ITokenService
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.auth.guard_code_guesses import GuardCodeGuessesUseCase
 from app.domain.use_cases.auth.look_up_invite import usable_invite
+from app.domain.use_cases.auth.sign_in_device import SignInDeviceUseCase
 from app.domain.use_cases.users.create_member import CreateMemberUseCase
 from app.domain.use_cases.users.member_names import raise_if_name_taken
 
@@ -27,14 +27,14 @@ class RedeemInviteUseCase:
         invite_repo: IInviteRepository,
         user_repo: IUserRepository,
         create_member: CreateMemberUseCase,
-        token_service: ITokenService,
+        sign_in_device: SignInDeviceUseCase,
         guard: GuardCodeGuessesUseCase,
         clock: Callable[[], datetime] = _utc_now,
     ):
         self.invite_repo = invite_repo
         self.user_repo = user_repo
         self.create_member = create_member
-        self.token_service = token_service
+        self.sign_in_device = sign_in_device
         self.guard = guard
         self.clock = clock
 
@@ -55,11 +55,4 @@ class RedeemInviteUseCase:
             avatar_color=avatar_color,
             is_admin=invite.is_admin,
         )
-        token = self.token_service.create_access_token(
-            subject=member.id, is_admin=member.is_admin, token_version=member.token_version
-        )
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "user": member,
-        }
+        return await self.sign_in_device.execute(member)

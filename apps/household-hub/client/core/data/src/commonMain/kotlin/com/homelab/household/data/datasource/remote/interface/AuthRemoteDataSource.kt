@@ -52,4 +52,11 @@ interface AuthRemoteDataSource {
      * decided somebody is signed in, and the data source keeps nothing of its own.
      */
     suspend fun renew(accessToken: String): TokenResponseDto
+
+    /**
+     * Tells the hub this phone is signing out, so it stops accepting every token the phone was given.
+     * [accessToken] is passed for the same reason as in [renew]. A token the hub had already dropped
+     * is unauthorized here too; whether that matters is the repository's to say.
+     */
+    suspend fun signOut(accessToken: String)
 }

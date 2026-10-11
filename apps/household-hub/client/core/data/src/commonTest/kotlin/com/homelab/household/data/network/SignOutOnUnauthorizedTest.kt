@@ -101,6 +101,25 @@ class SignOutOnUnauthorizedTest {
             assertEquals(0, signedOut)
         }
 
+    /**
+     * The member asked to sign out, so a 401 to that call only means the hub had already dropped the
+     * token. Nothing is announced; forgetting the token is the repository's, which does it either way.
+     */
+    @Test
+    fun `GIVEN a member signing out WHEN the hub answers the sign-out with 401 THEN nothing is announced and the token is left to the caller`() =
+        runTest {
+            // GIVEN
+            val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
+            var signedOut = 0
+
+            // WHEN
+            client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.post("$hub/api/v1/auth/logout")
+
+            // THEN
+            assertEquals("revoked-token", tokens.getAccessToken())
+            assertEquals(0, signedOut)
+        }
+
     @Test
     fun `GIVEN no token kept on this phone WHEN a call comes back 401 THEN nobody is signed out`() =
         runTest {
