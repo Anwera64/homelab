@@ -74,7 +74,7 @@ if git diff --cached --name-only | grep -q '^apps/household-hub/client/'; then
   (cd apps/household-hub/client && ./gradlew ktlintCheck :shared:jvmTest \
     --tests "*CleanArchitectureBoundaryTest*" --tests "*KoinDependencyGraphTest*" \
     --tests "*DesignSystemTokenTest*" --tests "*CoroutineSafetyTest*" \
-    --tests "*LintSetupTest*" -q --console=plain)
+    --tests "*LintSetupTest*" --tests "*TestsGoThroughRobotsTest*" -q --console=plain)
   CLIENT_EXIT_CODE=$?
   if [ $CLIENT_EXIT_CODE -ne 0 ]; then
     echo ""
