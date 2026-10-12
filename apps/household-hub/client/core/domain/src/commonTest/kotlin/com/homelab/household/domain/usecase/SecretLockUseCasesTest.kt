@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * The PIN reaches the data layer and is dropped there for now: nothing verifies it on either
  * side, which `docs/STAGE_5_SECRET_SESSION_LOCKING.md` §1 states outright. These tests pin the
  * only check that does exist today — that something was typed — and the pass-through the spec's
- * §5 needs when slice 5 sends the PIN to the hub.
+ * §5 needs when slice 6 sends the PIN to the hub.
  */
 class SecretLockUseCasesTest {
     private val sessionRepo = mock<SessionRepository>()

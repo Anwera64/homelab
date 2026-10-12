@@ -14,6 +14,7 @@ Everything decided while designing the Stage 5 mobile client, in one place: the 
 | :--- | :--- |
 | Design canvas — *Household Hub* ([link](https://claude.ai/artifact/EgTpi5oNpDv855uweAjCNT)) | Every flow, one page per area (151 artboards on 16 pages). Its Foundations page holds the palette proof, the type scale and the Hearth icon set, which used to be separate artefacts |
 | [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md) | Approved spec for server-enforced secret chats |
+| [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) | Spec for how memories are written, stored and read (slice 5). **It replaces what this document says about memories, shared facts and the publish notice**; its screens are not designed yet |
 | [`STAGE_5_UI_UX_SPECIFICATION.md`](STAGE_5_UI_UX_SPECIFICATION.md) | The original Stage 5 spec. **Its token table and some flows are out of date** — see §7 |
 
 The canvas link is private to the owner's account.
@@ -162,7 +163,12 @@ A screen reads the scale off the theme, beside the palette — `HearthTheme.spac
 | Chat previews | New `last_message_preview` on the session list | Rows need to be recognisable when scrolling |
 | PDFs | Attached to a chat. The file is never kept, the extracted text is. No page limit | Agreed when the document feature was designed |
 | Notes | Read, share (.md), delete. No editing in the app | You ask the agent to change a note |
-| Memories | Remove only, no editing | Kept simple; `UpdateMemoryUseCase` stays unused |
+| Memories | Remove only, no editing. *Reopened by the memory spec: a proposed change to a memory may need editing before it is accepted (its §12, question 2)* | Kept simple; `UpdateMemoryUseCase` stays unused |
+| Memory: writing | An explicit "remember" goes through a tool and its approval card; everything else is found by one reflection after the chat goes idle, never after each turn. Only what the member states is saved (memory spec §2) | Per-turn reflection saved the agent's own words, made the next message wait and undid the prompt cache (#133, #81) |
+| Memory: one store | Shared facts are household memories. Gossip milestones, their endpoints and the publish notice are gone (memory spec §3) | The two stores were written together and held the same things |
+| Memory: reading | A fixed block filled to a budget, preferences and health first; older memories are recalled by meaning when a message relates to them (memory spec §5) | The newest 20 were sent whatever the question, and 30 of 50 never reached an agent |
+| Memory: changes | A changed or contradicting fact becomes a proposal the member answers; nothing stored is rewritten in the background (memory spec §6) | Similarity cannot tell a correction from a repeat |
+| Calendar events | Events that come up in a chat are remembered, linked to the event, and follow it when it moves or is removed (memory spec §7) | Knowing someone's plans is part of knowing them; the fault in #133 was that they went stale |
 | Web search | Each step shows its own sources, from a summary saved with the tool part: a search opens to its results, a page read names its page. A closed fold says what its steps did (#40) | Doesn't depend on the model remembering to cite, and survives reopening the chat |
 | Agent in a chat | The header pill names the agent, with no chevron. Changing agent means starting a new chat | A session is bound to one agent and there is no endpoint to switch |
 | Platforms | Android and iOS phones, portrait. Tablet in a later stage | Both of you need it on your own phone |
@@ -190,7 +196,7 @@ Items marked **⛔** break a designed flow until they're done.
 - [ ] ⛔ `POST /auth/unlock-secret`, 423 on secret reads, rate limit (§4.1–4.2).
 - [ ] ⛔ Session-scoped token when a chat is made secret or created secret (§4.1.1).
 - [ ] ⛔ Session list withholds `title` and `last_message_preview` for secret chats while locked (§4.3).
-- [ ] ⛔ Skip memory extraction on secret turns, plus a one-off cleanup (§4.4).
+- *Moved to §5.6:* skipping memory extraction on secret turns (§4.4) is built by the memory slice, which comes first. The one-off cleanup is not needed: that slice starts with no memories.
 - [ ] ⛔ Client: replace the unlock stub, keep the token in memory only, drive the idle timer from user input only, clear on background / device lock / sign-out, unlock bar and Lock now in Chats.
 - [ ] **Surface `suggestSecretMode`.** The client parses it from the stream's done event and drops it.
 - [ ] Privacy phrases are English regexes only; Spanish or Catalan never trigger.
@@ -203,7 +209,7 @@ Items marked **⛔** break a designed flow until they're done.
 - [x] ⛔ **Handle `ToolExecuting` and `ToolResult`.** Done in #33/#34: every tool part is drawn where it ran.
 - [x] **Tool steps say what they found, or why not (#40).** Each tool part carries a `summary`; see §6.7.
 - [x] ⛔ **`tool_call_id` on `ToolApprovalProposal`.** `approveTool` needs it and the event doesn't carry it, so approval can't work as wired. *Done in slice 4 (#58): the proposal carries it, and the turn pauses until the card is answered.*
-- [ ] Milestone ids on `ChatStreamEvent.Done`, for the transient publish notice and its Undo (`DELETE /gossip/{id}`).
+- ~~Milestone ids on `ChatStreamEvent.Done`, for the transient publish notice and its Undo (`DELETE /gossip/{id}`).~~ Dropped: no turn publishes anything once reflection leaves the turn (memory spec §8).
 - [ ] Title search on the phone, over the loaded list, excluding secret chats.
 
 ### 5.4 Tools and approvals
@@ -219,7 +225,21 @@ Items marked **⛔** break a designed flow until they're done.
 
 ### 5.6 Memory and household sharing
 
-- [ ] ⛔ `MemoryAuditViewModel.loadAudit()` never loads `userMilestones` — wire it to `GET /gossip/audit`, or "Shared with the household" renders empty.
+Built in slice 5 from [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md); the section numbers below are that document's.
+
+- ~~`MemoryAuditViewModel.loadAudit()` never loads `userMilestones` — wire it to `GET /gossip/audit`.~~ Dropped: the endpoint and the milestones go.
+- [ ] ⛔ **No reflection after a turn.** A sweep reflects a chat once it has been idle, when the chat model is in memory and no turn is running, from a per-chat marker (§2.2).
+- [ ] ⛔ **Reflection saves only what the member states**, and nothing from a secret chat or secret turn, read per message (§2.2; locking spec §4.4).
+- [ ] ⛔ **`remember` and `forget`** as a write tool on the approval card, locked in secret turns, with its labels in the one label map (§2.1).
+- [ ] The chat title starts as the first message's opening words and is replaced at the first reflection (§2.3).
+- [ ] ⛔ **One store.** `agent_memories` gains expiry, origin, `relevant_for`, the event link and what replaced a retired memory; `gossip_milestones` and `/gossip` are removed; the store starts empty (§3).
+- [ ] ⛔ **Vectors** in `memory_vectors`, ranked with `sqlite-vec`'s distance function and with Python as the fallback (§4).
+- [ ] ⛔ **The fixed block** in the system prompt, filled to a token budget, in place of the newest 20 / 10 / 15 (§5.1).
+- [ ] **Recall** once per member message, attached to the message and saved with it (§5.2).
+- [ ] ⛔ **Comparing on write**: the model names the relation; changes and contradictions become proposals (§6).
+- [ ] **Calendar events** as linked memories, updated or retired with the event, and a periodic check for changes made outside the hub (§7).
+- [ ] ⛔ **Logging** of every sweep decision, reflection run, recall and calendar-link change (§9).
+- [ ] ⛔ Client: the screens are not designed. What they must make possible is in §8; the open questions are in §12.
 
 ### 5.7 Calendar
 
@@ -380,11 +400,13 @@ RULE — SCREENS SCROLL. Any screen whose content can outgrow the viewport scrol
 
 - Briefing cards — no endpoint generates them
 - Both calendars — no CalendarViewModel exists
-- Publish notice — needs milestone ids on ChatStreamEvent.Done
+- Publish notice — needs milestone ids on ChatStreamEvent.Done *(dropped, see below)*
 
 Inline tool approval. Decline / Edit / Approve are 46px tall — above the 44px floor. The card scrolls away with history rather than blocking the thread.
 
 The transient publish notice. Appears only when THAT turn published something of yours; Undo calls DELETE /gossip/{id}. Self-dismisses, leaves no trace — a confirmation of your own action, never a view of the bus.
+
+*Superseded (12 October 2026): the publish notice is dropped. Memories are no longer written at the end of a turn, so no turn has anything to confirm. What a chat's reflection saved is shown in the chat instead; how is not designed yet (memory spec §8).*
 
 Gossip, in prose only. "Liam mentioned he's back by seven" is the whole surface. No card, no badge, no citation chip.
 
@@ -578,6 +600,8 @@ So the composer is disabled outright and says why. If you would rather queue, it
 ### 6.10 Profile
 
 *Screens:* Profile, What I know about you, Shared with the household
+
+*Superseded in part (12 October 2026). The notes below describe memories and shared facts as two stores read from two endpoints. [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) makes them one, and adds proposals and a reflection time in each chat. The memory screens are to be redesigned when slice 5 is planned; until then these notes and the Profile & memory boards show the old system. The Profile hub itself, and its rows outside "What the agents keep", are not affected.*
 
 #### Profile — reached from the avatar on any dashboard
 
@@ -809,6 +833,8 @@ Empty Chats has no search and no secret bar — both arrive with the first chat.
 reflect_turn.py used to drop milestones for secret turns but still extract memories, only forcing them to personal. They showed up unlocked in What I know about you, and personal memories are loaded into every chat, so a secret surprise could surface in an ordinary one.
 
 Now memory extraction is skipped for secret turns exactly like milestones; the title step still runs. Which is why the empty memory screen can promise “Nothing said in Secret Mode is ever written down.”
+
+*Not built yet when this was written. It is built in slice 5, as a rule of the new reflection (memory spec §2.2), so the promise holds from the day the memory screens ship.*
 
 Spec: STAGE_5_SECRET_SESSION_LOCKING.md §4.4.
 
