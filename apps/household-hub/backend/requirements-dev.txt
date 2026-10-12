@@ -30,7 +30,7 @@ bcrypt==5.0.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
-caldav==3.3.1
+caldav==3.4.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -75,7 +75,7 @@ dnspython==2.8.0
     # via
     #   -c requirements.txt
     #   caldav
-fastapi==0.142.2
+fastapi==0.143.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -170,13 +170,13 @@ pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementatio
     # via
     #   -c requirements.txt
     #   cffi
-pydantic==2.13.5
+pydantic==2.14.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.46.5
+pydantic-core==2.50.0
     # via
     #   -c requirements.txt
     #   pydantic
@@ -247,7 +247,7 @@ six==1.17.0
     # via
     #   -c requirements.txt
     #   python-dateutil
-sqlalchemy==2.1.3
+sqlalchemy==2.1.4
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -260,7 +260,7 @@ tld==0.13.2
     # via
     #   -c requirements.txt
     #   courlan
-trafilatura==2.3.0
+trafilatura==2.3.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
