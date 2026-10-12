@@ -1,14 +1,9 @@
 package com.homelab.household.app.components
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.wait_slow_hub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.util.WaitPhase
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 
 /**
@@ -23,7 +18,7 @@ class SlowLineTest {
         runComposeUiTest {
             setContent { StillTheme { SlowLine(WaitPhase.Slow) } }
 
-            onNodeWithText(getString(Res.string.wait_slow_hub)).assertIsDisplayed()
+            onSlowLine { seesTheHubIsSlow() }
         }
 
     /**
@@ -40,6 +35,6 @@ class SlowLineTest {
                 }
             }
 
-            onNodeWithText(getString(Res.string.wait_slow_hub)).assertDoesNotExist()
+            onSlowLine { doesNotSeeTheHubIsSlow() }
         }
 }

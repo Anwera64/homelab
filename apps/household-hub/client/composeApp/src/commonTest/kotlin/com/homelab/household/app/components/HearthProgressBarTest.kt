@@ -2,20 +2,12 @@ package com.homelab.household.app.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_working
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DayColors
 import com.homelab.household.app.theme.NightColors
 import com.homelab.household.app.theme.StillMotion
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -69,13 +61,6 @@ class HearthProgressBarTest {
                 }
             }
 
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG)
-                .assertIsDisplayed()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_working),
-                    ),
-                )
+            onHearthProgressBar { seesTheBarWorking() }
         }
 }

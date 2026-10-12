@@ -14,21 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
-import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
-import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
-import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 /**
  * Screens scroll: the content region moves, header and navigation stay pinned (design notes §2).
@@ -56,11 +45,13 @@ class HearthScaffoldTest {
                 }
             }
 
-            onNodeWithText("Row 119").performScrollTo().assertIsDisplayed()
+            onHearthScaffold {
+                scrollsToAndSees("Row 119")
 
-            onNodeWithText("Row 0").assertIsNotDisplayed()
-            onNodeWithText("HyggeHub · Household").assertIsDisplayed()
-            onNodeWithText("Bottom bar").assertIsDisplayed()
+                doesNotSeeOnScreen("Row 0")
+                seesText("HyggeHub · Household")
+                seesText("Bottom bar")
+            }
         }
 
     @Test
@@ -76,10 +67,12 @@ class HearthScaffoldTest {
                 }
             }
 
-            onNodeWithTag("list").performScrollToIndex(499)
+            onHearthScaffold {
+                scrollsTheListTo("list", 499)
 
-            onNodeWithText("Chat 499").assertIsDisplayed()
-            onNodeWithText("Chats").assertIsDisplayed()
+                seesText("Chat 499")
+                seesText("Chats")
+            }
         }
 
     @Test
@@ -114,11 +107,7 @@ class HearthScaffoldTest {
                 }
             }
 
-            val root = onRoot().getBoundsInRoot()
-            val content = onNodeWithTag("content").getBoundsInRoot()
-
-            assertEquals(BAR, content.top)
-            assertEquals(root.bottom - BAR, content.bottom)
+            onHearthScaffold { seesContentBetween("content", top = BAR, bottom = BAR) }
         }
 
     @Test
@@ -137,9 +126,7 @@ class HearthScaffoldTest {
                 }
             }
 
-            onNodeWithTag("content")
-                .assertTopPositionInRootIsEqualTo(STATUS_BAR)
-                .assertLeftPositionInRootIsEqualTo(20.dp)
+            onHearthScaffold { seesContentAt("content", top = STATUS_BAR, left = 20.dp) }
         }
 
     private companion object {

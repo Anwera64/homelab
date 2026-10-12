@@ -2,8 +2,6 @@ package com.homelab.household.app.components
 
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
@@ -19,8 +17,10 @@ class BentoCardTest {
                 }
             }
 
-            onNodeWithText("TODAY · MERGED", ignoreCase = true).assertIsDisplayed()
-            onNodeWithText("Dinner together").assertIsDisplayed()
+            onBentoCard {
+                seesLabel("TODAY · MERGED")
+                seesText("Dinner together")
+            }
         }
 
     @Test
@@ -32,6 +32,6 @@ class BentoCardTest {
                 }
             }
 
-            onNodeWithText("Dinner together").assertIsDisplayed()
+            onBentoCard { seesText("Dinner together") }
         }
 }

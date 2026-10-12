@@ -1,10 +1,6 @@
 package com.homelab.household.app.components
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.testing.StillTheme
@@ -27,9 +23,11 @@ class EmptyStateTest {
                 }
             }
 
-            onNodeWithTag(EMPTY_STATE_ICON_TAG).assertIsDisplayed()
-            onNodeWithText("Nothing remembered yet").assertIsDisplayed()
-            onNodeWithText("What agents learn about you will appear here.").assertIsDisplayed()
+            onEmptyState {
+                seesTheIcon()
+                seesText("Nothing remembered yet")
+                seesText("What agents learn about you will appear here.")
+            }
         }
 
     @Test
@@ -47,7 +45,7 @@ class EmptyStateTest {
                 }
             }
 
-            onNodeWithText("Start a chat").assertIsDisplayed().performClick()
+            onEmptyState { tapsTheAction("Start a chat") }
             assertEquals(1, started)
         }
 
@@ -64,6 +62,6 @@ class EmptyStateTest {
                 }
             }
 
-            onNodeWithText("Start a chat").assertDoesNotExist()
+            onEmptyState { doesNotSeeTheAction("Start a chat") }
         }
 }

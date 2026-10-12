@@ -1,10 +1,6 @@
 package com.homelab.household.app.components
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
@@ -22,7 +18,7 @@ class HearthTopBarTest {
                 }
             }
 
-            onNodeWithContentDescription("Back").performClick()
+            onHearthTopBar { tapsBack("Back") }
 
             assertEquals(1, back)
         }
@@ -36,7 +32,9 @@ class HearthTopBarTest {
                 }
             }
 
-            onNodeWithText("Members").assertIsDisplayed()
-            onNodeWithContentDescription("Back").assertIsDisplayed()
+            onHearthTopBar {
+                seesTitle("Members")
+                seesBack("Back")
+            }
         }
 }

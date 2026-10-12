@@ -1,12 +1,6 @@
 package com.homelab.household.app.components
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.StillTheme
 import kotlin.test.Test
@@ -25,7 +19,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNode(hasSetTextAction()).performTextInput("48a29-13")
+            onSliceTwoComponents { typesIntoTheField("48a29-13") }
 
             assertEquals("482913", pin)
         }
@@ -40,7 +34,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNode(hasSetTextAction()).performTextInput("7")
+            onSliceTwoComponents { typesIntoTheField("7") }
 
             assertEquals(6, pin.length)
         }
@@ -55,7 +49,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithContentDescription("Invite code").performTextInput("k7m2qp9")
+            onSliceTwoComponents { typesIntoTheControlDescribed("Invite code", "k7m2qp9") }
 
             assertEquals("K7M2QP", code)
         }
@@ -69,9 +63,11 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithText("K").assertIsDisplayed()
-            onNodeWithText("7").assertIsDisplayed()
-            onNodeWithText("M").assertIsDisplayed()
+            onSliceTwoComponents {
+                seesText("K")
+                seesText("7")
+                seesText("M")
+            }
         }
 
     @Test
@@ -83,8 +79,10 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithText("K7M2QP").assertIsDisplayed()
-            onNodeWithText("Expires in 14:52").assertIsDisplayed()
+            onSliceTwoComponents {
+                seesText("K7M2QP")
+                seesText("Expires in 14:52")
+            }
         }
 
     @Test
@@ -101,10 +99,12 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithText("Erased for good").assertIsDisplayed()
-            onNodeWithText("Every conversation he's had").assertIsDisplayed()
-            onNodeWithText("Stays in the household").assertIsDisplayed()
-            onNodeWithText("Things he shared keep his name on them").assertIsDisplayed()
+            onSliceTwoComponents {
+                seesText("Erased for good")
+                seesText("Every conversation he's had")
+                seesText("Stays in the household")
+                seesText("Things he shared keep his name on them")
+            }
         }
 
     @Test
@@ -121,7 +121,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithContentDescription("Household admin").performClick()
+            onSliceTwoComponents { tapsTheControlDescribed("Household admin") }
 
             assertEquals(true, admin)
         }
@@ -136,7 +136,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithText("Members").performClick()
+            onSliceTwoComponents { tapsText("Members") }
 
             assertEquals(1, opened)
         }
@@ -156,8 +156,10 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithText("Not while you're the only admin").assertIsDisplayed()
-            onNodeWithText("Delete my account").performClick()
+            onSliceTwoComponents {
+                seesText("Not while you're the only admin")
+                tapsText("Delete my account")
+            }
 
             assertEquals(0, opened)
         }
@@ -178,7 +180,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithContentDescription("Colour 2").performClick()
+            onSliceTwoComponents { tapsTheControlDescribed("Colour 2") }
 
             assertEquals("#3C6E4E", chosen)
         }
@@ -199,7 +201,7 @@ class SliceTwoComponentsTest {
                 }
             }
 
-            onNodeWithContentDescription("Colour 2").performClick()
+            onSliceTwoComponents { tapsTheControlDescribed("Colour 2") }
 
             assertEquals("#C05638", chosen)
         }
