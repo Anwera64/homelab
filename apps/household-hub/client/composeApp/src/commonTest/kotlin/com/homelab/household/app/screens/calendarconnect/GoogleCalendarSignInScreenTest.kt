@@ -1,26 +1,10 @@
 package com.homelab.household.app.screens.calendarconnect
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.google_signin_again
-import com.homelab.household.app.resources.google_signin_button
-import com.homelab.household.app.resources.google_signin_denied
-import com.homelab.household.app.resources.google_signin_step_two
-import com.homelab.household.app.resources.google_signin_unavailable
 import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.StillTheme
-import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemorySessionStorage
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -28,13 +12,6 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class GoogleCalendarSignInScreenTest {
     private val wait = 5_000L
-
-    /** A phone with somebody signed in on it: this screen is behind a token. */
-    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
-
-    /** The button, not the title above it that says the same. */
-    private suspend fun signInButton(): SemanticsMatcher =
-        hasClickAction() and hasText(getString(Res.string.google_signin_button))
 
     @Test
     fun `GIVEN Google shares the calendar WHEN the member signs in THEN Google's page opens and the screen hands back`() {
@@ -44,14 +21,10 @@ class GoogleCalendarSignInScreenTest {
         var connected = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn(), externalApps = browser) {
-                    GoogleCalendarSignInScreen(onBack = {}, onConnect = { connected++ })
-                }
-            }
+            googleCalendarSignInScreen(hub, browser, onConnect = { connected++ })
 
             // WHEN
-            onNode(signInButton()).performClick()
+            onGoogleCalendarSignIn { tapsSignIn() }
 
             // THEN
             waitUntil(timeoutMillis = wait) { connected == 1 }
@@ -67,18 +40,16 @@ class GoogleCalendarSignInScreenTest {
         var connected = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn(), externalApps = browser) {
-                    GoogleCalendarSignInScreen(onBack = {}, onConnect = { connected++ })
-                }
+            googleCalendarSignInScreen(hub, browser, onConnect = { connected++ })
+
+            onGoogleCalendarSignIn {
+                // WHEN
+                tapsSignIn()
+
+                // THEN
+                seesTheMemberDidNotShare()
+                seesToSignInAgain()
             }
-
-            // WHEN
-            onNode(signInButton()).performClick()
-
-            // THEN
-            waitUntilExactlyOneExists(hasText(getString(Res.string.google_signin_denied)), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.google_signin_again)).assertIsDisplayed()
         }
         assertEquals(0, connected)
     }
@@ -90,19 +61,17 @@ class GoogleCalendarSignInScreenTest {
         val browser = FakeExternalApps().apply { browserReturnsTo = null }
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn(), externalApps = browser) {
-                    GoogleCalendarSignInScreen(onBack = {}, onConnect = {})
-                }
-            }
+            googleCalendarSignInScreen(hub, browser)
 
             // WHEN
-            onNode(signInButton()).performClick()
+            onGoogleCalendarSignIn { tapsSignIn() }
 
             // THEN
             waitUntil(timeoutMillis = wait) { browser.pagesOpened.size == 1 }
-            waitUntilExactlyOneExists(signInButton(), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.google_signin_denied)).assertDoesNotExist()
+            onGoogleCalendarSignIn {
+                seesItReadyToSignIn()
+                doesNotSeeTheMemberDidNotShare()
+            }
         }
     }
 
@@ -113,17 +82,15 @@ class GoogleCalendarSignInScreenTest {
         val browser = FakeExternalApps()
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn(), externalApps = browser) {
-                    GoogleCalendarSignInScreen(onBack = {}, onConnect = {})
-                }
+            googleCalendarSignInScreen(hub, browser)
+
+            onGoogleCalendarSignIn {
+                // WHEN
+                tapsSignIn()
+
+                // THEN
+                seesGoogleSignInIsUnavailable()
             }
-
-            // WHEN
-            onNode(signInButton()).performClick()
-
-            // THEN
-            waitUntilExactlyOneExists(hasText(getString(Res.string.google_signin_unavailable)), timeoutMillis = wait)
         }
         assertEquals(emptyList(), browser.pagesOpened)
     }
@@ -139,7 +106,7 @@ class GoogleCalendarSignInScreenTest {
                 setContent { StillTheme { GoogleCalendarSignInContent(state = state, onSignIn = {}, onBack = {}) } }
 
                 // THEN
-                onNodeWithText(getString(Res.string.google_signin_step_two)).assertExists()
+                onGoogleCalendarSignIn { seesTheStepsInTheBrowser() }
             }
         }
     }
