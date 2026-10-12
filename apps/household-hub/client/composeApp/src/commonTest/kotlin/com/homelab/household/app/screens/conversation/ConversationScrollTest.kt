@@ -8,13 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.waitUntilExactlyOneExists
 import androidx.compose.ui.unit.dp
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.ChatMessage
@@ -99,7 +93,7 @@ class ConversationScrollTest {
             // scrolled from not — the node counts as displayed the moment any of it is. What the
             // question does is the honest signal: following the answer pushes it off the top, far
             // enough that the list stops composing it at all.
-            onNodeWithText("What's left before Friday?").assertDoesNotExist()
+            onConversationScroll { doesNotSee(QUESTION) }
         }
 
     @Test
@@ -113,8 +107,10 @@ class ConversationScrollTest {
 
             state = opened
 
-            waitUntilExactlyOneExists(hasText(NEWEST_ANSWER), timeoutMillis = WAIT_MILLIS)
-            onNodeWithText(OLDEST_QUESTION).assertDoesNotExist()
+            onConversationScroll {
+                waitsForText(NEWEST_ANSWER)
+                doesNotSee(OLDEST_QUESTION)
+            }
         }
 
     @Test
@@ -122,12 +118,11 @@ class ConversationScrollTest {
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             var state by mutableStateOf(stateNamed("A conversation opened again"))
             setContent(growing { state })
-            waitUntilExactlyOneExists(hasText(NEWEST_ANSWER), timeoutMillis = WAIT_MILLIS)
+            onConversationScroll { waitsForText(NEWEST_ANSWER) }
 
             state = state.andThen(LATEST_ANSWER)
 
-            waitUntilExactlyOneExists(hasText(LATEST_ANSWER), timeoutMillis = WAIT_MILLIS)
-            onNodeWithText(LATEST_ANSWER).assertIsDisplayed()
+            onConversationScroll { seesText(LATEST_ANSWER) }
         }
 
     @Test
@@ -135,18 +130,21 @@ class ConversationScrollTest {
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             var state by mutableStateOf(stateNamed("A conversation opened again"))
             setContent(growing { state })
-            waitUntilExactlyOneExists(hasText(NEWEST_ANSWER), timeoutMillis = WAIT_MILLIS)
-
-            onNodeWithTag(CONVERSATION_TRANSCRIPT_TAG).performScrollToIndex(0)
-            waitUntilExactlyOneExists(hasText(OLDEST_QUESTION), timeoutMillis = WAIT_MILLIS)
+            onConversationScroll {
+                waitsForText(NEWEST_ANSWER)
+                scrollsBackToTheStart()
+                waitsForText(OLDEST_QUESTION)
+            }
 
             state = state.andThen(LATEST_ANSWER)
             waitForIdle()
 
             // Following unconditionally would make a long answer impossible to read back while it
             // is still being written.
-            onNodeWithText(OLDEST_QUESTION).assertIsDisplayed()
-            onNodeWithText(LATEST_ANSWER).assertDoesNotExist()
+            onConversationScroll {
+                seesItStillShown(OLDEST_QUESTION)
+                doesNotSee(LATEST_ANSWER)
+            }
         }
 
     @Test
@@ -155,13 +153,13 @@ class ConversationScrollTest {
             setContent(conversation(stateNamed("A finished exchange")))
             waitForIdle()
 
-            onNodeWithText("What's left before Friday?").assertIsDisplayed()
+            onConversationScroll { seesItStillShown(QUESTION) }
         }
 
     private companion object {
         val PHONE_WIDTH = 390.dp
         val PHONE_HEIGHT = 844.dp
-        const val WAIT_MILLIS = 5_000L
+        const val QUESTION = "What's left before Friday?"
         const val NEWEST_ANSWER = "Answer 20, at some length to fill the screen."
         const val OLDEST_QUESTION = "Question 1 of a long-running conversation"
         const val LATEST_ANSWER = "One more answer, after the fold."
