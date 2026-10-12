@@ -2,13 +2,8 @@ package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.navigation3.runtime.NavKey
-import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.CalendarProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,92 +27,108 @@ class AppNavHostTest {
     @Test
     fun a_phone_the_hub_signs_out_starts_over_at_who_is_here() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
+                seesHome()
 
-            session.hubSignsThisPhoneOut()
+                session.hubSignsThisPhoneOut()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun the_session_is_renewed_once_when_the_app_opens() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
 
-            waitForIdle()
-            assertEquals(1, session.renewals)
+                waitForIdle()
+                assertEquals(1, session.renewals)
+            }
         }
 
     @Test
     fun it_starts_on_launch() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.LAUNCH).assertIsDisplayed()
+                seesLaunch()
+            }
         }
 
     @Test
     fun launch_sends_the_user_to_sign_in() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
+                tapsGoToSignIn()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            // Launch is answered once, so it leaves the stack rather than hiding under the answer.
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                // Launch is answered once, so it leaves the stack rather than hiding under the answer.
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun launch_sends_the_user_to_first_run() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
+                tapsGoToFirstRun()
 
-            onNodeWithText(StubScreens.FIRST_RUN).assertIsDisplayed()
-            assertEquals(listOf(Destination.FirstRun), backStack.toList())
+                seesFirstRun()
+                assertEquals(listOf(Destination.FirstRun), backStack.toList())
+            }
         }
 
     @Test
     fun first_run_goes_home_once_the_household_exists() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
-            onNodeWithText(StubScreens.CREATED).performClick()
+                tapsGoToFirstRun()
+                tapsCreatedHousehold()
 
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
-            // The form is done with; back from home doesn't return to it.
-            assertEquals(listOf(Destination.Home), backStack.toList())
+                seesHome()
+                // The form is done with; back from home doesn't return to it.
+                assertEquals(listOf(Destination.Home), backStack.toList())
+            }
         }
 
     @Test
     fun first_run_on_a_hub_already_set_up_goes_to_sign_in() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_FIRST_RUN).performClick()
-            onNodeWithText(StubScreens.SIGN_IN_INSTEAD).performClick()
+                tapsGoToFirstRun()
+                tapsSignInInstead()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun tapping_a_face_opens_that_members_pin_over_the_picker() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
+                tapsGoToSignIn()
+                tapsPickEmma()
 
-            onNodeWithText(StubScreens.pinOf(StubScreens.EMMA)).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn, Destination.Pin(StubScreens.EMMA)), backStack.toList())
+                seesThePinPadOf(StubScreens.EMMA)
+                assertEquals(listOf(Destination.SignIn, Destination.Pin(StubScreens.EMMA)), backStack.toList())
+            }
         }
 
     // ---- a destination's ViewModels ---------------------------------------
@@ -125,321 +136,361 @@ class AppNavHostTest {
     @Test
     fun `GIVEN a conversation WHEN a screen is opened over it and closed THEN it still has the same ViewModel`() =
         runComposeUiTest {
-            // GIVEN
-            val screens = StubScreens()
-            backStack[0] = Destination.Conversation()
-            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+            onAppNavHost {
+                // GIVEN
+                val screens = StubScreens()
+                backStack[0] = Destination.Conversation()
+                appNavHost(screens, backStack, session)
 
-            // WHEN
-            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
-            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
-            onNodeWithText(StubScreens.BACK).performClick()
+                // WHEN
+                tapsReconnectCalendar()
+                seesTheCalendarPicker()
+                tapsBack()
 
-            // THEN
-            onNodeWithText(StubScreens.NEW_CONVERSATION).assertIsDisplayed()
-            val kept = screens.viewModels.single()
-            assertFalse(kept.cleared)
+                // THEN
+                seesANewConversation()
+                val kept = screens.viewModels.single()
+                assertFalse(kept.cleared)
+            }
         }
 
     @Test
     fun `GIVEN a conversation that opened the connect flow WHEN a calendar connects THEN the conversation hears it once`() =
         runComposeUiTest {
-            // GIVEN
-            val screens = StubScreens()
-            backStack[0] = Destination.Conversation("s-1")
-            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+            onAppNavHost {
+                // GIVEN
+                val screens = StubScreens()
+                backStack[0] = Destination.Conversation("s-1")
+                appNavHost(screens, backStack, session)
 
-            // WHEN
-            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
-            onNodeWithText(StubScreens.PICK_APPLE).performClick()
-            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
-            waitForIdle()
+                // WHEN
+                tapsReconnectCalendar()
+                tapsPickApple()
+                tapsCalendarConnected()
+                waitForIdle()
 
-            // THEN
-            onNodeWithText(StubScreens.conversationOf("s-1")).assertIsDisplayed()
-            assertEquals(1, screens.calendarsConnected)
+                // THEN
+                seesTheConversation("s-1")
+                assertEquals(1, screens.calendarsConnected)
+            }
         }
 
     @Test
     fun `GIVEN a conversation that opened the connect flow WHEN it is left with Back THEN the conversation hears nothing`() =
         runComposeUiTest {
-            // GIVEN
-            val screens = StubScreens()
-            backStack[0] = Destination.Conversation("s-1")
-            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
+            onAppNavHost {
+                // GIVEN
+                val screens = StubScreens()
+                backStack[0] = Destination.Conversation("s-1")
+                appNavHost(screens, backStack, session)
 
-            // WHEN
-            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
-            onNodeWithText(StubScreens.BACK).performClick()
-            waitForIdle()
+                // WHEN
+                tapsReconnectCalendar()
+                tapsBack()
+                waitForIdle()
 
-            // THEN
-            assertEquals(0, screens.calendarsConnected)
+                // THEN
+                assertEquals(0, screens.calendarsConnected)
+            }
         }
 
     @Test
     fun `GIVEN a PIN pad closed with Back WHEN it is opened again THEN it has a new ViewModel`() =
         runComposeUiTest {
-            // GIVEN
-            val screens = StubScreens()
-            backStack[0] = Destination.SignIn
-            setContent { StillTheme { AppNavHost(screens = screens, backStack = backStack, session = session) } }
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
-            onNodeWithText(StubScreens.BACK).performClick()
-            waitForIdle()
+            onAppNavHost {
+                // GIVEN
+                val screens = StubScreens()
+                backStack[0] = Destination.SignIn
+                appNavHost(screens, backStack, session)
+                tapsPickEmma()
+                tapsBack()
+                waitForIdle()
 
-            // WHEN
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
-            waitForIdle()
+                // WHEN
+                tapsPickEmma()
+                waitForIdle()
 
-            // THEN
-            assertEquals(2, screens.viewModels.size)
-            assertTrue(screens.viewModels.first().cleared)
-            assertFalse(screens.viewModels.last().cleared)
+                // THEN
+                assertEquals(2, screens.viewModels.size)
+                assertTrue(screens.viewModels.first().cleared)
+                assertFalse(screens.viewModels.last().cleared)
+            }
         }
 
     @Test
     fun back_from_the_pin_returns_to_the_picker() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsGoToSignIn()
+                tapsPickEmma()
+                tapsBack()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun the_right_pin_goes_home_and_leaves_sign_in_behind() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
-            onNodeWithText(StubScreens.SIGNED_IN).performClick()
+                tapsGoToSignIn()
+                tapsPickEmma()
+                tapsSignedIn()
 
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
-            assertEquals(listOf(Destination.Home), backStack.toList())
+                seesHome()
+                assertEquals(listOf(Destination.Home), backStack.toList())
+            }
         }
 
     @Test
     fun someone_with_an_invite_types_the_code_and_joins() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.HAVE_AN_INVITE).performClick()
-            onNodeWithText(StubScreens.CODE_ACCEPTED).performClick()
+                tapsGoToSignIn()
+                tapsHaveAnInvite()
+                tapsCodeAccepted()
 
-            onNodeWithText(StubScreens.joinOf(StubScreens.INVITE)).assertIsDisplayed()
-            onNodeWithText(StubScreens.JOINED).performClick()
+                seesTheJoinFor(StubScreens.INVITE)
+                tapsJoined()
 
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
-            assertEquals(listOf(Destination.Home), backStack.toList())
+                seesHome()
+                assertEquals(listOf(Destination.Home), backStack.toList())
+            }
         }
 
     @Test
     fun a_code_that_has_gone_sends_them_back_to_typing_one() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.HAVE_AN_INVITE).performClick()
-            onNodeWithText(StubScreens.CODE_ACCEPTED).performClick()
-            onNodeWithText(StubScreens.CODE_EXPIRED).performClick()
+                tapsGoToSignIn()
+                tapsHaveAnInvite()
+                tapsCodeAccepted()
+                tapsCodeExpired()
 
-            onNodeWithText(StubScreens.INVITE_CODE).assertIsDisplayed()
-            assertEquals(listOf(Destination.InviteCode), backStack.toList())
+                seesTheInviteCode()
+                assertEquals(listOf(Destination.InviteCode), backStack.toList())
+            }
         }
 
     @Test
     fun a_forgotten_pin_goes_through_a_reset_code_to_a_new_one() =
         runComposeUiTest {
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_SIGN_IN).performClick()
-            onNodeWithText(StubScreens.PICK_EMMA).performClick()
-            onNodeWithText(StubScreens.FORGOTTEN).performClick()
-            onNodeWithText(StubScreens.forgotOf(StubScreens.EMMA)).assertIsDisplayed()
+                tapsGoToSignIn()
+                tapsPickEmma()
+                tapsForgotten()
+                seesTheForgottenPinOf(StubScreens.EMMA)
 
-            onNodeWithText(StubScreens.HAVE_A_RESET_CODE).performClick()
-            onNodeWithText(StubScreens.RESET_CODE_TYPED).performClick()
-            onNodeWithText(StubScreens.newPinFor("P4XN7T")).assertIsDisplayed()
-            onNodeWithText(StubScreens.SIGNED_IN).performClick()
+                tapsHaveAResetCode()
+                tapsResetCodeTyped()
+                seesTheNewPinFor("P4XN7T")
+                tapsSignedIn()
 
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
-            assertEquals(listOf(Destination.Home), backStack.toList())
+                seesHome()
+                assertEquals(listOf(Destination.Home), backStack.toList())
+            }
         }
 
     @Test
     fun the_profile_opens_from_home_and_leads_to_members() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_PROFILE).performClick()
-            onNodeWithText(StubScreens.GO_TO_MEMBERS).performClick()
+                tapsGoToProfile()
+                tapsGoToMembers()
 
-            onNodeWithText(StubScreens.MEMBERS).assertIsDisplayed()
-            assertEquals(listOf(Destination.Home, Destination.Profile, Destination.Members), backStack.toList())
+                seesMembers()
+                assertEquals(listOf(Destination.Home, Destination.Profile, Destination.Members), backStack.toList())
+            }
         }
 
     @Test
     fun the_profile_leads_to_when_agents_act_and_back() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_WHEN_AGENTS_ACT).performClick()
-            onNodeWithText(StubScreens.WHEN_AGENTS_ACT).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile, Destination.WhenAgentsAct), backStack.toList())
+                tapsGoToWhenAgentsAct()
+                seesWhenAgentsAct()
+                assertEquals(listOf(Destination.Profile, Destination.WhenAgentsAct), backStack.toList())
 
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsBack()
 
-            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile), backStack.toList())
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
+            }
         }
 
     @Test
     fun members_leads_to_inviting_approving_and_removing() =
         runComposeUiTest {
-            backStack[0] = Destination.Members
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Members
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_INVITE).performClick()
-            onNodeWithText(StubScreens.INVITE_CREATE).assertIsDisplayed()
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsGoToInvite()
+                seesTheInviteCreate()
+                tapsBack()
 
-            onNodeWithText(StubScreens.RESET_LIAMS_PIN).performClick()
-            onNodeWithText(StubScreens.approveOf(StubScreens.LIAM)).assertIsDisplayed()
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsResetLiamsPin()
+                seesTheApprovalFor(StubScreens.LIAM)
+                tapsBack()
 
-            onNodeWithText(StubScreens.REMOVE_LIAM).performClick()
-            onNodeWithText(StubScreens.removeOf(StubScreens.LIAM)).assertIsDisplayed()
-            onNodeWithText(StubScreens.REMOVED).performClick()
+                tapsRemoveLiam()
+                seesTheRemovalOf(StubScreens.LIAM)
+                tapsRemoved()
 
-            onNodeWithText(StubScreens.MEMBERS).assertIsDisplayed()
-            assertEquals(listOf(Destination.Members), backStack.toList())
+                seesMembers()
+                assertEquals(listOf(Destination.Members), backStack.toList())
+            }
         }
 
     @Test
     fun leaving_the_household_ends_at_who_is_here() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_LEAVE).performClick()
-            onNodeWithText(StubScreens.LEFT).performClick()
+                tapsGoToLeave()
+                tapsLeft()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun signing_out_ends_at_who_is_here() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.SIGNED_OUT).performClick()
+                tapsSignedOut()
 
-            onNodeWithText(StubScreens.SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.SignIn), backStack.toList())
+                seesSignIn()
+                assertEquals(listOf(Destination.SignIn), backStack.toList())
+            }
         }
 
     @Test
     fun a_changed_pin_returns_to_the_profile() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_CHANGE_PIN).performClick()
-            onNodeWithText(StubScreens.PIN_CHANGED).performClick()
+                tapsGoToChangePin()
+                tapsPinChanged()
 
-            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile), backStack.toList())
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
+            }
         }
 
     @Test
     fun a_connected_calendar_returns_to_the_profile_past_the_picker() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
-            onNodeWithText(StubScreens.PICK_APPLE).performClick()
-            onNodeWithText(StubScreens.calendarConnectOf(CalendarProvider.APPLE)).assertIsDisplayed()
-            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+                tapsGoToCalendar()
+                tapsPickApple()
+                seesTheCalendarConnectFor(CalendarProvider.APPLE)
+                tapsCalendarConnected()
 
-            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile), backStack.toList())
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
+            }
         }
 
     @Test
     fun `GIVEN the picker WHEN Google is picked and signed in THEN the profile is back past the picker`() =
         runComposeUiTest {
-            // GIVEN
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
-            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
+            onAppNavHost {
+                // GIVEN
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
+                tapsGoToCalendar()
 
-            // WHEN
-            onNodeWithText(StubScreens.PICK_GOOGLE).performClick()
-            onNodeWithText(StubScreens.GOOGLE_SIGN_IN).assertIsDisplayed()
-            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+                // WHEN
+                tapsPickGoogle()
+                seesTheGoogleSignIn()
+                tapsCalendarConnected()
 
-            // THEN
-            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile), backStack.toList())
+                // THEN
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
+            }
         }
 
     @Test
     fun `GIVEN a Google calendar that needs signing in again WHEN the profile asks for it THEN the sign-in opens straight away`() =
         runComposeUiTest {
-            // GIVEN
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                // GIVEN
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            // WHEN
-            onNodeWithText(StubScreens.SIGN_IN_TO_GOOGLE_AGAIN).performClick()
+                // WHEN
+                tapsSignInToGoogleAgain()
 
-            // THEN
-            onNodeWithText(StubScreens.GOOGLE_SIGN_IN).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile, Destination.GoogleCalendarSignIn), backStack.toList())
+                // THEN
+                seesTheGoogleSignIn()
+                assertEquals(listOf(Destination.Profile, Destination.GoogleCalendarSignIn), backStack.toList())
+            }
         }
 
     @Test
     fun `GIVEN a failed calendar step WHEN Reconnect calendar is tapped and a calendar connected THEN the conversation is back`() =
         runComposeUiTest {
-            // GIVEN
-            backStack[0] = Destination.Conversation("s-1")
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                // GIVEN
+                backStack[0] = Destination.Conversation("s-1")
+                appNavHost(StubScreens(), backStack, session)
 
-            // WHEN
-            onNodeWithText(StubScreens.RECONNECT_CALENDAR).performClick()
-            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
-            onNodeWithText(StubScreens.PICK_APPLE).performClick()
-            onNodeWithText(StubScreens.CALENDAR_CONNECTED).performClick()
+                // WHEN
+                tapsReconnectCalendar()
+                seesTheCalendarPicker()
+                tapsPickApple()
+                tapsCalendarConnected()
 
-            // THEN
-            onNodeWithText(StubScreens.conversationOf("s-1")).assertIsDisplayed()
-            assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
+                // THEN
+                seesTheConversation("s-1")
+                assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
+            }
         }
 
     @Test
     fun back_from_a_calendar_s_details_returns_to_the_picker() =
         runComposeUiTest {
-            backStack[0] = Destination.Profile
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.GO_TO_CALENDAR).performClick()
-            onNodeWithText(StubScreens.PICK_APPLE).performClick()
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsGoToCalendar()
+                tapsPickApple()
+                tapsBack()
 
-            onNodeWithText(StubScreens.CALENDAR_PICKER).assertIsDisplayed()
-            assertEquals(listOf(Destination.Profile, Destination.CalendarPicker), backStack.toList())
+                seesTheCalendarPicker()
+                assertEquals(listOf(Destination.Profile, Destination.CalendarPicker), backStack.toList())
+            }
         }
 
     // ---- the four tabs and the raised + ------------------------------------
@@ -447,68 +498,67 @@ class AppNavHostTest {
     @Test
     fun each_tab_reaches_its_own_screen() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(CHATS_TAB).performClick()
-            onNodeWithText(StubScreens.CHATS).assertIsDisplayed()
+                tapsTheChatsTab()
+                seesChats()
 
-            onNodeWithText(SCHEDULE_TAB).performClick()
-            onNodeWithText(StubScreens.SCHEDULE).assertIsDisplayed()
+                tapsTheScheduleTab()
+                seesSchedule()
 
-            onNodeWithText(MY_SPACE_TAB).performClick()
-            onNodeWithText(StubScreens.MY_SPACE).assertIsDisplayed()
+                tapsTheMySpaceTab()
+                seesMySpace()
 
-            onNodeWithText(HOUSEHOLD_TAB).performClick()
-            onNodeWithText(StubScreens.HOME).assertIsDisplayed()
+                tapsTheHouseholdTab()
+                seesHome()
+            }
         }
 
     @Test
     fun a_tab_replaces_the_stack_rather_than_piling_onto_it() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(CHATS_TAB).performClick()
-            onNodeWithText(SCHEDULE_TAB).performClick()
+                tapsTheChatsTab()
+                tapsTheScheduleTab()
 
-            // Otherwise Back would walk the tabs you happened to visit instead of leaving.
-            assertEquals(listOf(Destination.Schedule), backStack.toList())
+                // Otherwise Back would walk the tabs you happened to visit instead of leaving.
+                assertEquals(listOf(Destination.Schedule), backStack.toList())
+            }
         }
 
     @Test
     fun the_raised_plus_opens_a_conversation_that_has_no_session_yet() =
         runComposeUiTest {
-            backStack[0] = Destination.Home
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Home
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithContentDescription(NEW_CHAT).performClick()
+                tapsTheRaisedPlus()
 
-            onNodeWithText(StubScreens.NEW_CONVERSATION).assertIsDisplayed()
-            assertEquals(listOf(Destination.Home, Destination.Conversation(null)), backStack.toList())
+                seesANewConversation()
+                assertEquals(listOf(Destination.Home, Destination.Conversation(null)), backStack.toList())
+            }
         }
 
     @Test
     fun opening_a_chat_stacks_it_on_the_list_so_back_returns_there() =
         runComposeUiTest {
-            backStack[0] = Destination.Chats
-            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+            onAppNavHost {
+                backStack[0] = Destination.Chats
+                appNavHost(StubScreens(), backStack, session)
 
-            onNodeWithText(StubScreens.OPEN_A_CHAT).performClick()
-            onNodeWithText(StubScreens.conversationOf("s-1")).assertIsDisplayed()
+                tapsOpenAChat()
+                seesTheConversation("s-1")
 
-            onNodeWithText(StubScreens.BACK).performClick()
+                tapsBack()
 
-            onNodeWithText(StubScreens.CHATS).assertIsDisplayed()
-            assertEquals(listOf(Destination.Chats), backStack.toList())
+                seesChats()
+                assertEquals(listOf(Destination.Chats), backStack.toList())
+            }
         }
-
-    private companion object {
-        // The bar labels, as the strings file spells them.
-        const val HOUSEHOLD_TAB = "Household"
-        const val SCHEDULE_TAB = "Schedule"
-        const val CHATS_TAB = "Chats"
-        const val MY_SPACE_TAB = "My Space"
-        const val NEW_CHAT = "New chat"
-    }
 }
