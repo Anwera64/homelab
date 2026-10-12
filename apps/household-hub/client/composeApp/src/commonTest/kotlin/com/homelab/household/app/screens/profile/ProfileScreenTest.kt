@@ -1,46 +1,12 @@
 package com.homelab.household.app.screens.profile
 
-import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.waitUntilDoesNotExist
-import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.SKELETON_GROUP_TAG
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.calendar_apple
-import com.homelab.household.app.resources.calendar_disconnect_keep
-import com.homelab.household.app.resources.calendar_disconnect_submit
-import com.homelab.household.app.resources.calendar_disconnect_title
-import com.homelab.household.app.resources.calendar_disconnect_unreachable
-import com.homelab.household.app.resources.calendar_sheet_change
-import com.homelab.household.app.resources.calendar_sheet_disconnect
-import com.homelab.household.app.resources.profile_agents
-import com.homelab.household.app.resources.profile_calendar_connect
-import com.homelab.household.app.resources.profile_calendar_options
-import com.homelab.household.app.resources.profile_calendar_sign_in_again
-import com.homelab.household.app.resources.profile_calendar_sign_in_needed
-import com.homelab.household.app.resources.profile_delete_blocked
-import com.homelab.household.app.resources.profile_members
-import com.homelab.household.app.resources.profile_sign_out
-import com.homelab.household.app.resources.profile_when_agents_act
-import com.homelab.household.app.resources.profile_when_agents_act_automatic
-import com.homelab.household.app.resources.profile_when_agents_act_none
 import com.homelab.household.app.testing.FakeMembersHub
-import com.homelab.household.app.testing.StillTheme
-import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
-import org.jetbrains.compose.resources.getPluralString
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -49,35 +15,21 @@ import kotlin.test.assertNull
 @OptIn(ExperimentalTestApi::class)
 class ProfileScreenTest {
     private val wait = 5_000L
-
-    /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
+    private val calendarAccount = "emma@icloud.com"
 
     @Test
     fun arriving_stands_blocks_where_the_name_goes_and_draws_the_rest_at_once() {
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    ProfileContent(
-                        state = ProfileUiState(member = null, status = ProfileStatus.Loading),
-                        onBack = {},
-                        onMembers = {},
-                        onChangePin = {},
-                        onLeave = {},
-                        onSignOut = {},
-                        onCalendar = {},
-                        onCalendarSignInAgain = {},
-                        onWhenAgentsAct = {},
-                    )
-                }
-            }
+            profileContent(ProfileUiState(member = null, status = ProfileStatus.Loading))
 
-            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
-            // The settings rows and Sign out are static copy: they need no hub, so they are there.
-            onNodeWithText(getString(Res.string.profile_members)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
-            // Whether this phone is the only admin is not known yet, so the row makes no claim.
-            onNodeWithText(getString(Res.string.profile_delete_blocked)).assertDoesNotExist()
+            onProfile {
+                seesItLoading()
+                // The settings rows and Sign out are static copy: they need no hub, so they are there.
+                seesMembers()
+                seesSignOut()
+                // Whether this phone is the only admin is not known yet, so the row makes no claim.
+                doesNotSeeTheOnlyAdminCannotLeave()
+            }
         }
     }
 
@@ -86,23 +38,12 @@ class ProfileScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(
-                        onBack = {},
-                        onMembers = {},
-                        onChangePin = {},
-                        onLeave = {},
-                        onSignedOut = {},
-                        onCalendar = {},
-                        onCalendarSignInAgain = {},
-                        onWhenAgentsAct = {},
-                    )
-                }
-            }
+            profileScreen(hub)
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_delete_blocked)), timeoutMillis = wait)
-            onNodeWithText("Emma Larsson").assertIsDisplayed()
+            onProfile {
+                seesTheOnlyAdminCannotLeave()
+                seesMember("Emma Larsson")
+            }
         }
     }
 
@@ -112,23 +53,9 @@ class ProfileScreenTest {
         var members = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(
-                        onBack = {},
-                        onMembers = { members++ },
-                        onChangePin = {},
-                        onLeave = {},
-                        onSignedOut = {},
-                        onCalendar = {},
-                        onCalendarSignInAgain = {},
-                        onWhenAgentsAct = {},
-                    )
-                }
-            }
+            profileScreen(hub, onMembers = { members++ })
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_members)), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.profile_members)).performClick()
+            onProfile { tapsMembers() }
             waitUntil(timeoutMillis = wait) { members == 1 }
         }
     }
@@ -140,23 +67,9 @@ class ProfileScreenTest {
         var signedOut = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = tokens) {
-                    ProfileScreen(
-                        onBack = {},
-                        onMembers = {},
-                        onChangePin = {},
-                        onLeave = {},
-                        onSignedOut = { signedOut++ },
-                        onCalendar = {},
-                        onCalendarSignInAgain = {},
-                        onWhenAgentsAct = {},
-                    )
-                }
-            }
+            profileScreen(hub, sessionStorage = tokens, onSignedOut = { signedOut++ })
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_sign_out)), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.profile_sign_out)).performClick()
+            onProfile { tapsSignOut() }
             waitUntil(timeoutMillis = wait) { signedOut == 1 }
         }
 
@@ -170,23 +83,9 @@ class ProfileScreenTest {
 
         states.forEach { state ->
             runComposeUiTest {
-                setContent {
-                    StillTheme {
-                        ProfileContent(
-                            state = state,
-                            onBack = {},
-                            onMembers = {},
-                            onChangePin = {},
-                            onLeave = {},
-                            onSignOut = {},
-                            onCalendar = {},
-                            onCalendarSignInAgain = {},
-                            onWhenAgentsAct = {},
-                        )
-                    }
-                }
+                profileContent(state)
 
-                onNodeWithText(getString(Res.string.profile_sign_out)).assertIsDisplayed()
+                onProfile { seesSignOut() }
             }
         }
     }
@@ -197,15 +96,17 @@ class ProfileScreenTest {
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
-            showProfile(hub)
-            waitUntilExactlyOneExists(hasText("emma@icloud.com"), timeoutMillis = wait)
+            profileScreen(hub)
 
-            // WHEN
-            onNodeWithContentDescription(getString(Res.string.profile_calendar_options)).performClick()
+            onProfile {
+                seesCalendar(calendarAccount)
 
-            // THEN
-            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_sheet_change)), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).assertIsDisplayed()
+                // WHEN
+                opensTheCalendarOptions()
+
+                // THEN
+                seesItCanBeChangedOrDisconnected()
+            }
         }
     }
 
@@ -216,11 +117,14 @@ class ProfileScreenTest {
         var picker = 0
 
         runScreenTest {
-            showProfile(hub, onCalendar = { picker++ })
-            openCalendarOptions()
+            profileScreen(hub, onCalendar = { picker++ })
 
-            // WHEN
-            onNodeWithText(getString(Res.string.calendar_sheet_change)).performClick()
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
+
+                // WHEN
+                tapsChangeCalendar()
+            }
 
             // THEN
             waitUntil(timeoutMillis = wait) { picker == 1 }
@@ -233,15 +137,17 @@ class ProfileScreenTest {
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
-            showProfile(hub)
-            openCalendarOptions()
+            profileScreen(hub)
 
-            // WHEN
-            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
 
-            // THEN
-            val title = getString(Res.string.calendar_disconnect_title, getString(Res.string.calendar_apple))
-            waitUntilExactlyOneExists(hasText(title), timeoutMillis = wait)
+                // WHEN
+                tapsDisconnectCalendar()
+
+                // THEN
+                seesItAsksToDisconnectAppleCalendar()
+            }
             assertEquals(0, hub.calendarsRemoved)
         }
     }
@@ -252,16 +158,18 @@ class ProfileScreenTest {
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
-            showProfile(hub)
-            openCalendarOptions()
-            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
-            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_submit)), timeoutMillis = wait)
+            profileScreen(hub)
 
-            // WHEN
-            onNodeWithText(getString(Res.string.calendar_disconnect_submit)).performClick()
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
+                tapsDisconnectCalendar()
 
-            // THEN
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_calendar_connect)), timeoutMillis = wait)
+                // WHEN
+                tapsConfirmTheDisconnect()
+
+                // THEN
+                seesToConnectACalendar()
+            }
             assertEquals(1, hub.calendarsRemoved)
         }
     }
@@ -272,17 +180,19 @@ class ProfileScreenTest {
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
-            showProfile(hub)
-            openCalendarOptions()
-            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
-            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_keep)), timeoutMillis = wait)
+            profileScreen(hub)
 
-            // WHEN
-            onNodeWithText(getString(Res.string.calendar_disconnect_keep)).performClick()
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
+                tapsDisconnectCalendar()
 
-            // THEN
-            waitUntilDoesNotExist(hasText(getString(Res.string.calendar_disconnect_keep)), timeoutMillis = wait)
-            onNodeWithText("emma@icloud.com").assertIsDisplayed()
+                // WHEN
+                tapsKeepItConnected()
+
+                // THEN
+                seesTheDisconnectQuestionGone()
+                seesCalendar(calendarAccount)
+            }
             assertEquals(0, hub.calendarsRemoved)
         }
     }
@@ -293,20 +203,21 @@ class ProfileScreenTest {
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
-            showProfile(hub)
-            openCalendarOptions()
-            onNodeWithText(getString(Res.string.calendar_sheet_disconnect)).performClick()
-            waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_disconnect_submit)), timeoutMillis = wait)
-            hub.isOffline()
+            profileScreen(hub)
 
-            // WHEN
-            onNodeWithText(getString(Res.string.calendar_disconnect_submit)).performClick()
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
+                tapsDisconnectCalendar()
+                // The confirmation is up before the hub goes quiet.
+                seesItAsksToDisconnectAppleCalendar()
+                hub.isOffline()
 
-            // THEN
-            waitUntilExactlyOneExists(
-                hasText(getString(Res.string.calendar_disconnect_unreachable)),
-                timeoutMillis = wait,
-            )
+                // WHEN
+                tapsConfirmTheDisconnect()
+
+                // THEN
+                seesTheHubCouldNotBeReached()
+            }
             assertEquals(0, hub.calendarsRemoved)
         }
     }
@@ -318,18 +229,18 @@ class ProfileScreenTest {
         var signInAgain = 0
 
         runScreenTest {
-            showProfile(hub, onCalendarSignInAgain = { signInAgain++ })
-            waitUntilExactlyOneExists(
-                hasText(getString(Res.string.profile_calendar_sign_in_needed)),
-                timeoutMillis = wait,
-            )
+            profileScreen(hub, onCalendarSignInAgain = { signInAgain++ })
 
-            // WHEN
-            onNodeWithText(getString(Res.string.profile_calendar_sign_in_again)).performClick()
+            onProfile {
+                seesTheCalendarNeedsSigningInAgain()
+
+                // WHEN
+                tapsSignInAgain()
+            }
 
             // THEN
             waitUntil(timeoutMillis = wait) { signInAgain == 1 }
-            onNodeWithText("emma@gmail.com").assertIsDisplayed()
+            onProfile { seesCalendar("emma@gmail.com") }
         }
     }
 
@@ -340,13 +251,15 @@ class ProfileScreenTest {
         var opened = 0
 
         runScreenTest {
-            showProfile(hub, onWhenAgentsAct = { opened++ })
-            val caption = getPluralString(Res.plurals.profile_when_agents_act_automatic, 1, 1)
-            waitUntilExactlyOneExists(hasText(caption), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.profile_agents).uppercase()).assertIsDisplayed()
+            profileScreen(hub, onWhenAgentsAct = { opened++ })
 
-            // WHEN
-            onNodeWithText(getString(Res.string.profile_when_agents_act)).performScrollTo().performClick()
+            onProfile {
+                seesAgentsAddingWithoutAsking(count = 1)
+                seesTheAgentsHeading()
+
+                // WHEN
+                tapsWhenAgentsAct()
+            }
 
             // THEN
             waitUntil(timeoutMillis = wait) { opened == 1 }
@@ -358,38 +271,10 @@ class ProfileScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            showProfile(hub)
+            profileScreen(hub)
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_when_agents_act_none)), timeoutMillis = wait)
+            onProfile { seesEveryChangeAsks() }
         }
-    }
-
-    private fun ComposeUiTest.showProfile(
-        hub: FakeMembersHub,
-        onCalendar: () -> Unit = {},
-        onCalendarSignInAgain: () -> Unit = {},
-        onWhenAgentsAct: () -> Unit = {},
-    ) {
-        setContent {
-            TestApp(hub.engine, sessionStorage = signedIn()) {
-                ProfileScreen(
-                    onBack = {},
-                    onMembers = {},
-                    onChangePin = {},
-                    onLeave = {},
-                    onSignedOut = {},
-                    onCalendar = onCalendar,
-                    onCalendarSignInAgain = onCalendarSignInAgain,
-                    onWhenAgentsAct = onWhenAgentsAct,
-                )
-            }
-        }
-    }
-
-    private suspend fun ComposeUiTest.openCalendarOptions() {
-        waitUntilExactlyOneExists(hasText("emma@icloud.com"), timeoutMillis = wait)
-        onNodeWithContentDescription(getString(Res.string.profile_calendar_options)).performClick()
-        waitUntilExactlyOneExists(hasText(getString(Res.string.calendar_sheet_disconnect)), timeoutMillis = wait)
     }
 
     @Test
@@ -398,23 +283,9 @@ class ProfileScreenTest {
         var calendar = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) {
-                    ProfileScreen(
-                        onBack = {},
-                        onMembers = {},
-                        onChangePin = {},
-                        onLeave = {},
-                        onSignedOut = {},
-                        onCalendar = { calendar++ },
-                        onCalendarSignInAgain = {},
-                        onWhenAgentsAct = {},
-                    )
-                }
-            }
+            profileScreen(hub, onCalendar = { calendar++ })
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_calendar_connect)), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.profile_calendar_connect)).performClick()
+            onProfile { tapsConnectACalendar() }
             waitUntil(timeoutMillis = wait) { calendar == 1 }
         }
     }
