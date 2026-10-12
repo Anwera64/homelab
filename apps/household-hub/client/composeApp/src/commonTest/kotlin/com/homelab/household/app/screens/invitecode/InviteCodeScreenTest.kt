@@ -1,30 +1,13 @@
 package com.homelab.household.app.screens.invitecode
 
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.unit.width
-import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_invite_code_checking
-import com.homelab.household.app.resources.invite_code_checking
-import com.homelab.household.app.resources.invite_code_continue
-import com.homelab.household.app.resources.invite_code_title
 import com.homelab.household.app.testing.FakeJoinHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.presentation.invitecode.InviteCodeStatus
 import com.homelab.household.presentation.invitecode.InviteCodeUiState
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -150,16 +133,11 @@ class InviteCodeScreenTest {
                 }
             }
 
-            onNodeWithText(getString(Res.string.invite_code_checking))
-                .assertIsEnabled()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_invite_code_checking),
-                    ),
-                )
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
+            onInviteCode {
+                seesTheButtonCheckingTheCode()
+                seesTheProgressBar()
+                doesNotSeeContinue()
+            }
         }
 
     /**
@@ -183,11 +161,7 @@ class InviteCodeScreenTest {
                 }
             }
 
-            val screen = onRoot().getUnclippedBoundsInRoot().width
-            val button =
-                onNodeWithText(getString(Res.string.invite_code_continue))
-                    .getUnclippedBoundsInRoot()
-                    .width
+            val (screen, button) = onInviteCode { screenWidth() to continueButtonWidth() }
 
             assertTrue(
                 button > screen / 2,
@@ -213,7 +187,7 @@ class InviteCodeScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.invite_code_title)).assertIsDisplayed()
+                onInviteCode { seesTheTitle() }
             }
         }
     }

@@ -1,23 +1,13 @@
 package com.homelab.household.app.screens.pinentry
 
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_pin_checking
-import com.homelab.household.app.resources.pin_title
 import com.homelab.household.app.testing.FakeSignInHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.pinentry.PinEntryUiState
 import com.homelab.household.presentation.pinentry.PinStatus
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -148,12 +138,7 @@ class PinEntryScreenTest {
                 }
             }
 
-            onNodeWithTag(PIN_DOTS_TAG).assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_pin_checking),
-                ),
-            )
+            onPinPad { seesThePinBeingChecked() }
         }
 
     @Test
@@ -169,7 +154,7 @@ class PinEntryScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.pin_title, state.member.name)).assertIsDisplayed()
+                onPinPad { seesThePinPadOf(state.member.name) }
             }
         }
     }

@@ -1,16 +1,11 @@
 package com.homelab.household.app.screens.profilepicker
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.picker_title
 import com.homelab.household.app.testing.FakeSignInHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.domain.model.Member
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -96,7 +91,7 @@ class ProfilePickerScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.picker_title)).assertIsDisplayed()
+                onProfilePicker { seesTheTitle() }
             }
         }
     }

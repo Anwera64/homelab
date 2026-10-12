@@ -1,20 +1,7 @@
 package com.homelab.household.app.screens.join
 
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_join_joining
-import com.homelab.household.app.resources.join_joining
-import com.homelab.household.app.resources.join_submit
-import com.homelab.household.app.resources.join_title
 import com.homelab.household.app.testing.FakeJoinHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
@@ -22,7 +9,6 @@ import com.homelab.household.domain.model.InvitePreview
 import com.homelab.household.presentation.firstrun.AvatarPalette
 import com.homelab.household.presentation.join.JoinStatus
 import com.homelab.household.presentation.join.JoinUiState
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -135,16 +121,11 @@ class JoinScreenTest {
                 }
             }
 
-            onNodeWithText(getString(Res.string.join_joining))
-                .assertIsEnabled()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_join_joining),
-                    ),
-                )
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.join_submit)).assertDoesNotExist()
+            onJoin {
+                seesTheButtonJoining()
+                seesTheProgressBar()
+                doesNotSeeJoin()
+            }
         }
 
     @Test
@@ -165,7 +146,7 @@ class JoinScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.join_title)).assertIsDisplayed()
+                onJoin { seesTheTitle() }
             }
         }
     }

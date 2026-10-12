@@ -2,26 +2,15 @@ package com.homelab.household.app.screens.conversation
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
-import org.jetbrains.compose.resources.getString
 import kotlin.math.ceil
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,35 +33,40 @@ class ToolStepLineTest {
         runComposeUiTest {
             setContent { StillTheme { ToolStepLine(search) } }
 
-            onNodeWithText("Searched the web for “dinner Gràcia” · 2 results").assertIsDisplayed()
-            onNodeWithText(guide.title).assertDoesNotExist()
+            onToolStepLine {
+                seesTheSearch("dinner Gràcia", count = 2)
+                doesNotSeeResult(guide.title)
+            }
         }
 
     @Test
     fun `GIVEN a search WHEN tapped THEN its results open in place and tapping again closes them`() =
         runComposeUiTest {
             setContent { StillTheme { ToolStepLine(search) } }
-            val line = "Searched the web for “dinner Gràcia” · 2 results"
 
-            onNodeWithText(line).performClick()
+            onToolStepLine {
+                tapsTheSearch("dinner Gràcia", count = 2)
 
-            onNodeWithText(guide.title).assertIsDisplayed()
-            onNodeWithText("timeout.com").assertIsDisplayed()
-            onNodeWithText(menu.title).assertIsDisplayed()
-            onNodeWithText("lapubilla.cat").assertIsDisplayed()
+                seesResult(guide.title, site = "timeout.com")
+                seesResult(menu.title, site = "lapubilla.cat")
 
-            onNodeWithText(line).performClick()
+                tapsTheSearch("dinner Gràcia", count = 2)
 
-            onNodeWithText(guide.title).assertDoesNotExist()
+                doesNotSeeResult(guide.title)
+            }
         }
 
     @Test
     fun `GIVEN an opened search WHEN drawn THEN each result's title is a link to it`() =
         runComposeUiTest {
             setContent { StillTheme { ToolStepLine(search) } }
-            onNodeWithText("Searched the web for “dinner Gràcia” · 2 results").performClick()
 
-            assertEquals(listOf(guide.url), linksIn(guide.title))
+            onToolStepLine {
+                tapsTheSearch("dinner Gràcia", count = 2)
+                seesResult(guide.title, site = "timeout.com")
+
+                assertEquals(listOf(guide.url), linksInResult(guide.title))
+            }
         }
 
     @Test
@@ -86,10 +80,11 @@ class ToolStepLineTest {
                 }
             }
 
-            val read = "Read Menu and opening hours"
-            onNodeWithText(read).assertIsDisplayed()
-            onNodeWithText(" · lapubilla.cat", useUnmergedTree = true).assertIsDisplayed()
-            assertEquals(listOf(menu.url), linksIn(read))
+            onToolStepLine {
+                seesThePageRead(menu.title)
+                seesThePageSite(menu.title, site = "lapubilla.cat")
+                assertEquals(listOf(menu.url), linksInPageRead(menu.title))
+            }
         }
 
     @Test
@@ -109,13 +104,15 @@ class ToolStepLineTest {
                 }
             }
 
-            val title = layoutOf("Read ${long.title}")
-            assertEquals(1, title.lineCount)
-            assertFalse(title.isShownWhole(), "the title is shortened")
+            onToolStepLine {
+                val title = layoutOfPageTitle(long.title)
+                assertEquals(1, title.lineCount)
+                assertFalse(title.isShownWhole(), "the title is shortened")
 
-            val site = layoutOf(" · rsf.org")
-            assertEquals(1, site.lineCount)
-            assertTrue(site.isShownWhole(), "the site is shown whole")
+                val site = layoutOfPageSite(long.title, site = "rsf.org")
+                assertEquals(1, site.lineCount)
+                assertTrue(site.isShownWhole(), "the site is shown whole")
+            }
         }
 
     @Test
@@ -130,8 +127,10 @@ class ToolStepLineTest {
                 }
             }
 
-            assertTrue(layoutOf("Read Menu and opening hours").isShownWhole())
-            assertTrue(layoutOf(" · lapubilla.cat").isShownWhole())
+            onToolStepLine {
+                assertTrue(layoutOfPageTitle(menu.title).isShownWhole())
+                assertTrue(layoutOfPageSite(menu.title, site = "lapubilla.cat").isShownWhole())
+            }
         }
 
     @Test
@@ -144,7 +143,7 @@ class ToolStepLineTest {
                 )
             setContent { StillTheme { ToolStepLine(AnswerPart.ToolFailed("read_page", blocked)) } }
 
-            onNodeWithText("Couldn’t read scmp.com · it blocks automated reading").assertIsDisplayed()
+            onToolStepLine { seesThePageWasBlocked(site = "scmp.com") }
         }
 
     @Test
@@ -153,7 +152,7 @@ class ToolStepLineTest {
             val down = ToolSummary(query = "q", reason = ToolFailureReason.ServiceUnavailable)
             setContent { StillTheme { ToolStepLine(AnswerPart.ToolFailed("searxng_search", down)) } }
 
-            onNodeWithText("Couldn’t search the web · the hub’s search service isn’t answering").assertIsDisplayed()
+            onToolStepLine { seesWhyTheSearchServiceIsDown() }
         }
 
     @Test
@@ -161,17 +160,11 @@ class ToolStepLineTest {
         runComposeUiTest {
             setContent { StillTheme { ToolStepLine(AnswerPart.ToolDone("searxng_search")) } }
 
-            onNodeWithText(getString(Res.string.tool_search_done)).assertIsDisplayed().performClick()
-            onNodeWithText("·", substring = true).assertDoesNotExist()
+            onToolStepLine {
+                tapsTheOldSearch()
+                seesNoDetailAfterTheWords()
+            }
         }
-
-    private fun ComposeUiTest.layoutOf(text: String): TextLayoutResult {
-        val layouts = mutableListOf<TextLayoutResult>()
-        onNodeWithText(text, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
-            it(layouts)
-        }
-        return layouts.single()
-    }
 
     /**
      * Every character shown, with room for all of it. Asked this way because on the JVM, where these
@@ -180,9 +173,4 @@ class ToolStepLineTest {
     private fun TextLayoutResult.isShownWhole(): Boolean =
         getLineEnd(lineCount - 1, visibleEnd = true) == layoutInput.text.length &&
             size.width >= ceil(multiParagraph.maxIntrinsicWidth)
-
-    private fun ComposeUiTest.linksIn(text: String): List<String> {
-        val shown = onNodeWithText(text).fetchSemanticsNode().config[SemanticsProperties.Text].first()
-        return shown.getLinkAnnotations(0, shown.length).map { (it.item as LinkAnnotation.Url).url }
-    }
 }

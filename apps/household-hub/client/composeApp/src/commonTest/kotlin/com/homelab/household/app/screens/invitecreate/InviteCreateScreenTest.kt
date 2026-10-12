@@ -1,63 +1,31 @@
 package com.homelab.household.app.screens.invitecreate
 
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
-import com.homelab.household.app.components.SKELETON_GROUP_TAG
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_invite_create_making
-import com.homelab.household.app.resources.a11y_invite_create_remaking
-import com.homelab.household.app.resources.invite_create_making
-import com.homelab.household.app.resources.invite_create_making_new
-import com.homelab.household.app.resources.invite_create_name_label
-import com.homelab.household.app.resources.invite_create_name_missing
-import com.homelab.household.app.resources.invite_create_new_code
-import com.homelab.household.app.resources.invite_create_title
-import com.homelab.household.app.resources.join_name_taken
 import com.homelab.household.app.testing.FakeMembersHub
-import com.homelab.household.app.testing.StillTheme
-import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Invite
 import com.homelab.household.presentation.invitecreate.InviteCreateStatus
 import com.homelab.household.presentation.invitecreate.InviteCreateUiState
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /** Making an invite code, with the real stack under it; only the hub is faked. */
 @OptIn(ExperimentalTestApi::class)
 class InviteCreateScreenTest {
-    private val wait = 5_000L
-
-    /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
-
     @Test
     fun a_name_and_a_tap_produce_a_code_to_read_out() {
         val hub = FakeMembersHub()
         hub.makesInvites(code = "K7M2QP")
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            inviteCreateScreen(hub)
 
-            onNodeWithContentDescription(getString(Res.string.invite_create_name_label)).performTextInput("Liam")
-            onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()
-
-            waitUntilExactlyOneExists(hasText("K7M2QP"), timeoutMillis = wait)
+            onInviteCreate {
+                typesTheName("Liam")
+                tapsNewCode()
+                seesTheCode("K7M2QP")
+            }
         }
 
         assertTrue(hub.requests.any { it.contains(""""invited_name":"Liam"""") }, hub.requests.toString())
@@ -68,11 +36,12 @@ class InviteCreateScreenTest {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            inviteCreateScreen(hub)
 
-            onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()
-
-            waitUntilExactlyOneExists(hasText(getString(Res.string.invite_create_name_missing)), timeoutMillis = wait)
+            onInviteCreate {
+                tapsNewCode()
+                seesTheNameIsMissing()
+            }
         }
     }
 
@@ -82,12 +51,13 @@ class InviteCreateScreenTest {
         hub.saysTheNameIsTaken()
 
         runScreenTest {
-            setContent { TestApp(hub.engine, sessionStorage = signedIn()) { InviteCreateScreen(onBack = {}) } }
+            inviteCreateScreen(hub)
 
-            onNodeWithContentDescription(getString(Res.string.invite_create_name_label)).performTextInput("Emma")
-            onNodeWithText(getString(Res.string.invite_create_new_code)).performClick()
-
-            waitUntilExactlyOneExists(hasText(getString(Res.string.join_name_taken)), timeoutMillis = wait)
+            onInviteCreate {
+                typesTheName("Emma")
+                tapsNewCode()
+                seesTheNameIsTaken()
+            }
         }
     }
 
@@ -99,30 +69,12 @@ class InviteCreateScreenTest {
     @Test
     fun making_the_first_code_shows_on_the_button() =
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    InviteCreateContent(
-                        state = InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating),
-                        onNameChange = {},
-                        onAdminChange = {},
-                        onCreate = {},
-                        onNewCode = {},
-                        onCopy = {},
-                        onBack = {},
-                    )
-                }
-            }
+            inviteCreateContent(InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating))
 
-            onNodeWithText(getString(Res.string.invite_create_making))
-                .assertIsEnabled()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_invite_create_making),
-                    ),
-                )
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.invite_create_new_code)).assertDoesNotExist()
+            onInviteCreate {
+                seesTheButtonMakingTheFirstCode()
+                doesNotSeeNewCode()
+            }
         }
 
     /**
@@ -134,38 +86,24 @@ class InviteCreateScreenTest {
         runComposeUiTest {
             val invite = Invite(code = "K7M2QP", invitedName = "Liam", isAdmin = false, expiresInSeconds = 892)
 
-            setContent {
-                StillTheme {
-                    InviteCreateContent(
-                        state =
-                            InviteCreateUiState(
-                                name = "Liam",
-                                invite = invite,
-                                secondsLeft = 892,
-                                status = InviteCreateStatus.Creating,
-                            ),
-                        onNameChange = {},
-                        onAdminChange = {},
-                        onCreate = {},
-                        onNewCode = {},
-                        onCopy = {},
-                        onBack = {},
-                    )
-                }
-            }
-
-            onNodeWithText(getString(Res.string.invite_create_making)).assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    getString(Res.string.a11y_invite_create_remaking),
+            inviteCreateContent(
+                InviteCreateUiState(
+                    name = "Liam",
+                    invite = invite,
+                    secondsLeft = 892,
+                    status = InviteCreateStatus.Creating,
                 ),
             )
 
-            // The old code must go. Leaving it on screen invites the admin to read out six characters
-            // that are being replaced, which is worse than showing nothing (§6.21, pattern 4).
-            onNodeWithText("K7M2QP").assertDoesNotExist()
-            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.invite_create_making_new)).assertIsDisplayed()
+            onInviteCreate {
+                seesTheButtonMakingANewCode()
+
+                // The old code must go. Leaving it on screen invites the admin to read out six characters
+                // that are being replaced, which is worse than showing nothing (§6.21, pattern 4).
+                doesNotSeeTheCode("K7M2QP")
+                seesTheCodePlaceholder()
+                seesTheNewCodeIsComing()
+            }
         }
 
     @Test
@@ -174,21 +112,9 @@ class InviteCreateScreenTest {
 
         states.forEach { state ->
             runComposeUiTest {
-                setContent {
-                    StillTheme {
-                        InviteCreateContent(
-                            state = state,
-                            onNameChange = {},
-                            onAdminChange = {},
-                            onCreate = {},
-                            onNewCode = {},
-                            onCopy = {},
-                            onBack = {},
-                        )
-                    }
-                }
+                inviteCreateContent(state)
 
-                onNodeWithText(getString(Res.string.invite_create_title)).assertIsDisplayed()
+                onInviteCreate { seesTheTitle() }
             }
         }
     }

@@ -4,13 +4,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DefaultSpacing
@@ -33,8 +26,10 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = answer, fromMe = false) } }
 
             // THEN
-            onNodeWithText("Panel review at 14:30").assertIsDisplayed()
-            onAllNodes(hasText("**", substring = true)).assertCountEquals(0)
+            onMessageBubble {
+                seesText("Panel review at 14:30")
+                doesNotSeeAnyTextContaining("**")
+            }
         }
 
     @Test
@@ -47,7 +42,7 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = question, fromMe = true) } }
 
             // THEN
-            onNodeWithText(question).assertIsDisplayed()
+            onMessageBubble { seesText(question) }
         }
 
     @Test
@@ -60,9 +55,11 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = answer, fromMe = false) } }
 
             // THEN
-            onNodeWithText("Milk").assertIsDisplayed()
-            onNodeWithText("Bread").assertIsDisplayed()
-            onAllNodesWithText("•").assertCountEquals(2)
+            onMessageBubble {
+                seesText("Milk")
+                seesText("Bread")
+                seesBullets(2)
+            }
         }
 
     @Test
@@ -77,9 +74,11 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = answer, fromMe = false) } }
 
             // THEN
-            onNodeWithText("Crowds").assertIsDisplayed()
-            onNodeWithText("Beach: Often High").assertIsDisplayed()
-            onNodeWithText("Mountains: Generally Lower").assertIsDisplayed()
+            onMessageBubble {
+                seesText("Crowds")
+                seesText("Beach: Often High")
+                seesText("Mountains: Generally Lower")
+            }
         }
 
     @Test
@@ -92,9 +91,7 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = answer, fromMe = false) } }
 
             // THEN
-            val first = onNodeWithText("Tomorrow is light.").getUnclippedBoundsInRoot()
-            val second = onNodeWithText("Nothing in the evening.").getUnclippedBoundsInRoot()
-            assertEquals(DefaultSpacing.md, second.top - first.bottom)
+            onMessageBubble { seesGapBetween("Tomorrow is light.", "Nothing in the evening.", DefaultSpacing.md) }
         }
 
     @Test
@@ -107,9 +104,7 @@ class MessageBubbleTest {
             setContent { StillTheme { MessageBubble(content = answer, fromMe = false) } }
 
             // THEN
-            val intro = onNodeWithText("Here’s the plan:").getUnclippedBoundsInRoot()
-            val heading = onNodeWithText("Saturday").getUnclippedBoundsInRoot()
-            assertEquals(DefaultSpacing.xl, heading.top - intro.bottom)
+            onMessageBubble { seesGapBetween("Here’s the plan:", "Saturday", DefaultSpacing.xl) }
         }
 
     @Test
@@ -133,7 +128,7 @@ class MessageBubbleTest {
             }
 
             // WHEN
-            onNodeWithText("the forecast").performClick()
+            onMessageBubble { tapsText("the forecast") }
 
             // THEN
             assertEquals(listOf("https://met.no/x"), opened)

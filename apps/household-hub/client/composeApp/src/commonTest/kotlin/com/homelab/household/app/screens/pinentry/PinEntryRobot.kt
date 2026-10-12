@@ -1,14 +1,20 @@
 package com.homelab.household.app.screens.pinentry
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_pin_checking
 import com.homelab.household.app.resources.pin_attempts_left
 import com.homelab.household.app.resources.pin_back
 import com.homelab.household.app.resources.pin_delete
@@ -61,6 +67,17 @@ class PinEntryRobot(
     suspend fun seesItIsLocked() = seesText(getString(Res.string.pin_locked))
 
     suspend fun seesTheHubDidNotAnswer() = seesText(getString(Res.string.pin_unreachable))
+
+    /** The dots say the PIN is with the hub; they stand still under a still theme, so the words are asserted. */
+    suspend fun seesThePinBeingChecked() {
+        test.waitUntilExactlyOneExists(hasTestTag(PIN_DOTS_TAG), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(PIN_DOTS_TAG).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                getString(Res.string.a11y_pin_checking),
+            ),
+        )
+    }
 
     private fun seesText(text: String) {
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)

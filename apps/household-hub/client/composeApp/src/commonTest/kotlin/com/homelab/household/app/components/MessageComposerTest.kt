@@ -4,26 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.assertWidthIsAtLeast
-import androidx.compose.ui.test.hasImeAction
-import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performImeAction
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.text.input.ImeAction
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.testing.StillTheme
-import com.homelab.household.app.theme.DefaultSizes
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -45,8 +27,10 @@ class MessageComposerTest {
                 }
             }
 
-            onNode(hasSetTextAction()).performTextInput("What's left this week?")
-            onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
+            onMessageComposer {
+                typesMessage("What's left this week?")
+                tapsSend()
+            }
 
             assertEquals("What's left this week?", sent)
         }
@@ -61,9 +45,10 @@ class MessageComposerTest {
                 }
             }
 
-            onNodeWithContentDescription(
-                getString(Res.string.send_message),
-            ).assertIsEnabled().assertHasClickAction().performClick()
+            onMessageComposer {
+                seesSendReadyToTap()
+                tapsSend()
+            }
 
             assertEquals(1, sends)
         }
@@ -78,9 +63,11 @@ class MessageComposerTest {
                 }
             }
 
-            onNodeWithContentDescription(getString(Res.string.send_message)).performClick()
+            onMessageComposer {
+                tapsSend()
 
-            onNode(hasSetTextAction()).assertTextContains("Move dinner to 20:00")
+                seesTypedMessage("Move dinner to 20:00")
+            }
         }
 
     /** Send used to be 44dp square, under the floor — the one thing the scale actually grew. */
@@ -93,9 +80,7 @@ class MessageComposerTest {
                 }
             }
 
-            onNodeWithContentDescription(getString(Res.string.send_message))
-                .assertHeightIsAtLeast(DefaultSizes.touchTarget)
-                .assertWidthIsAtLeast(DefaultSizes.touchTarget)
+            onMessageComposer { seesSendBigEnoughToHit() }
         }
 
     /**
@@ -118,8 +103,10 @@ class MessageComposerTest {
                 }
             }
 
-            onNode(hasSetTextAction()).performTextInput("Move dinner to 20:00")
-            onNode(hasSetTextAction()).performImeAction()
+            onMessageComposer {
+                typesMessage("Move dinner to 20:00")
+                pressesTheKeyboardSendKey()
+            }
 
             assertEquals("Move dinner to 20:00", sent)
         }
@@ -133,7 +120,7 @@ class MessageComposerTest {
                 }
             }
 
-            onNode(hasSetTextAction()).assert(hasImeAction(ImeAction.Send))
+            onMessageComposer { seesTheKeyboardOffersSend() }
         }
 
     @Test
@@ -150,6 +137,6 @@ class MessageComposerTest {
                 }
             }
 
-            onNodeWithText("Message the Coordinator…").assertExists()
+            onMessageComposer { seesPlaceholder("Message the Coordinator…") }
         }
 }

@@ -1,8 +1,6 @@
 package com.homelab.household.app.navigation
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
@@ -54,7 +52,7 @@ class AppStartTest {
         runScreenTest {
             setContent { TestApp(hub, sessionStorage = tokens) { AppNavHost(screens = StubScreens()) } }
 
-            waitUntilExactlyOneExists(hasText(StubScreens.HOME), timeoutMillis = WAIT_MILLIS)
+            onAppNavHost { seesHome() }
         }
     }
 
@@ -79,7 +77,7 @@ class AppStartTest {
         runScreenTest {
             setContent { TestApp(refusing, sessionStorage = tokens) { AppNavHost(screens = StubScreens()) } }
 
-            waitUntilExactlyOneExists(hasText(StubScreens.SIGN_IN), timeoutMillis = WAIT_MILLIS)
+            onAppNavHost { seesSignIn() }
         }
 
         assertEquals(null, tokens.getAccessToken())
@@ -95,7 +93,7 @@ class AppStartTest {
                 ) { AppNavHost(screens = StubScreens()) }
             }
 
-            waitUntilExactlyOneExists(hasText(StubScreens.LAUNCH), timeoutMillis = WAIT_MILLIS)
+            onAppNavHost { seesLaunch() }
         }
     }
 

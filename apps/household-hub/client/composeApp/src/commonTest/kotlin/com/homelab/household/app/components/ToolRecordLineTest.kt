@@ -1,12 +1,6 @@
 package com.homelab.household.app.components
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.testing.StillTheme
@@ -25,7 +19,7 @@ class ToolRecordLineTest {
                 }
             }
 
-            onNodeWithText("Checked your calendar").assertIsDisplayed()
+            onToolRecordLine { seesRecord("Checked your calendar") }
         }
 
     @Test
@@ -37,7 +31,7 @@ class ToolRecordLineTest {
                 }
             }
 
-            onNode(hasText("Checked your calendar") and hasClickAction()).assertDoesNotExist()
+            onToolRecordLine { doesNotSeeItCanBeOpened("Checked your calendar") }
         }
 
     @Test
@@ -50,7 +44,7 @@ class ToolRecordLineTest {
                 }
             }
 
-            onNodeWithText("Searched the web").assertHasClickAction().performClick()
+            onToolRecordLine { tapsRecordThatCanBeOpened("Searched the web") }
             assertEquals(1, opened)
         }
 }

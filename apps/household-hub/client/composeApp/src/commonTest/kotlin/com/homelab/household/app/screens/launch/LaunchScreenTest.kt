@@ -4,13 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.launch_offline_hint
 import com.homelab.household.app.testing.FakeExternalApps
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TEST_HUB_HOST
@@ -18,7 +13,6 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.presentation.launch.HubFailure
 import com.homelab.household.presentation.launch.HubStatus
 import io.ktor.http.HttpStatusCode
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -211,7 +205,7 @@ class LaunchScreenTest {
                 }
             }
 
-            onNodeWithText(getString(Res.string.launch_offline_hint)).performScrollTo().assertIsDisplayed()
+            onLaunch { scrollsToTheOfflineHint() }
         }
 
     private companion object {

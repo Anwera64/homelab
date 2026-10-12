@@ -5,33 +5,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertWidthIsEqualTo
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.width
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_working
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DayColors
-import com.homelab.household.app.theme.DefaultSizes
 import com.homelab.household.app.theme.NightColors
 import com.homelab.household.app.theme.StillMotion
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Primary buttons are never disabled (design notes §2): they have no `enabled` parameter, so a tap
@@ -98,15 +80,10 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithText("Creating…")
-                .assertIsEnabled()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_working),
-                    ),
-                )
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+            onButtons {
+                seesItEnabledAndSayingItIsWorking("Creating…")
+                seesTheProgressBar()
+            }
         }
 
     /**
@@ -128,9 +105,7 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithText("Joining…").assert(
-                SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Joining the household"),
-            )
+            onButtons { seesItAnnouncing("Joining…", "Joining the household") }
         }
 
     /** And no bar when it isn't working — the affordance only exists during the wait. */
@@ -143,7 +118,7 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertDoesNotExist()
+            onButtons { doesNotSeeTheProgressBar() }
         }
 
     /**
@@ -238,7 +213,7 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithText("Create").assertWidthIsEqualTo(ROOMY)
+            onButtons { seesItAsWideAs("Create", ROOMY) }
         }
 
     private fun assertWrapsItsLabel(button: @Composable () -> Unit) =
@@ -249,8 +224,7 @@ class ButtonsTest {
                 }
             }
 
-            val width = onNodeWithText("Create").getUnclippedBoundsInRoot().width
-            assertTrue(width < ROOMY, "a button given no width should wrap its label, but measured $width")
+            onButtons { seesItNarrowerThan("Create", ROOMY) }
         }
 
     private fun assertAlwaysClickable(button: @Composable (onClick: () -> Unit) -> Unit) =
@@ -258,11 +232,10 @@ class ButtonsTest {
             var clicks = 0
             setContent { StillTheme { button { clicks++ } } }
 
-            onNodeWithText("Create")
-                .assertIsEnabled()
-                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-                .assertHeightIsAtLeast(DefaultSizes.touchTarget)
-                .performClick()
+            onButtons {
+                seesItEnabledAsAButtonBigEnoughToHit("Create")
+                tapsTheButton("Create")
+            }
 
             assertEquals(1, clicks)
         }
@@ -276,7 +249,7 @@ class ButtonsTest {
                 }
             }
 
-            onNodeWithText("Creating…").performClick()
+            onButtons { tapsTheButton("Creating…") }
             assertEquals(0, clicks)
         }
 

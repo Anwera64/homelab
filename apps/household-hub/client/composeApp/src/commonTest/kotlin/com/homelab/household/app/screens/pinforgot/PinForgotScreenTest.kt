@@ -1,28 +1,13 @@
 package com.homelab.household.app.screens.pinforgot
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.homelab.household.app.components.SKELETON_GROUP_TAG
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.forgot_alone_title
-import com.homelab.household.app.resources.forgot_ask
-import com.homelab.household.app.resources.forgot_have_code
-import com.homelab.household.app.resources.forgot_title
 import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
-import com.homelab.household.app.testing.TestApp
 import com.homelab.household.app.testing.runScreenTest
-import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.domain.model.Member
 import com.homelab.household.presentation.pinforgot.PinForgotStatus
 import com.homelab.household.presentation.pinforgot.PinForgotUiState
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 
 /** A forgotten PIN, with the real stack under it; only the hub is faked. */
@@ -31,23 +16,17 @@ class PinForgotScreenTest {
     private val emma = Member(id = "emma", name = "Emma Larsson", avatarColor = "#3C6E4E")
     private val wait = 5_000L
 
-    /** A phone with somebody signed in on it: these screens are all behind a token. */
-    private fun signedIn() = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
-
     @Test
     fun it_names_the_housemate_who_can_vouch() {
         val hub = FakeMembersHub()
 
         runScreenTest {
-            setContent {
-                TestApp(
-                    hub.engine,
-                    sessionStorage = signedIn(),
-                ) { PinForgotScreen(member = emma, onBack = {}, onHaveCode = {}) }
-            }
+            pinForgotScreen(hub, emma)
 
-            waitUntilExactlyOneExists(hasText(getString(Res.string.forgot_ask, "Liam")), timeoutMillis = wait)
-            onNodeWithText(getString(Res.string.forgot_alone_title)).assertIsDisplayed()
+            onPinForgot {
+                seesToAsk("Liam")
+                seesTheFallback()
+            }
         }
     }
 
@@ -57,13 +36,9 @@ class PinForgotScreenTest {
         var code = 0
 
         runScreenTest {
-            setContent {
-                TestApp(hub.engine, sessionStorage = signedIn()) {
-                    PinForgotScreen(member = emma, onBack = {}, onHaveCode = { code++ })
-                }
-            }
+            pinForgotScreen(hub, emma, onHaveCode = { code++ })
 
-            onNodeWithText(getString(Res.string.forgot_have_code)).performClick()
+            onPinForgot { tapsHaveACode() }
             waitUntil(timeoutMillis = wait) { code == 1 }
         }
     }
@@ -81,9 +56,10 @@ class PinForgotScreenTest {
                 }
             }
 
-            onNodeWithTag(SKELETON_GROUP_TAG).assertIsDisplayed()
-            // The hub's own reset is the backstop, and it does not depend on the hub answering.
-            onNodeWithText(getString(Res.string.forgot_alone_title)).assertIsDisplayed()
+            onPinForgot {
+                seesItLoading()
+                seesTheFallback()
+            }
         }
     }
 
@@ -99,7 +75,7 @@ class PinForgotScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.forgot_title)).assertIsDisplayed()
+                onPinForgot { seesTheTitle() }
             }
         }
     }

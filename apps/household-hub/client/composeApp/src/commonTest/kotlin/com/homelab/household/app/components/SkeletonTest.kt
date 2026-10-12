@@ -2,22 +2,13 @@ package com.homelab.household.app.components
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.a11y_loading
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.theme.DefaultMotion
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.StillMotion
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -47,14 +38,7 @@ class SkeletonTest {
                 }
             }
 
-            onNodeWithTag(SKELETON_GROUP_TAG)
-                .assertIsDisplayed()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        getString(Res.string.a11y_loading),
-                    ),
-                )
+            onSkeleton { seesTheGroupAnnouncingTheWait() }
         }
 
     /**
@@ -75,25 +59,7 @@ class SkeletonTest {
                 }
             }
 
-            // `clearAndSetSemantics` empties a node rather than removing it, so the blocks are still
-            // there to be counted, and still carry the layout's own `Shape`. What matters is that none
-            // of them carries anything a screen reader would say out loud.
-            val spoken =
-                setOf(
-                    SemanticsProperties.Text,
-                    SemanticsProperties.ContentDescription,
-                    SemanticsProperties.StateDescription,
-                    SemanticsProperties.Role,
-                ).map { it.name }
-
-            val exposed =
-                onNodeWithTag(SKELETON_GROUP_TAG, useUnmergedTree = true)
-                    .fetchSemanticsNode()
-                    .descendants()
-                    .flatMap { node -> node.config.map { it.key.name } }
-                    .filter { it in spoken }
-
-            assertEquals(emptyList(), exposed, "a skeleton block must say nothing of its own")
+            onSkeleton { hearsNothingFromTheBlocks() }
         }
 
     /**
@@ -120,12 +86,6 @@ class SkeletonTest {
         )
         assertEquals(Duration.ZERO, StillMotion.breatheStagger, "nothing is time-gated with motion off")
     }
-
-    /**
-     * The whole subtree, not just the group's own children: a label smuggled into a skeleton would
-     * sit a level further down, inside the block that drew it.
-     */
-    private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
 
     @Composable
     private fun Still(content: @Composable () -> Unit) {

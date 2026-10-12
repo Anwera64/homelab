@@ -1,18 +1,8 @@
 package com.homelab.household.app.screens.calendarprovider
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.calendar_apple
-import com.homelab.household.app.resources.calendar_google
-import com.homelab.household.app.resources.calendar_google_caption
-import com.homelab.household.app.resources.calendar_other
-import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.CalendarProvider
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -24,10 +14,10 @@ class CalendarProviderScreenTest {
         runComposeUiTest {
             // GIVEN
             val picked = mutableListOf<CalendarProvider>()
-            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
+            calendarProviderScreen(onPick = { picked += it })
 
             // WHEN
-            onNodeWithText(getString(Res.string.calendar_apple)).performClick()
+            onCalendarProvider { tapsApple() }
 
             // THEN
             assertEquals(listOf(CalendarProvider.APPLE), picked)
@@ -38,10 +28,10 @@ class CalendarProviderScreenTest {
         runComposeUiTest {
             // GIVEN
             val picked = mutableListOf<CalendarProvider>()
-            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
+            calendarProviderScreen(onPick = { picked += it })
 
             // WHEN
-            onNodeWithText(getString(Res.string.calendar_other)).performClick()
+            onCalendarProvider { tapsAnotherCalDavServer() }
 
             // THEN
             assertEquals(listOf(CalendarProvider.OTHER), picked)
@@ -52,10 +42,10 @@ class CalendarProviderScreenTest {
         runComposeUiTest {
             // GIVEN
             val picked = mutableListOf<CalendarProvider>()
-            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = { picked += it }) } }
+            calendarProviderScreen(onPick = { picked += it })
 
             // WHEN
-            onNodeWithText(getString(Res.string.calendar_google)).performClick()
+            onCalendarProvider { tapsGoogle() }
 
             // THEN
             assertEquals(listOf(CalendarProvider.GOOGLE), picked)
@@ -64,14 +54,12 @@ class CalendarProviderScreenTest {
     @Test
     fun `GIVEN Google only takes a sign-in WHEN the list is shown THEN Google says so`() =
         runComposeUiTest {
-            // GIVEN
-            val caption = getString(Res.string.calendar_google_caption)
-
             // WHEN
-            setContent { StillTheme { CalendarProviderScreen(onBack = {}, onPick = {}) } }
+            calendarProviderScreen()
 
             // THEN
-            onNodeWithText(caption).assertIsDisplayed()
-            assertEquals("Sign in with Google", caption)
+            onCalendarProvider {
+                assertEquals("Sign in with Google", seesGoogleOnlyTakesASignIn())
+            }
         }
 }

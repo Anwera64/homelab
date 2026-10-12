@@ -1,25 +1,8 @@
 package com.homelab.household.app.screens.chats
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.chats_empty_action
-import com.homelab.household.app.resources.chats_empty_title
-import com.homelab.household.app.resources.chats_no_matches_line
-import com.homelab.household.app.resources.chats_retry
-import com.homelab.household.app.resources.chats_search_cancel
-import com.homelab.household.app.resources.chats_search_placeholder
-import com.homelab.household.app.resources.chats_title
-import com.homelab.household.app.resources.chats_unreachable
-import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.presentation.chats.ChatsUiState
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -39,47 +22,25 @@ class ChatsScreenTest {
     @Test
     fun a_row_shows_its_title_its_preview_and_the_agents_face() =
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("The list"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("The list"))
 
-            onNodeWithText("Saturday dinner").assertIsDisplayed()
-            onNodeWithText("Added. I've let the household know you're both out Saturday evening.").assertIsDisplayed()
-            onNodeWithText("Jury panel references").assertIsDisplayed()
-            // Two of the three are the Coordinator's, and the researcher's is its own.
-            onAllNodesWithText("🏡", substring = true).assertCountEquals(2)
-            onAllNodesWithText("📚", substring = true).assertCountEquals(1)
+            onChats {
+                seesChat("Saturday dinner")
+                seesChat("Added. I've let the household know you're both out Saturday evening.")
+                seesChat("Jury panel references")
+                // Two of the three are the Coordinator's, and the researcher's is its own.
+                seesAgentFaces("🏡", count = 2)
+                seesAgentFaces("📚", count = 1)
+            }
         }
 
     @Test
     fun tapping_a_row_opens_that_conversation() =
         runComposeUiTest {
             val opened = mutableListOf<String>()
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("The list"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = { opened += it },
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("The list"), onOpen = { opened += it })
 
-            onNodeWithText("Saturday dinner").performClick()
+            onChats { tapsChat("Saturday dinner") }
 
             assertEquals(listOf("s-1"), opened)
         }
@@ -88,21 +49,9 @@ class ChatsScreenTest {
     fun typing_in_the_search_field_reaches_the_view_model() =
         runComposeUiTest {
             val typed = mutableListOf<String>()
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("The list"),
-                        onSearch = { typed += it },
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("The list"), onSearch = { typed += it })
 
-            onNodeWithText(getString(Res.string.chats_search_placeholder)).performTextInput("din")
+            onChats { typesInTheSearch("din") }
 
             assertEquals(listOf("din"), typed)
         }
@@ -111,21 +60,9 @@ class ChatsScreenTest {
     fun cancel_appears_only_while_searching_and_clears_the_query() =
         runComposeUiTest {
             var cancelled = false
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("Searching"),
-                        onSearch = {},
-                        onCancelSearch = { cancelled = true },
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("Searching"), onCancelSearch = { cancelled = true })
 
-            onNodeWithText(getString(Res.string.chats_search_cancel)).performClick()
+            onChats { tapsCancel() }
 
             assertEquals(true, cancelled)
         }
@@ -133,45 +70,25 @@ class ChatsScreenTest {
     @Test
     fun a_query_that_matches_nothing_names_the_query_and_says_what_search_cannot_do() =
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("Nothing matched"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("Nothing matched"))
 
-            onNodeWithText("No chats called “boiler”").assertIsDisplayed()
-            // The footnote is why a miss is not mistaken for a lost chat.
-            onNodeWithText(getString(Res.string.chats_no_matches_line)).assertIsDisplayed()
+            onChats {
+                seesNoMatchesFor("boiler")
+                // The footnote is why a miss is not mistaken for a lost chat.
+                seesWhatSearchCannotDo()
+            }
         }
 
     @Test
     fun a_household_that_has_never_chatted_gets_the_one_empty_state_with_a_button() =
         runComposeUiTest {
             var started = false
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("Never chatted"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = { started = true },
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("Never chatted"), onNewChat = { started = true })
 
-            onNodeWithText(getString(Res.string.chats_empty_title)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.chats_empty_action)).performClick()
+            onChats {
+                seesNoChatsYet()
+                tapsStartAChat()
+            }
 
             assertEquals(true, started)
         }
@@ -179,44 +96,22 @@ class ChatsScreenTest {
     @Test
     fun the_empty_screen_has_no_search_because_there_is_nothing_to_search() =
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("Never chatted"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("Never chatted"))
 
-            onNodeWithText(getString(Res.string.chats_search_placeholder)).assertDoesNotExist()
+            onChats { doesNotSeeTheSearch() }
         }
 
     @Test
     fun an_unreachable_hub_offers_another_go_rather_than_claiming_there_are_no_chats() =
         runComposeUiTest {
             var retried = false
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("Hub unreachable"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = { retried = true },
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("Hub unreachable"), onRetry = { retried = true })
 
-            onNodeWithText(getString(Res.string.chats_unreachable)).assertIsDisplayed()
-            onNodeWithText(getString(Res.string.chats_empty_title)).assertDoesNotExist()
-            onNodeWithText(getString(Res.string.chats_retry)).performClick()
+            onChats {
+                seesTheHubIsUnreachable()
+                doesNotSeeNoChatsYet()
+                tapsTryAgain()
+            }
 
             assertEquals(true, retried)
         }
@@ -224,43 +119,21 @@ class ChatsScreenTest {
     @Test
     fun a_conversation_whose_agent_is_gone_still_draws_its_row() =
         runComposeUiTest {
-            setContent {
-                StillTheme {
-                    ChatsContent(
-                        state = stateNamed("An agent that is gone"),
-                        onSearch = {},
-                        onCancelSearch = {},
-                        onOpen = {},
-                        onNewChat = {},
-                        onRetry = {},
-                        tabs = {},
-                    )
-                }
-            }
+            chatsScreen(stateNamed("An agent that is gone"))
 
-            onNodeWithText("Is the 5080 worth it?").assertIsDisplayed()
-            onNodeWithText("That settles it, thanks").assertIsDisplayed()
+            onChats {
+                seesChat("Is the 5080 worth it?")
+                seesChat("That settles it, thanks")
+            }
         }
 
     @Test
     fun every_previewed_state_draws() {
         provider.values.toList().forEach { state ->
             runComposeUiTest {
-                setContent {
-                    StillTheme {
-                        ChatsContent(
-                            state = state,
-                            onSearch = {},
-                            onCancelSearch = {},
-                            onOpen = {},
-                            onNewChat = {},
-                            onRetry = {},
-                            tabs = {},
-                        )
-                    }
-                }
+                chatsScreen(state)
 
-                onNodeWithText(getString(Res.string.chats_title)).assertIsDisplayed()
+                onChats { seesTheTitle() }
             }
         }
     }

@@ -128,6 +128,12 @@ covers the drawing, the ViewModel, the use case, the repository and the error ma
 | `Fake<Screen>Hub` | beside the screen's tests | A `MockEngine` speaking only the endpoints that screen calls, with a swappable answer so a test can change the hub's mind halfway through. Named for its screen; a hub two screens share moves to `app/testing/` — `FakeSignInHub` serves both "Who's here?" and the PIN pad. |
 | `<Screen>Robot` | beside the screen's tests | Every string the screen shows, named once — as the **resource**, resolved with `getString`, never as a second copy of the text. Each assertion **waits** for its text: the hub answers on its own coroutine, so `waitForIdle` — which only waits for Compose — can run first. |
 
+**Every UI test goes through a robot**, not only screen tests: components and navigation have
+theirs beside them too. `TestsGoThroughRobotsTest` fails the build when a `*ScreenTest.kt` has no
+`*Robot.kt` in its folder, or when any test outside a robot looks a node up itself — `onNode…`,
+`onAllNodes…`, `onRoot`, or a wait that names a node. Waiting on the fake hub
+(`waitUntil { hub.… }`) stays in the test, since it is the hub being waited on, not the screen.
+
 Navigation is tested on its own: `AppNavHostTest` passes `StubScreens` to `AppNavHost` and reads
 the hoisted back stack, so it covers where the app goes with no Koin, no hub and no real screen.
 Where it *opens* is `AppStartTest`: the host's own back stack reads the stored session through
