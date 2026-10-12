@@ -41,7 +41,7 @@ cryptography==50.0.2
     # via -r requirements.in
 dateparser==1.4.3
     # via htmldate
-dnspython==2.8.0
+dnspython==2.9.0
     # via caldav
 fastapi==0.143.0
     # via -r requirements.in
@@ -56,7 +56,7 @@ htmldate==1.11.0
     # via trafilatura
 httpcore==1.0.9
     # via httpx
-httptools==0.8.0
+httptools==0.9.0
     # via uvicorn
 httpx==0.28.1
     # via -r requirements.in
@@ -67,7 +67,7 @@ icalendar==7.3.0
     #   icalendar-searcher
     #   recurring-ical-events
     #   x-wr-timezone
-icalendar-searcher==1.0.6
+icalendar-searcher==1.0.7
     # via caldav
 idna==3.20
     # via
@@ -94,7 +94,7 @@ niquests==3.21.2
     # via caldav
 opentelemetry-api==1.45.1
     # via fastapi
-pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
 pydantic==2.14.0
     # via
