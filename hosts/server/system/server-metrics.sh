@@ -11,7 +11,8 @@
 #                      disk's power-on hours when it ran
 #   server_qbittorrent.prom  what qBittorrent has downloaded and uploaded, its
 #                      peers and whether they can reach it (the Downloads dashboard)
-#   server_vpn.prom    whether Gluetun holds a forwarded port
+#   server_vpn.prom    whether Gluetun holds a forwarded port, and whether
+#                      qBittorrent listens on it
 #
 # Runs every minute from server-metrics.timer, as root (smartctl needs it).
 # ==============================================================================
@@ -72,8 +73,18 @@ mkdir -p "$TEXTFILE_DIR"
 
 # Gluetun keeps the forwarded port in a file while it has one. qBittorrent's
 # "connected" is not that: it says so on a port nobody forwards.
-echo "server_vpn_port_forwarded $(flag timeout 10 docker exec gluetun test -s /tmp/gluetun/forwarded_port)" \
-  | write_prom "$TEXTFILE_DIR/server_vpn.prom"
+{
+  echo "server_vpn_port_forwarded $(flag timeout 10 docker exec gluetun test -s /tmp/gluetun/forwarded_port)"
+  # Peers are sent to the forwarded port: qBittorrent must listen on that one. It
+  # starts on the port it had, and Gluetun gives it the port only when forwarding
+  # comes up. With no forwarded port, or no answer, there is nothing to compare.
+  forwarded="$(timeout 10 docker exec gluetun cat /tmp/gluetun/forwarded_port 2>/dev/null | head -1 || true)"
+  listening="$(timeout 10 docker exec gluetun wget -qO- http://127.0.0.1:8080/api/v2/app/preferences 2>/dev/null \
+    | jq -r '.listen_port // empty' 2>/dev/null || true)"
+  if [[ "$forwarded" =~ ^[0-9]+$ && "$listening" =~ ^[0-9]+$ ]]; then
+    echo "server_qbittorrent_listen_port_matches $(flag test "$forwarded" = "$listening")"
+  fi
+} | write_prom "$TEXTFILE_DIR/server_vpn.prom"
 
 # The latest self-test of one disk, as "passed hours", or nothing when it has
 # never run one. ATA disks say passed or not; NVMe gives a result code, 0 for passed.

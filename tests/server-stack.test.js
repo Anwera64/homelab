@@ -266,6 +266,12 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.doesNotMatch(up + down, /\$/, 'nothing for compose to interpolate');
   });
 
+  await t.test('GIVEN qBittorrent restarts alone WHEN it starts THEN no fixed listening port overrides the forwarded one', () => {
+    // The image passes TORRENTING_PORT to qBittorrent at every start, over the port Gluetun gave it;
+    // Gluetun gives the port only when forwarding comes up, not when qBittorrent restarts.
+    assert.doesNotMatch(block('qbittorrent'), /TORRENTING_PORT/);
+  });
+
   await t.test('runs no Watchtower: pinned images change only through a merged PR', () => {
     assert.ok(!names.includes('watchtower'));
     assert.doesNotMatch(compose, /watchtower/i, 'no service carries a Watchtower label');
@@ -534,6 +540,18 @@ test('Server README', async (t) => {
     assert.match(watchdog[1], /`VPN_PORT_FORWARDING`/);
   });
 
+  await t.test('says qBittorrent keeps the forwarded port across its own restarts, and that the watchdog gives it back', () => {
+    const section = readme.match(/## VPN provider\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    // Before the watchdog's part: what happens when only qBittorrent restarts.
+    const before = section.split('### The VPN watchdog')[0];
+    assert.match(before, /restart[^\n]*keeps the port|keeps the port[^\n]*restart/);
+    const watchdog = section.match(/### The VPN watchdog\n([\s\S]*?)(?=\n### |(?![\s\S]))/)[1];
+    const row = watchdog.split('\n').find((line) => line.startsWith('|') && /listens on another port/.test(line));
+    assert.ok(row, 'a row of the table for a port qBittorrent does not listen on');
+    assert.match(row, /Gives qBittorrent the forwarded port/);
+    assert.match(watchdog, /Each recreate and each port given is one line in the journal/);
+  });
+
   await t.test('.env.example says the HTTP proxy is on unless switched off', () => {
     const envExample = read(path.join(SERVER_DIR, '.env.example'));
     assert.match(envExample, /^# HTTPPROXY=on$/m);
@@ -552,7 +570,7 @@ test('Server README', async (t) => {
     assert.ok(section, 'the README must have a section for the downloads dashboard');
     assert.ok(section[1].includes('config/grafana/dashboards/downloads.json'));
     assert.match(section[1], /watchdog/i, 'the marker for the watchdog');
-    for (const shown of ['Average download', 'Peak download', 'Average upload', 'Wi-Fi band', 'Connectable', 'Port forwarded', 'Peer connections']) {
+    for (const shown of ['Average download', 'Peak download', 'Average upload', 'Wi-Fi band', 'Connectable', 'Port forwarded', 'Listening port', 'Peer connections']) {
       assert.ok(section[1].includes(shown), `it must name ${shown}`);
     }
     assert.match(section[1], /megabits/i);

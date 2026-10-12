@@ -647,16 +647,20 @@ test('Server host metrics', async (t) => {
   const maindata = (state) => JSON.stringify({ rid: 1, server_state: {
     alltime_dl: 2762556297724, alltime_ul: 829953468616, connection_status: 'connected', total_peer_connections: 67, ...state,
   } });
-  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null, forwarded = false } = {}) => {
+  const setup = ({ mounted = true, stamp = true, reboot = false, selftests = {}, throttleMs = null, qbittorrent = null, forwarded = false, listening = null } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-metrics-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
     fs.mkdirSync(bin);
     // docker answers the two calls the script makes. Asked for qBittorrent's numbers with
     // nothing to say, it fails, as it does when Gluetun is stopped or qBittorrent wants a login.
-    // Asked whether Gluetun holds a forwarded port, it fails when there is none.
+    // Asked whether Gluetun holds a forwarded port, it fails when there is none; asked for
+    // the port, it is 51413. Asked for qBittorrent's settings, it gives the port qBittorrent
+    // listens on (listening), or fails as above.
     const answer = qbittorrent === null ? 'exit 1' : `cat <<'JSON'\n${qbittorrent}\nJSON`;
-    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\ncase "$*" in *forwarded_port*) exit ${forwarded ? 0 : 1} ;; esac\n${answer}\n`, { mode: 0o755 });
+    const port = forwarded ? 'echo 51413; exit 0' : 'exit 1';
+    const preferences = listening === null ? 'exit 1' : `echo '{"listen_port":${listening},"upnp":false}'; exit 0`;
+    fs.writeFileSync(path.join(bin, 'docker'), `#!/bin/sh\necho "docker $*" >> "${root}/docker.log"\ncase "$*" in\n  *"cat /tmp/gluetun/forwarded_port") ${port} ;;\n  *forwarded_port*) exit ${forwarded ? 0 : 1} ;;\n  *app/preferences) ${preferences} ;;\nesac\n${answer}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'mountpoint'), `#!/bin/sh\nexit ${mounted ? 0 : 1}\n`, { mode: 0o755 });
     // --scan lists the devices; a device with no answer here is asleep (exit 2).
     const cases = Object.entries(selftests).map(([dev, json]) => `  /dev/${dev}) cat <<'JSON'\n${json}\nJSON\n  ;;`).join('\n');
@@ -809,6 +813,35 @@ test('Server host metrics', async (t) => {
     assert.match(prom('server_host.prom'), /^server_media_disk_mounted 1$/m);
     fs.rmSync(root, { recursive: true, force: true });
   });
+
+  await t.test('GIVEN qBittorrent listens on the forwarded port WHEN it runs THEN it says the listening port matches', { skip: !canRun && 'needs bash and jq' }, () => {
+    const { root, run, prom } = setup({ forwarded: true, listening: 51413 });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 1\nserver_qbittorrent_listen_port_matches 1\n');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN qBittorrent listens on another port than the forwarded one WHEN it runs THEN it says the listening port differs', { skip: !canRun && 'needs bash and jq' }, () => {
+    // Peers are sent to a port qBittorrent does not listen on, while it still says "connected".
+    const { root, run, prom } = setup({ forwarded: true, listening: 6881, qbittorrent: maindata({}) });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(prom('server_vpn.prom'), 'server_vpn_port_forwarded 1\nserver_qbittorrent_listen_port_matches 0\n');
+    assert.match(prom('server_qbittorrent.prom'), /^server_qbittorrent_connectable 1$/m);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('GIVEN no forwarded port, or qBittorrent does not answer WHEN it runs THEN it says nothing about the listening port', { skip: !canRun && 'needs bash and jq' }, () => {
+    // Nothing to compare: the dashboard's strip is empty for that time.
+    for (const [given, forwardedLine] of [[{ forwarded: false, listening: 0 }, 0], [{ forwarded: true, listening: null }, 1]]) {
+      const { root, run, prom } = setup(given);
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(prom('server_vpn.prom'), `server_vpn_port_forwarded ${forwardedLine}\n`);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 test('Server VPN watchdog', async (t) => {
@@ -840,7 +873,8 @@ test('Server VPN watchdog', async (t) => {
   const NOON = Date.UTC(2026, 9, 12, 12, 0, 0) / 1000;
   const MIN = 60;
   const ALLOWED = 'node-nl-01.example.net,node-nl-02.example.net';
-  const setup = ({ forwarding = 'on', allowlist = ALLOWED, port = false, losses = 0, mounted = true } = {}) => {
+  // listening: the port qBittorrent says it listens on; null when it does not answer.
+  const setup = ({ forwarding = 'on', allowlist = ALLOWED, port = false, losses = 0, mounted = true, listening = null } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-vpn-'));
     const bin = path.join(root, 'bin');
     const textfile = path.join(root, 'textfile');
@@ -850,8 +884,14 @@ test('Server VPN watchdog', async (t) => {
     fs.writeFileSync(path.join(root, '.env'), `VPN_PROVIDER=protonvpn\nVPN_PORT_FORWARDING=${forwarding}\n${allowlist ? `VPN_SERVER_HOSTNAMES=${allowlist}\n` : ''}`);
     // The port file is there or not; the log holds one line for each port Gluetun lost.
     // A recreate is written down with the server list it was given ("unset": the one in .env).
+    // qBittorrent's settings are read and written through Gluetun; what is written is kept too.
     fs.writeFileSync(path.join(bin, 'docker'), [
       '#!/bin/sh',
+      'case "$*" in',
+      `  *"cat /tmp/gluetun/forwarded_port") cat "${root}/port" 2>/dev/null; exit $? ;;`,
+      `  *app/preferences) ${listening === null ? 'exit 1' : `echo '{"listen_port":${listening},"upnp":false}'; exit 0`} ;;`,
+      `  *app/setPreferences) echo "$*" >> "${root}/pushes.log"; exit 0 ;;`,
+      'esac',
       'case "$1" in',
       `  exec) [ -e "${root}/port" ]; exit $? ;;`,
       `  logs) cat "${root}/gluetun.log"; exit 0 ;;`,
@@ -878,11 +918,54 @@ test('Server VPN watchdog', async (t) => {
     // One run a minute, from minute `from` to minute `to` after noon.
     const minutes = (from, to) => { for (let m = from; m <= to; m += 1) run(NOON + m * MIN); };
     const recreates = () => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+    const pushes = () => (fs.existsSync(path.join(root, 'pushes.log')) ? fs.readFileSync(path.join(root, 'pushes.log'), 'utf8').split('\n').filter(Boolean) : []);
     const prom = () => (fs.existsSync(path.join(textfile, 'server_vpn_watchdog.prom')) ? fs.readFileSync(path.join(textfile, 'server_vpn_watchdog.prom'), 'utf8') : '');
     const done = () => fs.rmSync(root, { recursive: true, force: true });
-    return { root, textfile, run, minutes, recreates, prom, setPort, setLosses, done };
+    return { root, textfile, run, minutes, recreates, pushes, prom, setPort, setLosses, done };
   };
   const TOGETHER = /^compose --project-directory \S+ up -d --force-recreate gluetun flaresolverr qbittorrent \[servers=unset\]$/;
+
+  await t.test('GIVEN a forwarded port and qBittorrent listening on another WHEN it runs THEN the forwarded port is pushed to qBittorrent', { skip }, () => {
+    // qBittorrent restarted alone, or missed the port Gluetun gave it: Gluetun does not give it twice.
+    const { run, recreates, pushes, done } = setup({ port: true, listening: 6881 });
+    const result = run(NOON);
+    assert.equal(pushes().length, 1);
+    assert.match(pushes()[0], /^exec gluetun wget .*--post-data json=\{"listen_port":51413\} http:\/\/127\.0\.0\.1:8080\/api\/v2\/app\/setPreferences$/);
+    assert.match(result.stdout, /^vpn watchdog: qBittorrent listened on port 6881, the forwarded port is 51413: set$/m);
+    assert.deepEqual(recreates(), [], 'nothing is recreated for it');
+    done();
+  });
+
+  await t.test('GIVEN qBittorrent already listens on the forwarded port WHEN it runs THEN nothing is pushed', { skip }, () => {
+    const { minutes, pushes, done } = setup({ port: true, listening: 51413 });
+    minutes(0, 5);
+    assert.deepEqual(pushes(), []);
+    done();
+  });
+
+  await t.test('GIVEN qBittorrent does not answer WHEN it runs THEN nothing is pushed and the run succeeds', { skip }, () => {
+    // It wants a login, or is stopped: run() asserts the script still ends well.
+    const { minutes, pushes, done } = setup({ port: true, listening: null });
+    minutes(0, 5);
+    assert.deepEqual(pushes(), []);
+    done();
+  });
+
+  await t.test('GIVEN no forwarded port WHEN it runs THEN nothing is pushed', { skip }, () => {
+    // Gluetun's own command sets the port to 0 when forwarding stops; there is nothing to give.
+    const { minutes, pushes, done } = setup({ port: false, listening: 0 });
+    minutes(0, 5);
+    assert.deepEqual(pushes(), []);
+    done();
+  });
+
+  await t.test('GIVEN a port lost too often and qBittorrent on another port WHEN it recreates THEN it does not push to the old container', { skip }, () => {
+    const { run, recreates, pushes, done } = setup({ port: true, losses: 7, listening: 6881 });
+    run(NOON);
+    assert.equal(recreates().length, 1);
+    assert.deepEqual(pushes(), []);
+    done();
+  });
 
   await t.test('GIVEN port forwarding is off in .env WHEN it runs THEN it does nothing', { skip }, () => {
     const { minutes, recreates, prom, done } = setup({ forwarding: 'off' });

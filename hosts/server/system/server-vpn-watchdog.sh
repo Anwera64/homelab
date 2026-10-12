@@ -8,6 +8,7 @@
 #   a port, lost six times an hour or less -> nothing happens
 #   no port for ten minutes                -> recreates the VPN's containers
 #   a port lost more often than that       -> the same
+#   a port qBittorrent does not listen on  -> gives it to qBittorrent
 #
 # A recreate makes Gluetun pick a server again, among those named in .env
 # (VPN_SERVER_HOSTNAMES). After three recreations that brought no port, any
@@ -77,6 +78,24 @@ retry() {
   tries=$((tries + 1))
 }
 
+# Gives qBittorrent the forwarded port when it listens on another. Gluetun gives
+# it only when forwarding comes up: a qBittorrent that restarted alone, or did
+# not answer then, is left without it. Its Web UI is Gluetun's localhost; when
+# it does not answer, nothing is done.
+sync_port() {
+  local qbittorrent="http://127.0.0.1:8080/api/v2/app" forwarded listening
+  forwarded="$(timeout 10 docker exec gluetun cat /tmp/gluetun/forwarded_port 2>/dev/null | head -1 || true)"
+  listening="$(timeout 10 docker exec gluetun wget -qO- "$qbittorrent/preferences" 2>/dev/null \
+    | sed -n 's/.*"listen_port":\([0-9]*\).*/\1/p' | head -1 || true)"
+  [[ "$forwarded" =~ ^[0-9]+$ && "$listening" =~ ^[0-9]+$ ]] || return 0
+  [ "$forwarded" != "$listening" ] || return 0
+  if timeout 10 docker exec gluetun wget -qO- --post-data "json={\"listen_port\":$forwarded}" "$qbittorrent/setPreferences" >/dev/null 2>&1; then
+    log "qBittorrent listened on port $listening, the forwarded port is $forwarded: set"
+  else
+    log "qBittorrent listened on port $listening, the forwarded port is $forwarded: it did not take it"
+  fi
+}
+
 # The latest 04:00 that has passed.
 four="$(date -d "$(date -d "@$NOW" +%F) 04:00" +%s)"
 [ "$four" -le "$NOW" ] || four=$((four - 86400))
@@ -96,6 +115,8 @@ elif timeout 10 docker exec gluetun test -s /tmp/gluetun/forwarded_port; then
   losses="$(timeout 20 docker logs --since 1h gluetun 2>&1 | grep -c 'clearing port file' || true)"
   if [ "$losses" -gt "$MAX_LOSSES" ] && [ $((NOW - last_recreate)) -ge "$wait" ]; then
     retry "the port was lost $losses times in an hour"
+  else
+    sync_port
   fi
 else
   port_since=0
