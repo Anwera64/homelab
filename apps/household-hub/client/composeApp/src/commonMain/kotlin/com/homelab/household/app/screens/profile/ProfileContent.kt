@@ -131,7 +131,10 @@ fun ProfileContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.profile_back)) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             // Only the header depends on the hub. Everything below it is this screen's own copy,
@@ -198,7 +201,9 @@ fun ProfileContent(
                 text = stringResource(Res.string.profile_sign_out),
                 onClick = onSignOut,
                 icon = HearthIcon.SignOut,
-                modifier = Modifier.fillMaxWidth().padding(bottom = HearthTheme.spacing.xxl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = HearthTheme.spacing.xxl),
             )
         }
     }
@@ -265,7 +270,11 @@ private fun CalendarSection(
                 // The card at a row's height and nothing in it, so the page does not jump when the
                 // answer lands. The header already carries this screen's one skeleton.
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = HearthTheme.size.touchTarget))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = HearthTheme.size.touchTarget),
+                    )
                 }
             }
 
@@ -362,7 +371,9 @@ private fun ConnectedCalendar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
+                    modifier = Modifier
+                        .size(HearthTheme.size.swatch)
+                        .background(colors.canvas, HearthShapes.item),
                     contentAlignment = Alignment.Center,
                 ) {
                     CalendarProviderMark(provider = row.provider)
@@ -400,7 +411,9 @@ private fun ConnectedCalendar(
                 }
                 IconButton(
                     onClick = onOptions,
-                    modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
+                    modifier = Modifier
+                        .size(HearthTheme.size.touchTarget)
+                        .background(colors.canvas, HearthShapes.item),
                 ) {
                     HearthIconImage(
                         icon = HearthIcon.More,

@@ -38,7 +38,9 @@ fun HearthCheckbox(
             Modifier.border(HearthTheme.size.emphasis, colors.outline, HearthShapes.checkbox)
         }
     Box(
-        modifier = modifier.size(HearthTheme.size.iconMd).then(box),
+        modifier = modifier
+            .size(HearthTheme.size.iconMd)
+            .then(box),
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {
@@ -66,14 +68,13 @@ fun HearthCheckboxRow(
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = HearthTheme.size.touchTarget)
-                .clip(HearthShapes.item)
-                .border(HearthTheme.size.hairline, if (checked) colors.primary else colors.outline, HearthShapes.item)
-                .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
-                .padding(horizontal = HearthTheme.spacing.md, vertical = HearthTheme.spacing.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .clip(HearthShapes.item)
+            .border(HearthTheme.size.hairline, if (checked) colors.primary else colors.outline, HearthShapes.item)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .padding(horizontal = HearthTheme.spacing.md, vertical = HearthTheme.spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -59,31 +59,31 @@ fun CodeBoxes(
                 repeat(length) { index ->
                     val character = code.getOrNull(index)
                     Box(
-                        modifier =
-                            Modifier
-                                .width(HearthTheme.size.touchTarget)
-                                .height(HearthTheme.size.control)
-                                .background(
+                        modifier = Modifier
+                            .width(HearthTheme.size.touchTarget)
+                            .height(HearthTheme.size.control)
+                            .background(
+                                if (character ==
+                                    null
+                                ) {
+                                    colors.surfaceAlt
+                                } else {
+                                    colors.surface
+                                },
+                                HearthShapes.item,
+                            )
+                            .border(
+                                width =
                                     if (character ==
                                         null
                                     ) {
-                                        colors.surfaceAlt
+                                        HearthTheme.size.hairline
                                     } else {
-                                        colors.surface
+                                        HearthTheme.size.emphasis
                                     },
-                                    HearthShapes.item,
-                                ).border(
-                                    width =
-                                        if (character ==
-                                            null
-                                        ) {
-                                            HearthTheme.size.hairline
-                                        } else {
-                                            HearthTheme.size.emphasis
-                                        },
-                                    color = if (character == null) colors.outlineSoft else colors.primary,
-                                    shape = HearthShapes.item,
-                                ),
+                                color = if (character == null) colors.outlineSoft else colors.primary,
+                                shape = HearthShapes.item,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (character != null) {

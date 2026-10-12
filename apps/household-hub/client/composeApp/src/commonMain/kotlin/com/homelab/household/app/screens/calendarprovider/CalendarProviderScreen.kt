@@ -55,7 +55,10 @@ fun CalendarProviderScreen(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.calendar_back)) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
@@ -70,11 +73,10 @@ fun CalendarProviderScreen(
             }
 
             Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(colors.surfaceAlt, HearthShapes.item)
-                        .padding(HearthTheme.spacing.lg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.surfaceAlt, HearthShapes.item)
+                    .padding(HearthTheme.spacing.lg),
                 horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                 verticalAlignment = Alignment.Top,
             ) {
@@ -112,7 +114,9 @@ private fun ProviderCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(HearthTheme.size.touchTarget).background(colors.canvas, HearthShapes.item),
+                modifier = Modifier
+                    .size(HearthTheme.size.touchTarget)
+                    .background(colors.canvas, HearthShapes.item),
                 contentAlignment = Alignment.Center,
             ) {
                 CalendarProviderMark(provider = provider)

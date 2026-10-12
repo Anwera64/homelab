@@ -108,7 +108,9 @@ private fun OptionsStep(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
+                modifier = Modifier
+                    .size(HearthTheme.size.swatch)
+                    .background(colors.canvas, HearthShapes.item),
                 contentAlignment = Alignment.Center,
             ) {
                 CalendarProviderMark(provider = row.provider)
@@ -152,12 +154,11 @@ private fun SheetAction(
     val spacing = HearthTheme.spacing
 
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = HearthTheme.size.control)
-                .clickable(role = Role.Button, onClick = onClick)
-                .padding(horizontal = spacing.sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = HearthTheme.size.control)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {

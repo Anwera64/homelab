@@ -67,11 +67,10 @@ fun NotSentReceipt(
             modifier = Modifier.clearAndSetSemantics {},
         )
         Row(
-            modifier =
-                Modifier
-                    .heightIn(min = HearthTheme.size.touchTarget)
-                    .clickable(role = Role.Button, onClick = onRetry)
-                    .padding(horizontal = spacing.xs),
+            modifier = Modifier
+                .heightIn(min = HearthTheme.size.touchTarget)
+                .clickable(role = Role.Button, onClick = onRetry)
+                .padding(horizontal = spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {

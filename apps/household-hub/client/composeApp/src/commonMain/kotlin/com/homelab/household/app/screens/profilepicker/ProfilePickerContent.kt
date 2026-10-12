@@ -65,7 +65,9 @@ fun ProfilePickerContent(
         bottomBar = {
             // A new member opening the app is not on the picker: this is their door.
             Box(
-                modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
                 contentAlignment = Alignment.Center,
             ) {
                 SecondaryButton(text = stringResource(Res.string.picker_invite_code), onClick = onInviteCode)
@@ -73,11 +75,10 @@ fun ProfilePickerContent(
         },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(vertical = HearthTheme.spacing.huge),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxxl, Alignment.CenterVertically),
         ) {
@@ -150,13 +151,13 @@ private fun Face(
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier =
-            Modifier
-                .clip(HearthShapes.item)
-                .clickable(
-                    onClickLabel = stringResource(Res.string.picker_member_description, member.name),
-                    onClick = onClick,
-                ).padding(HearthTheme.spacing.sm),
+        modifier = Modifier
+            .clip(HearthShapes.item)
+            .clickable(
+                onClickLabel = stringResource(Res.string.picker_member_description, member.name),
+                onClick = onClick,
+            )
+            .padding(HearthTheme.spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {

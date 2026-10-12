@@ -51,13 +51,12 @@ fun SkeletonGroup(
 ) {
     val loading = stringResource(Res.string.a11y_loading)
     Column(
-        modifier =
-            modifier
-                .testTag(SKELETON_GROUP_TAG)
-                .semantics {
-                    stateDescription = loading
-                    liveRegion = LiveRegionMode.Polite
-                },
+        modifier = modifier
+            .testTag(SKELETON_GROUP_TAG)
+            .semantics {
+                stateDescription = loading
+                liveRegion = LiveRegionMode.Polite
+            },
         verticalArrangement = verticalArrangement,
         content = content,
     )
@@ -75,7 +74,13 @@ fun SkeletonBlock(
     shape: Shape = HearthShapes.skeleton,
     position: Int = 0,
 ) {
-    Skeleton(shape, position, modifier.fillMaxWidth(widthFraction).height(height))
+    Skeleton(
+        shape,
+        position,
+        modifier
+            .fillMaxWidth(widthFraction)
+            .height(height),
+    )
 }
 
 /** An avatar that hasn't arrived. */
@@ -95,11 +100,10 @@ private fun Skeleton(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier =
-            modifier
-                .alpha(breath(position))
-                .background(HearthTheme.colors.outlineSoft, shape)
-                .clearAndSetSemantics {},
+        modifier = modifier
+            .alpha(breath(position))
+            .background(HearthTheme.colors.outlineSoft, shape)
+            .clearAndSetSemantics {},
     )
 }
 

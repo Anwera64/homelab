@@ -37,11 +37,10 @@ fun CodeCard(
     val type = HearthTheme.typography
 
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(colors.surface, HearthShapes.bento)
-                .padding(HearthTheme.spacing.xl),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.surface, HearthShapes.bento)
+            .padding(HearthTheme.spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {

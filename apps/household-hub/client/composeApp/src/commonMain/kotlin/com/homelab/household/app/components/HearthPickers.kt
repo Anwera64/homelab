@@ -52,19 +52,19 @@ fun HearthPickerField(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         HearthFieldLabel(label = label, changed = changed)
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = HearthTheme.size.touchTarget)
-                    .clip(HearthShapes.item)
-                    .background(colors.surface, HearthShapes.item)
-                    .border(
-                        width = if (changed) HearthTheme.size.changed else HearthTheme.size.hairline,
-                        color = if (changed) colors.primary else colors.outline,
-                        shape = HearthShapes.item,
-                    ).clickable(role = Role.Button, onClick = onClick)
-                    .testTag(tag)
-                    .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = HearthTheme.size.touchTarget)
+                .clip(HearthShapes.item)
+                .background(colors.surface, HearthShapes.item)
+                .border(
+                    width = if (changed) HearthTheme.size.changed else HearthTheme.size.hairline,
+                    color = if (changed) colors.primary else colors.outline,
+                    shape = HearthShapes.item,
+                )
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag)
+                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(text = value, style = type.body, color = colors.textPrimary)

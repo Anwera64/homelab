@@ -31,10 +31,9 @@ fun PlaceholderContent(
     val colors = HearthTheme.colors
 
     Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(HearthTheme.spacing.huge),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(HearthTheme.spacing.huge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm, Alignment.CenterVertically),
     ) {

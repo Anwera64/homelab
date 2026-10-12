@@ -67,7 +67,9 @@ fun AgentCard(
 
     Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().semantics { this.selected = selected },
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { this.selected = selected },
         shape = HearthShapes.bento,
         color = if (selected) colors.surface else colors.surfaceAlt,
         border =
@@ -83,11 +85,10 @@ fun AgentCard(
             verticalAlignment = Alignment.Top,
         ) {
             Box(
-                modifier =
-                    Modifier
-                        .size(size.touchTarget)
-                        .clip(CircleShape)
-                        .background(colors.primaryContainer),
+                modifier = Modifier
+                    .size(size.touchTarget)
+                    .clip(CircleShape)
+                    .background(colors.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(text = avatar, style = type.glyphLg)

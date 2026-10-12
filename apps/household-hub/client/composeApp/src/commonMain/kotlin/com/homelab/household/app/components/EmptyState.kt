@@ -40,8 +40,9 @@ fun EmptyState(
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier =
-            modifier.fillMaxWidth().padding(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(
                 start = HearthTheme.spacing.lg,
                 top = HearthTheme.spacing.xxl,
                 end = HearthTheme.spacing.lg,
@@ -51,11 +52,10 @@ fun EmptyState(
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterVertically),
     ) {
         Box(
-            modifier =
-                Modifier
-                    .size(HearthTheme.size.tile)
-                    .background(colors.outlineSoft, HearthShapes.tile)
-                    .testTag(EMPTY_STATE_ICON_TAG),
+            modifier = Modifier
+                .size(HearthTheme.size.tile)
+                .background(colors.outlineSoft, HearthShapes.tile)
+                .testTag(EMPTY_STATE_ICON_TAG),
             contentAlignment = Alignment.Center,
         ) {
             HearthIconImage(

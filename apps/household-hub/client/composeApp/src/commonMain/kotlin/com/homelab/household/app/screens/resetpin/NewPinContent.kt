@@ -58,7 +58,11 @@ fun NewPinContent(
     HearthScaffold(
         modifier = modifier,
         bottomBar = {
-            Column(modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
+            ) {
                 PrimaryButton(
                     text = stringResource(if (waiting) Res.string.new_pin_setting else Res.string.new_pin_submit),
                     onClick = onSetPin,
@@ -71,7 +75,9 @@ fun NewPinContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(

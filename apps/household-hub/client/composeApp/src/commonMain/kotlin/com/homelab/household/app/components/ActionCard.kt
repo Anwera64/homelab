@@ -25,11 +25,10 @@ fun ActionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .actionCardSurface()
-                .padding(HearthTheme.spacing.lg),
+        modifier = modifier
+            .fillMaxWidth()
+            .actionCardSurface()
+            .padding(HearthTheme.spacing.lg),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         content = content,
     )

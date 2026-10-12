@@ -38,12 +38,11 @@ fun NowAutomaticLine(
         trailing = {
             // The line itself is short; the button keeps a full finger's height around its word.
             Box(
-                modifier =
-                    Modifier
-                        .heightIn(min = HearthTheme.size.touchTarget)
-                        .clip(HearthShapes.item)
-                        .clickable(role = Role.Button, onClick = onUndo)
-                        .padding(horizontal = HearthTheme.spacing.sm),
+                modifier = Modifier
+                    .heightIn(min = HearthTheme.size.touchTarget)
+                    .clip(HearthShapes.item)
+                    .clickable(role = Role.Button, onClick = onUndo)
+                    .padding(horizontal = HearthTheme.spacing.sm),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

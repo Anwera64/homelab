@@ -38,13 +38,12 @@ fun MessageBubble(
     ) {
         if (fromMe) {
             Box(
-                modifier =
-                    Modifier
-                        .background(colors.primary, HearthShapes.item)
-                        .padding(
-                            horizontal = HearthTheme.spacing.lg,
-                            vertical = HearthTheme.spacing.md,
-                        ),
+                modifier = Modifier
+                    .background(colors.primary, HearthShapes.item)
+                    .padding(
+                        horizontal = HearthTheme.spacing.lg,
+                        vertical = HearthTheme.spacing.md,
+                    ),
             ) {
                 Text(text = content, style = type.body, color = colors.onPrimary)
             }

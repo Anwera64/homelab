@@ -73,13 +73,12 @@ fun HearthTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        if (error != null) error(error)
-                        if (contentDescription != null) this.contentDescription = contentDescription
-                    },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    if (error != null) error(error)
+                    if (contentDescription != null) this.contentDescription = contentDescription
+                },
             textStyle = fieldStyle.copy(color = colors.textPrimary),
             singleLine = singleLine,
             minLines = minLines,
@@ -88,25 +87,25 @@ fun HearthTextField(
             cursorBrush = SolidColor(colors.primary),
             decorationBox = { innerField ->
                 Box(
-                    modifier =
-                        Modifier
-                            .heightIn(min = HearthTheme.size.touchTarget)
-                            .background(colors.surface, HearthShapes.item)
-                            .border(
-                                width =
-                                    when {
-                                        error != null -> HearthTheme.size.emphasis
-                                        changed -> HearthTheme.size.changed
-                                        else -> HearthTheme.size.hairline
-                                    },
-                                color =
-                                    when {
-                                        error != null -> colors.error
-                                        changed -> colors.primary
-                                        else -> colors.outline
-                                    },
-                                shape = HearthShapes.item,
-                            ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+                    modifier = Modifier
+                        .heightIn(min = HearthTheme.size.touchTarget)
+                        .background(colors.surface, HearthShapes.item)
+                        .border(
+                            width =
+                                when {
+                                    error != null -> HearthTheme.size.emphasis
+                                    changed -> HearthTheme.size.changed
+                                    else -> HearthTheme.size.hairline
+                                },
+                            color =
+                                when {
+                                    error != null -> colors.error
+                                    changed -> colors.primary
+                                    else -> colors.outline
+                                },
+                            shape = HearthShapes.item,
+                        )
+                        .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Row(

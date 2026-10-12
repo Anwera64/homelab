@@ -32,11 +32,10 @@ internal fun CalendarNotice(
 ) {
     val type = HearthTheme.typography
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(background, HearthShapes.bento)
-                .padding(HearthTheme.spacing.lg),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(background, HearthShapes.bento)
+            .padding(HearthTheme.spacing.lg),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         Row(

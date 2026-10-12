@@ -53,12 +53,11 @@ fun StepsFold(
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
         Row(
-            modifier =
-                Modifier
-                    .minimumInteractiveComponentSize()
-                    .clip(HearthShapes.item)
-                    .clickable(onClickLabel = action) { open = !open }
-                    .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .clip(HearthShapes.item)
+                .clickable(onClickLabel = action) { open = !open }
+                .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {

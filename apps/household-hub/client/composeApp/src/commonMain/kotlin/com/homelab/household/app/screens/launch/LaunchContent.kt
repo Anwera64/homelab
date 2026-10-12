@@ -105,11 +105,10 @@ private fun CheckingContent(
 
     HearthScaffold(modifier = modifier, gutter = HearthTheme.spacing.huge) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(vertical = HearthTheme.spacing.huge),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement =
                 Arrangement.spacedBy(
@@ -118,13 +117,12 @@ private fun CheckingContent(
                 ),
         ) {
             Box(
-                modifier =
-                    Modifier
-                        .size(HearthTheme.size.tileHero)
-                        .background(
-                            color = colors.primary,
-                            shape = HearthShapes.tile,
-                        ),
+                modifier = Modifier
+                    .size(HearthTheme.size.tileHero)
+                    .background(
+                        color = colors.primary,
+                        shape = HearthShapes.tile,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 HearthIconImage(
@@ -188,12 +186,11 @@ private fun OfflineContent(
         // Fixed shape by design, but a short phone or a large font would clip the buttons: it scrolls
         // only then, and stays centred otherwise.
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding)
-                    .padding(vertical = HearthTheme.spacing.huge),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(vertical = HearthTheme.spacing.huge),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl, Alignment.CenterVertically),
         ) {
@@ -335,13 +332,12 @@ private fun wordsFor(reason: HubFailure): OfflineWords =
 private fun OfflineTile() {
     val colors = HearthTheme.colors
     Box(
-        modifier =
-            Modifier
-                .size(HearthTheme.size.tile)
-                .background(
-                    color = colors.errorContainer,
-                    shape = HearthShapes.tile,
-                ),
+        modifier = Modifier
+            .size(HearthTheme.size.tile)
+            .background(
+                color = colors.errorContainer,
+                shape = HearthShapes.tile,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         HearthIconImage(
@@ -357,11 +353,10 @@ private fun OfflineTile() {
 private fun HubAddressPill(hubAddress: String) {
     val colors = HearthTheme.colors
     Row(
-        modifier =
-            Modifier
-                .background(colors.surface, HearthShapes.pill)
-                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
-                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.sm),
+        modifier = Modifier
+            .background(colors.surface, HearthShapes.pill)
+            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
+            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

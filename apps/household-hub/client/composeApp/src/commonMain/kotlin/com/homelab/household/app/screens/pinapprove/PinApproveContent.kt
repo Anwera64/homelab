@@ -80,7 +80,9 @@ fun PinApproveContent(
         bottomBar = {
             if (approved == null) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(HearthTheme.spacing.xl),
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                 ) {
                     PrimaryButton(
@@ -104,7 +106,10 @@ fun PinApproveContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {

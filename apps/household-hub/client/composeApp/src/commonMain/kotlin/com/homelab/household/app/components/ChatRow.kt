@@ -43,20 +43,18 @@ fun ChatRow(
     val type = HearthTheme.typography
 
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .heightIn(min = HearthTheme.size.touchTarget)
-                .padding(vertical = HearthTheme.spacing.md),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .padding(vertical = HearthTheme.spacing.md),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         Box(
-            modifier =
-                Modifier
-                    .size(HearthTheme.size.touchTarget)
-                    .clip(CircleShape)
-                    .background(colors.primary.copy(alpha = colors.ghostTint)),
+            modifier = Modifier
+                .size(HearthTheme.size.touchTarget)
+                .clip(CircleShape)
+                .background(colors.primary.copy(alpha = colors.ghostTint)),
             contentAlignment = Alignment.Center,
         ) {
             if (agentAvatar != null) {

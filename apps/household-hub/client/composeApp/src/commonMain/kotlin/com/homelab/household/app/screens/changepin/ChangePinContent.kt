@@ -78,7 +78,11 @@ fun ChangePinContent(
         modifier = modifier,
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.change_pin_back)) },
         bottomBar = {
-            Column(modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
+            ) {
                 PrimaryButton(
                     text =
                         stringResource(
@@ -94,7 +98,10 @@ fun ChangePinContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {

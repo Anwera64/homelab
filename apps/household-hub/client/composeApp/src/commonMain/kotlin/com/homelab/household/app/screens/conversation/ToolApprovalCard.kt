@@ -649,26 +649,28 @@ private fun DayChips(
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = label },
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         DAY_CHIPS.forEachIndexed { day, (letter, name) ->
             val on = day in ticked
             val spoken = stringResource(name)
             Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(horizontal = HearthTheme.spacing.xxs)
-                        .heightIn(min = HearthTheme.size.touchTarget)
-                        .clip(HearthShapes.button)
-                        .background(if (on) colors.primary else colors.surface)
-                        .border(
-                            HearthTheme.size.hairline,
-                            if (on) colors.primary else colors.outline,
-                            HearthShapes.button,
-                        ).toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(day) })
-                        .semantics { contentDescription = spoken },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = HearthTheme.spacing.xxs)
+                    .heightIn(min = HearthTheme.size.touchTarget)
+                    .clip(HearthShapes.button)
+                    .background(if (on) colors.primary else colors.surface)
+                    .border(
+                        HearthTheme.size.hairline,
+                        if (on) colors.primary else colors.outline,
+                        HearthShapes.button,
+                    )
+                    .toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(day) })
+                    .semantics { contentDescription = spoken },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -721,14 +723,13 @@ private fun StepButton(
 ) {
     val colors = HearthTheme.colors
     Box(
-        modifier =
-            Modifier
-                .size(HearthTheme.size.touchTarget)
-                .clip(HearthShapes.item)
-                .background(colors.surface)
-                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
-                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-                .semantics { contentDescription = spoken },
+        modifier = Modifier
+            .size(HearthTheme.size.touchTarget)
+            .clip(HearthShapes.item)
+            .background(colors.surface)
+            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = spoken },
         contentAlignment = Alignment.Center,
     ) {
         Text(

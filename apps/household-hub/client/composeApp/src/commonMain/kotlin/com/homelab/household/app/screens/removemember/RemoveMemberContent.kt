@@ -75,7 +75,9 @@ fun RemoveMemberContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.remove_back)) },
         bottomBar = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
@@ -100,7 +102,10 @@ fun RemoveMemberContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {

@@ -39,10 +39,9 @@ internal fun HomePlaceholderContent(
         bottomBar = tabs,
         header = {
             Box(
-                modifier =
-                    Modifier
-                        .safeContentPadding()
-                        .fillMaxWidth(),
+                modifier = Modifier
+                    .safeContentPadding()
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 MemberAvatar(
@@ -50,19 +49,17 @@ internal fun HomePlaceholderContent(
                     colour = member?.avatarColor ?: DEFAULT_COLOUR,
                     size = HearthTheme.size.touchTarget,
                     glyph = HearthTheme.typography.glyphMd,
-                    modifier =
-                        Modifier
-                            .clickable(onClick = onProfile)
-                            .semantics { contentDescription = description },
+                    modifier = Modifier
+                        .clickable(onClick = onProfile)
+                        .semantics { contentDescription = description },
                 )
             }
         },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
             verticalArrangement = Arrangement.Center,
         ) {
             PlaceholderContent(

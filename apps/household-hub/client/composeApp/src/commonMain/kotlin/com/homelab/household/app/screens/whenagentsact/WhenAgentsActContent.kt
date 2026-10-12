@@ -94,7 +94,10 @@ fun WhenAgentsActContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.when_agents_act_back)) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
@@ -206,7 +209,9 @@ private fun ActionRow(
     trailing: @Composable () -> Unit,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = HearthTheme.size.touchTarget),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = HearthTheme.size.touchTarget),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {

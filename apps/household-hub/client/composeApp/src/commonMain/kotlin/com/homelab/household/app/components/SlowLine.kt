@@ -35,6 +35,8 @@ fun SlowLine(
         style = HearthTheme.typography.caption,
         color = HearthTheme.colors.textMuted,
         textAlign = TextAlign.Center,
-        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
     )
 }
