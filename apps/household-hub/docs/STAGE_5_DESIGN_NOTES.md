@@ -12,13 +12,11 @@ Everything decided while designing the Stage 5 mobile client, in one place: the 
 
 | Artefact | What it holds |
 | :--- | :--- |
-| Design canvas — *Household Hub Mobile* ([link](https://claude.ai/code/artifact/c8d66772-c6ea-4c07-90a7-8a4aba45b2b4)) | 84 screens in 20 flows, day theme, 390×844, plus the type proof |
-| Palette proof ([link](https://claude.ai/code/artifact/e0af0e37-e774-48a5-b3c2-de096de4d1f6)) | Final tokens, contrast checks, both themes |
-| Hearth icon set ([link](https://claude.ai/code/artifact/b87fc4c0-1259-4278-ba6d-71507297affc)) | 31 icons and their drawing rules |
+| Design canvas — *Household Hub* ([link](https://claude.ai/artifact/EgTpi5oNpDv855uweAjCNT)) | Every flow, one page per area (151 artboards on 16 pages). Its Foundations page holds the palette proof, the type scale and the Hearth icon set, which used to be separate artefacts |
 | [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md) | Approved spec for server-enforced secret chats |
 | [`STAGE_5_UI_UX_SPECIFICATION.md`](STAGE_5_UI_UX_SPECIFICATION.md) | The original Stage 5 spec. **Its token table and some flows are out of date** — see §7 |
 
-The artefact links are private to the owner's account.
+The canvas link is private to the owner's account.
 
 Where this document and the UI/UX specification disagree, this document is the later decision.
 
@@ -204,14 +202,14 @@ Items marked **⛔** break a designed flow until they're done.
 - [ ] ⛔ The 60-second polling limit ends the active wait, not the turn — it must not surface as an error.
 - [x] ⛔ **Handle `ToolExecuting` and `ToolResult`.** Done in #33/#34: every tool part is drawn where it ran.
 - [x] **Tool steps say what they found, or why not (#40).** Each tool part carries a `summary`; see §6.7.
-- [ ] ⛔ **`tool_call_id` on `ToolApprovalProposal`.** `approveTool` needs it and the event doesn't carry it, so approval can't work as wired.
+- [x] ⛔ **`tool_call_id` on `ToolApprovalProposal`.** `approveTool` needs it and the event doesn't carry it, so approval can't work as wired. *Done in slice 4 (#58): the proposal carries it, and the turn pauses until the card is answered.*
 - [ ] Milestone ids on `ChatStreamEvent.Done`, for the transient publish notice and its Undo (`DELETE /gossip/{id}`).
 - [ ] Title search on the phone, over the loaded list, excluding secret chats.
 
 ### 5.4 Tools and approvals
 
-- [ ] ⛔ **Per-person, per-(tool, action) auto-approve** stored per user and checked in `process_chat_turn`, replacing the single `auto_approve_writes` boolean. Remove-event and replace-note are excluded entirely.
-- [ ] Approval card labels come from the action, not the tool.
+- [x] ⛔ **Per-person, per-(tool, action) auto-approve** stored per user and checked in `process_chat_turn`, replacing the single `auto_approve_writes` boolean. Remove-event and replace-note are excluded entirely. *Done in slice 4: `PUT /users/me/tool-approvals`, set from the card (#61) or Profile › Agents › "When agents act" (#147).*
+- [x] Approval card labels come from the action, not the tool. *Done in slice 4 (#51).*
 
 ### 5.5 Agents
 
