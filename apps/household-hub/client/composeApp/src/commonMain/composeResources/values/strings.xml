@@ -167,6 +167,40 @@
         <item quantity="other">Checked %1$d days ago</item>
     </plurals>
     <string name="profile_calendar_note">One calendar per member. Changing it replaces this one.</string>
+    <string name="profile_agents">Agents</string>
+    <string name="profile_when_agents_act">When agents act</string>
+    <plurals name="profile_when_agents_act_automatic">
+        <item quantity="one">%1$d action runs without asking</item>
+        <item quantity="other">%1$d actions run without asking</item>
+    </plurals>
+    <string name="profile_when_agents_act_none">Every change asks you first</string>
+
+    <string name="when_agents_act_back">Back</string>
+    <string name="when_agents_act_title">When agents act</string>
+    <string name="when_agents_act_intro">Everything an agent can do, and which of it waits for your okay. These are yours — they apply to every agent you talk to.</string>
+    <string name="when_agents_act_looking">Just looking</string>
+    <string name="when_agents_act_looking_note">Reading changes nothing, so these never ask.</string>
+    <string name="when_agents_act_runs_freely">Runs freely</string>
+    <string name="when_agents_act_calendar">Your calendar</string>
+    <string name="when_agents_act_notes">Your notes</string>
+    <string name="when_agents_act_always_asks">Always asks</string>
+    <string name="when_agents_act_read_calendar_caption">Checks when you’re free</string>
+    <string name="when_agents_act_search_caption">Through your own SearXNG</string>
+    <string name="when_agents_act_pdf_caption">Documents you attach to a chat</string>
+    <string name="when_agents_act_calendar_add_asks">Asks before adding anything</string>
+    <string name="when_agents_act_calendar_add_auto">Auto-approved — new events go straight in</string>
+    <string name="when_agents_act_calendar_change_asks">Asks before moving or editing anything</string>
+    <string name="when_agents_act_calendar_change_auto">Auto-approved — changes go straight in</string>
+    <string name="when_agents_act_calendar_remove_caption">Can’t be undone from here</string>
+    <string name="when_agents_act_note_create_asks">Asks before making a new one</string>
+    <string name="when_agents_act_note_create_auto">Auto-approved — new notes go straight in</string>
+    <string name="when_agents_act_note_append_asks">Asks before appending</string>
+    <string name="when_agents_act_note_append_auto">Auto-approved — additions go straight in</string>
+    <string name="when_agents_act_note_replace_caption">Overwrites what was there</string>
+    <string name="when_agents_act_secret_note">In Secret Mode nothing is written at all, whatever’s switched on here.</string>
+    <string name="when_agents_act_save_unreachable">Can’t reach your hub, so nothing changed.</string>
+    <string name="when_agents_act_save_failed">Your hub didn’t save that, so nothing changed.</string>
+    <string name="when_agents_act_retry">Try again</string>
 
     <!-- Slice 4 · connecting a calendar -->
     <string name="calendar_back">Back</string>

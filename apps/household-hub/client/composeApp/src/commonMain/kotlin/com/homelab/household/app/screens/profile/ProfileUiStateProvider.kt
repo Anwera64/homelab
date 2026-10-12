@@ -39,6 +39,7 @@ class ProfileUiStateProvider : PreviewParameterProvider<ProfileUiState> {
                             minutesAgo = 4,
                         ),
                     status = ProfileStatus.Ready,
+                    automaticWrites = 1,
                 ),
             "An admin who can leave" to
                 ProfileUiState(

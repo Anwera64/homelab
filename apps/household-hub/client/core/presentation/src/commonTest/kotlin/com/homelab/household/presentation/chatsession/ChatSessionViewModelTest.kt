@@ -10,11 +10,13 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
+import com.homelab.household.domain.model.ToolApproval
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
 import com.homelab.household.domain.model.ToolSummary
@@ -31,7 +33,9 @@ import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import com.homelab.household.presentation.whenagentsact.WhenAgentsActViewModel
 import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.every
@@ -474,6 +478,57 @@ class ChatSessionViewModelTest {
             val state = viewModel.uiState.value
             assertEquals(AutomaticWrite("calendar_write", ToolAction.Create), state.madeAutomatic)
             assertEquals(TurnState.Idle, state.turnState)
+        }
+
+    /** The hub's settings, kept the way the hub keeps them: one list, whoever changes it. */
+    private class HubSettings {
+        var approvals =
+            listOf(
+                ToolApproval(HubTool.CALENDAR_WRITE, ToolAction.Create, automatic = false),
+                ToolApproval(HubTool.CALENDAR_WRITE, ToolAction.Update, automatic = false),
+                ToolApproval(HubTool.CALENDAR_WRITE, ToolAction.Delete, automatic = false, alwaysAsks = true),
+            )
+
+        fun set(
+            tool: String,
+            action: ToolAction,
+            automatic: Boolean,
+        ): List<ToolApproval> {
+            approvals =
+                approvals.map { if (it.tool == tool && it.action == action) it.copy(automatic = automatic) else it }
+            return approvals
+        }
+    }
+
+    @Test
+    fun `GIVEN the card's box and the When agents act switch WHEN either changes THEN both show the same setting`() =
+        runTest(testDispatcher) {
+            val hub = HubSettings()
+            everySuspend { setToolApprovalUseCase(any(), any(), any()) } calls
+                { (tool: String, action: ToolAction, auto: Boolean) ->
+                    hub.set(tool, action, auto)
+                }
+            openPaused(dinner)
+            approvedTurn("c1")
+
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+
+            val settings = WhenAgentsActViewModel({ hub.approvals }, setToolApprovalUseCase)
+            advanceUntilIdle()
+            val addEvents = {
+                settings.uiState.value.groups
+                    .first()
+                    .approvals
+                    .first { it.action == ToolAction.Create }
+            }
+            assertTrue(addEvents().automatic)
+
+            settings.onToggle(HubTool.CALENDAR_WRITE, ToolAction.Create, automatic = false)
+            advanceUntilIdle()
+
+            assertFalse(addEvents().automatic)
+            assertFalse(hub.approvals.first { it.action == ToolAction.Create }.automatic)
         }
 
     @Test
