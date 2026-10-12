@@ -79,7 +79,7 @@ back to reflects only the new part. It also stores what the last run did, for th
 
 **What it does with each fact** is §6: save it, or raise a proposal.
 
-**Later trigger.** When the chat connection becomes a WebSocket (a separate issue), a socket that
+**Later trigger.** When the chat connection becomes a WebSocket (#165), a socket that
 closes and stays closed can trigger the same job sooner. The sweep stays as the safety net.
 
 ### 2.3 Chat title
@@ -488,8 +488,8 @@ implied changes much lower.
 
 ## 13. Out of scope
 
-- **WebSocket transport** for chat. It gets its own issue; this slice works over the existing
-  server-sent events.
+- **WebSocket transport** for chat. That is #165; this slice works over the existing server-sent
+  events.
 - **The dashboard.** Its household section reads household memories in place of milestones, with no
   redesign.
 - **A reranker or an entailment model.** Both would be another model to host.
@@ -498,8 +498,8 @@ implied changes much lower.
 
 ## 14. References
 
-- Issues: #133 (the trigger), #81 (reasoning on background calls), #64 (claimed tool calls), #79 (the
-  prompt cache), #53 (work after a turn).
+- Issues: #133 (the trigger, closed in favour of this slice), #81 (reasoning on background calls),
+  #64 (claimed tool calls), #79 (the prompt cache), #53 (work after a turn), #165 (WebSocket transport).
 - [A-MEM: Agentic Memory for LLM Agents](https://arxiv.org/pdf/2502.12110) — a note on when a memory
   matters, embedded with it.
 - [Mem0: how it works](https://docs.mem0.ai/core-concepts/how-it-works.md) — search before the model
