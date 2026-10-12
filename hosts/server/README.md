@@ -198,8 +198,12 @@ All media lives on one disk mounted at `/data`, in the TRaSH layout, so download
 ```
 /data/media/movies
 /data/media/tv
+/data/media/anime
+/data/media/anime-movies
 /data/torrents
 ```
+
+Anime has folders of its own because it has a quality profile of its own, `[Anime] Remux-1080p` from the TRaSH Guides, which Recyclarr keeps in Sonarr and Radarr beside the regular ones. In Sonarr an anime series also needs the series type "Anime". Seerr sends anime series there by itself (Settings → Services → Sonarr: the anime profile, folder and series type); for an anime movie, pick the profile and the folder in the request's advanced options. Jellyfin has a library for each of the two folders.
 
 1. Format the disk ext4 and read its ID: `lsblk -o NAME,SIZE,FSTYPE,UUID`.
 2. Put the ID in `DATA_DISK_UUID` in `.env` and rerun the bootstrap script. It adds the mount, creates the folders and starts the media services.
