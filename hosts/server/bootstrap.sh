@@ -231,7 +231,7 @@ else
 fi
 if mountpoint -q /data; then
   # TRaSH layout; the apps run as 1000:1000.
-  install -d -o 1000 -g 1000 /data/media /data/media/movies /data/media/tv /data/torrents
+  install -d -o 1000 -g 1000 /data/media /data/media/movies /data/media/tv /data/media/anime /data/media/anime-movies /data/torrents
 fi
 
 step "Disk health: a short self-test every Sunday at 03:00"

@@ -138,6 +138,16 @@ test('Server bootstrap script', async (t) => {
     assert.match(script.slice(notMounted), /chattr \+i \/data/);
   });
 
+  await t.test('creates the library folders on the media disk, anime apart from the rest', () => {
+    // Anime has its own quality profile and its own Jellyfin libraries, so it gets its own folders.
+    const line = (script.match(/^  install -d -o 1000 -g 1000 (\/data\/[^\n]*)$/m) || ['', ''])[1].split(/\s+/);
+    for (const folder of ['/data/media/movies', '/data/media/tv', '/data/media/anime', '/data/media/anime-movies', '/data/torrents']) {
+      assert.ok(line.includes(folder), `${folder} must be created, owned by the apps' user`);
+    }
+    // Only on the disk itself: without it /data is the immutable empty folder.
+    assert.ok(at(script, /^if mountpoint -q \/data; then$/m) < at(script, 'install -d -o 1000 -g 1000 /data/media'));
+  });
+
   await t.test('installs the firewall, disk guard and battery units with the repo path filled in', () => {
     for (const unit of ['server-firewall.service', 'server-media.service', 'server-battery.service', 'server-update.timer', 'server-renovate.timer']) {
       assert.ok(script.includes(unit), `must install ${unit}`);
