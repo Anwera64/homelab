@@ -39,27 +39,25 @@ fun <T> HearthSegmented(
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(HearthShapes.item)
-                .background(colors.canvas)
-                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
-                .padding(HearthTheme.spacing.xs)
-                .semantics { contentDescription = label }
-                .selectableGroup(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(HearthShapes.item)
+            .background(colors.canvas)
+            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.item)
+            .padding(HearthTheme.spacing.xs)
+            .semantics { contentDescription = label }
+            .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
     ) {
         options.forEach { (option, words) ->
             val selected = option == chosen
             Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = HearthTheme.size.touchTarget - HearthTheme.spacing.xs)
-                        .clip(HearthShapes.button)
-                        .background(if (selected) colors.surface else colors.canvas)
-                        .selectable(selected = selected, role = Role.RadioButton, onClick = { onChoose(option) }),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = HearthTheme.size.touchTarget - HearthTheme.spacing.xs)
+                    .clip(HearthShapes.button)
+                    .background(if (selected) colors.surface else colors.canvas)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onChoose(option) }),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

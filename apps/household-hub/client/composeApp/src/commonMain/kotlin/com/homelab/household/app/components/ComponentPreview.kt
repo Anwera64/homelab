@@ -18,10 +18,9 @@ import com.homelab.household.app.theme.HearthTheme
 internal fun ComponentPreview(content: @Composable ColumnScope.() -> Unit) {
     HearthTheme {
         Column(
-            modifier =
-                Modifier
-                    .background(HearthTheme.colors.canvas)
-                    .padding(HearthTheme.spacing.xl),
+            modifier = Modifier
+                .background(HearthTheme.colors.canvas)
+                .padding(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             content = content,
         )

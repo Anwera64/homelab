@@ -32,6 +32,10 @@ ktlint_standard_package-name = disabled
 # dependency this rule exists to catch. See DesignSystemTokenTest.
 compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps
 
+# `modifier = Modifier` reads as one thought, with the chain's calls one per line beneath it. This
+# rule would move `Modifier` down a line of its own after the `=`. ModifierChainTest guards the shape.
+ktlint_standard_multiline-expression-wrapping = disabled
+
 [**/androidDeviceTest/**/*.kt]
 # Android instrumented tests write `GIVEN_..._WHEN_..._THEN_...` because dex below API 30
 # rejects a space in a method name and this client is minSdk 26. Again: TestNameCompatibilityTest.

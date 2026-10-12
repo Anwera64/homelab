@@ -72,11 +72,10 @@ fun AgentAvatarButton(
 
     Box(modifier = modifier.then(tappable)) {
         Box(
-            modifier =
-                Modifier
-                    .size(size.tile)
-                    .clip(CircleShape)
-                    .background(colors.primaryContainer),
+            modifier = Modifier
+                .size(size.tile)
+                .clip(CircleShape)
+                .background(colors.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Text(text = avatar, style = HearthTheme.typography.glyphXxl)
@@ -102,32 +101,30 @@ fun AgentAvatarButton(
             }
             rings.forEach { ring ->
                 Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .offset(spacing.xs, spacing.xs)
-                            .size(size.iconXl)
-                            .graphicsLayer {
-                                val progress = ring.value
-                                val scale = 1f + (NUDGE_SPREAD - 1f) * progress
-                                scaleX = scale
-                                scaleY = scale
-                                // Nothing before the ring starts, and nothing once it has spread.
-                                alpha = if (progress <= 0f || progress >= 1f) 0f else NUDGE_ALPHA * (1f - progress)
-                            }.border(size.emphasis, colors.primary, CircleShape),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(spacing.xs, spacing.xs)
+                        .size(size.iconXl)
+                        .graphicsLayer {
+                            val progress = ring.value
+                            val scale = 1f + (NUDGE_SPREAD - 1f) * progress
+                            scaleX = scale
+                            scaleY = scale
+                            // Nothing before the ring starts, and nothing once it has spread.
+                            alpha = if (progress <= 0f || progress >= 1f) 0f else NUDGE_ALPHA * (1f - progress)
+                        }.border(size.emphasis, colors.primary, CircleShape),
                 )
             }
         }
 
         Box(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(spacing.xs, spacing.xs)
-                    .size(size.iconXl)
-                    .clip(CircleShape)
-                    .background(colors.surface)
-                    .border(size.hairline, colors.outline, CircleShape),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(spacing.xs, spacing.xs)
+                .size(size.iconXl)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .border(size.hairline, colors.outline, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             HearthIconImage(

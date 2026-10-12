@@ -26,11 +26,10 @@ private fun TypeScalePreview() {
         val type = HearthTheme.typography
         val colors = HearthTheme.colors
         Column(
-            modifier =
-                Modifier
-                    .background(colors.canvas)
-                    .verticalScroll(rememberScrollState())
-                    .padding(HearthTheme.spacing.xl),
+            modifier = Modifier
+                .background(colors.canvas)
+                .verticalScroll(rememberScrollState())
+                .padding(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         ) {
             Specimen("hero", "Evening, Emma", type.hero)

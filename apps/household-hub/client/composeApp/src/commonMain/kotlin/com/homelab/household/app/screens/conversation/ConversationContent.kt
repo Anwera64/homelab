@@ -234,14 +234,13 @@ fun ConversationContent(
                         text = failure,
                         style = type.caption,
                         color = colors.error,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = HearthTheme.spacing.xl,
-                                    end = HearthTheme.spacing.xl,
-                                    bottom = HearthTheme.spacing.sm,
-                                ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = HearthTheme.spacing.xl,
+                                end = HearthTheme.spacing.xl,
+                                bottom = HearthTheme.spacing.sm,
+                            ),
                     )
                 }
                 MessageComposer(
@@ -274,12 +273,11 @@ fun ConversationContent(
     ) { padding ->
         if (state.isNew) {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(tapClearsFocus)
-                        .padding(padding)
-                        .padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(tapClearsFocus)
+                    .padding(padding)
+                    .padding(HearthTheme.spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md, Alignment.CenterVertically),
             ) {
@@ -321,12 +319,11 @@ fun ConversationContent(
 
         LazyColumn(
             state = transcript,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .then(tapClearsFocus)
-                    .padding(padding)
-                    .testTag(CONVERSATION_TRANSCRIPT_TAG),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(tapClearsFocus)
+                .padding(padding)
+                .testTag(CONVERSATION_TRANSCRIPT_TAG),
             contentPadding = PaddingValues(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         ) {

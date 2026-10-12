@@ -39,11 +39,10 @@ fun ToolRunningChip(
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier =
-            modifier
-                .actionCardSurface()
-                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md)
-                .semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = modifier
+            .actionCardSurface()
+            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md)
+            .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -87,10 +86,9 @@ private fun Spinner() {
 
     val stroke = HearthTheme.size.emphasis
     Canvas(
-        modifier =
-            Modifier
-                .size(HearthTheme.size.iconSm)
-                .rotate(angle),
+        modifier = Modifier
+            .size(HearthTheme.size.iconSm)
+            .rotate(angle),
     ) {
         val width = stroke.toPx()
         drawCircle(

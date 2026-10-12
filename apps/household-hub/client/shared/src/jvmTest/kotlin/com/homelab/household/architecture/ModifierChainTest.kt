@@ -20,17 +20,18 @@ class ModifierChainTest {
             if (dir.name == "shared") dir.parentFile else dir
         }
 
+    private val sources by lazy {
+        clientRootDir
+            .walkTopDown()
+            .onEnter { it.name != "build" && !it.name.startsWith(".") }
+            .filter { it.isFile && it.extension == "kt" && "${File.separator}src${File.separator}" in it.path }
+            // Its own samples are chains on one line, on purpose.
+            .filterNot { it.name == "ModifierChainTest.kt" }
+            .toList()
+    }
+
     @Test
     fun `GIVEN a modifier chain WHEN it has more than one call THEN each call is on its own line`() {
-        val sources =
-            clientRootDir
-                .walkTopDown()
-                .onEnter { it.name != "build" && !it.name.startsWith(".") }
-                .filter { it.isFile && it.extension == "kt" && "${File.separator}src${File.separator}" in it.path }
-                // Its own samples are chains on one line, on purpose.
-                .filterNot { it.name == "ModifierChainTest.kt" }
-                .toList()
-
         assertTrue(sources.isNotEmpty(), "Expected Kotlin sources under ${clientRootDir.absolutePath}")
 
         val violations =
@@ -47,6 +48,36 @@ class ModifierChainTest {
         assertTrue(
             violations.isEmpty(),
             "Break these modifier chains one call per line (${violations.size}):\n" + violations.joinToString("\n"),
+        )
+    }
+
+    /**
+     * The chain starts where it is assigned: `modifier = Modifier` and then its calls below. Wrapping
+     * after the `=` spends a line on nothing and pushes the whole chain one indent further right.
+     * ktlint's `multiline-expression-wrapping` asks for exactly that wrap, which is why
+     * `.editorconfig` turns it off.
+     */
+    @Test
+    fun `GIVEN a modifier chain WHEN it is assigned THEN it starts on the assignment line`() {
+        val wrappedAfterEquals = Regex("""=\s*$""")
+        val bareReceiver = Regex("""^\s*[Mm]odifier\s*$""")
+
+        val violations =
+            sources.flatMap { file ->
+                file.readLines().zipWithNext().mapIndexedNotNull { index, (line, next) ->
+                    if (wrappedAfterEquals.containsMatchIn(line) && bareReceiver.matches(next)) {
+                        "${file.toRelativeString(clientRootDir)}:${index + 1}: ${line.trim()} ${next.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Start these modifier chains on the assignment line (${violations.size}):\n" + violations.joinToString(
+                "\n",
+            ),
         )
     }
 

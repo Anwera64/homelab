@@ -54,15 +54,14 @@ fun MessageComposer(
     val textStyle = HearthTheme.typography.label
 
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(colors.surface)
-                // Bottom and horizontal only: the keyboard is already in `safeDrawing`, so this
-                // rises above it rather than hiding underneath.
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-                ),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            // Bottom and horizontal only: the keyboard is already in `safeDrawing`, so this
+            // rises above it rather than hiding underneath.
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+            ),
     ) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
@@ -91,11 +90,10 @@ fun MessageComposer(
                 cursorBrush = SolidColor(colors.primary),
                 decorationBox = { innerField ->
                     Box(
-                        modifier =
-                            Modifier
-                                .background(colors.canvas, HearthShapes.pill)
-                                .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
-                                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+                        modifier = Modifier
+                            .background(colors.canvas, HearthShapes.pill)
+                            .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
+                            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     ) {
                         if (value.isEmpty()) {
                             Text(placeholder, style = textStyle, color = colors.textMuted)
@@ -105,12 +103,11 @@ fun MessageComposer(
                 },
             )
             Box(
-                modifier =
-                    Modifier
-                        .size(HearthTheme.size.touchTarget)
-                        .clip(CircleShape)
-                        .background(colors.primary)
-                        .clickable(role = Role.Button) { onSend(value) },
+                modifier = Modifier
+                    .size(HearthTheme.size.touchTarget)
+                    .clip(CircleShape)
+                    .background(colors.primary)
+                    .clickable(role = Role.Button) { onSend(value) },
                 contentAlignment = Alignment.Center,
             ) {
                 HearthIconImage(

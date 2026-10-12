@@ -29,11 +29,10 @@ private fun HearthIconSetPreview() {
     HearthTheme {
         val cellWidth = HearthTheme.size.readingWidth / 3
         Column(
-            modifier =
-                Modifier
-                    .background(HearthTheme.colors.canvas)
-                    .verticalScroll(rememberScrollState())
-                    .padding(HearthTheme.spacing.xl),
+            modifier = Modifier
+                .background(HearthTheme.colors.canvas)
+                .verticalScroll(rememberScrollState())
+                .padding(HearthTheme.spacing.xl),
         ) {
             // Three cells to a row: the grid is as wide as the reading column, and cells carry no gap.
             FlowRow(

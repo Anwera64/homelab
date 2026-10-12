@@ -124,10 +124,9 @@ fun CalendarConnectContent(
         },
         bottomBar = {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
@@ -168,11 +167,10 @@ fun CalendarConnectContent(
         },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         ) {
             if (rejected) {
@@ -286,26 +284,24 @@ private fun PresetServer(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         Text(stringResource(Res.string.calendar_server), style = type.labelStrong, color = colors.textMuted)
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = HearthTheme.size.touchTarget)
-                    .background(colors.surfaceAlt, HearthShapes.item)
-                    .border(
-                        width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
-                        color = if (error != null) colors.error else colors.outlineSoft,
-                        shape = HearthShapes.item,
-                    ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = HearthTheme.size.touchTarget)
+                .background(colors.surfaceAlt, HearthShapes.item)
+                .border(
+                    width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
+                    color = if (error != null) colors.error else colors.outlineSoft,
+                    shape = HearthShapes.item,
+                ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(address, modifier = Modifier.weight(1f), style = type.mono, color = colors.textMuted)
             Text(
                 stringResource(Res.string.calendar_server_preset),
-                modifier =
-                    Modifier
-                        .background(colors.outlineSoft, HearthShapes.pill)
-                        .padding(horizontal = HearthTheme.spacing.sm, vertical = HearthTheme.spacing.xs),
+                modifier = Modifier
+                    .background(colors.outlineSoft, HearthShapes.pill)
+                    .padding(horizontal = HearthTheme.spacing.sm, vertical = HearthTheme.spacing.xs),
                 style = type.monoSm,
                 color = colors.textMuted,
             )

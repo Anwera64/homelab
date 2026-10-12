@@ -35,22 +35,20 @@ fun HearthSwitch(
     val thumbOffset by animateDpAsState(if (checked) travel else HearthTheme.spacing.none)
 
     Box(
-        modifier =
-            modifier
-                .width(track)
-                .height(HearthTheme.spacing.xxl + HearthTheme.spacing.xs)
-                .semantics { this.contentDescription = contentDescription }
-                .background(if (checked) colors.primary else colors.outline, HearthShapes.pill)
-                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-                .padding(HearthTheme.spacing.xs),
+        modifier = modifier
+            .width(track)
+            .height(HearthTheme.spacing.xxl + HearthTheme.spacing.xs)
+            .semantics { this.contentDescription = contentDescription }
+            .background(if (checked) colors.primary else colors.outline, HearthShapes.pill)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(HearthTheme.spacing.xs),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
-            modifier =
-                Modifier
-                    .offset(x = thumbOffset)
-                    .size(thumb)
-                    .background(colors.surface, CircleShape),
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(thumb)
+                .background(colors.surface, CircleShape),
         )
     }
 }

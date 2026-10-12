@@ -29,11 +29,10 @@ fun MemberAvatar(
 ) {
     val colors = HearthTheme.colors
     Box(
-        modifier =
-            modifier
-                .size(size)
-                .background(hexColor(colour, fallback = colors.primary), CircleShape)
-                .clearAndSetSemantics {},
+        modifier = modifier
+            .size(size)
+            .background(hexColor(colour, fallback = colors.primary), CircleShape)
+            .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
         Text(

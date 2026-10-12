@@ -65,11 +65,10 @@ fun PinForgotContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.forgot_back)) },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
@@ -124,11 +123,10 @@ fun PinForgotContent(
                     text = stringResource(Res.string.forgot_alone_command, state.member.name),
                     style = type.monoSm,
                     color = colors.textMuted,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .background(colors.surfaceAlt, HearthShapes.item)
-                            .padding(HearthTheme.spacing.md),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.surfaceAlt, HearthShapes.item)
+                        .padding(HearthTheme.spacing.md),
                 )
             }
 

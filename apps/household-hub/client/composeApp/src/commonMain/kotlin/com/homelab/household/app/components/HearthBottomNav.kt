@@ -59,46 +59,43 @@ fun HearthBottomNav(
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(colors.surface)
-                // The bar pays for its own insets, as Material 3's do: `Scaffold` gives the content
-                // this bar's height and nothing more, so without this the tabs sit under the
-                // gesture bar.
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-                ),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            // The bar pays for its own insets, as Material 3's do: `Scaffold` gives the content
+            // this bar's height and nothing more, so without this the tabs sit under the
+            // gesture bar.
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+            ),
     ) {
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = HearthTheme.spacing.sm,
-                        top = HearthTheme.spacing.md,
-                        end = HearthTheme.spacing.sm,
-                        bottom = HearthTheme.spacing.lg,
-                    ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = HearthTheme.spacing.sm,
+                    top = HearthTheme.spacing.md,
+                    end = HearthTheme.spacing.sm,
+                    bottom = HearthTheme.spacing.lg,
+                ),
             verticalAlignment = Alignment.Bottom,
         ) {
             NavItem(NavTab.Household, selected, onSelect)
             NavItem(NavTab.Schedule, selected, onSelect)
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Box(
-                    modifier =
-                        Modifier
-                            .offset(y = -HearthTheme.spacing.xxl)
-                            .size(HearthTheme.size.control)
-                            .shadow(
-                                elevation = HearthTheme.size.raised,
-                                shape = CircleShape,
-                                ambientColor = colors.primary.copy(alpha = 0.30f),
-                                spotColor = colors.primary.copy(alpha = 0.30f),
-                            ).clip(CircleShape)
-                            .background(colors.primary)
-                            .clickable(role = Role.Button, onClick = onNewChat),
+                    modifier = Modifier
+                        .offset(y = -HearthTheme.spacing.xxl)
+                        .size(HearthTheme.size.control)
+                        .shadow(
+                            elevation = HearthTheme.size.raised,
+                            shape = CircleShape,
+                            ambientColor = colors.primary.copy(alpha = 0.30f),
+                            spotColor = colors.primary.copy(alpha = 0.30f),
+                        ).clip(CircleShape)
+                        .background(colors.primary)
+                        .clickable(role = Role.Button, onClick = onNewChat),
                     contentAlignment = Alignment.Center,
                 ) {
                     HearthIconImage(
@@ -125,12 +122,11 @@ private fun RowScope.NavItem(
     val isSelected = tab == selected
     val tint = if (isSelected) HearthTheme.colors.primary else HearthTheme.colors.textMuted
     Column(
-        modifier =
-            Modifier
-                .weight(1f)
-                .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
-                .heightIn(min = HearthTheme.size.touchTarget)
-                .padding(vertical = HearthTheme.spacing.xs),
+        modifier = Modifier
+            .weight(1f)
+            .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .padding(vertical = HearthTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs, Alignment.Bottom),
     ) {

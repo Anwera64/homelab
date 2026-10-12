@@ -104,16 +104,15 @@ fun FirstRunContent(
         bottomBar = { CreateFooter(state = state, onCreate = onCreate, onSignIn = onSignIn) },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    // iOS's numeric keypad (the PIN field's NumberPassword type) has no return key,
-                    // so tapping away from the fields is the only way to dismiss it there. A tap that
-                    // lands on a real control (a field, a swatch, the footer button) is consumed by
-                    // that control first and never reaches this gesture.
-                    .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                // iOS's numeric keypad (the PIN field's NumberPassword type) has no return key,
+                // so tapping away from the fields is the only way to dismiss it there. A tap that
+                // lands on a real control (a field, a swatch, the footer button) is consumed by
+                // that control first and never reaches this gesture.
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(
@@ -182,14 +181,13 @@ private fun CreateFooter(
     val type = HearthTheme.typography
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(colors.canvas)
-                // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-                ).padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.canvas)
+            // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+            ).padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         PrimaryButton(

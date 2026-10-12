@@ -49,27 +49,26 @@ fun ColourSwatches(
             val description = swatchDescription(index)
             // The tap target is the full 48dp; the chosen swatch wears a ring in the gap around it.
             Box(
-                modifier =
-                    Modifier
-                        .size(HearthTheme.size.touchTarget)
-                        .clip(CircleShape)
-                        .selectable(
-                            selected = isSelected,
-                            enabled = !isTaken,
-                            role = Role.RadioButton,
-                            onClick = { onSelect(hex) },
-                        ).semantics { contentDescription = description }
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(
-                                    HearthTheme.size.emphasis,
-                                    swatch,
-                                    CircleShape,
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
+                modifier = Modifier
+                    .size(HearthTheme.size.touchTarget)
+                    .clip(CircleShape)
+                    .selectable(
+                        selected = isSelected,
+                        enabled = !isTaken,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(hex) },
+                    ).semantics { contentDescription = description }
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(
+                                HearthTheme.size.emphasis,
+                                swatch,
+                                CircleShape,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(

@@ -51,11 +51,10 @@ const val THINKING_DOTS_TAG = "ThinkingDots"
 @Composable
 fun ThinkingDots(modifier: Modifier = Modifier) {
     Column(
-        modifier =
-            modifier
-                .testTag(THINKING_DOTS_TAG)
-                // One node, read once: the word is what a screen reader says, the dots are silent.
-                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        modifier = modifier
+            .testTag(THINKING_DOTS_TAG)
+            // One node, read once: the word is what a screen reader says, the dots are silent.
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
     ) {
         Row(
@@ -64,12 +63,11 @@ fun ThinkingDots(modifier: Modifier = Modifier) {
         ) {
             repeat(DOTS) { index ->
                 Box(
-                    modifier =
-                        Modifier
-                            .offset(y = lift(index))
-                            .size(HearthTheme.size.thinkingDot)
-                            .background(HearthTheme.colors.textMuted, CircleShape)
-                            .clearAndSetSemantics {},
+                    modifier = Modifier
+                        .offset(y = lift(index))
+                        .size(HearthTheme.size.thinkingDot)
+                        .background(HearthTheme.colors.textMuted, CircleShape)
+                        .clearAndSetSemantics {},
                 )
             }
         }

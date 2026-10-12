@@ -88,10 +88,9 @@ fun MembersContent(
             // has not said yet, and a button that may not be yours is worse than none.
             if (state.youAreAdmin && !arriving) {
                 Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(HearthTheme.spacing.xl),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(HearthTheme.spacing.xl),
                 ) {
                     PrimaryButton(
                         text = stringResource(Res.string.members_invite),
@@ -256,10 +255,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.failureItem(
         else -> {
             item {
                 Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = HearthTheme.spacing.xl),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = HearthTheme.spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
                 ) {

@@ -49,10 +49,9 @@ fun ResetCodeContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.reset_code_back)) },
         bottomBar = {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
             ) {
                 PrimaryButton(
                     text = stringResource(Res.string.invite_code_continue),
@@ -63,10 +62,9 @@ fun ResetCodeContent(
         },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {

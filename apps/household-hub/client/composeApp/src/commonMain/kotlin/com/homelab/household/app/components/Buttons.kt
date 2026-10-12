@@ -108,15 +108,14 @@ fun PrimaryButton(
     WithBusyBar(modifier = modifier, busy = busy, busyBar = BusyBar.filled(colors)) {
         Button(
             onClick = { if (!busy) onClick() },
-            modifier =
-                Modifier
-                    .heightIn(min = buttonMinHeight)
-                    .shadow(
-                        elevation = if (lifted) HearthTheme.size.raised else HearthTheme.spacing.none,
-                        shape = HearthShapes.button,
-                        ambientColor = colors.primary.copy(alpha = 0.30f),
-                        spotColor = colors.primary.copy(alpha = 0.30f),
-                    ).busySemantics(busy, busyDescription),
+            modifier = Modifier
+                .heightIn(min = buttonMinHeight)
+                .shadow(
+                    elevation = if (lifted) HearthTheme.size.raised else HearthTheme.spacing.none,
+                    shape = HearthShapes.button,
+                    ambientColor = colors.primary.copy(alpha = 0.30f),
+                    spotColor = colors.primary.copy(alpha = 0.30f),
+                ).busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
             colors =
                 ButtonDefaults.buttonColors(
@@ -195,10 +194,9 @@ private fun OutlinedActionButton(
     WithBusyBar(modifier = modifier, busy = busy, busyBar = busyBar) {
         OutlinedButton(
             onClick = { if (!busy) onClick() },
-            modifier =
-                Modifier
-                    .heightIn(min = buttonMinHeight)
-                    .busySemantics(busy, busyDescription),
+            modifier = Modifier
+                .heightIn(min = buttonMinHeight)
+                .busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
             border = BorderStroke(HearthTheme.size.hairline, borderColor),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
@@ -242,10 +240,9 @@ private fun WithBusyBar(
 @Composable
 private fun BoxScope.BusyBarOverlay(busyBar: BusyBar) {
     Box(
-        modifier =
-            Modifier
-                .matchParentSize()
-                .clip(HearthShapes.button),
+        modifier = Modifier
+            .matchParentSize()
+            .clip(HearthShapes.button),
         contentAlignment = Alignment.BottomCenter,
     ) {
         HearthProgressBar(

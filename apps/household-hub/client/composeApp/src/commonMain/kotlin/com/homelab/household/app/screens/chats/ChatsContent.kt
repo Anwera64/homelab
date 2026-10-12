@@ -80,20 +80,18 @@ fun ChatsContent(
         bottomBar = tabs,
         header = {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        // Chats has no Material 3 top bar to inset it, so the header does it
-                        // itself; otherwise the title sits under the status bar.
-                        .windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                        ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Chats has no Material 3 top bar to inset it, so the header does it
+                    // itself; otherwise the title sits under the status bar.
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    ),
             ) {
                 Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = HearthTheme.spacing.xl, vertical = HearthTheme.spacing.md),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = HearthTheme.spacing.xl, vertical = HearthTheme.spacing.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -105,14 +103,13 @@ fun ChatsContent(
                 // Both arrive with the first chat: an empty list has nothing to search.
                 if (!state.isEmpty) {
                     Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = HearthTheme.spacing.xl,
-                                    end = HearthTheme.spacing.xl,
-                                    bottom = HearthTheme.spacing.md,
-                                ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = HearthTheme.spacing.xl,
+                                end = HearthTheme.spacing.xl,
+                                bottom = HearthTheme.spacing.md,
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -143,19 +140,17 @@ fun ChatsContent(
         // hub that cannot be reached — sits in the middle of the space the list would have used.
         // A list, and the blocks that stand in for one while it arrives, start at the top.
         Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             contentAlignment = Alignment.Center,
         ) {
             when {
                 state.errorMessage != null -> {
                     Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(HearthTheme.spacing.xl),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(HearthTheme.spacing.xl),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
                     ) {
@@ -171,10 +166,9 @@ fun ChatsContent(
                 state.isLoading && state.visible.isEmpty() -> {
                     // Arriving empty: chrome is already drawn, so the rows breathe where they land.
                     SkeletonGroup(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(HearthTheme.spacing.xl),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(HearthTheme.spacing.xl),
                     ) {
                         repeat(4) { SkeletonBlock(modifier = Modifier.fillMaxWidth()) }
                     }
@@ -203,10 +197,9 @@ fun ChatsContent(
 
                 else -> {
                     LazyColumn(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .align(Alignment.TopCenter),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .align(Alignment.TopCenter),
                         contentPadding =
                             androidx.compose.foundation.layout
                                 .PaddingValues(HearthTheme.spacing.xl),

@@ -52,11 +52,10 @@ private fun ConsequenceCard(
     val type = HearthTheme.typography
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(background, HearthShapes.bento)
-                .padding(HearthTheme.spacing.xl),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(background, HearthShapes.bento)
+            .padding(HearthTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
     ) {
         Text(title, style = type.overline, color = ink)

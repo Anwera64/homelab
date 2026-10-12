@@ -40,12 +40,11 @@ fun SettingsRow(
     val ink = if (enabled) colors.textPrimary else colors.textMuted.copy(alpha = CLOSED_ALPHA)
 
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = HearthTheme.size.touchTarget)
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {

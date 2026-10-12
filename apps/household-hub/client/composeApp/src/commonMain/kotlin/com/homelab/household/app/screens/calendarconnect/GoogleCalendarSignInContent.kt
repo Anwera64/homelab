@@ -99,10 +99,9 @@ fun GoogleCalendarSignInContent(
         },
         bottomBar = {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(HearthTheme.spacing.xl),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(HearthTheme.spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 PrimaryButton(
@@ -129,11 +128,10 @@ fun GoogleCalendarSignInContent(
         },
     ) { padding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xl),
         ) {
             if (problem == null) {
@@ -182,12 +180,11 @@ private fun BrowserSteps(modifier: Modifier = Modifier) {
         )
 
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(colors.surfaceAlt, HearthShapes.bento)
-                .border(HearthTheme.size.hairline, colors.outlineSoft, HearthShapes.bento)
-                .padding(HearthTheme.spacing.xl),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.surfaceAlt, HearthShapes.bento)
+            .border(HearthTheme.size.hairline, colors.outlineSoft, HearthShapes.bento)
+            .padding(HearthTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         Text(
@@ -201,10 +198,9 @@ private fun BrowserSteps(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.Top,
             ) {
                 Box(
-                    modifier =
-                        Modifier
-                            .size(HearthTheme.size.iconLg)
-                            .background(colors.surface, HearthShapes.pill),
+                    modifier = Modifier
+                        .size(HearthTheme.size.iconLg)
+                        .background(colors.surface, HearthShapes.pill),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("${index + 1}", style = type.mono, color = colors.textPrimary)

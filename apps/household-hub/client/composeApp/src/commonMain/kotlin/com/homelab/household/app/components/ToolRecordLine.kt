@@ -73,11 +73,10 @@ fun ToolRecordLine(
     // Split in two, the line is still read as one.
     val oneLine = if (kept != null) Modifier.semantics(mergeDescendants = true) {} else Modifier
     Row(
-        modifier =
-            modifier
-                .then(interaction)
-                .then(oneLine)
-                .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
+        modifier = modifier
+            .then(interaction)
+            .then(oneLine)
+            .padding(horizontal = HearthTheme.spacing.xs, vertical = HearthTheme.spacing.xxs),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
