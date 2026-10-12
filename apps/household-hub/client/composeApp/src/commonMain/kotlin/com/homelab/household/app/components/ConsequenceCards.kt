@@ -48,12 +48,13 @@ private fun ConsequenceCard(
     lines: List<String>,
     background: Color,
     ink: Color,
+    modifier: Modifier = Modifier,
 ) {
     val type = HearthTheme.typography
 
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .background(background, HearthShapes.bento)
                 .padding(HearthTheme.spacing.xl),

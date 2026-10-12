@@ -155,12 +155,13 @@ fun FirstRunContent(
 private fun ColourPicker(
     selected: String,
     onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val count = AvatarPalette.swatches.size
 
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
         Text(stringResource(Res.string.first_run_colour_label), style = type.labelStrong, color = colors.textMuted)
         ColourSwatches(
             swatches = AvatarPalette.swatches,
@@ -177,13 +178,14 @@ private fun CreateFooter(
     state: FirstRunUiState,
     onCreate: () -> Unit,
     onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .background(colors.canvas)
                 // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.

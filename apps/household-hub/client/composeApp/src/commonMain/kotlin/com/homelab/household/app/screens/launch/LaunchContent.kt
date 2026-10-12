@@ -332,11 +332,11 @@ private fun wordsFor(reason: HubFailure): OfflineWords =
     }
 
 @Composable
-private fun OfflineTile() {
+private fun OfflineTile(modifier: Modifier = Modifier) {
     val colors = HearthTheme.colors
     Box(
         modifier =
-            Modifier
+            modifier
                 .size(HearthTheme.size.tile)
                 .background(
                     color = colors.errorContainer,
@@ -354,11 +354,14 @@ private fun OfflineTile() {
 }
 
 @Composable
-private fun HubAddressPill(hubAddress: String) {
+private fun HubAddressPill(
+    hubAddress: String,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     Row(
         modifier =
-            Modifier
+            modifier
                 .background(colors.surface, HearthShapes.pill)
                 .border(HearthTheme.size.hairline, colors.outline, HearthShapes.pill)
                 .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.sm),

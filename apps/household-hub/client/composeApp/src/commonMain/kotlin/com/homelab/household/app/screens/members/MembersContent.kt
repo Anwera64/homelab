@@ -139,10 +139,13 @@ fun MembersContent(
  * arriving rather than two lights blinking together.
  */
 @Composable
-private fun MemberCardSkeleton(position: Int) {
+private fun MemberCardSkeleton(
+    position: Int,
+    modifier: Modifier = Modifier,
+) {
     val size = HearthTheme.size
 
-    BentoCard(modifier = Modifier.fillMaxWidth()) {
+    BentoCard(modifier = modifier.fillMaxWidth()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
@@ -176,11 +179,12 @@ private fun MemberCard(
     youAreAdmin: Boolean,
     onResetPin: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
-    BentoCard(modifier = Modifier.fillMaxWidth()) {
+    BentoCard(modifier = modifier.fillMaxWidth()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,

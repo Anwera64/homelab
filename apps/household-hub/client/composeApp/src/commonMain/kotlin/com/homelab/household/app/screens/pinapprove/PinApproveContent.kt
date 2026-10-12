@@ -168,8 +168,10 @@ fun PinApproveContent(
 private fun Agreement(
     icon: HearthIcon,
     text: String,
+    modifier: Modifier = Modifier,
 ) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         verticalAlignment = Alignment.Top,
     ) {

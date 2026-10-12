@@ -147,11 +147,12 @@ fun ProfilePickerContent(
 private fun Face(
     member: Member,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     Column(
         modifier =
-            Modifier
+            modifier
                 .clip(HearthShapes.item)
                 .clickable(
                     onClickLabel = stringResource(Res.string.picker_member_description, member.name),
@@ -174,10 +175,11 @@ private fun Face(
 private fun Problem(
     message: String,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
     ) {

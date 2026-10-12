@@ -96,12 +96,13 @@ private fun OptionsStep(
     row: CalendarRow.Connected,
     onChange: () -> Unit,
     onAskToDisconnect: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val spacing = HearthTheme.spacing
 
-    Column(modifier = Modifier.padding(start = spacing.lg, end = spacing.lg, bottom = spacing.xxxl)) {
+    Column(modifier = modifier.padding(start = spacing.lg, end = spacing.lg, bottom = spacing.xxxl)) {
         Row(
             modifier = Modifier.padding(start = spacing.sm, end = spacing.sm, bottom = spacing.md),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
@@ -146,6 +147,7 @@ private fun SheetAction(
     tint: Color,
     labelColor: Color,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -153,7 +155,7 @@ private fun SheetAction(
 
     Row(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .heightIn(min = HearthTheme.size.control)
                 .clickable(role = Role.Button, onClick = onClick)
@@ -175,13 +177,14 @@ private fun ConfirmStep(
     disconnect: CalendarDisconnect,
     onDisconnect: () -> Unit,
     onKeep: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val spacing = HearthTheme.spacing
 
     Column(
-        modifier = Modifier.padding(start = spacing.xxl, end = spacing.xxl, bottom = spacing.xxxl),
+        modifier = modifier.padding(start = spacing.xxl, end = spacing.xxl, bottom = spacing.xxxl),
         verticalArrangement = Arrangement.spacedBy(spacing.lg),
     ) {
         Text(

@@ -47,6 +47,17 @@ class LintSetupTest {
     }
 
     @Test
+    fun `GIVEN a private composable WHEN ktlint runs THEN it still has to take a modifier`() {
+        // By default the Compose rules only ask public composables for a `modifier` parameter, so a
+        // private helper can build its modifiers inline and nobody hears about it.
+        assertTrue(
+            Regex("""^\s*compose_check_modifiers_for_visibility\s*=\s*all\s*$""", RegexOption.MULTILINE)
+                .containsMatchIn(editorConfig.readText()),
+            ".editorconfig must set compose_check_modifiers_for_visibility = all",
+        )
+    }
+
+    @Test
     fun `GIVEN every module WHEN the build configures THEN ktlint is applied with the Compose rules`() {
         val build = rootBuildFile.readText()
 

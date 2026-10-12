@@ -60,7 +60,7 @@ fun ToolRunningChip(
  * instead of failing with something readable (design notes §6.21).
  */
 @Composable
-private fun Spinner() {
+private fun Spinner(modifier: Modifier = Modifier) {
     val colors = HearthTheme.colors
     val motion = HearthTheme.motion
     val angle =
@@ -86,7 +86,7 @@ private fun Spinner() {
         }
 
     val stroke = HearthTheme.size.emphasis
-    Canvas(modifier = Modifier.size(HearthTheme.size.iconSm).rotate(angle)) {
+    Canvas(modifier = modifier.size(HearthTheme.size.iconSm).rotate(angle)) {
         val width = stroke.toPx()
         drawCircle(
             color = colors.secondary.copy(alpha = RING_ALPHA),

@@ -203,8 +203,8 @@ fun ProfileContent(
  * so the header does not jump when the answer lands.
  */
 @Composable
-private fun ArrivingHeader() {
-    SkeletonGroup {
+private fun ArrivingHeader(modifier: Modifier = Modifier) {
+    SkeletonGroup(modifier = modifier) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,

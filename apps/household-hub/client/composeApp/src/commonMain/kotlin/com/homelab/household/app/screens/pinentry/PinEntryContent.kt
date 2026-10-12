@@ -280,7 +280,9 @@ private fun StatusLine(
     fun line(
         text: String,
         warning: Boolean,
+        modifier: Modifier = Modifier,
     ) = Text(
+        modifier = modifier,
         text = text,
         style = caption,
         color = if (warning) colors.error else colors.textMuted,

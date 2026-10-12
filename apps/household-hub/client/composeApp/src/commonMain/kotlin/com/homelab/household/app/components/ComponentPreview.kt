@@ -15,11 +15,14 @@ import com.homelab.household.app.theme.HearthTheme
  * preview shows the component on the wrong ground.
  */
 @Composable
-internal fun ComponentPreview(content: @Composable ColumnScope.() -> Unit) {
+internal fun ComponentPreview(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     HearthTheme {
         Column(
             modifier =
-                Modifier
+                modifier
                     .background(HearthTheme.colors.canvas)
                     .padding(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),

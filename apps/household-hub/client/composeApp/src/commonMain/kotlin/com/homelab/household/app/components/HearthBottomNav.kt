@@ -119,12 +119,13 @@ private fun RowScope.NavItem(
     tab: NavTab,
     selected: NavTab,
     onSelect: (NavTab) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isSelected = tab == selected
     val tint = if (isSelected) HearthTheme.colors.primary else HearthTheme.colors.textMuted
     Column(
         modifier =
-            Modifier
+            modifier
                 .weight(1f)
                 .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
                 .heightIn(min = HearthTheme.size.touchTarget)

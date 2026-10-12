@@ -64,8 +64,8 @@ fun CodeCard(
  * the last, so six of them read as one code landing rather than six lights blinking together.
  */
 @Composable
-private fun ArrivingCode() {
-    SkeletonGroup(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.none)) {
+private fun ArrivingCode(modifier: Modifier = Modifier) {
+    SkeletonGroup(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.none)) {
         Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
             repeat(CODE_LENGTH) { position ->
                 SkeletonBlock(

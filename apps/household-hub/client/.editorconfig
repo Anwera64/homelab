@@ -32,6 +32,10 @@ ktlint_standard_package-name = disabled
 # dependency this rule exists to catch. See DesignSystemTokenTest.
 compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps
 
+# Private helpers take a `modifier` too. Left at the default (public only), a private composable can
+# build its modifiers inline and the caller can never place it, which is what #147 had to fix by hand.
+compose_check_modifiers_for_visibility = all
+
 [**/androidDeviceTest/**/*.kt]
 # Android instrumented tests write `GIVEN_..._WHEN_..._THEN_...` because dex below API 30
 # rejects a space in a method name and this client is minSdk 26. Again: TestNameCompatibilityTest.

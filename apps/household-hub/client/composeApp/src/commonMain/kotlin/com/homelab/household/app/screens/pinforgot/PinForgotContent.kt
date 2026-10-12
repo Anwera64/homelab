@@ -143,8 +143,8 @@ fun PinForgotContent(
  * the face, the two lines beside it, and the three steps — so nothing shifts when the name lands.
  */
 @Composable
-private fun ArrivingVouch() {
-    SkeletonGroup {
+private fun ArrivingVouch(modifier: Modifier = Modifier) {
+    SkeletonGroup(modifier = modifier) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
@@ -178,11 +178,13 @@ private val STEP_WIDTHS = listOf(0.9f, 0.75f, 0.8f)
 private fun Step(
     number: Int,
     text: String,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
 
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         verticalAlignment = Alignment.Top,
     ) {

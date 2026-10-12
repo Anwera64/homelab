@@ -341,8 +341,10 @@ private fun PendingCard(
 private fun CardTitle(
     label: ToolLabel,
     tint: Color,
+    modifier: Modifier = Modifier,
 ) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -368,6 +370,7 @@ private fun EditingCard(
     scope: EventScope?,
     onCancel: () -> Unit,
     onApprove: (edited: ProposalDetails?) -> Unit,
+    modifier: Modifier = Modifier,
     whichDates: @Composable () -> Unit = {},
 ) {
     val proposed = remember(card) { proposedValues(card) }
@@ -412,7 +415,7 @@ private fun EditingCard(
     val edit = editProposal(card, values, scope)
     val invalid = if (tried) edit.invalid else emptySet()
 
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
         if (EditField.What in fields) {
             HearthTextField(
                 value = values.title,
@@ -543,9 +546,10 @@ private fun RepeatFields(
     invalid: Set<EditField>,
     onChange: (EditValues) -> Unit,
     onPickLastDate: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
         val repeatLabel = stringResource(Res.string.tool_card_field_repeat)
         Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
             HearthFieldLabel(label = repeatLabel, changed = EditField.Repeat in changed)
@@ -646,10 +650,11 @@ private fun DayChips(
     ticked: Set<Int>,
     onToggle: (Int) -> Unit,
     label: String,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+        modifier = modifier.fillMaxWidth().semantics { contentDescription = label },
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         DAY_CHIPS.forEachIndexed { day, (letter, name) ->
@@ -687,8 +692,10 @@ private fun DayChips(
 private fun TimesStepper(
     times: Int,
     onStep: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -718,11 +725,12 @@ private fun StepButton(
     spoken: String,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     Box(
         modifier =
-            Modifier
+            modifier
                 .size(HearthTheme.size.touchTarget)
                 .clip(HearthShapes.item)
                 .background(colors.surface)
@@ -789,9 +797,13 @@ private fun Int.pad() = toString().padStart(2, '0')
 
 /** "Every Tue and Thu until 24 Dec", under the first date (canvas: RepeatAdd). */
 @Composable
-private fun RepeatLine(repeat: EventRepeat) {
+private fun RepeatLine(
+    repeat: EventRepeat,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {

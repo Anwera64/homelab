@@ -418,8 +418,9 @@ fun ConversationContent(
 private fun Thinking(
     phase: WaitPhase,
     slowPhase: WaitPhase,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         if (phase != WaitPhase.Hidden) ThinkingDots()
         SlowLine(slowPhase)
     }
@@ -445,11 +446,12 @@ private fun Answer(
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onConnectCalendar: () -> Unit,
     onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
+    modifier: Modifier = Modifier,
     onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
     val runs = parts.runs(written)
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
         runs.forEachIndexed { index, run ->
             // Keyed by place, so each fold remembers its own open or closed.
             key(index) {
@@ -581,8 +583,11 @@ private fun List<AnswerPart>.runs(written: String): List<AnswerRun> {
 
 /** Each step on a line of its own, in the order it ran. */
 @Composable
-private fun Steps(steps: List<AnswerPart>) {
-    Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
+private fun Steps(
+    steps: List<AnswerPart>,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
         steps.forEach { step ->
             when (step) {
                 is AnswerPart.Thought -> {
@@ -616,12 +621,14 @@ private fun Steps(steps: List<AnswerPart>) {
 private fun TurnStatus(
     state: ChatSessionUiState,
     onTryAgain: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     when (state.turnState) {
         TurnState.Reconnecting -> {
             TurnStatusLine(
+                modifier = modifier,
                 label = stringResource(Res.string.conversation_reconnecting),
                 detail = stringResource(Res.string.conversation_reconnecting_detail),
             )
@@ -629,13 +636,14 @@ private fun TurnStatus(
 
         TurnState.StillWorking -> {
             TurnStatusLine(
+                modifier = modifier,
                 label = stringResource(Res.string.conversation_still_working),
                 detail = stringResource(Res.string.conversation_still_working_detail),
             )
         }
 
         TurnState.Failed -> {
-            Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+            Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
                 Text(
                     text = stringResource(Res.string.conversation_failed_title),
                     style = type.bodyStrong,

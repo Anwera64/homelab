@@ -59,9 +59,10 @@ private fun Specimen(
     name: String,
     sample: String,
     style: TextStyle,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         verticalAlignment = Alignment.Bottom,
     ) {

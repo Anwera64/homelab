@@ -105,12 +105,15 @@ private fun ToolStepLine(
 
 /** What a search found: each title a link, its site under it, lined up with the line's words. */
 @Composable
-private fun Results(results: List<ToolSource>) {
+private fun Results(
+    results: List<ToolSource>,
+    modifier: Modifier = Modifier,
+) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val indent = HearthTheme.spacing.xs + HearthTheme.size.iconSm + HearthTheme.spacing.sm
     Column(
-        modifier = Modifier.padding(start = indent),
+        modifier = modifier.padding(start = indent),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
     ) {
         results.forEach { result ->

@@ -240,9 +240,12 @@ private fun WithBusyBar(
 }
 
 @Composable
-private fun BoxScope.BusyBarOverlay(busyBar: BusyBar) {
+private fun BoxScope.BusyBarOverlay(
+    busyBar: BusyBar,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier.matchParentSize().clip(HearthShapes.button),
+        modifier = modifier.matchParentSize().clip(HearthShapes.button),
         contentAlignment = Alignment.BottomCenter,
     ) {
         HearthProgressBar(
@@ -268,6 +271,9 @@ private fun Modifier.busySemantics(
     return semantics { stateDescription = announcement }
 }
 
+// The icon, gap and label are siblings laid straight into the button's own Row, so there is no root
+// node a modifier could go on; wrapping them in one would only add a layout pass to every button.
+@Suppress("ktlint:compose:modifier-missing-check")
 @Composable
 private fun RowScope.ButtonContent(
     text: String,
