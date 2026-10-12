@@ -112,7 +112,8 @@ fun AgentAvatarButton(
                             scaleY = scale
                             // Nothing before the ring starts, and nothing once it has spread.
                             alpha = if (progress <= 0f || progress >= 1f) 0f else NUDGE_ALPHA * (1f - progress)
-                        }.border(size.emphasis, colors.primary, CircleShape),
+                        }
+                        .border(size.emphasis, colors.primary, CircleShape),
                 )
             }
         }

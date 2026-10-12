@@ -57,7 +57,8 @@ fun ColourSwatches(
                         enabled = !isTaken,
                         role = Role.RadioButton,
                         onClick = { onSelect(hex) },
-                    ).semantics { contentDescription = description }
+                    )
+                    .semantics { contentDescription = description }
                     .then(
                         if (isSelected) {
                             Modifier.border(

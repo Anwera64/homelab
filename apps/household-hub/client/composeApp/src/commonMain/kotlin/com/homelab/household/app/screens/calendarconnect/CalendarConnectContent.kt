@@ -292,7 +292,8 @@ private fun PresetServer(
                     width = if (error != null) HearthTheme.size.emphasis else HearthTheme.size.hairline,
                     color = if (error != null) colors.error else colors.outlineSoft,
                     shape = HearthShapes.item,
-                ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+                )
+                .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
             horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {

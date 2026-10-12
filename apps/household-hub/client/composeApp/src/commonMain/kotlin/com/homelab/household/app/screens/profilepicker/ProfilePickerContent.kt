@@ -156,7 +156,8 @@ private fun Face(
             .clickable(
                 onClickLabel = stringResource(Res.string.picker_member_description, member.name),
                 onClick = onClick,
-            ).padding(HearthTheme.spacing.sm),
+            )
+            .padding(HearthTheme.spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {

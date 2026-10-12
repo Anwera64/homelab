@@ -115,7 +115,8 @@ fun PrimaryButton(
                     shape = HearthShapes.button,
                     ambientColor = colors.primary.copy(alpha = 0.30f),
                     spotColor = colors.primary.copy(alpha = 0.30f),
-                ).busySemantics(busy, busyDescription),
+                )
+                .busySemantics(busy, busyDescription),
             shape = HearthShapes.button,
             colors =
                 ButtonDefaults.buttonColors(

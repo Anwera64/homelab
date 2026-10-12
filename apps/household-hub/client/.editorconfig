@@ -36,6 +36,11 @@ compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalH
 # rule would move `Modifier` down a line of its own after the `=`. ModifierChainTest guards the shape.
 ktlint_standard_multiline-expression-wrapping = disabled
 
+# ktlint wants the call after a multi-line one tucked behind its bracket: `).padding(...)`. A modifier
+# chain puts every call on its own line instead, so `)` and `.padding(...)` are separate lines. The
+# rule can't be scoped to modifiers; ModifierChainTest guards their shape.
+ktlint_standard_chain-method-continuation = disabled
+
 [**/androidDeviceTest/**/*.kt]
 # Android instrumented tests write `GIVEN_..._WHEN_..._THEN_...` because dex below API 30
 # rejects a space in a method name and this client is minSdk 26. Again: TestNameCompatibilityTest.

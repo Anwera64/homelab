@@ -31,7 +31,7 @@ fun MemberAvatar(
     Box(
         modifier = modifier
             .size(size)
-            .background(hexColor(colour, fallback = colors.primary), CircleShape)
+            .background(color = hexColor(colour, fallback = colors.primary), shape = CircleShape)
             .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {

@@ -61,7 +61,8 @@ fun HearthPickerField(
                     width = if (changed) HearthTheme.size.changed else HearthTheme.size.hairline,
                     color = if (changed) colors.primary else colors.outline,
                     shape = HearthShapes.item,
-                ).clickable(role = Role.Button, onClick = onClick)
+                )
+                .clickable(role = Role.Button, onClick = onClick)
                 .testTag(tag)
                 .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
             contentAlignment = Alignment.CenterStart,

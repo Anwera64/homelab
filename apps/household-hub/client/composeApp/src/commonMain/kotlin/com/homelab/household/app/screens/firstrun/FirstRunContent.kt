@@ -187,7 +187,8 @@ private fun CreateFooter(
             // A bar pads its own insets: the footer sits above the gesture bar and the keyboard.
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-            ).padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
+            )
+            .padding(horizontal = HearthTheme.spacing.xxl, vertical = HearthTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
         PrimaryButton(

@@ -93,7 +93,8 @@ fun HearthBottomNav(
                             shape = CircleShape,
                             ambientColor = colors.primary.copy(alpha = 0.30f),
                             spotColor = colors.primary.copy(alpha = 0.30f),
-                        ).clip(CircleShape)
+                        )
+                        .clip(CircleShape)
                         .background(colors.primary)
                         .clickable(role = Role.Button, onClick = onNewChat),
                     contentAlignment = Alignment.Center,

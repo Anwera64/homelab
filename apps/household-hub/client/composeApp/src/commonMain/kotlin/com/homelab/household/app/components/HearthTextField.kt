@@ -104,7 +104,8 @@ fun HearthTextField(
                                     else -> colors.outline
                                 },
                             shape = HearthShapes.item,
-                        ).padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
+                        )
+                        .padding(horizontal = HearthTheme.spacing.lg, vertical = HearthTheme.spacing.md),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Row(

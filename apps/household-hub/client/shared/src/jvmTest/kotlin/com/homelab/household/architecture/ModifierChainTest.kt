@@ -1,5 +1,6 @@
 package com.homelab.household.architecture
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -7,7 +8,8 @@ import java.io.File
 /**
  * A modifier chain is read top to bottom, one call per line, because the order is the meaning:
  * `.padding().background()` and `.background().padding()` draw different things, and a chain
- * squeezed onto one line hides which came first.
+ * squeezed onto one line hides which came first. That includes the call after a multi-line one:
+ * `).padding(...)` tucks a call behind the closing bracket of the one before it.
  *
  * A single call (`Modifier.fillMaxWidth()`) stays inline; it has no order to read.
  *
@@ -31,23 +33,23 @@ class ModifierChainTest {
     }
 
     @Test
-    fun `GIVEN a modifier chain WHEN it has more than one call THEN each call is on its own line`() {
+    fun `GIVEN a modifier chain WHEN it has more than one call THEN each call starts its own line`() {
         assertTrue(sources.isNotEmpty(), "Expected Kotlin sources under ${clientRootDir.absolutePath}")
 
         val violations =
             sources.flatMap { file ->
-                file.readLines().mapIndexedNotNull { index, line ->
-                    if (oneLineChainCalls(line) >= 2) {
-                        "${file.toRelativeString(clientRootDir)}:${index + 1}: ${line.trim()}"
-                    } else {
-                        null
-                    }
+                val text = file.readText()
+                val lines = text.lines()
+                callsNotStartingTheirLine(text).map { offset ->
+                    val line = text.substring(0, offset).count { it == '\n' }
+                    "${file.toRelativeString(clientRootDir)}:${line + 1}: ${lines[line].trim()}"
                 }
             }
 
         assertTrue(
             violations.isEmpty(),
-            "Break these modifier chains one call per line (${violations.size}):\n" + violations.joinToString("\n"),
+            "Put each call of these modifier chains on its own line (${violations.size}):\n" +
+                violations.joinToString("\n"),
         )
     }
 
@@ -75,77 +77,133 @@ class ModifierChainTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Start these modifier chains on the assignment line (${violations.size}):\n" + violations.joinToString(
-                "\n",
-            ),
+            "Start these modifier chains on the assignment line (${violations.size}):\n" +
+                violations.joinToString("\n"),
         )
     }
 
     @Test
-    fun `GIVEN sample lines WHEN counted THEN only chained calls on one line count`() {
-        assertTrue(oneLineChainCalls("modifier = Modifier.matchParentSize().clip(HearthShapes.button),") == 2)
-        assertTrue(oneLineChainCalls("Canvas(modifier = modifier.size(a.b).rotate(angle)) {") == 2)
-        assertTrue(oneLineChainCalls("modifier.fillMaxWidth().padding(") == 2)
-        assertTrue(oneLineChainCalls("Row(modifier = modifier.semantics { x = y }.fillMaxWidth())") == 2)
-        assertTrue(oneLineChainCalls("Column(modifier = Modifier.weight(1f)) {") == 1)
-        assertTrue(oneLineChainCalls("modifier: Modifier = Modifier,") == 0)
-        assertTrue(oneLineChainCalls("            Modifier") == 0)
-        assertTrue(oneLineChainCalls("                .clip(HearthShapes.item)") == 0)
-        assertTrue(oneLineChainCalls("private fun Modifier.busySemantics(") == 1)
-        assertTrue(oneLineChainCalls("// Modifier.a().b() in a comment") == 0)
-        assertTrue(oneLineChainCalls("import androidx.compose.ui.Modifier") == 0)
+    fun `GIVEN sample chains WHEN scanned THEN only calls not starting their line are reported`() {
+        fun misplaced(text: String) = callsNotStartingTheirLine(text).size
+
+        assertEquals(2, misplaced("modifier = Modifier.matchParentSize().clip(HearthShapes.button),"))
+        assertEquals(2, misplaced("Canvas(modifier = modifier.size(a.b).rotate(angle)) {"))
+        assertEquals(2, misplaced("Row(modifier = modifier.semantics { x = y }.fillMaxWidth())"))
+        assertEquals(1, misplaced("modifier = Modifier\n  .clickable(\n    onClick = go,\n  ).padding(sm),"))
+        assertEquals(1, misplaced("modifier = Modifier\n  .semantics {\n    x = y\n  }.padding(sm),"))
+        assertEquals(0, misplaced("modifier = Modifier\n  .clickable(\n    onClick = go,\n  )\n  .padding(sm),"))
+        assertEquals(0, misplaced("modifier = Modifier\n    .size(a.b)\n    .clip(shape),"))
+        assertEquals(1, misplaced("modifier = Modifier\n  .size(a)\n  // why\n  .clip(\n    s,\n  ).padding(sm),"))
+        assertEquals(0, misplaced("Column(modifier = Modifier.weight(1f)) {"))
+        assertEquals(0, misplaced("modifier: Modifier = Modifier,"))
+        assertEquals(0, misplaced("private fun Modifier.busySemantics(\n    busy: Boolean,\n): Modifier {"))
+        assertEquals(0, misplaced("// Modifier.a().b() in a comment"))
+        assertEquals(0, misplaced("import androidx.compose.ui.Modifier"))
+        assertEquals(0, misplaced("Text(\"Modifier.a().b()\")"))
     }
 
     /**
-     * The most calls chained onto a `Modifier`/`modifier` receiver within this one line. Arguments
-     * and trailing lambdas are skipped with their brackets balanced, so `.padding(a.b)` is one call.
+     * Offsets of the `.` of every call, in a chain of two or more on a `Modifier`/`modifier`
+     * receiver, that has something other than indentation before it on its line. Arguments and
+     * lambdas are skipped with their brackets balanced, so `.padding(a.b)` is one call.
      */
-    private fun oneLineChainCalls(line: String): Int {
-        val trimmed = line.trimStart()
-        if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return 0
-        if (trimmed.startsWith("import ") || trimmed.startsWith("package ")) return 0
+    private fun callsNotStartingTheirLine(text: String): List<Int> =
+        receiver
+            .findAll(text)
+            .filterNot { inCommentOrString(text, it.range.first) }
+            .flatMap { match ->
+                val dots = chainDots(text, match.range.last + 1)
+                if (dots.size < 2) emptyList() else dots.filterNot { startsItsLine(text, it) }
+            }.toList()
 
-        return receiver.findAll(line).maxOfOrNull { match -> callsAfter(line, match.range.last + 1) } ?: 0
-    }
-
-    private fun callsAfter(
-        line: String,
+    private fun chainDots(
+        text: String,
         start: Int,
-    ): Int {
-        var i = start
-        var calls = 0
-        while (i < line.length && line[i] == '.') {
-            val name = identifier.matchAt(line, i + 1) ?: break
+    ): List<Int> {
+        val dots = mutableListOf<Int>()
+        var i = skipWhitespace(text, start)
+        while (i < text.length && text[i] == '.') {
+            val name = identifier.matchAt(text, i + 1) ?: break
+            dots += i
             i = name.range.last + 1
             while (true) {
                 // A trailing lambda may sit a space away: `.semantics { ... }`.
-                val bracket = (i until line.length).firstOrNull { line[it] != ' ' } ?: break
-                if (line[bracket] == '(' || line[bracket] == '{') {
-                    i = skipBalanced(line, bracket)
+                var bracket = i
+                while (bracket < text.length && text[bracket] == ' ') bracket++
+                if (bracket < text.length && (text[bracket] == '(' || text[bracket] == '{')) {
+                    i = skipBalanced(text, bracket)
                 } else {
                     break
                 }
             }
-            calls++
+            i = skipWhitespace(text, i)
         }
-        return calls
+        return dots
     }
 
-    /** Index just past the bracket opened at [open], or the end of the line if it never closes. */
+    /** Skips whitespace and `//` comments, which a chain may carry between its calls. */
+    private fun skipWhitespace(
+        text: String,
+        start: Int,
+    ): Int {
+        var i = start
+        while (i < text.length) {
+            when {
+                text[i].isWhitespace() -> i++
+                text.startsWith("//", i) -> i = text.indexOf('\n', i).let { if (it < 0) text.length else it }
+                else -> return i
+            }
+        }
+        return i
+    }
+
+    private fun startsItsLine(
+        text: String,
+        offset: Int,
+    ): Boolean = text.substring(text.lastIndexOf('\n', offset - 1) + 1, offset).isBlank()
+
+    /** A receiver on a comment or import line, or inside a string literal, is not code. */
+    private fun inCommentOrString(
+        text: String,
+        offset: Int,
+    ): Boolean {
+        val before = text.substring(text.lastIndexOf('\n', offset - 1) + 1, offset)
+        val trimmed = before.trimStart()
+        return trimmed.startsWith("//") ||
+            trimmed.startsWith("*") ||
+            trimmed.startsWith("/*") ||
+            trimmed.startsWith("import ") ||
+            before.count { it == '"' } % 2 == 1
+    }
+
+    /** Index just past the bracket opened at [open], skipping string literals inside it. */
     private fun skipBalanced(
-        line: String,
+        text: String,
         open: Int,
     ): Int {
         var depth = 0
         var i = open
-        while (i < line.length) {
-            when (line[i]) {
-                '(', '{', '[' -> depth++
-                ')', '}', ']' -> if (--depth == 0) return i + 1
+        while (i < text.length) {
+            when (text[i]) {
+                '"' -> {
+                    i++
+                    while (i < text.length && text[i] != '"') {
+                        if (text[i] == '\\') i++
+                        i++
+                    }
+                }
+
+                '(', '{', '[' -> {
+                    depth++
+                }
+
+                ')', '}', ']' -> {
+                    if (--depth == 0) return i + 1
+                }
             }
             i++
         }
-        return line.length
+        return text.length
     }
 
     private companion object {

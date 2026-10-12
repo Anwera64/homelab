@@ -71,7 +71,8 @@ fun CodeBoxes(
                                     colors.surface
                                 },
                                 HearthShapes.item,
-                            ).border(
+                            )
+                            .border(
                                 width =
                                     if (character ==
                                         null

@@ -668,7 +668,8 @@ private fun DayChips(
                         HearthTheme.size.hairline,
                         if (on) colors.primary else colors.outline,
                         HearthShapes.button,
-                    ).toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(day) })
+                    )
+                    .toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(day) })
                     .semantics { contentDescription = spoken },
                 contentAlignment = Alignment.Center,
             ) {
