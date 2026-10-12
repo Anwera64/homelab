@@ -321,11 +321,28 @@ test('Downloads dashboard', async (t) => {
     for (const strip of [band, reach, forwarded]) assert.equal(new Set(colours(strip)).size, 2, 'one colour for each state');
   });
 
+  await t.test('shows under "Port forwarded" whether qBittorrent listens on the forwarded port', () => {
+    const forwarded = titled('Port forwarded');
+    const listening = titled('Listening port');
+    assert.equal(listening.type, 'state-timeline');
+    assert.equal(listening.fieldConfig.defaults.color.mode, 'fixed');
+    assert.equal(listening.fieldConfig.defaults.thresholds, undefined);
+    assert.deepEqual(listening.gridPos, { h: forwarded.gridPos.h, w: 24, x: 0, y: bottom(forwarded) });
+    assert.equal(listening.interval, forwarded.interval);
+    // Peers are sent to the forwarded port; on another one qBittorrent still says "connected".
+    assert.deepEqual(exprs(listening), ['max(server_qbittorrent_listen_port_matches{host="server"})']);
+    const states = listening.fieldConfig.defaults.mappings[0].options;
+    assert.deepEqual(states, { 0: { text: 'differs', color: 'red', index: 0 }, 1: { text: 'matches', color: 'green', index: 1 } });
+    // With no forwarded port, or no answer from qBittorrent, there is nothing to compare.
+    assert.match(listening.description, /empty/i, 'what a gap in the strip means');
+    assert.equal(new Set(panels.map((p) => p.id)).size, panels.length, 'each panel has its own id');
+  });
+
   await t.test('draws the peer connections across the page, under the strips', () => {
     const peers = titled('Peer connections');
     assert.equal(peers.type, 'timeseries');
     assert.equal(peers.gridPos.w, 24);
-    assert.equal(peers.gridPos.y, bottom(titled('Port forwarded')));
+    assert.equal(peers.gridPos.y, bottom(titled('Listening port')));
     assert.deepEqual(exprs(peers), ['max(server_qbittorrent_peer_connections{host="server"})']);
   });
 
@@ -380,7 +397,7 @@ test('Downloads dashboard', async (t) => {
     const used = new Set(asked.flatMap((expr) => expr.match(/\b(?:node|server)_[A-Za-z0-9_]+/g) || []));
     assert.deepEqual([...used].sort(), [
       'node_wifi_interface_frequency_hertz', DOWN, 'server_qbittorrent_connectable', 'server_qbittorrent_peer_connections', UP,
-      'server_vpn_port_forwarded', 'server_vpn_watchdog_recreations_total',
+      'server_qbittorrent_listen_port_matches', 'server_vpn_port_forwarded', 'server_vpn_watchdog_recreations_total',
     ].sort());
     for (const name of [...used].filter((n) => n.startsWith('server_'))) assert.ok(script.includes(name), `a host script must write ${name}`);
     // The Wi-Fi collector is off unless asked for.

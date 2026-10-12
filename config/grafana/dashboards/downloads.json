@@ -575,6 +575,81 @@
       }
     },
     {
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "type": "state-timeline",
+      "title": "Listening port",
+      "description": "Whether qBittorrent listens on the port Gluetun holds. Peers are sent to the forwarded port, so on another one none of them can connect, while qBittorrent still says \"connected\". Empty while there is no forwarded port or qBittorrent does not answer: nothing to compare. Read once a minute.",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "interval": "1m",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "editorMode": "code",
+          "expr": "max(server_qbittorrent_listen_port_matches{host=\"server\"})",
+          "range": true,
+          "legendFormat": "qBittorrent"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "differs",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "matches",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "left",
+        "rowHeight": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 8,
       "datasource": {
         "type": "prometheus",
@@ -587,7 +662,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 24
       },
       "interval": "1m",
       "targets": [
