@@ -44,7 +44,7 @@ class SessionCacheLocalDataSource {
     // Provisional, and scheduled for deletion. `docs/STAGE_5_SECRET_SESSION_LOCKING.md` §5 replaces
     // this set with locked-by-default: with no `secret_read` token held, every secret session is
     // locked, and a set of ids is then unnecessary rather than something to persist. It is kept for
-    // now because that posture needs the hub endpoint from §4, which stage 5 slice 5 adds. What
+    // now because that posture needs the hub endpoint from §4, which stage 5 slice 6 adds. What
     // lives here until then is the behaviour the app already had, made safe to share between
     // coroutines — not a design being committed to.
 

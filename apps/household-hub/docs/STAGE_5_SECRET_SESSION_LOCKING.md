@@ -120,6 +120,13 @@ The list stays `200` — a locked secret session still exists and still needs a 
 
 ### 4.4 Secret turns write no memories
 
+> **Built by the memory slice, not this one (12 October 2026).** Memory became slice 5 and secret chats slice 6, and [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) replaces `ReflectTurnUseCase` with a reflection that runs after a chat goes idle. The decision below stands and is one of that reflection's rules (its §2.2). Two details change with it:
+>
+> * **Existing data:** no cleanup is needed. The memory slice starts with an empty store.
+> * **Not retroactive:** reflection now runs later, over several turns at once, so it reads secrecy per message: the turns before a switch to secret are reflected, the ones after are not.
+>
+> What follows describes the code as it was when this spec was approved.
+
 `ReflectTurnUseCase` already drops milestones for secret turns, but still extracts memories — it only forces their scope to `personal`. Two leaks follow:
 
 * **The audit screen shows them unlocked.** *What I know about you* has no lock, so a fact from a secret chat is readable by whoever holds the phone.
@@ -213,8 +220,8 @@ The released key must require a **strong biometric only**: `BIOMETRIC_STRONG` wi
 | `test_session_list_redacts_secret_content` | `GET /sessions` without a token → secret rows present, `title` and `last_message_preview` null |
 | `test_session_list_reveals_with_token` | Valid `secret_read` token → real titles and previews |
 | `test_session_list_preview_for_normal_sessions` | Non-secret rows carry `last_message_preview` with no token |
-| `test_reflect_turn_secret_writes_no_memories` | A secret session or secret turn creates and updates no `AgentMemory` rows |
-| `test_reflect_turn_secret_still_titles` | A first secret turn still sets the session title |
+| ~~`test_reflect_turn_secret_writes_no_memories`~~ | Moved to the memory spec's §10 ("Secret writes nothing"): §4.4 is built by slice 5 |
+| ~~`test_reflect_turn_secret_still_titles`~~ | Moved to the memory spec's §10 ("Secret still titled") |
 | `test_toggle_secret_returns_scoped_token` | Switching a session to secret returns a token that reads that session only |
 | `test_scoped_token_rejected_on_other_secret_sessions` | The scoped token gets 423 on every other secret session |
 | `SecretLockViewModelTest.idle timer ignores stream events` | SSE deltas do not reset the idle window |
