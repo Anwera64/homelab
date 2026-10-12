@@ -74,7 +74,10 @@ fun LeaveHouseholdContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.leave_back)) },
         bottomBar = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(HearthTheme.spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
             ) {
                 DestructiveButton(
@@ -94,7 +97,11 @@ fun LeaveHouseholdContent(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(

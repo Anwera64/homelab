@@ -242,7 +242,10 @@ private fun WithBusyBar(
 @Composable
 private fun BoxScope.BusyBarOverlay(busyBar: BusyBar) {
     Box(
-        modifier = Modifier.matchParentSize().clip(HearthShapes.button),
+        modifier =
+            Modifier
+                .matchParentSize()
+                .clip(HearthShapes.button),
         contentAlignment = Alignment.BottomCenter,
     ) {
         HearthProgressBar(

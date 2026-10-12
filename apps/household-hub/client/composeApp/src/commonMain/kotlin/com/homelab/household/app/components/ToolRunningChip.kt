@@ -86,7 +86,12 @@ private fun Spinner() {
         }
 
     val stroke = HearthTheme.size.emphasis
-    Canvas(modifier = Modifier.size(HearthTheme.size.iconSm).rotate(angle)) {
+    Canvas(
+        modifier =
+            Modifier
+                .size(HearthTheme.size.iconSm)
+                .rotate(angle),
+    ) {
         val width = stroke.toPx()
         drawCircle(
             color = colors.secondary.copy(alpha = RING_ALPHA),

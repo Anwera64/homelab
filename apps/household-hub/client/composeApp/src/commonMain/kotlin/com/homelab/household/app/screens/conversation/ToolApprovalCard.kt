@@ -649,7 +649,10 @@ private fun DayChips(
 ) {
     val colors = HearthTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = label },
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         DAY_CHIPS.forEachIndexed { day, (letter, name) ->

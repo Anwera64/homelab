@@ -65,7 +65,10 @@ fun ProfilePickerContent(
         bottomBar = {
             // A new member opening the app is not on the picker: this is their door.
             Box(
-                modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(HearthTheme.spacing.xl),
                 contentAlignment = Alignment.Center,
             ) {
                 SecondaryButton(text = stringResource(Res.string.picker_invite_code), onClick = onInviteCode)

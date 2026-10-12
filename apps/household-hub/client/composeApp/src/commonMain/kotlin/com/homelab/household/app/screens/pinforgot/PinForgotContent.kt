@@ -65,7 +65,11 @@ fun PinForgotContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.forgot_back)) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {

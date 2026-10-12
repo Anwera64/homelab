@@ -38,7 +38,10 @@ fun HearthCheckbox(
             Modifier.border(HearthTheme.size.emphasis, colors.outline, HearthShapes.checkbox)
         }
     Box(
-        modifier = modifier.size(HearthTheme.size.iconMd).then(box),
+        modifier =
+            modifier
+                .size(HearthTheme.size.iconMd)
+                .then(box),
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {

@@ -45,7 +45,11 @@ class HearthScaffoldTest {
                         header = { Text("HyggeHub · Household") },
                         bottomBar = { Text("Bottom bar") },
                     ) { padding ->
-                        Column(Modifier.verticalScroll(rememberScrollState()).padding(padding)) {
+                        Column(
+                            Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(padding),
+                        ) {
                             repeat(120) { Text("Row $it") }
                         }
                     }
@@ -84,11 +88,28 @@ class HearthScaffoldTest {
             setContent {
                 StillTheme {
                     HearthScaffold(
-                        header = { Box(Modifier.fillMaxWidth().height(BAR)) },
-                        bottomBar = { Box(Modifier.fillMaxWidth().height(BAR)) },
+                        header = {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(BAR),
+                            )
+                        },
+                        bottomBar = {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(BAR),
+                            )
+                        },
                         contentWindowInsets = WindowInsets(0.dp),
                     ) { padding ->
-                        Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                                .testTag("content"),
+                        )
                     }
                 }
             }
@@ -106,7 +127,12 @@ class HearthScaffoldTest {
             setContent {
                 StillTheme {
                     HearthScaffold(contentWindowInsets = WindowInsets(top = STATUS_BAR)) { padding ->
-                        Box(Modifier.fillMaxSize().padding(padding).testTag("content"))
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                                .testTag("content"),
+                        )
                     }
                 }
             }

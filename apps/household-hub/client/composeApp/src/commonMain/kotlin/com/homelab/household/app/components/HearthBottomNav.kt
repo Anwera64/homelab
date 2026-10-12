@@ -73,12 +73,14 @@ fun HearthBottomNav(
         HorizontalDivider(thickness = HearthTheme.size.hairline, color = colors.outlineSoft)
         Row(
             modifier =
-                Modifier.fillMaxWidth().padding(
-                    start = HearthTheme.spacing.sm,
-                    top = HearthTheme.spacing.md,
-                    end = HearthTheme.spacing.sm,
-                    bottom = HearthTheme.spacing.lg,
-                ),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = HearthTheme.spacing.sm,
+                        top = HearthTheme.spacing.md,
+                        end = HearthTheme.spacing.sm,
+                        bottom = HearthTheme.spacing.lg,
+                    ),
             verticalAlignment = Alignment.Bottom,
         ) {
             NavItem(NavTab.Household, selected, onSelect)

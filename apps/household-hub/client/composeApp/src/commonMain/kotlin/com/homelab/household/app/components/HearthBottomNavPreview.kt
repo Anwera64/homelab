@@ -16,7 +16,12 @@ import com.homelab.household.app.theme.PreviewDayNight
 @Composable
 private fun HearthBottomNavPreview() {
     HearthTheme {
-        Box(modifier = Modifier.background(HearthTheme.colors.canvas).padding(top = HearthTheme.spacing.huge)) {
+        Box(
+            modifier =
+                Modifier
+                    .background(HearthTheme.colors.canvas)
+                    .padding(top = HearthTheme.spacing.huge),
+        ) {
             HearthBottomNav(selected = NavTab.Chats, onSelect = {}, onNewChat = {})
         }
     }

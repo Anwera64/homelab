@@ -142,11 +142,20 @@ fun ChatsContent(
         // Anything that stands in for the list — the empty screen, a query that matched nothing, a
         // hub that cannot be reached — sits in the middle of the space the list would have used.
         // A list, and the blocks that stand in for one while it arrives, start at the top.
-        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            contentAlignment = Alignment.Center,
+        ) {
             when {
                 state.errorMessage != null -> {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(HearthTheme.spacing.xl),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
                     ) {
@@ -161,7 +170,12 @@ fun ChatsContent(
 
                 state.isLoading && state.visible.isEmpty() -> {
                     // Arriving empty: chrome is already drawn, so the rows breathe where they land.
-                    SkeletonGroup(modifier = Modifier.align(Alignment.TopCenter).padding(HearthTheme.spacing.xl)) {
+                    SkeletonGroup(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(HearthTheme.spacing.xl),
+                    ) {
                         repeat(4) { SkeletonBlock(modifier = Modifier.fillMaxWidth()) }
                     }
                 }
@@ -189,7 +203,10 @@ fun ChatsContent(
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .align(Alignment.TopCenter),
                         contentPadding =
                             androidx.compose.foundation.layout
                                 .PaddingValues(HearthTheme.spacing.xl),

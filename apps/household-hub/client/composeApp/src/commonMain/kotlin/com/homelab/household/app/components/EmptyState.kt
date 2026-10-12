@@ -41,12 +41,14 @@ fun EmptyState(
     val colors = HearthTheme.colors
     Column(
         modifier =
-            modifier.fillMaxWidth().padding(
-                start = HearthTheme.spacing.lg,
-                top = HearthTheme.spacing.xxl,
-                end = HearthTheme.spacing.lg,
-                bottom = HearthTheme.spacing.huge,
-            ),
+            modifier
+                .fillMaxWidth()
+                .padding(
+                    start = HearthTheme.spacing.lg,
+                    top = HearthTheme.spacing.xxl,
+                    end = HearthTheme.spacing.lg,
+                    bottom = HearthTheme.spacing.huge,
+                ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.CenterVertically),
     ) {

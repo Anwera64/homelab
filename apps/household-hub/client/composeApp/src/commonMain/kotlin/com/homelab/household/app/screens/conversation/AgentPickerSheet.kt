@@ -67,7 +67,10 @@ fun AgentPickerSheet(
         dragHandle = { BottomSheetDefaults.DragHandle(color = colors.outline) },
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = spacing.xxl).padding(bottom = spacing.lg),
+            modifier =
+                Modifier
+                    .padding(horizontal = spacing.xxl)
+                    .padding(bottom = spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
             Text(stringResource(Res.string.agent_picker_title), style = type.title, color = colors.textPrimary)

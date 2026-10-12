@@ -75,7 +75,13 @@ fun SkeletonBlock(
     shape: Shape = HearthShapes.skeleton,
     position: Int = 0,
 ) {
-    Skeleton(shape, position, modifier.fillMaxWidth(widthFraction).height(height))
+    Skeleton(
+        shape,
+        position,
+        modifier
+            .fillMaxWidth(widthFraction)
+            .height(height),
+    )
 }
 
 /** An avatar that hasn't arrived. */

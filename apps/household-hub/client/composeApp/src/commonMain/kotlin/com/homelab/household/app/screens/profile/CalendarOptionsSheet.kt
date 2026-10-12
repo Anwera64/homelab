@@ -108,7 +108,10 @@ private fun OptionsStep(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(HearthTheme.size.swatch).background(colors.canvas, HearthShapes.item),
+                modifier =
+                    Modifier
+                        .size(HearthTheme.size.swatch)
+                        .background(colors.canvas, HearthShapes.item),
                 contentAlignment = Alignment.Center,
             ) {
                 CalendarProviderMark(provider = row.provider)

@@ -68,7 +68,10 @@ fun InviteCodeContent(
         header = { HearthTopBar(onBack = onBack, backDescription = stringResource(Res.string.invite_code_back)) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxl),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
@@ -93,7 +96,10 @@ fun InviteCodeContent(
             }
 
             Column(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg, Alignment.Bottom),
             ) {
                 Text(
