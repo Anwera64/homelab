@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
@@ -20,6 +21,7 @@ import com.homelab.household.app.resources.calendar_disconnect_title
 import com.homelab.household.app.resources.calendar_disconnect_unreachable
 import com.homelab.household.app.resources.calendar_sheet_change
 import com.homelab.household.app.resources.calendar_sheet_disconnect
+import com.homelab.household.app.resources.profile_agents
 import com.homelab.household.app.resources.profile_calendar_connect
 import com.homelab.household.app.resources.profile_calendar_options
 import com.homelab.household.app.resources.profile_calendar_sign_in_again
@@ -27,6 +29,9 @@ import com.homelab.household.app.resources.profile_calendar_sign_in_needed
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_sign_out
+import com.homelab.household.app.resources.profile_when_agents_act
+import com.homelab.household.app.resources.profile_when_agents_act_automatic
+import com.homelab.household.app.resources.profile_when_agents_act_none
 import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
@@ -34,6 +39,7 @@ import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
+import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -61,6 +67,7 @@ class ProfileScreenTest {
                         onSignOut = {},
                         onCalendar = {},
                         onCalendarSignInAgain = {},
+                        onWhenAgentsAct = {},
                     )
                 }
             }
@@ -89,6 +96,7 @@ class ProfileScreenTest {
                         onSignedOut = {},
                         onCalendar = {},
                         onCalendarSignInAgain = {},
+                        onWhenAgentsAct = {},
                     )
                 }
             }
@@ -114,6 +122,7 @@ class ProfileScreenTest {
                         onSignedOut = {},
                         onCalendar = {},
                         onCalendarSignInAgain = {},
+                        onWhenAgentsAct = {},
                     )
                 }
             }
@@ -141,6 +150,7 @@ class ProfileScreenTest {
                         onSignedOut = { signedOut++ },
                         onCalendar = {},
                         onCalendarSignInAgain = {},
+                        onWhenAgentsAct = {},
                     )
                 }
             }
@@ -171,6 +181,7 @@ class ProfileScreenTest {
                             onSignOut = {},
                             onCalendar = {},
                             onCalendarSignInAgain = {},
+                            onWhenAgentsAct = {},
                         )
                     }
                 }
@@ -322,10 +333,42 @@ class ProfileScreenTest {
         }
     }
 
+    @Test
+    fun `GIVEN agents add events without asking WHEN the profile is shown THEN the agents row counts it and opens When agents act`() {
+        // GIVEN
+        val hub = FakeMembersHub().apply { addsEventsAutomatically() }
+        var opened = 0
+
+        runScreenTest {
+            showProfile(hub, onWhenAgentsAct = { opened++ })
+            val caption = getPluralString(Res.plurals.profile_when_agents_act_automatic, 1, 1)
+            waitUntilExactlyOneExists(hasText(caption), timeoutMillis = wait)
+            onNodeWithText(getString(Res.string.profile_agents).uppercase()).assertIsDisplayed()
+
+            // WHEN
+            onNodeWithText(getString(Res.string.profile_when_agents_act)).performScrollTo().performClick()
+
+            // THEN
+            waitUntil(timeoutMillis = wait) { opened == 1 }
+        }
+    }
+
+    @Test
+    fun `GIVEN nothing runs without asking WHEN the profile is shown THEN the agents row says every change asks`() {
+        val hub = FakeMembersHub()
+
+        runScreenTest {
+            showProfile(hub)
+
+            waitUntilExactlyOneExists(hasText(getString(Res.string.profile_when_agents_act_none)), timeoutMillis = wait)
+        }
+    }
+
     private fun ComposeUiTest.showProfile(
         hub: FakeMembersHub,
         onCalendar: () -> Unit = {},
         onCalendarSignInAgain: () -> Unit = {},
+        onWhenAgentsAct: () -> Unit = {},
     ) {
         setContent {
             TestApp(hub.engine, sessionStorage = signedIn()) {
@@ -337,6 +380,7 @@ class ProfileScreenTest {
                     onSignedOut = {},
                     onCalendar = onCalendar,
                     onCalendarSignInAgain = onCalendarSignInAgain,
+                    onWhenAgentsAct = onWhenAgentsAct,
                 )
             }
         }
@@ -364,6 +408,7 @@ class ProfileScreenTest {
                         onSignedOut = {},
                         onCalendar = { calendar++ },
                         onCalendarSignInAgain = {},
+                        onWhenAgentsAct = {},
                     )
                 }
             }

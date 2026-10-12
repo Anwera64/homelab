@@ -4,9 +4,13 @@ import app.cash.turbine.test
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
+import com.homelab.household.domain.model.HubTool
+import com.homelab.household.domain.model.ToolAction
+import com.homelab.household.domain.model.ToolApproval
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
+import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.RemoveCalendarUseCase
@@ -44,6 +48,7 @@ class ProfileViewModelTest {
     private val logout = mock<LogoutUseCase>()
     private val getCalendar = mock<GetCalendarUseCase>()
     private val removeCalendar = mock<RemoveCalendarUseCase>()
+    private val getToolApprovals = mock<GetToolApprovalsUseCase>()
 
     /** Four minutes after the hub last checked the calendar below. */
     private val clock =
@@ -71,7 +76,15 @@ class ProfileViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel() =
-        ProfileViewModel(getCurrentUser, listHouseholdMembers, logout, getCalendar, removeCalendar, clock)
+        ProfileViewModel(
+            getCurrentUser,
+            listHouseholdMembers,
+            logout,
+            getCalendar,
+            removeCalendar,
+            getToolApprovals,
+            clock,
+        )
 
     @Test
     fun the_only_admin_is_told_they_cannot_leave() =
@@ -330,4 +343,57 @@ class ProfileViewModelTest {
             advanceUntilIdle()
         }
     }
+
+    private fun writes(vararg automatic: ToolAction) =
+        listOf(ToolAction.Create, ToolAction.Update, ToolAction.Delete).map {
+            ToolApproval(HubTool.CALENDAR_WRITE, it, automatic = it in automatic, alwaysAsks = it == ToolAction.Delete)
+        } +
+            ToolApproval(HubTool.DOCUMENT_WRITER, ToolAction.Create, automatic = ToolAction.Append in automatic)
+
+    @Test
+    fun the_agents_row_counts_the_writes_that_run_without_asking() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getToolApprovals() } returns writes(ToolAction.Create, ToolAction.Update)
+            val viewModel = viewModel()
+            assertEquals(null, viewModel.uiState.value.automaticWrites)
+
+            viewModel.loadAutomaticWrites()
+            advanceUntilIdle()
+
+            assertEquals(2, viewModel.uiState.value.automaticWrites)
+        }
+
+    @Test
+    fun coming_back_to_the_profile_counts_again() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getToolApprovals() } returns writes()
+            val viewModel = viewModel()
+            viewModel.loadAutomaticWrites()
+            advanceUntilIdle()
+            assertEquals(0, viewModel.uiState.value.automaticWrites)
+
+            everySuspend { getToolApprovals() } returns writes(ToolAction.Create)
+            viewModel.loadAutomaticWrites()
+            advanceUntilIdle()
+
+            assertEquals(1, viewModel.uiState.value.automaticWrites)
+        }
+
+    @Test
+    fun a_count_the_hub_could_not_give_makes_no_claim() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getToolApprovals() } throws ServerOfflineException("offline")
+            val viewModel = viewModel()
+
+            viewModel.loadAutomaticWrites()
+            advanceUntilIdle()
+
+            assertEquals(null, viewModel.uiState.value.automaticWrites)
+        }
 }

@@ -287,6 +287,22 @@ class AppNavHostTest {
         }
 
     @Test
+    fun the_profile_leads_to_when_agents_act_and_back() =
+        runComposeUiTest {
+            backStack[0] = Destination.Profile
+            setContent { StillTheme { AppNavHost(screens = StubScreens(), backStack = backStack, session = session) } }
+
+            onNodeWithText(StubScreens.GO_TO_WHEN_AGENTS_ACT).performClick()
+            onNodeWithText(StubScreens.WHEN_AGENTS_ACT).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile, Destination.WhenAgentsAct), backStack.toList())
+
+            onNodeWithText(StubScreens.BACK).performClick()
+
+            onNodeWithText(StubScreens.PROFILE).assertIsDisplayed()
+            assertEquals(listOf(Destination.Profile), backStack.toList())
+        }
+
+    @Test
     fun members_leads_to_inviting_approving_and_removing() =
         runComposeUiTest {
             backStack[0] = Destination.Members

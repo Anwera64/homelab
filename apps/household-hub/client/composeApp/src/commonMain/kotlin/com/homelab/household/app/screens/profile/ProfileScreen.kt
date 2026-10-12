@@ -10,7 +10,7 @@ import com.homelab.household.presentation.profile.ProfileEvent
 import com.homelab.household.presentation.profile.ProfileViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Your own account: your calendar, the members list, your PIN, and the two ways out. */
+/** Your own account: your calendar, what agents may do, the members list, your PIN, and the two ways out. */
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
@@ -20,13 +20,18 @@ fun ProfileScreen(
     onSignedOut: () -> Unit,
     onCalendar: () -> Unit,
     onCalendarSignInAgain: () -> Unit,
+    onWhenAgentsAct: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Every time the profile is shown, not once: coming back from connecting a calendar shows it.
-    LaunchedEffect(viewModel) { viewModel.loadCalendar() }
+    // Every time the profile is shown, not once: coming back from connecting a calendar shows it,
+    // and coming back from "When agents act" counts what was just switched.
+    LaunchedEffect(viewModel) {
+        viewModel.loadCalendar()
+        viewModel.loadAutomaticWrites()
+    }
 
     ObserveEvents(viewModel.events) { event ->
         when (event) {
@@ -43,6 +48,7 @@ fun ProfileScreen(
         onSignOut = viewModel::onSignOut,
         onCalendar = onCalendar,
         onCalendarSignInAgain = onCalendarSignInAgain,
+        onWhenAgentsAct = onWhenAgentsAct,
         modifier = modifier,
         onDisconnectCalendar = viewModel::onDisconnectCalendar,
     )

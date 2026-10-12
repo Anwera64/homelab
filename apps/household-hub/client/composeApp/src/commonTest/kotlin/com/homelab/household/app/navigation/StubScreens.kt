@@ -229,15 +229,25 @@ class StubScreens : AppScreens {
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
+        onWhenAgentsAct: () -> Unit,
     ) {
         Column {
             Text(PROFILE)
+            Text(GO_TO_WHEN_AGENTS_ACT, modifier = Modifier.clickable { onWhenAgentsAct() })
             Text(GO_TO_CALENDAR, modifier = Modifier.clickable { onCalendar() })
             Text(SIGN_IN_TO_GOOGLE_AGAIN, modifier = Modifier.clickable { onCalendarSignInAgain() })
             Text(GO_TO_MEMBERS, modifier = Modifier.clickable { onMembers() })
             Text(GO_TO_CHANGE_PIN, modifier = Modifier.clickable { onChangePin() })
             Text(GO_TO_LEAVE, modifier = Modifier.clickable { onLeave() })
             Text(SIGNED_OUT, modifier = Modifier.clickable { onSignedOut() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun WhenAgentsAct(onBack: () -> Unit) {
+        Column {
+            Text(WHEN_AGENTS_ACT)
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -369,6 +379,8 @@ class StubScreens : AppScreens {
         const val INVITE_CODE = "invite code screen"
         const val RESET_CODE = "reset code screen"
         const val PROFILE = "profile screen"
+        const val WHEN_AGENTS_ACT = "when agents act screen"
+        const val GO_TO_WHEN_AGENTS_ACT = "go to when agents act"
         const val MEMBERS = "members screen"
         const val INVITE_CREATE = "invite create screen"
         const val LEAVE = "leave household screen"
