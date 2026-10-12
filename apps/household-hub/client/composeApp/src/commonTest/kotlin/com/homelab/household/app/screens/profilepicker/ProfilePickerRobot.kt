@@ -25,6 +25,8 @@ import org.jetbrains.compose.resources.getString
 class ProfilePickerRobot(
     private val test: ComposeUiTest,
 ) {
+    suspend fun seesTheTitle() = seesText(getString(Res.string.picker_title))
+
     suspend fun seesTheHousehold(vararg names: String) {
         seesText(getString(Res.string.picker_title))
         seesText(getPluralString(Res.plurals.picker_member_count, names.size, names.size))

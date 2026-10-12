@@ -1,15 +1,10 @@
 package com.homelab.household.app.screens.whenagentsact
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.when_agents_act_title
 import com.homelab.household.app.testing.FakeMembersHub
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -87,7 +82,7 @@ class WhenAgentsActScreenTest {
                         }, onRetry = {})
                     }
                 }
-                onNodeWithText(getString(Res.string.when_agents_act_title)).assertIsDisplayed()
+                onWhenAgentsAct { seesTheTitle() }
             }
         }
     }

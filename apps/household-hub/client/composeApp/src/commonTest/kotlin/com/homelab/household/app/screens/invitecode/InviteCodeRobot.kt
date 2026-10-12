@@ -1,16 +1,29 @@
 package com.homelab.household.app.screens.invitecode
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.width
+import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.a11y_invite_code_checking
 import com.homelab.household.app.resources.invite_code_back
+import com.homelab.household.app.resources.invite_code_checking
 import com.homelab.household.app.resources.invite_code_continue
 import com.homelab.household.app.resources.invite_code_detail
 import com.homelab.household.app.resources.invite_code_field
@@ -36,6 +49,8 @@ class InviteCodeRobot(
         seesText(getString(Res.string.invite_code_note))
     }
 
+    suspend fun seesTheTitle() = seesText(getString(Res.string.invite_code_title))
+
     suspend fun types(code: String) {
         test.onNodeWithContentDescription(getString(Res.string.invite_code_field)).performTextInput(code)
     }
@@ -56,6 +71,38 @@ class InviteCodeRobot(
 
     suspend fun seesTheHubDidNotAnswer() = seesText(getString(Res.string.invite_code_unreachable))
 
+    /** The tapped button says what it is doing, stays enabled, and tells a screen reader what is being checked. */
+    suspend fun seesTheButtonCheckingTheCode() {
+        val checking = getString(Res.string.invite_code_checking)
+        seesText(checking)
+        test
+            .onNodeWithText(checking)
+            .assertIsEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    getString(Res.string.a11y_invite_code_checking),
+                ),
+            )
+    }
+
+    fun seesTheProgressBar() {
+        test.waitUntilExactlyOneExists(hasTestTag(HEARTH_PROGRESS_BAR_TAG), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(HEARTH_PROGRESS_BAR_TAG).assertIsDisplayed()
+    }
+
+    suspend fun doesNotSeeContinue() {
+        test.onNodeWithText(getString(Res.string.invite_code_continue)).assertDoesNotExist()
+    }
+
+    fun screenWidth(): Dp = test.onRoot().getUnclippedBoundsInRoot().width
+
+    suspend fun continueButtonWidth(): Dp {
+        val label = getString(Res.string.invite_code_continue)
+        seesText(label)
+        return test.onNodeWithText(label).getUnclippedBoundsInRoot().width
+    }
+
     private fun seesText(text: String) {
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
         test.onNodeWithText(text).assertIsDisplayed()
@@ -67,9 +114,7 @@ class InviteCodeRobot(
 }
 
 @OptIn(ExperimentalTestApi::class)
-suspend fun ComposeUiTest.onInviteCode(block: suspend InviteCodeRobot.() -> Unit) {
-    InviteCodeRobot(this).block()
-}
+suspend fun <T> ComposeUiTest.onInviteCode(block: suspend InviteCodeRobot.() -> T): T = InviteCodeRobot(this).block()
 
 /** The invite-code screen over a hub that answers however the test says. */
 @OptIn(ExperimentalTestApi::class)

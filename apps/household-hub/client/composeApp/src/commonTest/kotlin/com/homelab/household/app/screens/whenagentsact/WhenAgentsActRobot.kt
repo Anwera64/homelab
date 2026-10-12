@@ -45,6 +45,12 @@ class WhenAgentsActRobot(
         test.onNodeWithText(getString(Res.string.when_agents_act_title)).assertIsDisplayed()
     }
 
+    suspend fun seesTheTitle() {
+        val title = getString(Res.string.when_agents_act_title)
+        test.waitUntilExactlyOneExists(hasText(title), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithText(title).assertIsDisplayed()
+    }
+
     suspend fun seesReadingRunFreely() {
         assertEquals(3, count(getString(Res.string.when_agents_act_runs_freely)))
     }

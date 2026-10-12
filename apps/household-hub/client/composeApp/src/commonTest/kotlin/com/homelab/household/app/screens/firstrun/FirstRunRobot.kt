@@ -38,6 +38,8 @@ import org.jetbrains.compose.resources.getString
 class FirstRunRobot(
     private val test: ComposeUiTest,
 ) {
+    suspend fun seesTheTitle() = seesText(getString(Res.string.first_run_title))
+
     suspend fun seesTheForm() {
         seesText(getString(Res.string.first_run_title))
         seesText(getString(Res.string.first_run_create))

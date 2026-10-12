@@ -1,15 +1,10 @@
 package com.homelab.household.app.screens.firstrun
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
-import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.first_run_title
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.runScreenTest
 import com.homelab.household.presentation.firstrun.AvatarPalette
-import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -149,7 +144,7 @@ class FirstRunScreenTest {
                     }
                 }
 
-                onNodeWithText(getString(Res.string.first_run_title)).assertIsDisplayed()
+                onFirstRun { seesTheTitle() }
             }
         }
     }

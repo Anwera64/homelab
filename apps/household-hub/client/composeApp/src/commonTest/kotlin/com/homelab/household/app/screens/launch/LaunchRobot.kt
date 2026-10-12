@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.components.HEARTH_PROGRESS_BAR_TAG
 import com.homelab.household.app.platform.ExternalApps
@@ -76,6 +77,13 @@ class LaunchRobot(
     /** A hub that already gave its answer isn't still being waited on. */
     fun seesNothingLoading() {
         test.onNode(loading).assertDoesNotExist()
+    }
+
+    /** On a short phone or with a large font the hint is below the fold, so it is scrolled to. */
+    suspend fun scrollsToTheOfflineHint() {
+        val hint = getString(Res.string.launch_offline_hint)
+        test.waitUntilExactlyOneExists(hasText(hint), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithText(hint).performScrollTo().assertIsDisplayed()
     }
 
     fun seesTheHubAddress(address: String) = seesText(address)
