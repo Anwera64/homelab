@@ -53,7 +53,7 @@ fun CodeCard(
         Text(
             text = if (loading) stringResource(Res.string.invite_create_making_new) else expiry,
             style = type.caption,
-            color = if (loading) colors.textMuted else colors.secondary,
+            color = if (loading) colors.textMuted else colors.tertiary,
         )
     }
 }

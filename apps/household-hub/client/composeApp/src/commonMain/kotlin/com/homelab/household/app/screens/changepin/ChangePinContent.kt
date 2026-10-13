@@ -146,7 +146,7 @@ fun ChangePinContent(
                         icon = HearthIcon.Warning,
                         contentDescription = null,
                         size = HearthTheme.size.iconMd,
-                        tint = colors.secondary,
+                        tint = colors.tertiary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)) {
                         Text(
