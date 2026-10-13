@@ -26,8 +26,8 @@ fun chipColors(
                 ChipColors(primaryContainer, onPrimaryContainer, null)
             }
 
-            ChipVariant.Secondary -> {
-                ChipColors(secondaryContainer, onSecondaryContainer, null)
+            ChipVariant.Attention -> {
+                ChipColors(tertiaryContainer, onTertiaryContainer, null)
             }
 
             ChipVariant.Error -> {
