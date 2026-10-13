@@ -187,8 +187,8 @@ fun CalendarConnectContent(
                     title = stringResource(words.warning),
                     detail = stringResource(words.warningDetail),
                     icon = HearthIcon.Warning,
-                    background = colors.secondaryContainer,
-                    ink = colors.onSecondaryContainer,
+                    background = colors.tertiaryContainer,
+                    ink = colors.onTertiaryContainer,
                 )
             }
 

@@ -92,12 +92,12 @@ private fun Spinner() {
     ) {
         val width = stroke.toPx()
         drawCircle(
-            color = colors.secondary.copy(alpha = RING_ALPHA),
+            color = colors.tertiary.copy(alpha = RING_ALPHA),
             radius = (size.minDimension - width) / 2f,
             style = Stroke(width = width),
         )
         drawArc(
-            color = colors.secondary,
+            color = colors.tertiary,
             startAngle = -QUARTER_TURN,
             sweepAngle = QUARTER_TURN,
             useCenter = false,

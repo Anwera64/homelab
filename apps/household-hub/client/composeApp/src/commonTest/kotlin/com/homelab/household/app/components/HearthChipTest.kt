@@ -34,9 +34,9 @@ class HearthChipTest {
             assertEquals(DayColors.primaryContainer, container)
             assertEquals(DayColors.onPrimaryContainer, content)
         }
-        with(chipColors(ChipVariant.Secondary, DayColors)) {
-            assertEquals(DayColors.secondaryContainer, container)
-            assertEquals(DayColors.onSecondaryContainer, content)
+        with(chipColors(ChipVariant.Attention, DayColors)) {
+            assertEquals(DayColors.tertiaryContainer, container)
+            assertEquals(DayColors.onTertiaryContainer, content)
         }
         with(chipColors(ChipVariant.Error, DayColors)) {
             assertEquals(DayColors.errorContainer, container)

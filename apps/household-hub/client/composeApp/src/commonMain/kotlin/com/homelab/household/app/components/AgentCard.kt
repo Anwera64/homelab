@@ -119,7 +119,7 @@ fun AgentCard(
                         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                         verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
-                        permissions.forEach { HearthChip(it, variant = ChipVariant.Secondary) }
+                        permissions.forEach { HearthChip(it, variant = ChipVariant.Attention) }
                     }
                 }
             }

@@ -7,6 +7,10 @@ import androidx.compose.ui.graphics.Color
  * The Hearth token set. Values come from the palette proof (design notes §3).
  *
  * Ghost alphas are per palette on purpose: one shared value reads ~1.5× weaker in daylight.
+ *
+ * Three accents, one meaning each: primary (forest green) is the action, secondary (eucalyptus)
+ * is its quiet partner for calm accents such as a proposed change, and tertiary (terracotta)
+ * is attention — time running out, a warning, something busy.
  */
 @Immutable
 data class HearthColors(
@@ -22,6 +26,10 @@ data class HearthColors(
     val onSecondary: Color,
     val secondaryContainer: Color,
     val onSecondaryContainer: Color,
+    val tertiary: Color,
+    val onTertiary: Color,
+    val tertiaryContainer: Color,
+    val onTertiaryContainer: Color,
     val error: Color,
     val errorContainer: Color,
     val onErrorContainer: Color,
@@ -49,10 +57,14 @@ val DayColors =
         onPrimary = Color(0xFFFFFFFF),
         primaryContainer = Color(0xFFD0DFD5),
         onPrimaryContainer = Color(0xFF102318),
-        secondary = Color(0xFFC05638),
+        secondary = Color(0xFF4D6B62),
         onSecondary = Color(0xFFFFFFFF),
-        secondaryContainer = Color(0xFFFFD5C7),
-        onSecondaryContainer = Color(0xFF541A0B),
+        secondaryContainer = Color(0xFFD7E3DE),
+        onSecondaryContainer = Color(0xFF142620),
+        tertiary = Color(0xFFC05638),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFFFD5C7),
+        onTertiaryContainer = Color(0xFF541A0B),
         error = Color(0xFFA33B2A),
         errorContainer = Color(0xFFFBDDD6),
         onErrorContainer = Color(0xFF5C1508),
@@ -80,10 +92,14 @@ val NightColors =
         onPrimary = Color(0xFF100F0E),
         primaryContainer = Color(0xFF26352D),
         onPrimaryContainer = Color(0xFF9BC2AC),
-        secondary = Color(0xFFE5855E),
+        secondary = Color(0xFFA3BFB5),
         onSecondary = Color(0xFF100F0E),
-        secondaryContainer = Color(0xFF381E15),
-        onSecondaryContainer = Color(0xFFFFB091),
+        secondaryContainer = Color(0xFF1F2B27),
+        onSecondaryContainer = Color(0xFFBFD6CD),
+        tertiary = Color(0xFFE5855E),
+        onTertiary = Color(0xFF100F0E),
+        tertiaryContainer = Color(0xFF381E15),
+        onTertiaryContainer = Color(0xFFFFB091),
         error = Color(0xFFE8705C),
         errorContainer = Color(0xFF4A160C),
         onErrorContainer = Color(0xFFFFB4A4),

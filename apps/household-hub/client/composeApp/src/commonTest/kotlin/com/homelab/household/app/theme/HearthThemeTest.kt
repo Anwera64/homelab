@@ -29,10 +29,14 @@ class HearthThemeTest {
             assertColor(0xFFFFFF, onPrimary, "onPrimary")
             assertColor(0xD0DFD5, primaryContainer, "primaryContainer")
             assertColor(0x102318, onPrimaryContainer, "onPrimaryContainer")
-            assertColor(0xC05638, secondary, "secondary")
+            assertColor(0x4D6B62, secondary, "secondary")
             assertColor(0xFFFFFF, onSecondary, "onSecondary")
-            assertColor(0xFFD5C7, secondaryContainer, "secondaryContainer")
-            assertColor(0x541A0B, onSecondaryContainer, "onSecondaryContainer")
+            assertColor(0xD7E3DE, secondaryContainer, "secondaryContainer")
+            assertColor(0x142620, onSecondaryContainer, "onSecondaryContainer")
+            assertColor(0xC05638, tertiary, "tertiary")
+            assertColor(0xFFFFFF, onTertiary, "onTertiary")
+            assertColor(0xFFD5C7, tertiaryContainer, "tertiaryContainer")
+            assertColor(0x541A0B, onTertiaryContainer, "onTertiaryContainer")
             assertColor(0xA33B2A, error, "error")
             assertColor(0xFBDDD6, errorContainer, "errorContainer")
             assertColor(0x5C1508, onErrorContainer, "onErrorContainer")
@@ -61,10 +65,14 @@ class HearthThemeTest {
             assertColor(0x100F0E, onPrimary, "onPrimary")
             assertColor(0x26352D, primaryContainer, "primaryContainer")
             assertColor(0x9BC2AC, onPrimaryContainer, "onPrimaryContainer")
-            assertColor(0xE5855E, secondary, "secondary")
+            assertColor(0xA3BFB5, secondary, "secondary")
             assertColor(0x100F0E, onSecondary, "onSecondary")
-            assertColor(0x381E15, secondaryContainer, "secondaryContainer")
-            assertColor(0xFFB091, onSecondaryContainer, "onSecondaryContainer")
+            assertColor(0x1F2B27, secondaryContainer, "secondaryContainer")
+            assertColor(0xBFD6CD, onSecondaryContainer, "onSecondaryContainer")
+            assertColor(0xE5855E, tertiary, "tertiary")
+            assertColor(0x100F0E, onTertiary, "onTertiary")
+            assertColor(0x381E15, tertiaryContainer, "tertiaryContainer")
+            assertColor(0xFFB091, onTertiaryContainer, "onTertiaryContainer")
             assertColor(0xE8705C, error, "error")
             assertColor(0x4A160C, errorContainer, "errorContainer")
             assertColor(0xFFB4A4, onErrorContainer, "onErrorContainer")
@@ -88,12 +96,16 @@ class HearthThemeTest {
             var hearth: HearthColors? = null
             var materialPrimary: Color? = null
             var materialBackground: Color? = null
+            var materialTertiary: Color? = null
+            var materialTertiaryContainer: Color? = null
 
             setContent {
                 HearthTheme(darkTheme = true) {
                     hearth = HearthTheme.colors
                     materialPrimary = MaterialTheme.colorScheme.primary
                     materialBackground = MaterialTheme.colorScheme.background
+                    materialTertiary = MaterialTheme.colorScheme.tertiary
+                    materialTertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
                 }
             }
 
@@ -101,6 +113,8 @@ class HearthThemeTest {
             assertEquals(NightColors, hearth)
             assertEquals(NightColors.primary, materialPrimary)
             assertEquals(NightColors.canvas, materialBackground)
+            assertEquals(NightColors.tertiary, materialTertiary)
+            assertEquals(NightColors.tertiaryContainer, materialTertiaryContainer)
         }
 
     @Test
@@ -108,17 +122,23 @@ class HearthThemeTest {
         runComposeUiTest {
             var hearth: HearthColors? = null
             var materialPrimary: Color? = null
+            var materialTertiary: Color? = null
+            var materialTertiaryContainer: Color? = null
 
             setContent {
                 HearthTheme(darkTheme = false) {
                     hearth = HearthTheme.colors
                     materialPrimary = MaterialTheme.colorScheme.primary
+                    materialTertiary = MaterialTheme.colorScheme.tertiary
+                    materialTertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
                 }
             }
 
             waitForIdle()
             assertEquals(DayColors, hearth)
             assertEquals(DayColors.primary, materialPrimary)
+            assertEquals(DayColors.tertiary, materialTertiary)
+            assertEquals(DayColors.tertiaryContainer, materialTertiaryContainer)
         }
 
     @Test

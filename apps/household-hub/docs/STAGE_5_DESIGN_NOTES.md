@@ -48,6 +48,8 @@ The palette proof is the source of truth. What changed from the UI/UX specificat
 | Role | Day | Night | Why |
 | :--- | :--- | :--- | :--- |
 | Primary | `#3C6E4E` | `#7FB894` | The old greens failed contrast and the selected nav tab didn't read in daylight |
+| Secondary | `#4D6B62` on `#D7E3DE` | `#A3BFB5` on `#1F2B27` | Eucalyptus, the quiet partner of primary: calm accents such as a proposed change (issue 169) |
+| Tertiary | `#C05638` on `#FFD5C7` | `#E5855E` on `#381E15` | Terracotta, moved here from secondary unchanged: attention, time running out, busy. Close to error in hue on purpose |
 | Secret Mode | `#6B655F` | `#B8B2AC` | Thistle and Plum replaced by an achromatic ghost; `onSecret` deleted |
 | Ghost tint / edge / frame | 20 / 69 / 66 % | 14 / 55 / 45 % | Tuned per palette so both land on the same perceived edge |
 | Soft outline (chat panel, dividers) | `#EFEBE4` | `#272523` | The day border was too faint next to night's |
