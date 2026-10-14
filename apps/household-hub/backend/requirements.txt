@@ -96,12 +96,12 @@ opentelemetry-api==1.45.1
     # via fastapi
 pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
-pydantic==2.14.0
+pydantic==2.14.1
     # via
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.50.0
+pydantic-core==2.50.1
     # via pydantic
 pydantic-settings==2.15.0
     # via -r requirements.in
