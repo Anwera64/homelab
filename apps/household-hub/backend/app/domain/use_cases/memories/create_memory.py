@@ -65,6 +65,7 @@ class CreateMemoryUseCase:
                 content=content,
                 confidence=confidence,
                 source_session_id=source_session_id,
+                origin="manual",
                 is_active=True,
             )
             created = await self.memory_repo.create(memory)

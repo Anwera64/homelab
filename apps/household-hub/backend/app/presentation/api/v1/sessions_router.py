@@ -252,7 +252,7 @@ async def chat_turn(
     """
     Execute a full multi-turn conversational inference cycle with autonomous tool execution.
     Guarded by SessionLockRegistry (409 Conflict on concurrent turns).
-    Schedules autonomous memory and gossip reflection in the background.
+    Schedules autonomous memory reflection in the background.
     """
     async with lock_registry.acquire(session_id):
         session_entity, messages = await prepare_uc.execute(session_id, current_user)
@@ -287,7 +287,6 @@ async def chat_turn(
             message=SessionPresentationMapper.to_message_response(result.message),
             tool_calls=result.tools_executed,
             memories_created_count=0,
-            milestones_created_count=0,
             suggest_secret_mode=result.suggest_secret_mode,
             session_title=session_entity.title,
         )

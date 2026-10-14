@@ -57,7 +57,6 @@ class Settings(BaseSettings):
     # How long a turn waits for vectors before its index falls back to keywords.
     EMBEDDING_TIMEOUT_SECONDS: float = 60.0
     MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
-    MAX_GOSSIP_SUMMARY_LENGTH: int = 250
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["https://spicy-llama.duckdns.org"]

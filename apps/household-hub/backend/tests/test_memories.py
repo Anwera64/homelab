@@ -291,3 +291,14 @@ async def test_memory_confidence_and_content_validation(client: httpx.AsyncClien
     assert empty_content.status_code == 422
 
 
+
+
+@pytest.mark.asyncio
+async def test_the_gossip_endpoints_are_gone(client: httpx.AsyncClient):
+    """Memory spec §3.2: a shared fact is a household memory, read and removed through /memories."""
+    admin_token, _ = await register_admin(client, full_name="Admin User")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    assert (await client.get("/api/v1/gossip/household", headers=headers)).status_code == 404
+    assert (await client.get("/api/v1/gossip/audit", headers=headers)).status_code == 404
+    assert (await client.post("/api/v1/gossip", json={"summary": "x"}, headers=headers)).status_code == 404

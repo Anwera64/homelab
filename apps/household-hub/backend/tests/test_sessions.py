@@ -50,7 +50,7 @@ async def test_session_lifecycle_and_secret_mode_toggle(client: httpx.AsyncClien
     assert msg_resp.status_code == 201
     assert msg_resp.json()["content"] == "What should we cook for dinner tonight?"
 
-    # 3. Toggle Secret Mode ON (Zero-Leak Gossip isolation)
+    # 3. Toggle Secret Mode ON (Zero-Leak household isolation)
     toggle_resp = await client.patch(
         f"/api/v1/sessions/{session_id}/secret",
         json={"is_secret": True},

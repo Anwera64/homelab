@@ -172,3 +172,21 @@ def test_di_providers_are_async_coroutines_to_prevent_threadpool_offloading():
             violations.append(f"Provider '{provider_name}' for stub '{stub_name}' is synchronous, causing threadpool offloading.")
 
     assert not violations, "Synchronous DI Provider Violation:\n" + "\n".join(violations)
+
+
+def test_nothing_brings_back_the_gossip_bus():
+    """
+    Memory spec §3.2: household memories are the bus. A second store for the same facts drifted
+    from the first once already, so no module may be named after it or import one that is.
+    """
+    violations = []
+    for file_path in get_all_python_files(APP_DIR):
+        rel_path = file_path.relative_to(APP_DIR.parent)
+        if "gossip" in str(rel_path).lower():
+            violations.append(f"[{rel_path}] is a gossip module")
+            continue
+        for lineno, mod_name in get_imports_from_file(file_path):
+            if "gossip" in mod_name.lower():
+                violations.append(f"[{rel_path}:{lineno}] imports '{mod_name}'")
+
+    assert not violations, "The gossip bus is gone (memory spec §3.2):\n" + "\n".join(violations)

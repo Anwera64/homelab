@@ -12,7 +12,6 @@ class ChatTurnResponse(BaseModel):
     message: ChatMessageRead
     tool_calls: List[Dict[str, Any]] = []
     memories_created_count: int = 0
-    milestones_created_count: int = 0
     suggest_secret_mode: bool = False
     session_title: Optional[str] = None
 

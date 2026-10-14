@@ -129,24 +129,12 @@ async def test_what_they_shared_keeps_their_name(client: httpx.AsyncClient):
         json={"scope": "household", "content": "The boiler is serviced in October", "category": "fact"},
         headers=_bearer(liam_token),
     )
-    async with TestingSessionLocal() as session:
-        await session.execute(
-            text(
-                "INSERT INTO gossip_milestones (id, source_user_id, source_username, reporting_agent_name,"
-                " target_scope, category, summary, details_json, is_active, created_at, updated_at)"
-                " VALUES (:id, :user_id, 'Liam', 'Home Coordinator', 'household', 'milestone',"
-                " 'Liam is back by seven', '{}', 1, datetime('now'), datetime('now'))"
-            ),
-            {"id": str(uuid.uuid4()), "user_id": liam_id},
-        )
-        await session.commit()
 
     await client.delete(f"/api/v1/users/{liam_id}", headers=_bearer(emma_token))
 
     kept = await client.get(f"/api/v1/memories/{shared.json()['id']}", headers=_bearer(emma_token))
     assert kept.status_code == 200
     assert kept.json()["user_id"] == liam_id
-    assert await _rows("gossip_milestones", "source_user_id", liam_id) == 1
 
 
 @pytest.mark.asyncio
