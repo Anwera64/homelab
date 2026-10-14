@@ -3,7 +3,6 @@ package com.homelab.household.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
-import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
@@ -17,7 +16,6 @@ import kotlinx.coroutines.launch
 class DashboardViewModel(
     private val observeServerStatusUseCase: ObserveServerStatusUseCase,
     private val listRecentSessionsUseCase: ListSessionsUseCase,
-    private val listHouseholdMilestonesUseCase: ListHouseholdMilestonesUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
@@ -42,13 +40,11 @@ class DashboardViewModel(
             try {
                 val user = getCurrentUserUseCase()
                 val sessions = listRecentSessionsUseCase()
-                val milestones = listHouseholdMilestonesUseCase()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         currentUser = user,
                         recentSessions = sessions,
-                        householdMilestones = milestones,
                     )
                 }
             } catch (e: Throwable) {

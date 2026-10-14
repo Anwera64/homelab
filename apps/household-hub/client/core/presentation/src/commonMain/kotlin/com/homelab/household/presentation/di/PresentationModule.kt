@@ -44,9 +44,9 @@ val presentationModule =
             )
         }
         factory { ChatsViewModel(get()) }
-        factory { DashboardViewModel(get(), get(), get(), get(), get()) }
+        factory { DashboardViewModel(get(), get(), get(), get()) }
         factory { LaunchViewModel(get(), get()) }
-        factory { MemoryAuditViewModel(get(), get(), get(), get()) }
+        factory { MemoryAuditViewModel(get(), get(), get()) }
         factory { FirstRunViewModel(get()) }
         factory { ProfilePickerViewModel(get()) }
         factory { InviteCodeViewModel(get()) }

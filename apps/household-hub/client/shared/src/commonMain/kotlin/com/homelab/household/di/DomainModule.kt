@@ -27,10 +27,8 @@ import com.homelab.household.domain.usecase.JoinHouseholdUseCase
 import com.homelab.household.domain.usecase.LeaveHouseholdUseCase
 import com.homelab.household.domain.usecase.ListAgentsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
-import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListMembersUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
-import com.homelab.household.domain.usecase.ListUserAuditMilestonesUseCase
 import com.homelab.household.domain.usecase.LockSecretSessionsUseCase
 import com.homelab.household.domain.usecase.LoginUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
@@ -47,7 +45,6 @@ import com.homelab.household.domain.usecase.RestoreAgentUseCase
 import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
-import com.homelab.household.domain.usecase.RevokeMilestoneUseCase
 import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StartGoogleCalendarSignInUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
@@ -83,10 +80,8 @@ import com.homelab.household.domain.usecase.impl.JoinHouseholdUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LeaveHouseholdUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListAgentsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListHouseholdMembersUseCaseImpl
-import com.homelab.household.domain.usecase.impl.ListHouseholdMilestonesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListMembersUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ListSessionsUseCaseImpl
-import com.homelab.household.domain.usecase.impl.ListUserAuditMilestonesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LockSecretSessionsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LoginUseCaseImpl
 import com.homelab.household.domain.usecase.impl.LogoutUseCaseImpl
@@ -103,7 +98,6 @@ import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ResumeTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
-import com.homelab.household.domain.usecase.impl.RevokeMilestoneUseCaseImpl
 import com.homelab.household.domain.usecase.impl.SetToolApprovalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
@@ -161,10 +155,7 @@ val domainModule =
         factory<LockSecretSessionsUseCase> { LockSecretSessionsUseCaseImpl(get()) }
         factory<UnlockSecretSessionUseCase> { UnlockSecretSessionUseCaseImpl(get()) }
 
-        // Gossip & Memory use cases
-        factory<ListHouseholdMilestonesUseCase> { ListHouseholdMilestonesUseCaseImpl(get()) }
-        factory<ListUserAuditMilestonesUseCase> { ListUserAuditMilestonesUseCaseImpl(get()) }
-        factory<RevokeMilestoneUseCase> { RevokeMilestoneUseCaseImpl(get()) }
+        // Memory use cases
         factory<AuditMemoriesUseCase> { AuditMemoriesUseCaseImpl(get()) }
         factory<RevokeMemoryUseCase> { RevokeMemoryUseCaseImpl(get()) }
         factory<UpdateMemoryUseCase> { UpdateMemoryUseCaseImpl(get()) }

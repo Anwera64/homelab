@@ -1,10 +1,8 @@
 package com.homelab.household.presentation.dashboard
 
-import com.homelab.household.domain.model.HouseholdMilestone
 import com.homelab.household.domain.model.ServerStatus
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
-import com.homelab.household.domain.usecase.ListHouseholdMilestonesUseCase
 import com.homelab.household.domain.usecase.ListSessionsUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
@@ -34,7 +32,6 @@ class DashboardViewModelTest {
 
     private val observeServerStatusUseCase = mock<ObserveServerStatusUseCase>()
     private val listRecentSessionsUseCase = mock<ListSessionsUseCase>()
-    private val listHouseholdMilestonesUseCase = mock<ListHouseholdMilestonesUseCase>()
     private val getCurrentUserUseCase = mock<GetCurrentUserUseCase>()
     private val logoutUseCase = mock<LogoutUseCase>()
 
@@ -52,22 +49,11 @@ class DashboardViewModelTest {
                 isActive = true,
             )
         everySuspend { listRecentSessionsUseCase() } returns emptyList()
-        everySuspend { listHouseholdMilestonesUseCase() } returns
-            listOf(
-                HouseholdMilestone(
-                    id = "m-1",
-                    sourceUserId = "u-1",
-                    sourceUsername = "alice",
-                    reportingAgentName = "Assistant",
-                    summary = "Family vacation planned",
-                ),
-            )
 
         viewModel =
             DashboardViewModel(
                 observeServerStatusUseCase = observeServerStatusUseCase,
                 listRecentSessionsUseCase = listRecentSessionsUseCase,
-                listHouseholdMilestonesUseCase = listHouseholdMilestonesUseCase,
                 getCurrentUserUseCase = getCurrentUserUseCase,
                 logoutUseCase = logoutUseCase,
             )
@@ -87,8 +73,7 @@ class DashboardViewModelTest {
             val state = viewModel.uiState.value
             assertEquals("Alice Doe", state.currentUser?.fullName)
             assertTrue(state.serverStatus is ServerStatus.Online)
-            assertEquals(1, state.householdMilestones.size)
-            assertEquals("Family vacation planned", state.householdMilestones[0].summary)
+            assertNull(state.errorMessage)
         }
 
     @Test
