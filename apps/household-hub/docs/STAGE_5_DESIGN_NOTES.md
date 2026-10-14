@@ -14,7 +14,7 @@ Everything decided while designing the Stage 5 mobile client, in one place: the 
 | :--- | :--- |
 | Design canvas — *Household Hub* ([link](https://claude.ai/artifact/EgTpi5oNpDv855uweAjCNT)) | Every flow, one page per area (151 artboards on 16 pages). Its Foundations page holds the palette proof, the type scale and the Hearth icon set, which used to be separate artefacts |
 | [`STAGE_5_SECRET_SESSION_LOCKING.md`](STAGE_5_SECRET_SESSION_LOCKING.md) | Approved spec for server-enforced secret chats |
-| [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) | Spec for how memories are written, stored and read (slice 5). **It replaces what this document says about memories, shared facts and the publish notice**; its screens are not designed yet |
+| [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) | Spec for how memories are written, stored and read (slice 5). **It replaces what this document says about memories, shared facts and the publish notice**; its screens are in §6.22 |
 | [`STAGE_5_UI_UX_SPECIFICATION.md`](STAGE_5_UI_UX_SPECIFICATION.md) | The original Stage 5 spec. **Its token table and some flows are out of date** — see §7 |
 
 The canvas link is private to the owner's account.
@@ -158,18 +158,18 @@ A screen reads the scale off the theme, beside the palette — `HearthTheme.spac
 | Secret chats | Server-enforced lock, 10-minute sliding window, PIN to unlock | The old lock accepted any string |
 | Unlock scope | One PIN unlocks every secret chat; switching a chat to secret gives a token for that chat only | Unlocking one at a time adds friction without adding safety |
 | Secret titles | Titles and previews are withheld by the server until unlocked | Hiding them in the app alone is spoofable |
-| Secret memory | Secret turns write no memories; switching a chat to secret is not retroactive | Secret means off the record, from that point on |
+| Secret memory | A chat that is secret now writes no memories, nor does a message with a privacy phrase. Per-message secrecy, so a chat switched part-way keeps what came before, is slice 6 | Secret means off the record |
 | Privacy phrases | "Don't tell…" keeps that message private and offers to make the whole chat secret | The backend already detects it |
 | Biometrics | Phase 2, "face or fingerprint", biometric only, hub PIN as the fallback, invalidated when enrolment changes | Partners often know each other's phone passcode |
 | Search | Titles and agent names, on the phone, for the MVP. Full-text after the MVP | No backend work, works offline |
 | Chat previews | New `last_message_preview` on the session list | Rows need to be recognisable when scrolling |
 | PDFs | Attached to a chat. The file is never kept, the extracted text is. No page limit | Agreed when the document feature was designed |
 | Notes | Read, share (.md), delete. No editing in the app | You ask the agent to change a note |
-| Memories | Remove only, no editing. *Reopened by the memory spec: a proposed change to a memory may need editing before it is accepted (its §12, question 2)* | Kept simple; `UpdateMemoryUseCase` stays unused |
+| Memories | Remove only, one tap with Undo; no editing, of a memory or of a proposed change. To word it differently, ask an agent to remember it (§6.22) | Kept simple; `UpdateMemoryUseCase` stays unused |
 | Memory: writing | An explicit "remember" goes through a tool and its approval card; everything else is found by one reflection after the chat goes idle, never after each turn. Only what the member states is saved (memory spec §2) | Per-turn reflection saved the agent's own words, made the next message wait and undid the prompt cache (#133, #81) |
 | Memory: one store | Shared facts are household memories. Gossip milestones, their endpoints and the publish notice are gone (memory spec §3) | The two stores were written together and held the same things |
 | Memory: reading | A fixed block filled to a budget, preferences and health first; older memories are recalled by meaning when a message relates to them (memory spec §5) | The newest 20 were sent whatever the question, and 30 of 50 never reached an agent |
-| Memory: changes | A changed or contradicting fact becomes a proposal the member answers; nothing stored is rewritten in the background (memory spec §6) | Similarity cannot tell a correction from a repeat |
+| Memory: changes | A changed or contradicting fact becomes a proposal; nothing stored is rewritten in the background. One card for every proposal: Keep stored, Keep both, Use new. Only the member who said the stored memory answers it (memory spec §6.1) | Similarity cannot tell a correction from a repeat, and nobody should overrule what someone else said |
 | Calendar events | Events that come up in a chat are remembered, linked to the event, and follow it when it moves or is removed (memory spec §7) | Knowing someone's plans is part of knowing them; the fault in #133 was that they went stale |
 | Web search | Each step shows its own sources, from a summary saved with the tool part: a search opens to its results, a page read names its page. A closed fold says what its steps did (#40) | Doesn't depend on the model remembering to cite, and survives reopening the chat |
 | Agent in a chat | The header pill names the agent, with no chevron. Changing agent means starting a new chat | A session is bound to one agent and there is no endpoint to switch |
@@ -241,7 +241,8 @@ Built in slice 5 from [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md); the section numb
 - [ ] ⛔ **Comparing on write**: the model names the relation; changes and contradictions become proposals (§6).
 - [ ] **Calendar events** as linked memories, updated or retired with the event, and a periodic check for changes made outside the hub (§7).
 - [ ] ⛔ **Logging** of every sweep decision, reflection run, recall and calendar-link change (§9).
-- [ ] ⛔ Client: the screens are not designed. What they must make possible is in §8; the open questions are in §12.
+- [ ] ⛔ **`memory_proposals`** with who may answer, and `retired_at` / `moved_from` on memories (§3.1, §3.5).
+- [ ] ⛔ Client: the memory page, Changes to check, the chat line and its sheet, designed in §6.22 (§8).
 
 ### 5.7 Calendar
 
@@ -603,7 +604,7 @@ So the composer is disabled outright and says why. If you would rather queue, it
 
 *Screens:* Profile, What I know about you, Shared with the household
 
-*Superseded in part (12 October 2026). The notes below describe memories and shared facts as two stores read from two endpoints. [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) makes them one, and adds proposals and a reflection time in each chat. The memory screens are to be redesigned when slice 5 is planned; until then these notes and the Profile & memory boards show the old system. The Profile hub itself, and its rows outside "What the agents keep", are not affected.*
+*Superseded in part (12 October 2026). The notes below describe memories and shared facts as two stores read from two endpoints. [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) makes them one, and adds proposals and a reflection time in each chat. The memory screens were redesigned on 13 and 14 October: see §6.22, which replaces What I know about you and Shared with the household. The Profile hub itself, and its rows outside "What the agents keep", are not affected.*
 
 #### Profile — reached from the avatar on any dashboard
 
@@ -836,7 +837,7 @@ reflect_turn.py used to drop milestones for secret turns but still extract memor
 
 Now memory extraction is skipped for secret turns exactly like milestones; the title step still runs. Which is why the empty memory screen can promise “Nothing said in Secret Mode is ever written down.”
 
-*Not built yet when this was written. It is built in slice 5, as a rule of the new reflection (memory spec §2.2), so the promise holds from the day the memory screens ship.*
+*Not built yet when this was written. It is built in slice 5, as a rule of the new reflection (memory spec §2.2), so the promise holds from the day the memory screens ship. The empty memory screen is redrawn as "Empty · nothing remembered" on the Memory page (§6.22); "Empty · nothing shared" goes with the Shared screen.*
 
 Spec: STAGE_5_SECRET_SESSION_LOCKING.md §4.4.
 
@@ -971,6 +972,61 @@ So motion is switched off by construction rather than driven by hand. `HearthMot
 Tests reach it through one composable, `StillTheme`, and never compose `HearthTheme` directly — `StillMotionInTestsTest` fails the build otherwise. That guard exists because the first version of this relied on `TestApp` alone, and the tests that most needed the off switch turn out not to use `TestApp`: every `every_previewed_state_draws` mounts its screen's `Content` on a bare theme. The first busy state added to a preview provider would have hung a whole screen test rather than failing it. The theme's own tests are the one exception, since proving `HearthTheme` hands out `DefaultMotion` means composing the real thing.
 
 The rule that follows: a component that cannot stand still cannot be tested, so it does not ship. Nothing asserts on the motion itself — no test names a duration, an easing or a frame. The only timing test is `waitPhase`, which is arithmetic over two thresholds with no clock in it. The motion is checked by eye, once, on a real device against a real hub.
+
+### 6.22 Memory
+
+*Screens:* the canvas page "Memory (slice 5)", 27 boards. Spec: [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md) §6.1 and §8.
+
+#### Where memories show
+
+| Place | Boards |
+| :--- | :--- |
+| Profile's Memories row, with "2 to check" | Profile · one memory row |
+| The memory page: Yours and Household tabs, and a band at the top when something needs checking | Memories · yours, with changes to check; Memories · household; Empty · nothing remembered |
+| Changes to check, opened from the band | Changes to check · yours, and one waiting for Liam; Changes to check · Liam's side, from Emma's chat |
+| In a chat: a quiet line after the last message looked over, and the sheet it opens | Chat · where it was last looked over; Chat · what that look-over remembered; Chat · a long look-over, scrolling |
+| The approval card for `remember` and `forget` | Remember · replaces your own memory; Remember · another member's memory is kept; Forget · always asks; Forget · after it ran |
+
+"Shared with the household" is no longer a screen: shared facts are household memories, on the Household tab. Household rows say who said them; only your own have ✕.
+
+#### The change card
+
+Every proposal is the same card, whichever relation the model named. The relation is for the hub and the logs; a label like "Looks changed" told the member nothing they could act on.
+
+- A **Yours** or **Household** chip says which memory it is about.
+- **Stored** is a `secondaryContainer` box (eucalyptus, `onSecondaryContainer` text): the calm colour reads as what is already kept.
+- **Read in a chat** is neutral: `surfaceAlt` with an `outline` border, and the source under it, "Emma's chat · yesterday". The chat's title is shown only to its owner; anyone else sees the owner's name.
+- Three buttons, always all three: **Keep stored · Keep both · Use new**. Use new is the filled one.
+- A change against a memory another member said is read-only for you: both boxes, no buttons, and "Liam said this. Waiting for Liam to choose." It counts in Liam's "to check", not yours.
+
+No hint footers and no explanatory lines under the buttons. They took space and said what the buttons already say.
+
+#### Wording
+
+| Where | Text |
+| :--- | :--- |
+| The band | An agent read something in a chat that differs from what's stored. |
+| The chat line | Remembered 2 · 1 to check · 10:52 › |
+| A look-over that saved nothing | Looked over · 10:52 · nothing new (not tappable) |
+| The sheet's title | Remembered from this chat |
+| A removed row | Removed · Undo |
+| After a forget | Forgot a memory · *the sentence* (a step line, like any tool) |
+| Remember, on another member's memory | Liam said … / This is kept too. Liam will be asked which one is right. |
+| Remember, on your own | This replaces … |
+| An event that moved | Moved in your calendar · was Sat 20:00 (one line) |
+| An event memory | until *date* |
+
+#### Removing and forgetting
+
+✕ on the memory page is one tap. The row turns into "Removed" with Undo, and stays undoable until you leave the page (Memories · one removed, with Undo). Forget from a chat is an agent action on the approval card, so it asks first and has no Undo.
+
+#### States drawn
+
+Loading, can't reach the hub, saving a choice, a choice that didn't save, all answered, an answer given in the sheet, a long memory (it wraps in full, never clamped), an event moved in the calendar, and Night for the memory page, Changes to check and the sheet. A removed event's memory simply leaves the list (memory spec §7).
+
+#### Accent roles
+
+Since #170, `secondary` is eucalyptus, the calm accent: the Stored box, the "to check" chip and the band icon. `tertiary` is terracotta, for attention: warnings, busy states and expiry, so on these screens only the "until" chip uses it. A change to check is not a warning, so it never does.
 
 ---
 

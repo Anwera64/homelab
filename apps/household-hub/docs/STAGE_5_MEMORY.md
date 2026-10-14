@@ -1,13 +1,13 @@
 # Household Hub: Memory
 
-**Status:** 📐 Specification — behaviour agreed, screens still to be designed
+**Status:** 📐 Specification — behaviour and screens agreed
 **Target:** `backend` (`memories`, `chat`, `integrations`, `bootstrap`) + `client` (`:core:*`, `:composeApp`)
 **Date:** October 2026
 
 This is the spec for Stage 5 slice 5. It replaces the per-turn reflection, the gossip milestones and the
 "Profile, memory and sharing" slice as first planned. It was agreed decision by decision on
-12 October 2026, with measurements taken on the live hub; §11 holds those numbers, and §12 lists what
-is still open.
+12 October 2026, with measurements taken on the live hub; §11 holds those numbers. The screens and
+the questions left open were settled on 13 and 14 October; §8 and §12 record them.
 
 ---
 
@@ -43,6 +43,12 @@ A tool the agent calls during the turn, for "remember that…" and "forget that�
 - It is a write tool: it pauses on the approval card (Decline / Edit / Approve) like any other, and is
   locked in a secret turn.
 - The card shows the closest stored memory (§6), so the member sees what would be added to or replaced.
+- **It never replaces another member's memory.** When the closest memory was said by someone else,
+  approving saves the new one as a household memory, keeps theirs, and raises a proposal for them
+  (§6.1). The card says "Liam said" over the stored memory and "This is kept too. Liam will be asked
+  which one is right." Replacing the member's own memory still reads "This replaces".
+- `remember` can be set to run without asking, like adding an event. `forget` always asks, like
+  removing one, and has no Undo; once it runs it leaves a step line ("Forgot a memory · …").
 - The write changes the system prompt, so the next call re-reads it once, about 2 seconds. That is
   accepted: it only follows something the member asked for. No per-chat snapshot of memories is kept.
 - The same model sometimes says it did something without calling the tool (#64). Reflection (§2.2)
@@ -62,10 +68,24 @@ it reflects when all of these hold:
 | :--- | :--- |
 | The chat's newest message is older than the idle time (10 minutes, a setting) | The member has probably stopped |
 | Ollama reports the chat model in memory (`GET /api/ps`) | Never load the model just to reflect; the desktop keeps it 15 minutes |
-| No turn is running | Never start in front of a live answer |
+| No turn is running, anywhere on the hub | Never start in front of a live answer |
+| No approval card is waiting in the chat | The turn is paused, not finished; the chat is skipped until the card is answered |
 
 A chat that fails a condition is tried again on a later pass. A chat left unreflected by a restart or a
 skipped pass is picked up the next time the model is in memory.
+
+**A turn always wins.** Whether a turn is running is known only per chat today
+(`presentation/api/session_lock.py`). It becomes a hub-wide port in `domain`, set while any turn runs.
+A turn that starts while reflection is running cancels it; the marker is not moved, so a later pass
+redoes the work. Nobody waits behind reflection.
+
+**Which model.** The chat's own agent model, resolved through `ResolveAgentModelUseCase` as a turn does;
+the sweep checks that this model is in memory. Every agent runs the same model today, so there is no
+separate reflection setting.
+
+**Not keeping the model longer.** `GET /api/ps` returns each loaded model's `expires_at`. A reflection
+call passes `keep_alive` as the time left until then, so the model unloads when it would have anyway.
+To be confirmed against the hub's Ollama version when the sweep is built.
 
 **The marker.** Each chat stores the last message that was reflected and when. A chat the member comes
 back to reflects only the new part. It also stores what the last run did, for the screens (§8).
@@ -73,8 +93,10 @@ back to reflects only the new part. It also stores what the last run did, for th
 **What reflection may save.**
 
 - Only what the member states. The assistant's text is context for understanding it, never a source.
-- Nothing from a secret chat or a secret turn. Secrecy is read per message, so a chat switched to
-  secret part-way keeps what came before, as the locking spec's §4.4 requires.
+- Nothing from a chat that is secret now, and nothing from a message that tripped a privacy phrase
+  (`privacy_trigger_detected` in its metadata). Whether a chat was secret when each message was sent
+  is not stored yet, so a chat switched to secret part-way is not reflected at all. Keeping what came
+  before, as the locking spec's §4.4 asks, is slice 6.
 - Dates are written as absolute dates, as today.
 
 **What it does with each fact** is §6: save it, or raise a proposal.
@@ -86,7 +108,8 @@ closes and stays closed can trigger the same job sooner. The sweep stays as the 
 
 Reflection used to write the title on the first turn. Now the title is the start of the member's first
 message, cut with "…" when long, so a new chat is recognisable at once. The first reflection replaces
-it with a proper one, unless the member has renamed the chat.
+it with a proper one. Chats cannot be renamed today (the only session `PATCH` is `/{id}/secret`); when
+renaming arrives, it adds a flag that stops the replacement.
 
 ---
 
@@ -109,9 +132,11 @@ Gossip milestones and household memories were written together and read together
 | `origin` | **new** | `reflection`, `tool` or `manual`: how it got there |
 | `relevant_for` | **new** | A short list of when this memory matters, written by the model when it saves (§5.2) |
 | `event_id` | **new** | Optional. The calendar event this memory is about (§7) |
-| replaced-by and retired-at | **new** | Set when a memory is retired in favour of another, so the history can be read and undone |
+| replaced-by and retired-at | **new** | Set when a memory is retired in favour of another, or removed by the member, so the history can be read and undone |
+| `moved_from` | **new** | Optional. For an event memory, the event's time before it last moved, for the "Moved in your calendar · was …" line (§7) |
 
-A memory is never deleted by the system, only made inactive.
+A memory is never deleted by the system, only made inactive. Removing one with ✕ retires it, and Undo
+brings it back until the member leaves the page.
 
 ### 3.2 What happens to the gossip bus
 
@@ -133,13 +158,35 @@ milestone go too: if an agent is purged, a memory it recorded reads "an agent".
 
 ### 3.3 Starting empty
 
-The hub is a development environment. The migration clears `agent_memories` and drops
-`gossip_milestones`; nothing is carried over.
+The hub is a development environment. The migration clears `agent_memories`, `conversation_sessions`
+and `chat_messages`, and drops `gossip_milestones`; nothing is carried over. Clearing the chats means no
+old chat waits to be reflected without a marker.
+
+The reflection PR clears memories, vectors, proposals and chats once more, so the new reflection is
+tested from a clean start rather than on what per-turn reflection wrote in the meantime.
 
 ### 3.4 `conversation_sessions`
 
 Gains the reflection marker (last reflected message, when) and a small record of what the last run
 added, proposed and retired.
+
+### 3.5 `memory_proposals`
+
+A pending change to a stored memory (§6.1).
+
+| Column | Purpose |
+| :--- | :--- |
+| `id` | |
+| `memory_id` | The stored memory it would change |
+| `content` | The new statement, as read in the chat |
+| `relation` | What the model named (§6). Kept for the logs; never shown |
+| `answerer_id` | The member who said the stored memory. Only they can answer |
+| `source_session_id`, `source_user_id` | The chat it was read in, and whose chat that is |
+| `state` | `pending`, then `kept` (Keep stored), `both` (Keep both), `replaced` (Use new) or `dropped` |
+| `created_at`, `answered_at` | |
+
+A proposal is dropped, not answered, when its stored memory is removed or retired, or when a newer
+proposal about the same memory takes its place.
 
 ---
 
@@ -189,7 +236,11 @@ did not fit, when a message relates to it.
 
 ### 5.1 The fixed block
 
-A block in the system prompt, filled up to a token budget (a setting, not a row count).
+A block in the system prompt, filled up to a token budget (a setting, not a row count; about 1,000
+tokens to start, half of today's memory lines).
+
+It holds the member's own personal memories and the household ones, never another member's personal
+ones. In a secret chat, personal ones only. Recall (§5.2) follows the same rule.
 
 1. Preferences and health first, personal and household alike. Recall cannot find these: "answer
    briefly" resembles no message.
@@ -213,13 +264,15 @@ a paused turn resumes, not on regenerate: those reuse what the message already c
 - **It scores** a memory by the better of its two vectors: the statement and its `relevant_for` list.
   The list is what makes a dinner question find "is vegetarian" (§11.4).
 - **It attaches** the best matches above a cut-off, up to a small maximum, to the message, and saves
-  them with it. Later turns replay the same text, so the cache holds. A memory already attached to an
+  them with it in `chat_messages.metadata_json["recalled"]`: each memory's id and its text exactly as
+  attached. Later turns replay the same text, so the cache holds. A memory already attached to an
   earlier message in the window is not attached again.
 - **It stays silent** when nothing passes the cut-off, which is the normal case.
 - **It gives up** when the embedder has to load (6.3 seconds, measured): a wait cap skips recall for
   that message.
 
-The cut-off is a setting and starts conservative. Similarity scores are only comparable within one
+The cut-off is a setting and starts at 0.60, with at most 3 memories attached (§11.4: wanted matches
+scored 0.63 to 0.69, noise up to 0.54). Similarity scores are only comparable within one
 question, so the real value has to come from the hub's own chats. Recall therefore logs its scores from
 the first day, including for memories that are already in the block, where it attaches nothing.
 
@@ -245,7 +298,7 @@ Every new fact, from `remember` or from reflection, is compared with what is sto
 | more detail | Agrees and adds something | Proposal |
 | changed | The stored one is out of date | Proposal |
 | contradicts | Both cannot be true | Proposal |
-| unclear | The model cannot tell | Proposal showing both |
+| unclear | The model cannot tell | Proposal |
 
 In `remember` the member is already looking at an approval card, so the relation and the closest
 memory are shown there and the member decides; no separate proposal is raised.
@@ -255,6 +308,21 @@ answers. This is the guard against a background step quietly losing information,
 another memory system (Mem0) reportedly stopped updating automatically.
 
 When a memory is replaced, the old one is made inactive and records what replaced it and when.
+
+### 6.1 Proposals
+
+The relation decides whether a fact is saved, dropped or proposed, and it is logged. It is not shown:
+every proposal is the same card, whichever of the four relations raised it.
+
+- **Three answers.** Keep stored (the proposal is closed), Keep both (the new statement is saved beside
+  the stored one) and Use new (it replaces the stored one). Use new is the suggested answer.
+- **Only the speaker answers.** A proposal against a memory another member said goes to that member,
+  and counts only in their "to check". Everyone else sees it read-only, with who will choose.
+- **Where it came from.** The card shows when and in whose chat the statement was read. The chat's
+  title is shown only to the chat's owner; anyone else sees the owner's name ("Emma's chat").
+- **No editing.** To word it differently, the member tells an agent to remember it; that card has Edit.
+- **No expiry.** A proposal stays until it is answered or dropped (§3.5).
+- **A count only.** No notification.
 
 ---
 
@@ -285,30 +353,43 @@ memory with an expiry and no link.
 **The periodic check.** The hub keeps no copy of the calendar and has no sync: events are read live from
 Apple or Google. So a pass asks the calendar for the event of each linked, unexpired memory
 (`ICalendarConnector.get_event`). Gone means retire; moved means update. It needs no model, so it runs
-on its own schedule, apart from the reflection sweep. A calendar that cannot be reached changes nothing.
+on its own schedule, every 30 minutes, apart from the reflection sweep. A calendar that cannot be
+reached changes nothing: a Google sign-in that expired, for instance while the OAuth app is in Testing
+(seven days), stops updates until the member reconnects, and retires nothing.
+
+**When it moves.** The sentence is rebuilt from the event's fields, with no model call, so it is right
+at once, and `moved_from` keeps the time it had. The member sees the new sentence with "Moved in your
+calendar · was Sat 20:00". A removed event's memory is retired silently.
+
+**Repeating events.** One memory for the series, expiring when the series ends, or never.
 
 ---
 
-## 8. What the member needs to see
+## 8. What the member sees
 
-The screens are **not designed here**. They are settled when the slice is planned, and the current
-"Profile & memory" boards on the canvas describe the old system. This section only records what the
-screens must make possible.
+Designed on the canvas's "Memory (slice 5)" page, 13 and 14 October 2026. The design notes (§6.22)
+hold the wording, colours and every state; this section is what the hub must serve.
 
-- When a chat was last reflected, and what that run saved.
-- Proposed changes to memories, and a way to answer them.
-- The memories themselves: removing one, its expiry, and who said a shared one.
+- **The memory page**, from Profile's Memories row. Yours and Household tabs; each row is the sentence,
+  who said it, which agent, when, an "until" date for event memories, and ✕ on the member's own. ✕ is
+  one tap with Undo in place. Household rows by others have no ✕.
+- **Changes to check**, from a band at the top of the memory page and a count on Profile's row. One
+  card per proposal the member can answer, then the ones waiting for someone else, read-only.
+- **In a chat**, a quiet line after the last message looked over: "Remembered 2 · 1 to check · 10:52".
+  It opens "Remembered from this chat": changes to check first, then what the look-over saved, each with
+  ✕ and answers in place. A look-over that saved nothing shows "Looked over · 10:52 · nothing new", which
+  opens nothing.
+- **On the approval card**, `remember` shows the closest memory and whether it is replaced or kept
+  (§2.1).
 
-Noted from the discussion as input, not as decisions: the reflection time shown in the transcript after
-the last reflected message and in the chat's overflow menu, with the time and what was saved.
-
-Three things the old design had that no longer apply:
+Two things the old design had that no longer apply:
 
 - **The publish notice and its Undo.** No turn publishes anything now, so there is nothing to confirm
   at the end of a turn.
 - **Two separate lists** for memories and shared facts. They are one store; a shared fact is a
   household memory.
-- **"Nothing said in Secret Mode is ever written down"** stays true, and is delivered by this slice.
+
+"Nothing said in Secret Mode is ever written down" stays true, and is delivered by this slice.
 
 ---
 
@@ -320,6 +401,10 @@ database. Every problem in this slice should be readable from Loki without guess
 Every line carries the member and chat ids, in the form the tool-call lines already use (`_log_call`
 in `process_chat_turn.py`). Content from a secret turn is never logged.
 
+Lines carry ids, scores, relations, outcomes and counts. **Memory text is off by default**: a hub setting
+(`MEMORY_LOG_TEXT`) adds it, cut to 500 characters, while tuning. That is the only way to check a
+dropped fact, which is stored nowhere else.
+
 | Area | What is logged |
 | :--- | :--- |
 | Sweep | For each chat it considers: reflected, or skipped and why (not idle yet, model not in memory, a turn running, nothing new, secret) |
@@ -329,7 +414,7 @@ in `process_chat_turn.py`). Content from a secret turn is never logged.
 | Prompt block | Budget used against the limit, how many memories went in, which were left out |
 | Recall | Per message: the top scores, what was attached, the cut-off in force, how long it took, and why when it attached nothing (below cut-off, embedder loading, wait cap) |
 | Calendar link | A memory updated or retired because the hub changed its event; for the periodic check, how many were checked, changed and retired, and any calendar that could not be reached |
-| Proposals | Created, accepted, rejected |
+| Proposals | Created, answered (which answer, by whom), dropped and why |
 | Title | When reflection replaces the automatic one |
 
 A Grafana dashboard for these is not part of this spec; which panels it shows is a separate choice.
@@ -345,25 +430,31 @@ Behaviour the slice's tests must pin. Names are for orientation; each PR writes 
 | No reflection per turn | Finishing a turn starts no model call |
 | Sweep waits for idle | A chat younger than the idle time is not reflected |
 | Sweep respects the model | With the chat model not in memory, nothing is reflected and the reason is logged |
-| Sweep respects turns | With a turn running, nothing is reflected |
+| Sweep respects turns | With a turn running anywhere on the hub, nothing is reflected; a turn that starts mid-reflection cancels it and the marker does not move |
+| Sweep skips a paused chat | A chat with an unanswered approval card is not reflected |
+| Model kept no longer | A reflection call's `keep_alive` is the time left on the loaded model |
 | Marker | A second pass over an unchanged chat does nothing; a returned-to chat reflects only the new messages |
 | Member's words only | A fact that appears only in the assistant's answer is not saved |
-| Secret writes nothing | A secret chat or secret turn creates and changes no memory (moved here from the locking spec's §8) |
+| Secret writes nothing | A secret chat, or a message with a privacy trigger, creates and changes no memory (moved here from the locking spec's §8) |
 | Secret still titled | A secret chat still gets its title (moved here from the locking spec's §8) |
-| Not retroactive | In a chat switched to secret part-way, the earlier messages are still reflected |
-| Title | A new chat's title is the start of the first message with "…"; reflection replaces it; a renamed chat keeps its name |
+| Title | A new chat's title is the start of the first message with "…"; reflection replaces it |
 | `remember` | The fact is stored only after approval, and is refused in a secret turn |
+| `remember` on another's memory | Approving keeps their memory, saves the new one as household, and raises a proposal for them |
 | Same fact | A rewording, or the same fact in another language, adds no row |
 | Changed fact | A changed or contradicting fact creates a proposal and leaves the stored memory active |
-| Replacement | Accepting a proposal makes the old memory inactive and records what replaced it |
+| Replacement | Use new makes the old memory inactive and records what replaced it; Keep both keeps both active |
+| Only the speaker answers | Another member cannot answer a proposal, and it is not in their count |
+| Source chat | A proposal shows its chat's title to the chat's owner only |
+| Remove and Undo | ✕ retires a memory; Undo makes it active again |
 | Fixed block | Preferences and health are present whatever their age; the block never exceeds its budget; expired and inactive memories are absent |
 | Recall | A related memory outside the block is attached and replayed unchanged on the next turn; an unrelated message attaches nothing |
 | Recall gives up | A slow embedder skips recall and the turn still answers |
 | Search fallback | With the extension unavailable, search returns the same order from Python |
 | Event link | An event created in a chat is remembered once with its id and expiry; created and removed in the same chat, it is not |
-| Event changed in the hub | Removing the event retires its memory; moving it updates the memory |
+| Event changed in the hub | Removing the event retires its memory; moving it rebuilds the sentence and records `moved_from` |
 | Event changed outside | The periodic check retires a memory whose event is gone, and changes nothing when the calendar is unreachable |
 | One store | No `/gossip` route exists; a household memory carries who said it into the prompt line |
+| Log text | With the setting off, no log line carries memory text |
 | Boundaries | The AST boundary tests pass: no vector or SQL type reaches `domain` |
 
 ---
@@ -456,38 +547,43 @@ implied changes much lower.
 
 ---
 
-## 12. Open questions
+## 12. Questions settled
 
-**Design — left open, settled when the slice is planned**
+Left open on 12 October; answered by Anton on 13 and 14 October.
 
-1. Where proposals live: a third row in "What the agents keep", a band on the memory page, or a tab.
-2. Whether a proposal can be edited before accepting. The design notes say memories are never edited.
-3. Whether an unanswered proposal expires.
-4. A count only, or a notification as well.
-5. What becomes of "Shared with the household", now that the Household tab shows the same rows.
-6. Where and how the last reflection is shown in a chat.
+| Question | Answer |
+| :--- | :--- |
+| Where proposals live | A band on the memory page opens Changes to check; in a chat, they are answered in the sheet (§8) |
+| Editing a proposal | No. Keep stored, Keep both or Use new (§6.1) |
+| Expiry of a proposal | None (§6.1) |
+| Count or notification | A count only |
+| "Shared with the household" | Gone as a screen: the Household tab |
+| The last reflection in a chat | A quiet line after the last message looked over, and its sheet (§8) |
+| Defaults | Block about 1,000 tokens; recall cut-off 0.60; at most 3 attached. All settings |
+| Renaming chats | Not possible today; no flag until it is (§2.3) |
+| Keeping the model loaded | `keep_alive` set to the time left (§2.2) |
+| Event memories | Checked every 30 minutes; one memory per series; a moved sentence rebuilt from the event (§7) |
+| Memory text in logs | Off by default, behind a setting (§9) |
+| Per-message secrecy | Slice 6. Until then a chat that is secret now is skipped (§2.2) |
+| `remember` / `forget` without asking | `remember` can be; `forget` always asks (§2.1) |
 
-**Behaviour and settings**
+**How it ships.** Each PR writes its tests first and changes something that can be checked on the phone.
 
-7. Defaults for the token budget, the recall cut-off and the maximum attached memories.
-8. Whether chats can be renamed today, which decides how the title rule is built.
-9. Whether one request can avoid extending the model's 15 minutes in video memory. A reflection call
-   restarts that clock.
-10. Event memories: how often the periodic check runs; how a repeating event is remembered and when it
-    expires; whether a moved event's sentence is rebuilt from the event's fields or reworded by the
-    model at the next reflection.
-11. Whether memory text appears in log lines, as tool arguments do today (cut to 500 characters), or
-    only ids.
-12. Where per-message secrecy is read from. `process_chat_turn.py` keeps `privacy_trigger_detected` in
-    a message's metadata; that this covers every secret turn is not yet confirmed.
-13. Whether `remember` and `forget` can be set to run without asking, like adding an event, or always
-    ask, like removing one.
-14. How the slice is cut into PRs, decided in the slice's own session.
+1. **One store.** The migration (§3), proposals table and wipe; `/gossip` goes.
+2. **Memory page.** The list, tabs, ✕ with Undo, and its states.
+3. **Reading.** Vectors (§4), the fixed block and recall (§5).
+4. **Reflection.** The sweep (§2.2) and comparing on write (§6), after another wipe (§3.3).
+5. **Changes to check and the chat sheet** (§6.1, §8).
+6. **`remember` / `forget`** (§2.1).
+7. **Calendar links** (§7).
+8. **Wrap-up.**
 
 ---
 
 ## 13. Out of scope
 
+- **Per-message secrecy.** Slice 6 stores whether each message was sent in secret, so a chat switched
+  to secret part-way keeps what came before (locking spec §4.4).
 - **WebSocket transport** for chat. That is #165; this slice works over the existing server-sent
   events.
 - **The dashboard.** Its household section reads household memories in place of milestones, with no
