@@ -1,4 +1,7 @@
 import json
+import logging
+import re
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional
 import httpx
 
@@ -9,10 +12,22 @@ from app.domain.entities.llm_message import (
     LLMToolCall,
 )
 from app.domain.repositories.llm_client import ILLMClient
+from app.domain.repositories.model_residency import IModelResidency
 from app.domain.exceptions import LLMInferenceException
 
+logger = logging.getLogger(__name__)
 
-class OllamaLLMConnector(ILLMClient):
+# A thinking model can write its reasoning into the answer when the native route isn't told to
+# separate it; the reasoning is never part of the answer.
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _model_names(model: str) -> set:
+    """A model as Ollama may name it: with or without the implied ":latest" tag."""
+    return {model, f"{model}:latest"} if ":" not in model else {model, model.removesuffix(":latest")}
+
+
+class OllamaLLMConnector(ILLMClient, IModelResidency):
     def __init__(
         self,
         base_url: str = "http://ollama:11434",
@@ -81,7 +96,11 @@ class OllamaLLMConnector(ILLMClient):
         temperature: float = 0.7,
         top_p: float = 0.9,
         tools: Optional[List[Dict[str, Any]]] = None,
+        keep_alive: Optional[int] = None,
     ) -> LLMResponse:
+        if keep_alive is not None:
+            # Only the native route documents keep_alive; the OpenAI-compatible one may ignore it.
+            return await self._native_chat(messages, model, temperature, top_p, keep_alive)
         url = f"{self.base_url}/v1/chat/completions"
         payload: Dict[str, Any] = {
             "model": model,
@@ -122,6 +141,59 @@ class OllamaLLMConnector(ILLMClient):
             raise
         except Exception as e:
             raise LLMInferenceException(f"Unexpected LLM inference error: {e}")
+
+    async def _native_chat(
+        self, messages: List[LLMMessage], model: str, temperature: float, top_p: float, keep_alive: int
+    ) -> LLMResponse:
+        payload: Dict[str, Any] = {
+            "model": model,
+            "messages": self._format_messages(messages),
+            "stream": False,
+            "keep_alive": keep_alive,
+            "options": {"temperature": temperature, "top_p": top_p},
+        }
+        try:
+            resp = await self._client.post(f"{self.base_url}/api/chat", json=payload)
+            if resp.status_code != 200:
+                raise LLMInferenceException(f"LLM inference returned HTTP {resp.status_code}: {resp.text}")
+            data = resp.json()
+            content = _THINK_RE.sub("", (data.get("message") or {}).get("content") or "").strip()
+            return LLMResponse(
+                content=content,
+                finish_reason=data.get("done_reason"),
+                usage={
+                    "prompt_tokens": int(data.get("prompt_eval_count") or 0),
+                    "completion_tokens": int(data.get("eval_count") or 0),
+                },
+            )
+        except httpx.TimeoutException as e:
+            raise LLMInferenceException(f"LLM inference timed out: {e}")
+        except httpx.ConnectError as e:
+            raise LLMInferenceException(f"Failed to connect to LLM at {self.base_url}: {e}")
+        except LLMInferenceException:
+            raise
+        except Exception as e:
+            raise LLMInferenceException(f"Unexpected LLM inference error: {e}")
+
+    async def loaded_until(self, model: str) -> Optional[datetime]:
+        try:
+            resp = await self._client.get(f"{self.base_url}/api/ps")
+            if resp.status_code != 200:
+                logger.warning("Model residency | GET /api/ps returned HTTP %s", resp.status_code)
+                return None
+            loaded = resp.json().get("models") or []
+        except Exception as e:
+            logger.warning("Model residency | GET /api/ps failed: %s", e)
+            return None
+        names = _model_names(model)
+        for entry in loaded:
+            if {entry.get("name"), entry.get("model")} & names and entry.get("expires_at"):
+                try:
+                    until = datetime.fromisoformat(str(entry["expires_at"]).replace("Z", "+00:00"))
+                except ValueError:
+                    return None
+                return until.astimezone(timezone.utc) if until.tzinfo else until.replace(tzinfo=timezone.utc)
+        return None
 
     async def stream_chat_completion(
         self,

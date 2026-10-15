@@ -14,6 +14,7 @@ from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.tool_approval_repository import IToolApprovalRepository
+from app.domain.use_cases.chat.chat_title import title_from_first_message
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.memories.recall_memories import RECALLED, RecallMemoriesUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
@@ -352,6 +353,7 @@ class ProcessChatTurnUseCase:
         suggest_secret_mode = privacy_trigger_detected and not session.is_secret
 
         # 2. Persist User Message
+        await self._title_a_new_chat(session, content)
         async with self.uow:
             user_msg = ChatMessage(
                 session_id=session.id,
@@ -606,6 +608,7 @@ class ProcessChatTurnUseCase:
 
         privacy_trigger_detected = self._check_privacy_triggers(content)
 
+        await self._title_a_new_chat(session, content)
         async with self.uow:
             user_msg = ChatMessage(
                 session_id=session.id,
@@ -635,6 +638,11 @@ class ProcessChatTurnUseCase:
             timezone_name=timezone_name,
         ):
             yield event
+
+    async def _title_a_new_chat(self, session: ConversationSession, content: str) -> None:
+        """The first message titles the chat at once (memory spec §2.3); saved with the message."""
+        if not await self.session_repo.get_messages(session.id, limit=1):
+            session.title = title_from_first_message(content)
 
     async def _answer_or_say_it_failed(self, **kwargs):
         """

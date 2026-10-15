@@ -1,7 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, Optional
 from fastapi import HTTPException, status
+
+from app.domain.repositories.turn_activity import ITurnActivity
 
 
 class SessionLockRegistry:
@@ -11,9 +13,11 @@ class SessionLockRegistry:
     Automatically prunes locks upon release to prevent unbounded memory growth.
     """
 
-    def __init__(self):
+    def __init__(self, turn_activity: Optional[ITurnActivity] = None):
         self._locks: Dict[str, asyncio.Lock] = {}
         self._registry_guard = asyncio.Lock()
+        # Told of every turn, so the hub knows whether one is running anywhere (memory spec §2.2).
+        self.turn_activity = turn_activity
 
     async def try_acquire(self, session_id: str) -> bool:
         """
@@ -28,6 +32,8 @@ class SessionLockRegistry:
             if lock.locked():
                 return False
             await lock.acquire()
+            if self.turn_activity is not None:
+                self.turn_activity.turn_started()
             return True
 
     def is_locked(self, session_id: str) -> bool:
@@ -54,6 +60,8 @@ class SessionLockRegistry:
                 lock = self._locks[session_id]
                 if lock.locked():
                     lock.release()
+                    if self.turn_activity is not None:
+                        self.turn_activity.turn_ended()
                 del self._locks[session_id]
 
     @asynccontextmanager
