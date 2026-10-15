@@ -131,7 +131,7 @@ def test_GIVEN_budget_settings_WHEN_the_container_is_built_THEN_the_turn_the_ass
 
 
 @pytest.mark.asyncio
-async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_history_is_summarized_after_reflection(
+async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_only_the_history_is_summarized(
     monkeypatch: pytest.MonkeyPatch,
 ):
     import asyncio
@@ -147,10 +147,6 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
         async def execute_stream(self, **kwargs):
             yield {"type": "done", "agent_id": "a1", "agent_name": "Assistant", "assistant_content": "Hi."}
 
-    class Reflect:
-        async def execute(self, **kwargs):
-            order.append("reflect")
-
     class Summary:
         async def execute(self, session_id, timezone_name=None):
             order.append(("summary", session_id, timezone_name))
@@ -164,25 +160,25 @@ async def test_GIVEN_a_finished_turn_WHEN_the_background_stream_ends_THEN_the_hi
     monkeypatch.setattr(di, "AsyncSessionLocal", fake_session)
     monkeypatch.setattr(di, "get_container", lambda session: {
         deps.get_process_chat_turn_use_case: Turn(),
-        deps.get_reflect_turn_use_case: Reflect(),
         deps.get_summarize_history_use_case: Summary(),
     })
 
     queue: asyncio.Queue = asyncio.Queue()
     await runner("s1", User(id="u1", full_name="Alex"), "Hello", queue, timezone_name="Asia/Tokyo")
 
-    # Reflection and the summary are queued, not awaited (#53); let them run.
+    # The summary is queued, not awaited (#53); let it run.
     for _ in range(100):
         if di._after_turn_work.running == 0:
             break
         await asyncio.sleep(0.01)
 
     # #39: the summary stamps messages in the member's timezone, so it is handed the turn's.
-    assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
+    # No reflection follows a turn any more (memory spec §2.2).
+    assert order == [("summary", "s1", "Asia/Tokyo")]
 
 
 @pytest.mark.asyncio
-async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_is_summarized_after_it(
+async def test_GIVEN_a_non_streamed_turn_WHEN_it_ends_THEN_the_history_is_summarized(
     monkeypatch: pytest.MonkeyPatch,
 ):
     import asyncio
@@ -193,35 +189,27 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
 
     order = []
 
-    class Reflect:
-        async def execute(self, **kwargs):
-            order.append("reflect")
-
     class Summary:
         async def execute(self, session_id, timezone_name=None):
             order.append(("summary", session_id, timezone_name))
 
-    runner = di.get_container(session=None)[deps.get_background_reflection_runner]
+    runner = di.get_container(session=None)[deps.get_after_turn_runner]
 
     @asynccontextmanager
     async def fake_session():
         yield None
 
     monkeypatch.setattr(di, "AsyncSessionLocal", fake_session)
-    monkeypatch.setattr(di, "get_container", lambda session: {
-        deps.get_reflect_turn_use_case: Reflect(),
-        deps.get_summarize_history_use_case: Summary(),
-    })
+    monkeypatch.setattr(di, "get_container", lambda session: {deps.get_summarize_history_use_case: Summary()})
 
-    await runner("s1", "u1", "Alex", "a1", "Assistant", "Hi", "Hello", False, False, False, timezone_name="Asia/Tokyo")
+    await runner(session_id="s1", timezone_name="Asia/Tokyo")
 
-    # Reflection and the summary are queued, not awaited (#53); let them run.
     for _ in range(100):
         if di._after_turn_work.running == 0:
             break
         await asyncio.sleep(0.01)
 
-    assert order == ["reflect", ("summary", "s1", "Asia/Tokyo")]
+    assert order == [("summary", "s1", "Asia/Tokyo")]
 
 
 def test_settings_pause_searching_for_five_minutes_when_the_engines_throttle_us(settings_without_overrides: Settings):

@@ -100,6 +100,8 @@ class ChatTurnResult:
     privacy_trigger_detected: bool = False
     suggest_secret_mode: bool = False
     is_turn_secret: bool = False
+    # The chat's title after the turn: a first message titles it (memory spec §2.3).
+    session_title: Optional[str] = None
 
 
 class _AnswerParts:
@@ -519,6 +521,7 @@ class ProcessChatTurnUseCase:
             privacy_trigger_detected=privacy_trigger_detected,
             suggest_secret_mode=suggest_secret_mode,
             is_turn_secret=is_turn_secret,
+            session_title=session.title,
         )
 
     async def _open_turn(self, session_id: str, current_user: User):

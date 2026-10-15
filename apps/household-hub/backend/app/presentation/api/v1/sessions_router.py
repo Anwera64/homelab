@@ -26,7 +26,6 @@ from app.domain.use_cases.sessions.toggle_secret_mode import ToggleSecretModeUse
 from app.domain.use_cases.sessions.archive_session import ArchiveSessionUseCase
 from app.domain.use_cases.sessions.add_chat_message import AddChatMessageUseCase
 from app.domain.use_cases.sessions.delete_session import DeleteSessionUseCase
-from app.domain.use_cases.agents.get_agent import GetAgentUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
 from app.presentation.api.session_lock import SessionLockRegistry
@@ -42,10 +41,9 @@ from app.presentation.api.deps import (
     get_archive_session_use_case,
     get_add_chat_message_use_case,
     get_delete_session_use_case,
-    get_agent_use_case,
     get_process_chat_turn_use_case,
     get_session_lock_registry,
-    get_background_reflection_runner,
+    get_after_turn_runner,
     get_background_chat_stream_runner,
     get_turn_log_registry,
 )
@@ -221,7 +219,6 @@ async def decide_tool_proposal(
                 current_user=current_user,
                 content=decision.question,
                 queue=log,
-                agent_id=decision.agent_id,
                 decision={
                     "tool_call_id": tool_call_id,
                     "approved": payload.approved,
@@ -243,23 +240,18 @@ async def chat_turn(
     payload: ChatTurnRequest,
     process_use_case: ProcessChatTurnUseCase = Depends(get_process_chat_turn_use_case),
     prepare_uc: PrepareChatTurnUseCase = Depends(get_prepare_chat_turn_use_case),
-    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
-    reflection_runner = Depends(get_background_reflection_runner),
+    after_turn_runner = Depends(get_after_turn_runner),
     x_timezone: Optional[str] = Header(None, alias="X-Timezone"),
     current_user: User = Depends(get_current_user),
 ):
     """
     Execute a full multi-turn conversational inference cycle with autonomous tool execution.
-    Guarded by SessionLockRegistry (409 Conflict on concurrent turns).
-    Schedules autonomous memory reflection in the background.
+    Guarded by SessionLockRegistry (409 Conflict on concurrent turns). Memories are no longer
+    written after the turn: the reflection sweep reads the chat once it goes quiet (memory spec §2.2).
     """
     async with lock_registry.acquire(session_id):
-        session_entity, messages = await prepare_uc.execute(session_id, current_user)
-        is_first_turn = len(messages) == 0
-        agent_id = session_entity.agent_id or ""
-        agent = await agent_uc.execute(agent_id) if agent_id else None
-        agent_name = agent.name if agent else ""
+        await prepare_uc.execute(session_id, current_user)
 
         result = await process_use_case.execute(
             session_id=session_id,
@@ -268,27 +260,15 @@ async def chat_turn(
             timezone_name=x_timezone,
         )
 
-        # Only queues reflection; it runs after the lock is let go.
-        await reflection_runner(
-            session_id=session_id,
-            user_id=current_user.id,
-            username=current_user.full_name,
-            agent_id=agent_id,
-            agent_name=agent_name,
-            user_message=payload.content,
-            assistant_message=result.message.content,
-            is_secret_session=result.is_secret,
-            is_turn_secret=result.is_turn_secret,
-            is_first_turn=is_first_turn,
-            timezone_name=x_timezone,
-        )
+        # Only queues the history summary; it runs after the lock is let go.
+        await after_turn_runner(session_id=session_id, timezone_name=x_timezone)
 
         return ChatTurnResponse(
             message=SessionPresentationMapper.to_message_response(result.message),
             tool_calls=result.tools_executed,
             memories_created_count=0,
             suggest_secret_mode=result.suggest_secret_mode,
-            session_title=session_entity.title,
+            session_title=result.session_title,
         )
 
 
@@ -296,7 +276,6 @@ async def chat_turn(
 async def regenerate_answer(
     session_id: str,
     get_session_uc: GetSessionUseCase = Depends(get_session_use_case),
-    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
     turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
@@ -316,7 +295,7 @@ async def regenerate_answer(
         )
 
     try:
-        session_entity, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
+        _, messages = await get_session_uc.execute(session_id=session_id, current_user=current_user)
 
         last_message = messages[-1] if messages else None
         if last_message is None or last_message.role != "user":
@@ -325,11 +304,7 @@ async def regenerate_answer(
                 detail="There is no unanswered question in this conversation to answer again.",
             )
 
-        agent_id = session_entity.agent_id or ""
-        agent = await agent_uc.execute(agent_id) if agent_id else None
-        agent_name = agent.name if agent else ""
         question = last_message.content
-        is_first_turn = len(messages) == 1
     except Exception:
         await lock_registry.release(session_id)
         raise
@@ -343,9 +318,6 @@ async def regenerate_answer(
                 current_user=current_user,
                 content=question,
                 queue=log,
-                agent_id=agent_id,
-                agent_name=agent_name,
-                is_first_turn=is_first_turn,
                 regenerate=True,
                 timezone_name=x_timezone,
             )
@@ -362,7 +334,6 @@ async def chat_turn_stream(
     session_id: str,
     payload: ChatTurnRequest,
     prepare_uc: PrepareChatTurnUseCase = Depends(get_prepare_chat_turn_use_case),
-    agent_uc: GetAgentUseCase = Depends(get_agent_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
     stream_runner = Depends(get_background_chat_stream_runner),
     turn_logs: TurnLogRegistry = Depends(get_turn_log_registry),
@@ -382,11 +353,7 @@ async def chat_turn_stream(
         )
 
     try:
-        session_entity, messages = await prepare_uc.execute(session_id, current_user)
-        is_first_turn = len(messages) == 0
-        agent_id = session_entity.agent_id or ""
-        agent = await agent_uc.execute(agent_id) if agent_id else None
-        agent_name = agent.name if agent else ""
+        await prepare_uc.execute(session_id, current_user)
     except Exception:
         await lock_registry.release(session_id)
         raise
@@ -400,9 +367,6 @@ async def chat_turn_stream(
                 current_user=current_user,
                 content=payload.content,
                 queue=log,
-                agent_id=agent_id,
-                agent_name=agent_name,
-                is_first_turn=is_first_turn,
                 timezone_name=x_timezone,
             )
         finally:

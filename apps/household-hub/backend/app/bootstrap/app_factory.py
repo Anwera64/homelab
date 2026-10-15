@@ -15,6 +15,7 @@ from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCa
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app.domain.use_cases.auth.purge_expired_device_sessions import PurgeExpiredDeviceSessionsUseCase
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.reflection_sweep import ReflectionSweepUseCase
 from app.data.datasources import sqlite_vec_extension
 from app import __version__
 
@@ -56,6 +57,23 @@ async def periodic_trash_purger(interval_seconds: int = 3600):
             logger.error("Error in periodic trash purger: %s", e, exc_info=True)
 
 
+async def periodic_reflection_sweeper(interval_seconds: float = 60):
+    """
+    The reflection sweep (memory spec §2.2): wakes about once a minute and reflects the chats that
+    have gone quiet. A loop inside the hub rather than a cron job, because it has to see whether a
+    turn is running, and a turn starting cancels it. Each pass has a database session of its own.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            async with AsyncSessionLocal() as session:
+                await get_container(session)[ReflectionSweepUseCase].run_pass()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Error in the reflection sweep: %s", e, exc_info=True)
+
+
 async def fill_memory_vectors() -> None:
     """
     Gives stored memories the vectors they lack, after a change of embedding model or a spell with
@@ -73,6 +91,7 @@ async def lifespan(app: FastAPI):
     # Initialize DB schemas, seed baseline models, and start background workers on startup
     bg_task = None
     fill_task = None
+    sweep_task = None
     if settings.ENVIRONMENT != "testing":
         await init_db()
         async with AsyncSessionLocal() as session:
@@ -86,12 +105,19 @@ async def lifespan(app: FastAPI):
         bg_task = asyncio.create_task(periodic_trash_purger())
         # In the background: a slow embedder mustn't hold the hub's start.
         fill_task = asyncio.create_task(fill_memory_vectors())
+        sweep_task = asyncio.create_task(periodic_reflection_sweeper(settings.REFLECTION_SWEEP_SECONDS))
 
     try:
         yield
     finally:
         if fill_task and not fill_task.done():
             fill_task.cancel()
+        if sweep_task and not sweep_task.done():
+            sweep_task.cancel()
+            try:
+                await sweep_task
+            except asyncio.CancelledError:
+                pass
         if bg_task and not bg_task.done():
             bg_task.cancel()
             try:

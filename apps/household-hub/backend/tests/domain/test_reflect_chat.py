@@ -205,6 +205,7 @@ async def test_GIVEN_the_system_prompt_WHEN_read_THEN_it_says_only_the_member_is
     system = world.llm.calls[0]["messages"][0].content
     assert "Only what the member states" in system
     assert "never a source" in system
+    assert '"relevant_for"' in system
 
 
 # Cycle 9: comparing on write
