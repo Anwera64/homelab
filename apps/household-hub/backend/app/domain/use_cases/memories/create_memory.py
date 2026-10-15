@@ -4,6 +4,7 @@ from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
 from app.domain.exceptions import (
     EntityNotFoundException,
     ZeroLeakViolationException,
@@ -19,11 +20,14 @@ class CreateMemoryUseCase:
         session_repo: ISessionRepository,
         agent_repo: IAgentRepository,
         uow: IUnitOfWork,
+        embed_memories: Optional[EmbedMemoriesUseCase] = None,
     ):
         self.memory_repo = memory_repo
         self.session_repo = session_repo
         self.agent_repo = agent_repo
         self.uow = uow
+        # Gives the new memory its vectors, so recall can find it (memory spec §4.3).
+        self.embed_memories = embed_memories
 
     async def execute(
         self,
@@ -71,4 +75,6 @@ class CreateMemoryUseCase:
             created = await self.memory_repo.create(memory)
             await self.uow.commit()
 
+        if self.embed_memories:
+            await self.embed_memories.execute([created])
         return created

@@ -102,3 +102,22 @@ async def test_GIVEN_a_vector_count_mismatch_WHEN_embed_is_called_THEN_it_raises
         await embedder.embed(["hello", "world"])
     assert "2" in str(exc_info.value) and "1" in str(exc_info.value)
     await embedder.close()
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_keep_alive_WHEN_embedding_THEN_ollama_is_told_how_long_to_keep_the_model():
+    """The server's embedder may stay loaded, so recall never waits for it to load (Anton, 15 Oct)."""
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"embeddings": [[0.1]]})
+
+    kept = OllamaEmbedder(client=httpx.AsyncClient(transport=httpx.MockTransport(handler)), keep_alive=-1)
+    default = OllamaEmbedder(client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    await kept.embed(["a"])
+    await default.embed(["b"])
+
+    assert bodies[0]["keep_alive"] == -1
+    assert "keep_alive" not in bodies[1]

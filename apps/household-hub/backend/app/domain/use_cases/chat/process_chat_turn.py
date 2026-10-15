@@ -15,6 +15,7 @@ from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.tool_approval_repository import IToolApprovalRepository
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
+from app.domain.use_cases.memories.recall_memories import RECALLED, RecallMemoriesUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.entities.calendar_event import ALL
 from app.domain.use_cases.integrations import calendar_arguments
@@ -261,6 +262,7 @@ class ProcessChatTurnUseCase:
         answer_reserve_tokens: int = 4096,
         approval_repo: Optional[IToolApprovalRepository] = None,
         event_lookup: Optional[GetCalendarEventUseCase] = None,
+        recall: Optional[RecallMemoriesUseCase] = None,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -282,6 +284,24 @@ class ProcessChatTurnUseCase:
         self.approval_repo = approval_repo
         # Finds the event a remove or change card is about, so the card can name it. None: it can't.
         self.event_lookup = event_lookup
+        # Attaches memories the fixed block left out to a new message. None: no recall.
+        self.recall = recall
+
+    async def _recall(self, session, current_user: User, recent_messages: List[ChatMessage], is_turn_secret: bool):
+        """
+        Recall for the member's new message, the last of [recent_messages], saved on it (memory spec
+        §5.2). Only here: tool rounds, resumed turns and regenerating replay what the message carries.
+        """
+        if self.recall is None or not recent_messages or recent_messages[-1].role != "user":
+            return
+        recalled = await self.recall.execute(current_user.id, session.id, recent_messages, is_secret=is_turn_secret)
+        if not recalled:
+            return
+        question = recent_messages[-1]
+        async with self.uow:
+            question.metadata_json = {**(question.metadata_json or {}), RECALLED: recalled}
+            await self.session_repo.update_message(question)
+            await self.uow.commit()
 
     def _check_privacy_triggers(self, text: str) -> bool:
         lower_text = text.lower()
@@ -346,6 +366,7 @@ class ProcessChatTurnUseCase:
 
         # 3. Assemble Prompt & Context
         recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
+        await self._recall(session, current_user, recent_messages, is_turn_secret)
         llm_messages = await self.context_assembler.execute(
             user=current_user,
             agent=agent,
@@ -603,6 +624,7 @@ class ProcessChatTurnUseCase:
         yield {"type": "accepted"}
 
         recent_messages = await self.session_repo.get_messages_after(session.id, session.summarized_through_id)
+        await self._recall(session, current_user, recent_messages, privacy_trigger_detected or session.is_secret)
 
         async for event in self._answer_or_say_it_failed(
             session=session,

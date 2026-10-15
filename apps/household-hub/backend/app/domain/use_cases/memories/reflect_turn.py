@@ -12,6 +12,7 @@ from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.chat.current_date_line import current_date_line
+from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,8 @@ Return a valid JSON object ONLY with the following schema:
       "content": "concise statement of the fact/preference",
       "scope": "personal" | "household",
       "confidence": 0.0 to 1.0,
-      "expires_at": "ISO-8601 timestamp string, or null if it stays true"
+      "expires_at": "ISO-8601 timestamp string, or null if it stays true",
+      "relevant_for": ["up to 5 short situations where this matters, e.g. \"planning dinner\""]
     }
   ]
 }
@@ -36,6 +38,7 @@ Return a valid JSON object ONLY with the following schema:
 Guidelines:
 - Only extract persistent facts, preferences, or significant milestones. Do NOT extract ephemeral chatter.
 - Use "household" scope for what the rest of the household should know: events, schedules, deadlines, shared plans.
+- relevant_for lists the kinds of questions or plans this memory would help with, not the memory reworded.
 - Give expires_at to a memory that stops mattering on a date, such as an event or a deadline.
 - High confidence (>=0.7) should only be assigned to clear, factual, or explicit user statements.
 - Never output markdown formatting or commentary outside the JSON object.
@@ -51,6 +54,14 @@ DATE_RESOLUTION_GUIDANCE = (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _parse_relevant_for(value) -> Optional[List[str]]:
+    """The model's `relevant_for` list, without blanks or non-text items; None when there is nothing usable."""
+    if not isinstance(value, list):
+        return None
+    items = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return items[:5] or None
 
 
 def _parse_expiry(value) -> Optional[datetime]:
@@ -82,8 +93,11 @@ class ReflectTurnUseCase:
         model_resolver: ResolveAgentModelUseCase,
         confidence_threshold: float = 0.70,
         clock: Callable[[], datetime] = _utc_now,
+        embed_memories: Optional[EmbedMemoriesUseCase] = None,
     ):
         self.llm_client = llm_client
+        # Gives each new memory its vectors, so recall can find it (memory spec §4.3).
+        self.embed_memories = embed_memories
         self.memory_repo = memory_repo
         self.session_repo = session_repo
         self.uow = uow
@@ -199,6 +213,7 @@ class ReflectTurnUseCase:
                         source_session_id=session_id,
                         expires_at=_parse_expiry(item.get("expires_at")),
                         origin="reflection",
+                        relevant_for=_parse_relevant_for(item.get("relevant_for")),
                     )
                     created_mem = await self.memory_repo.create(mem)
                     memories_to_create.append(created_mem)
@@ -206,6 +221,9 @@ class ReflectTurnUseCase:
 
         async with self.uow:
             await self.uow.commit()
+
+        if self.embed_memories:
+            await self.embed_memories.execute(memories_to_create)
 
         return ReflectTurnResult(
             session_title=updated_title,

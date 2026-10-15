@@ -1,4 +1,4 @@
-import re
+import logging
 from typing import Callable, List, Optional
 from datetime import datetime, timezone
 
@@ -7,48 +7,27 @@ from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.session import ChatMessage
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
-from app.domain.entities.memory import AgentMemory
+from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase, MemoryBlock
+from app.domain.use_cases.memories.recall_memories import RECALLED
 from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import sent_at_stamp, today_line
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _sanitize_prompt_snippet(text: str, max_length: int = 500) -> str:
-    if not text:
-        return ""
-    patterns = [
-        r"(?i)\bsystem\s*:",
-        r"(?i)\bhuman\s*:",
-        r"(?i)\bassistant\s*:",
-        r"(?i)<\|.*?\|>",
-        r"###",
-        r"---",
-    ]
-    cleaned = text
-    for pattern in patterns:
-        cleaned = re.sub(pattern, " ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if len(cleaned) > max_length:
-        cleaned = cleaned[:max_length]
-    return cleaned
-
-
-def _unexpired(memories: List[AgentMemory], now: datetime) -> List[AgentMemory]:
-    """An expired memory is left out of the prompt (memory spec §3.1)."""
-
-    def expired(memory: AgentMemory) -> bool:
-        if memory.expires_at is None:
-            return False
-        # SQLite gives datetimes back without their zone; every one the hub writes is UTC.
-        expires_at = memory.expires_at if memory.expires_at.tzinfo else memory.expires_at.replace(tzinfo=timezone.utc)
-        return expires_at <= now
-
-    return [m for m in memories if not expired(m)]
+def _with_recalled(message: ChatMessage) -> str:
+    content = message.content or ""
+    recalled = [item for item in (message.metadata_json or {}).get(RECALLED) or [] if isinstance(item, dict)]
+    if message.role != "user" or not recalled:
+        return content
+    lines = "\n".join(f"- {item.get('text', '')}" for item in recalled)
+    return f"{content}\n\n[Memories that may help]:\n{lines}"
 
 
 class AssembleAgentContextUseCase:
@@ -59,6 +38,7 @@ class AssembleAgentContextUseCase:
         agent_repo: Optional[IAgentRepository] = None,
         history_tokens: int = 6000,
         clock: Callable[[], datetime] = _utc_now,
+        memory_block_tokens: int = 1000,
     ):
         self.memory_repo = memory_repo
         self.user_repo = user_repo
@@ -67,30 +47,11 @@ class AssembleAgentContextUseCase:
         self.history_tokens = history_tokens
         # Tells the agent what day it is. Injected so a test can fix it.
         self.clock = clock
-
-    async def _household_lines(self, memories: List[AgentMemory]) -> List[str]:
-        """
-        One line per household memory, saying who said it and to which agent (memory spec §3.2).
-        A member who has left is named in the past, so agents stop planning around them while what
-        they shared keeps their name on it. Names are looked up once per assembly, not per line.
-        """
-        members = {member.id: member for member in await self.user_repo.list_all()} if self.user_repo else {}
-        agent_names: dict = {}
-        for agent_id in {m.agent_id for m in memories if m.agent_id}:
-            agent = await self.agent_repo.get_by_id(agent_id) if self.agent_repo else None
-            agent_names[agent_id] = agent.name if agent else None
-
-        lines = []
-        for memory in memories:
-            member = members.get(memory.user_id)
-            source = _sanitize_prompt_snippet(member.full_name, max_length=50) if member else ""
-            source = source or "A member"
-            if member and not member.is_active:
-                source = f"{source}, who's no longer in the household,"
-            agent_name = _sanitize_prompt_snippet(agent_names.get(memory.agent_id) or "", max_length=50)
-            told = f"the {agent_name}" if agent_name else "an agent"
-            lines.append(f"- {source} said to {told}: {_sanitize_prompt_snippet(memory.content)}")
-        return lines
+        # The fixed block of memories, filled to a token budget (memory spec §5.1).
+        self.memory_block = BuildMemoryBlockUseCase(
+            memory_repo, user_repo=user_repo, agent_repo=agent_repo, budget_tokens=memory_block_tokens,
+            clock=lambda: self.clock(),
+        )
 
     async def execute(
         self,
@@ -103,17 +64,13 @@ class AssembleAgentContextUseCase:
         history_summary: Optional[str] = None,
     ) -> List[LLMMessage]:
         is_secret = is_secret_session or is_turn_secret
-        now = self.clock()
 
-        # 1. Fetch user personal memories
-        personal_memories = _unexpired(
-            await self.memory_repo.list_user_memories(user_id=user.id, scope="personal", active_only=True), now
+        block = await self.memory_block.execute(user.id, is_secret=is_secret)
+        logger.info(
+            "Memory block | member=%s tokens=%d/%d in=%d left_out=%d left_out_ids=%s",
+            user.id, block.tokens_used, block.budget_tokens, len(block.included), len(block.left_out),
+            ",".join(m.id for m in block.left_out),
         )
-
-        # 2. Fetch household memories (if not in secret mode). They are the household bus.
-        household_memories = []
-        if not is_secret:
-            household_memories = _unexpired(await self.memory_repo.list_household_memories(), now)
 
         # 4. Construct System Prompt with Attention-Optimized Boundary Ordering
         # --- PRIMACY ZONE (Top) ---
@@ -136,19 +93,7 @@ class AssembleAgentContextUseCase:
         # --- RECENCY ZONE (Bottom of system prompt, right above conversation turns) ---
         recency_lines = []
 
-        # Personal memories
-        if personal_memories:
-            recency_lines.append("[What I Know About You]:")
-            for m in personal_memories[:20]:
-                created_str = m.created_at.strftime("%b %Y") if hasattr(m, "created_at") and m.created_at else "Recent"
-                safe_content = _sanitize_prompt_snippet(m.content)
-                recency_lines.append(f"- [Added {created_str}] {safe_content} (confidence: {m.confidence:.2f})")
-
-        # Household memories, with who said them and an anti-echo tag. 25 is the 10 household
-        # memories and 15 milestones this replaces; the fixed block's token budget comes in its own PR.
-        if household_memories:
-            recency_lines.append("[Household Shared Knowledge - Do Not Re-Extract]:")
-            recency_lines.extend(await self._household_lines(household_memories[:25]))
+        recency_lines.extend(self._memory_lines(block))
 
         # Sandwich reminder for secret mode
         if is_secret:
@@ -174,19 +119,35 @@ class AssembleAgentContextUseCase:
             )
         # Each of the member's messages carries when it was sent, from its stored time, so it reads
         # the same on every later turn and the newest one tells the model the time now (#79).
+        # What recall attached to a message comes after its words, exactly as it was attached, so the
+        # prompt reads the same on every later turn (memory spec §5.2).
         for msg in self._newest_that_fit(recent_messages):
-            content = msg.content or ""
+            content = _with_recalled(msg)
             if msg.role == "user":
                 content = f"[Sent {sent_at_stamp(msg.created_at, timezone_name)}] {content}"
             llm_messages.append(LLMMessage(role=msg.role, content=content))
 
         return llm_messages
 
+    @staticmethod
+    def _memory_lines(block: MemoryBlock) -> List[str]:
+        """The block's memories under their two headings, a household line saying who said it."""
+        lines: List[str] = []
+        personal = [m for m in block.included if m.scope != "household"]
+        household = [m for m in block.included if m.scope == "household"]
+        if personal:
+            lines.append("[What I Know About You]:")
+            lines.extend(f"- {block.lines[m.id]}" for m in personal)
+        if household:
+            lines.append("[Household Shared Knowledge - Do Not Re-Extract]:")
+            lines.extend(f"- {block.lines[m.id]}" for m in household)
+        return lines
+
     def _newest_that_fit(self, messages: List[ChatMessage]) -> List[ChatMessage]:
         kept: List[ChatMessage] = []
         used = 0.0
         for msg in reversed(messages):
-            cost = estimate_tokens(msg.content)
+            cost = estimate_tokens(_with_recalled(msg))
             if kept and used + cost > self.history_tokens:
                 break
             kept.append(msg)

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 import httpx
 
 from app.domain.repositories.embedder import IEmbedder
@@ -12,12 +12,15 @@ class OllamaEmbedder(IEmbedder):
         model: str = "bge-m3",
         timeout_seconds: float = 60.0,
         client: Optional[httpx.AsyncClient] = None,
+        keep_alive: Optional[Union[int, str]] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds)
         self._owns_client = client is None
+        # Sent with every request when set; None leaves it to Ollama's own default.
+        self.keep_alive = keep_alive
 
     async def close(self) -> None:
         if self._owns_client and self._client:
@@ -29,6 +32,8 @@ class OllamaEmbedder(IEmbedder):
 
         url = f"{self.base_url}/api/embed"
         payload = {"model": self.model, "input": texts}
+        if self.keep_alive is not None:
+            payload["keep_alive"] = self.keep_alive
 
         try:
             resp = await self._client.post(url, json=payload)

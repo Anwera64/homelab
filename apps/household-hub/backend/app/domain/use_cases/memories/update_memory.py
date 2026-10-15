@@ -3,13 +3,21 @@ from app.domain.entities.user import User
 from app.domain.entities.memory import AgentMemory
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
 from app.domain.exceptions import EntityNotFoundException, ZeroLeakViolationException
 
 
 class UpdateMemoryUseCase:
-    def __init__(self, memory_repo: IMemoryRepository, uow: IUnitOfWork):
+    def __init__(
+        self,
+        memory_repo: IMemoryRepository,
+        uow: IUnitOfWork,
+        embed_memories: Optional[EmbedMemoriesUseCase] = None,
+    ):
         self.memory_repo = memory_repo
         self.uow = uow
+        # A reworded memory means something else, so it is embedded again (memory spec §4.3).
+        self.embed_memories = embed_memories
 
     async def execute(
         self,
@@ -33,6 +41,7 @@ class UpdateMemoryUseCase:
             if memory.user_id != current_user.id and not current_user.is_admin:
                 raise ZeroLeakViolationException("Only the author or a Household Admin can modify shared household memories.")
 
+        reworded = content is not None and content != memory.content
         async with self.uow:
             if content is not None:
                 memory.content = content
@@ -44,4 +53,6 @@ class UpdateMemoryUseCase:
             updated = await self.memory_repo.update(memory)
             await self.uow.commit()
 
+        if reworded and self.embed_memories:
+            await self.embed_memories.execute([updated])
         return updated

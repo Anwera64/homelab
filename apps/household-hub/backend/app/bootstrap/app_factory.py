@@ -14,6 +14,8 @@ from app.domain.use_cases.agents.seed_builtin_agents import SeedBuiltinAgentsUse
 from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCase
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app.domain.use_cases.auth.purge_expired_device_sessions import PurgeExpiredDeviceSessionsUseCase
+from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.data.datasources import sqlite_vec_extension
 from app import __version__
 
 logger = logging.getLogger("household_hub.bootstrap")
@@ -54,10 +56,23 @@ async def periodic_trash_purger(interval_seconds: int = 3600):
             logger.error("Error in periodic trash purger: %s", e, exc_info=True)
 
 
+async def fill_memory_vectors() -> None:
+    """
+    Gives stored memories the vectors they lack, after a change of embedding model or a spell with
+    the embedder down (memory spec §4.3). It also loads the embedder, which then stays loaded.
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            await get_container(session)[EmbedMemoriesUseCase].fill_missing()
+    except Exception as e:
+        logger.error("Filling memory vectors at startup failed: %s", e, exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB schemas, seed baseline models, and start background workers on startup
     bg_task = None
+    fill_task = None
     if settings.ENVIRONMENT != "testing":
         await init_db()
         async with AsyncSessionLocal() as session:
@@ -67,11 +82,16 @@ async def lifespan(app: FastAPI):
             await container[pres_deps.get_shared_space_use_case].execute()
             await container[PurgeExpiredTrashAgentsUseCase].execute()
             await container[PurgeExpiredDeviceSessionsUseCase].execute()
+        logger.info("Memory search | sqlite-vec loaded=%s", sqlite_vec_extension.loaded())
         bg_task = asyncio.create_task(periodic_trash_purger())
+        # In the background: a slow embedder mustn't hold the hub's start.
+        fill_task = asyncio.create_task(fill_memory_vectors())
 
     try:
         yield
     finally:
+        if fill_task and not fill_task.done():
+            fill_task.cancel()
         if bg_task and not bg_task.done():
             bg_task.cancel()
             try:
