@@ -80,12 +80,6 @@ from app.domain.use_cases.integrations.manage_documents import (
 )
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
-from app.domain.use_cases.gossip.publish_gossip_milestone import PublishGossipMilestoneUseCase
-from app.domain.use_cases.gossip.manage_gossip_milestones import (
-    ListHouseholdMilestonesUseCase,
-    ListUserMilestonesAuditUseCase,
-    RevokeGossipMilestoneUseCase,
-)
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
@@ -311,18 +305,6 @@ _turn_log_registry = TurnLogRegistry()
 
 def get_turn_log_registry() -> TurnLogRegistry:
     return _turn_log_registry
-
-def get_publish_gossip_milestone_use_case() -> PublishGossipMilestoneUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
-
-def get_list_household_milestones_use_case() -> ListHouseholdMilestonesUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
-
-def get_list_user_milestones_audit_use_case() -> ListUserMilestonesAuditUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
-
-def get_revoke_gossip_milestone_use_case() -> RevokeGossipMilestoneUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_assemble_agent_context_use_case() -> AssembleAgentContextUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")

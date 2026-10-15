@@ -247,14 +247,9 @@ class SecretDecryptionException(DomainException):
     pass
 
 
-# Stage 3 AI & Gossip Exceptions
+# Stage 3 AI Exceptions
 class LLMInferenceException(DomainException):
     """Raised when LLM inference fails, times out, or returns an error."""
-    pass
-
-
-class GossipPublicationException(DomainException):
-    """Raised when publishing a milestone to the Gossip Bus fails."""
     pass
 
 

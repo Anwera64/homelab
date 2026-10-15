@@ -2,7 +2,6 @@ package com.homelab.household.data.mapper
 
 import com.homelab.household.data.dto.AgentReadDto
 import com.homelab.household.data.dto.ChatMessageReadDto
-import com.homelab.household.data.dto.GossipMilestoneDto
 import com.homelab.household.data.dto.MemberProfileDto
 import com.homelab.household.data.dto.MemoryReadDto
 import com.homelab.household.data.dto.SessionReadDto
@@ -439,27 +438,5 @@ class DataMappersTest {
         assertEquals("mem-1", mem.id)
         assertEquals("Vegetarian", mem.content)
         assertEquals(MemoryScope.PERSONAL, mem.scope)
-    }
-
-    @Test
-    fun gossip_mapper_converts_dto_to_domain() {
-        val dto =
-            GossipMilestoneDto(
-                id = "gm-1",
-                source_user_id = "u-1",
-                source_username = "alice",
-                reporting_agent_id = "ag-1",
-                reporting_agent_name = "Life Coordinator",
-                target_scope = "household",
-                category = "event",
-                summary = "Trip to Madrid",
-                is_active = true,
-                created_at = "2026-09-08T02:00:00Z",
-            )
-        val milestone = GossipDataMapper.toDomain(dto)
-
-        assertEquals("gm-1", milestone.id)
-        assertEquals("alice", milestone.sourceUsername)
-        assertEquals("Trip to Madrid", milestone.summary)
     }
 }

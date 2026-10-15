@@ -4,7 +4,6 @@ import com.homelab.household.data.datasource.local.KeychainSessionStorage
 import com.homelab.household.data.datasource.local.StoredSessionLocalDataSource
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
-import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
@@ -63,7 +62,6 @@ class IosPlatformModuleTest : KoinTest {
         assertNotNull(get<AgentRepository>())
         assertNotNull(get<SpaceRepository>())
         assertNotNull(get<MemoryRepository>())
-        assertNotNull(get<GossipRepository>())
 
         // Use cases
         assertNotNull(get<LoginUseCase>())

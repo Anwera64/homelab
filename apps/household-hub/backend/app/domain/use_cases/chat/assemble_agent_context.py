@@ -7,7 +7,8 @@ from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.session import ChatMessage
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.repositories.memory_repository import IMemoryRepository
-from app.domain.repositories.gossip_repository import IGossipRepository
+from app.domain.entities.memory import AgentMemory
+from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import sent_at_stamp, today_line
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
@@ -37,28 +38,59 @@ def _sanitize_prompt_snippet(text: str, max_length: int = 500) -> str:
     return cleaned
 
 
+def _unexpired(memories: List[AgentMemory], now: datetime) -> List[AgentMemory]:
+    """An expired memory is left out of the prompt (memory spec §3.1)."""
+
+    def expired(memory: AgentMemory) -> bool:
+        if memory.expires_at is None:
+            return False
+        # SQLite gives datetimes back without their zone; every one the hub writes is UTC.
+        expires_at = memory.expires_at if memory.expires_at.tzinfo else memory.expires_at.replace(tzinfo=timezone.utc)
+        return expires_at <= now
+
+    return [m for m in memories if not expired(m)]
+
+
 class AssembleAgentContextUseCase:
     def __init__(
         self,
         memory_repo: IMemoryRepository,
-        gossip_repo: IGossipRepository,
         user_repo: Optional[IUserRepository] = None,
+        agent_repo: Optional[IAgentRepository] = None,
         history_tokens: int = 6000,
         clock: Callable[[], datetime] = _utc_now,
     ):
         self.memory_repo = memory_repo
-        self.gossip_repo = gossip_repo
         self.user_repo = user_repo
+        self.agent_repo = agent_repo
         # How much of the window the conversation's own messages may take, word for word.
         self.history_tokens = history_tokens
         # Tells the agent what day it is. Injected so a test can fix it.
         self.clock = clock
 
-    async def _active_member_ids(self) -> Optional[set]:
-        """Who is still here, or None when nobody asked us to tell the difference."""
-        if not self.user_repo:
-            return None
-        return {member.id for member in await self.user_repo.list_active()}
+    async def _household_lines(self, memories: List[AgentMemory]) -> List[str]:
+        """
+        One line per household memory, saying who said it and to which agent (memory spec §3.2).
+        A member who has left is named in the past, so agents stop planning around them while what
+        they shared keeps their name on it. Names are looked up once per assembly, not per line.
+        """
+        members = {member.id: member for member in await self.user_repo.list_all()} if self.user_repo else {}
+        agent_names: dict = {}
+        for agent_id in {m.agent_id for m in memories if m.agent_id}:
+            agent = await self.agent_repo.get_by_id(agent_id) if self.agent_repo else None
+            agent_names[agent_id] = agent.name if agent else None
+
+        lines = []
+        for memory in memories:
+            member = members.get(memory.user_id)
+            source = _sanitize_prompt_snippet(member.full_name, max_length=50) if member else ""
+            source = source or "A member"
+            if member and not member.is_active:
+                source = f"{source}, who's no longer in the household,"
+            agent_name = _sanitize_prompt_snippet(agent_names.get(memory.agent_id) or "", max_length=50)
+            told = f"the {agent_name}" if agent_name else "an agent"
+            lines.append(f"- {source} said to {told}: {_sanitize_prompt_snippet(memory.content)}")
+        return lines
 
     async def execute(
         self,
@@ -71,21 +103,17 @@ class AssembleAgentContextUseCase:
         history_summary: Optional[str] = None,
     ) -> List[LLMMessage]:
         is_secret = is_secret_session or is_turn_secret
+        now = self.clock()
 
         # 1. Fetch user personal memories
-        personal_memories = await self.memory_repo.list_user_memories(
-            user_id=user.id, scope="personal", active_only=True
+        personal_memories = _unexpired(
+            await self.memory_repo.list_user_memories(user_id=user.id, scope="personal", active_only=True), now
         )
 
-        # 2. Fetch household memories (if not in secret mode)
+        # 2. Fetch household memories (if not in secret mode). They are the household bus.
         household_memories = []
         if not is_secret:
-            household_memories = await self.memory_repo.list_household_memories()
-
-        # 3. Fetch active non-expired gossip milestones
-        household_milestones = []
-        if not is_secret:
-            household_milestones = await self.gossip_repo.get_active_household_milestones(limit=15)
+            household_memories = _unexpired(await self.memory_repo.list_household_memories(), now)
 
         # 4. Construct System Prompt with Attention-Optimized Boundary Ordering
         # --- PRIMACY ZONE (Top) ---
@@ -102,7 +130,7 @@ class AssembleAgentContextUseCase:
         if is_secret:
             primacy_lines.append(
                 "[CONFIDENTIALITY NOTICE - SECRET MODE ACTIVE]: This conversation is strictly private. "
-                "Do NOT share anything discussed to the household or gossip bus. External write tools are restricted."
+                "Do NOT share anything discussed with the household. External write tools are restricted."
             )
 
         # --- RECENCY ZONE (Bottom of system prompt, right above conversation turns) ---
@@ -116,26 +144,11 @@ class AssembleAgentContextUseCase:
                 safe_content = _sanitize_prompt_snippet(m.content)
                 recency_lines.append(f"- [Added {created_str}] {safe_content} (confidence: {m.confidence:.2f})")
 
-        # Household memories
+        # Household memories, with who said them and an anti-echo tag. 25 is the 10 household
+        # memories and 15 milestones this replaces; the fixed block's token budget comes in its own PR.
         if household_memories:
-            recency_lines.append("[Household Shared Knowledge]:")
-            for hm in household_memories[:10]:
-                safe_content = _sanitize_prompt_snippet(hm.content)
-                recency_lines.append(f"- {safe_content}")
-
-        # Household milestones with provenance attribution and anti-echo tags
-        if household_milestones:
-            # A member who has left is named in the past, so agents stop planning around them while
-            # what they shared keeps their name on it.
-            who_is_still_here = await self._active_member_ids()
-            recency_lines.append("[Injected Household Context - Do Not Re-Extract]:")
-            for gm in household_milestones:
-                reporting = _sanitize_prompt_snippet(gm.reporting_agent_name, max_length=50) or "an agent"
-                source = _sanitize_prompt_snippet(gm.source_username, max_length=50) or "A member"
-                if who_is_still_here is not None and gm.source_user_id not in who_is_still_here:
-                    source = f"{source}, who's no longer in the household,"
-                safe_summary = _sanitize_prompt_snippet(gm.summary)
-                recency_lines.append(f"- {source} mentioned to the {reporting}: {safe_summary}")
+            recency_lines.append("[Household Shared Knowledge - Do Not Re-Extract]:")
+            recency_lines.extend(await self._household_lines(household_memories[:25]))
 
         # Sandwich reminder for secret mode
         if is_secret:

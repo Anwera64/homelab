@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, Float, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from app.data.models.base import Base
@@ -23,6 +23,14 @@ class MemoryModel(Base):
     confidence = Column(Float, default=1.0, nullable=False)
     source_session_id = Column(String(36), ForeignKey("conversation_sessions.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    # Memory spec §3.1.
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    origin = Column(String(16), default="reflection", server_default="reflection", nullable=False)  # 'reflection', 'tool', 'manual'
+    relevant_for = Column(JSON, nullable=True)
+    event_id = Column(String(255), nullable=True, index=True)
+    replaced_by_id = Column(String(36), ForeignKey("agent_memories.id", ondelete="SET NULL"), nullable=True)
+    retired_at = Column(DateTime(timezone=True), nullable=True)
+    moved_from = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 

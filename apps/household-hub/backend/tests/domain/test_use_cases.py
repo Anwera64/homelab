@@ -318,6 +318,17 @@ async def test_create_memory_blocked_if_secret_session():
 
 
 @pytest.mark.asyncio
+async def test_a_memory_a_member_adds_is_manual():
+    """Memory spec §3.1: origin says how a memory got there; one added through the API is manual."""
+    mem_repo = FakeMemoryRepository()
+    use_case = CreateMemoryUseCase(mem_repo, FakeSessionRepository([]), FakeAgentRepository([]), FakeUnitOfWork())
+
+    created = await use_case.execute(user_id="u1", scope="household", content="Bins go out on Monday")
+
+    assert created.origin == "manual"
+
+
+@pytest.mark.asyncio
 async def test_get_memory_zero_leak_enforced():
     from app.domain.use_cases.memories.get_memory import GetMemoryUseCase
     from app.domain.exceptions import ZeroLeakViolationException

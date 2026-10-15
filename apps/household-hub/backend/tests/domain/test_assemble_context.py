@@ -7,7 +7,6 @@ from app.domain.entities.user import User
 from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.session import ChatMessage, ConversationSession
 from app.domain.entities.memory import AgentMemory
-from app.domain.entities.gossip_milestone import GossipMilestone
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 
 
@@ -23,16 +22,12 @@ class FakeMemoryRepository:
         return [m for m in self.household if m.is_active]
 
 
-class FakeGossipRepository:
-    def __init__(self, milestones=None):
-        self.milestones = milestones or []
+class FakeAgentRepository:
+    def __init__(self, agents=None):
+        self.agents = {a.id: a for a in agents or []}
 
-    async def get_active_household_milestones(self, limit=50, now=None):
-        current_time = now or datetime.now(timezone.utc)
-        return [
-            m for m in self.milestones
-            if m.is_active and not m.is_expired(current_time)
-        ][:limit]
+    async def get_by_id(self, agent_id):
+        return self.agents.get(agent_id)
 
 
 @pytest.mark.asyncio
@@ -55,22 +50,19 @@ async def test_assemble_context_primacy_and_recency_layout():
         confidence=0.95,
         created_at=now,
     )
-    milestone = GossipMilestone(
-        id="gm1",
-        source_user_id="u2",
-        source_username="maria",
-        reporting_agent_name="Academic Researcher",
-        category="milestone",
-        summary="UPC Studio Jury is on Friday Oct 14th",
+    shared = AgentMemory(
+        id="hm1",
+        user_id="u2",
+        agent_id="researcher",
+        scope="household",
+        content="UPC Studio Jury is on Friday Oct 14th",
         created_at=now,
     )
 
-    mem_repo = FakeMemoryRepository(personal=[personal_mem])
-    gossip_repo = FakeGossipRepository(milestones=[milestone])
-
     use_case = AssembleAgentContextUseCase(
-        memory_repo=mem_repo,
-        gossip_repo=gossip_repo,
+        memory_repo=FakeMemoryRepository(personal=[personal_mem], household=[shared]),
+        user_repo=FakeUserRepository([user, User(id="u2", full_name="maria")]),
+        agent_repo=FakeAgentRepository([AgentPersonality(id="researcher", name="Academic Researcher")]),
     )
 
     messages = [
@@ -93,21 +85,22 @@ async def test_assemble_context_primacy_and_recency_layout():
     assert "You are a helpful homelab coordinator." in system_msg.content
     assert "You are speaking with Alex Rivera." in system_msg.content
 
-    # Recency check: Memories and Anti-Echo Milestones placed with provenance
+    # Recency check: memories, and household memories with who said them (memory spec §3.2)
     assert "[What I Know About You]" in system_msg.content
     assert "Prefers almond milk with matcha" in system_msg.content
-    assert "[Injected Household Context - Do Not Re-Extract]" in system_msg.content
-    assert "maria mentioned to the Academic Researcher: UPC Studio Jury is on Friday Oct 14th" in system_msg.content
+    assert "[Household Shared Knowledge - Do Not Re-Extract]" in system_msg.content
+    assert "- maria said to the Academic Researcher: UPC Studio Jury is on Friday Oct 14th" in system_msg.content
 
 
 @pytest.mark.asyncio
 async def test_assemble_context_secret_mode_sandwich_prompting():
     user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot")
-    mem_repo = FakeMemoryRepository()
-    gossip_repo = FakeGossipRepository()
+    mem_repo = FakeMemoryRepository(
+        household=[AgentMemory(user_id="u2", scope="household", content="Sam's birthday is in May")]
+    )
 
-    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo, gossip_repo=gossip_repo)
+    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo)
 
     messages = [ChatMessage(role="user", content="Planning a surprise gift")]
     llm_messages = await use_case.execute(
@@ -122,25 +115,28 @@ async def test_assemble_context_secret_mode_sandwich_prompting():
     assert "SECRET MODE ACTIVE" in system_msg.content
     # Check sandwich reminder at bottom of prompt before user message
     assert "[Reminder: Secret Mode is active" in system_msg.content
+    # A secret chat reads nothing the household shared
+    assert "Sam's birthday" not in system_msg.content
 
 
 @pytest.mark.asyncio
-async def test_assemble_context_filters_expired_milestones():
+async def test_assemble_context_leaves_out_expired_memories():
+    """Memory spec §3.1: an expired memory is left out of the prompt, household or personal."""
     user = User(id="u1", full_name="Alex Rivera")
     agent = AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot")
     now = datetime.now(timezone.utc)
 
-    expired_milestone = GossipMilestone(
-        id="gm_exp",
-        source_user_id="u2",
-        source_username="maria",
-        summary="Yesterday's deadline",
-        expires_at=now - timedelta(days=1),
+    mem_repo = FakeMemoryRepository(
+        personal=[
+            AgentMemory(user_id="u1", content="Dentist yesterday", expires_at=now - timedelta(hours=1)),
+            AgentMemory(user_id="u1", content="Dentist next week", expires_at=now + timedelta(days=7)),
+        ],
+        household=[
+            AgentMemory(user_id="u2", scope="household", content="Yesterday's deadline", expires_at=now - timedelta(days=1)),
+        ],
     )
-    mem_repo = FakeMemoryRepository()
-    gossip_repo = FakeGossipRepository(milestones=[expired_milestone])
 
-    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo, gossip_repo=gossip_repo)
+    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo)
 
     messages = [ChatMessage(role="user", content="Hello")]
     llm_messages = await use_case.execute(
@@ -152,6 +148,8 @@ async def test_assemble_context_filters_expired_milestones():
 
     system_msg = llm_messages[0]
     assert "Yesterday's deadline" not in system_msg.content
+    assert "Dentist yesterday" not in system_msg.content
+    assert "Dentist next week" in system_msg.content
 
 
 @pytest.mark.asyncio
@@ -167,9 +165,8 @@ async def test_assemble_context_sanitizes_injection_markers():
         confidence=0.9,
     )
     mem_repo = FakeMemoryRepository(personal=[malicious_mem])
-    gossip_repo = FakeGossipRepository()
 
-    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo, gossip_repo=gossip_repo)
+    use_case = AssembleAgentContextUseCase(memory_repo=mem_repo)
     messages = [ChatMessage(role="user", content="Hello")]
     llm_messages = await use_case.execute(user=user, agent=agent, recent_messages=messages)
 
@@ -189,6 +186,9 @@ class FakeUserRepository:
     async def list_active(self):
         return [u for u in self.users if u.is_active]
 
+    async def list_all(self):
+        return list(self.users)
+
 
 @pytest.mark.asyncio
 async def test_facts_from_a_member_who_left_are_told_in_the_past():
@@ -196,27 +196,45 @@ async def test_facts_from_a_member_who_left_are_told_in_the_past():
     emma = User(id="emma", full_name="Emma")
     liam = User(id="liam", full_name="Liam", is_active=False)
     agent = AgentPersonality(id="a1", slug="assistant", name="Home Coordinator", system_prompt="Help out.")
-    milestones = [
-        GossipMilestone(source_user_id="liam", source_username="Liam", reporting_agent_name="Home Coordinator",
-                        summary="Liam is back by seven"),
-        GossipMilestone(source_user_id="emma", source_username="Emma", reporting_agent_name="Home Coordinator",
-                        summary="Emma swims on Tuesdays"),
+    household = [
+        AgentMemory(user_id="liam", agent_id="a1", scope="household", content="Liam is back by seven"),
+        AgentMemory(user_id="emma", agent_id="a1", scope="household", content="Emma swims on Tuesdays"),
     ]
     use_case = AssembleAgentContextUseCase(
-        FakeMemoryRepository(),
-        FakeGossipRepository(milestones),
+        FakeMemoryRepository(household=household),
         user_repo=FakeUserRepository([emma, liam]),
+        agent_repo=FakeAgentRepository([agent]),
     )
 
     system_prompt = (await use_case.execute(user=emma, agent=agent, recent_messages=[]))[0].content
 
-    assert "Liam, who's no longer in the household, mentioned" in system_prompt
-    assert "Emma mentioned" in system_prompt
+    assert "- Liam, who's no longer in the household, said to the Home Coordinator: Liam is back by seven" in system_prompt
+    assert "- Emma said to the Home Coordinator: Emma swims on Tuesdays" in system_prompt
+
+
+@pytest.mark.asyncio
+async def test_a_fact_whose_agent_was_purged_was_said_to_an_agent():
+    """Memory spec §3.2: the name copies on a milestone are gone, so a purged agent reads "an agent"."""
+    emma = User(id="emma", full_name="Emma")
+    agent = AgentPersonality(id="a1", name="Assistant")
+    use_case = AssembleAgentContextUseCase(
+        FakeMemoryRepository(household=[
+            AgentMemory(user_id="emma", agent_id="gone", scope="household", content="The boiler is serviced in November"),
+            AgentMemory(user_id="emma", agent_id=None, scope="household", content="Bins go out on Monday"),
+        ]),
+        user_repo=FakeUserRepository([emma]),
+        agent_repo=FakeAgentRepository([]),
+    )
+
+    system_prompt = (await use_case.execute(user=emma, agent=agent, recent_messages=[]))[0].content
+
+    assert "- Emma said to an agent: The boiler is serviced in November" in system_prompt
+    assert "- Emma said to an agent: Bins go out on Monday" in system_prompt
 
 
 def _assembler(history_tokens: int = 6000) -> AssembleAgentContextUseCase:
     return AssembleAgentContextUseCase(
-        memory_repo=FakeMemoryRepository(), gossip_repo=FakeGossipRepository(), history_tokens=history_tokens
+        memory_repo=FakeMemoryRepository(), history_tokens=history_tokens
     )
 
 
@@ -281,10 +299,9 @@ async def test_GIVEN_a_question_bigger_than_the_budget_WHEN_assembled_THEN_it_is
 FIXED_NOW = datetime(2026, 9, 24, 20, 5, tzinfo=timezone.utc)
 
 
-def _dated_assembler(memories=None, milestones=None):
+def _dated_assembler(memories=None):
     return AssembleAgentContextUseCase(
         memory_repo=FakeMemoryRepository(personal=memories or []),
-        gossip_repo=FakeGossipRepository(milestones=milestones or []),
         clock=lambda: FIXED_NOW,
     )
 
@@ -371,7 +388,7 @@ async def test_a_minute_later_the_prompt_only_grows_so_ollama_can_keep_its_cache
 
     def assembler_at(now):
         return AssembleAgentContextUseCase(
-            memory_repo=FakeMemoryRepository(), gossip_repo=FakeGossipRepository(), clock=lambda: now
+            memory_repo=FakeMemoryRepository(), clock=lambda: now
         )
 
     first = await assembler_at(FIXED_NOW).execute(

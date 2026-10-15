@@ -25,7 +25,6 @@ from app.data.datasources.llm_model_data_source import SqliteLLMModelDataSource
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
 from app.data.datasources.tool_approval_data_source import SqliteToolApprovalDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
-from app.data.datasources.gossip_data_source import SqliteGossipDataSource
 from app.data.datasources.invite_data_source import SqliteInviteDataSource
 from app.data.datasources.pin_reset_data_source import SqlitePinResetDataSource
 from app.data.datasources.device_session_data_source import SqliteDeviceSessionDataSource
@@ -41,7 +40,6 @@ from app.data.mappers.llm_model_data_mapper import LLMModelDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
 from app.data.mappers.tool_approval_data_mapper import ToolApprovalDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
-from app.data.mappers.gossip_data_mapper import GossipDataMapper
 from app.data.mappers.invite_data_mapper import InviteDataMapper
 from app.data.mappers.pin_reset_data_mapper import PinResetDataMapper
 from app.data.mappers.device_session_data_mapper import DeviceSessionDataMapper
@@ -57,7 +55,6 @@ from app.data.repositories.llm_model_repository_impl import LLMModelRepositoryIm
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
 from app.data.repositories.tool_approval_repository_impl import ToolApprovalRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
-from app.data.repositories.gossip_repository_impl import GossipRepositoryImpl
 from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
 from app.data.repositories.pin_reset_repository_impl import PinResetRepositoryImpl
 from app.data.repositories.device_session_repository_impl import DeviceSessionRepositoryImpl
@@ -166,12 +163,6 @@ from app.domain.use_cases.integrations.manage_documents import (
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
 
-from app.domain.use_cases.gossip.publish_gossip_milestone import PublishGossipMilestoneUseCase
-from app.domain.use_cases.gossip.manage_gossip_milestones import (
-    ListHouseholdMilestonesUseCase,
-    ListUserMilestonesAuditUseCase,
-    RevokeGossipMilestoneUseCase,
-)
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.tool_approval import DropPendingProposalsUseCase
 from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, PrepareToolDecisionUseCase
@@ -202,7 +193,6 @@ _llm_model_mapper = LLMModelDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
 _tool_approval_mapper = ToolApprovalDataMapper()
 _document_mapper = DocumentDataMapper()
-_gossip_mapper = GossipDataMapper()
 _invite_mapper = InviteDataMapper()
 _pin_reset_mapper = PinResetDataMapper()
 _device_session_mapper = DeviceSessionDataMapper()
@@ -261,7 +251,6 @@ def get_container(session: AsyncSession):
     llm_model_ds = SqliteLLMModelDataSource(session)
     calendar_cred_ds = SqliteCalendarCredentialDataSource(session)
     document_ds = SqliteDocumentDataSource(session)
-    gossip_ds = SqliteGossipDataSource(session)
     invite_ds = SqliteInviteDataSource(session)
     pin_reset_ds = SqlitePinResetDataSource(session)
     device_session_ds = SqliteDeviceSessionDataSource(session)
@@ -277,7 +266,6 @@ def get_container(session: AsyncSession):
     calendar_cred_repo = CalendarCredentialRepositoryImpl(calendar_cred_ds, _calendar_cred_mapper)
     tool_approval_repo = ToolApprovalRepositoryImpl(SqliteToolApprovalDataSource(session), _tool_approval_mapper)
     document_repo = DocumentRepositoryImpl(document_ds, _document_mapper)
-    gossip_repo = GossipRepositoryImpl(gossip_ds, _gossip_mapper)
     invite_repo = InviteRepositoryImpl(invite_ds, _invite_mapper)
     pin_reset_repo = PinResetRepositoryImpl(pin_reset_ds, _pin_reset_mapper)
     device_session_repo = DeviceSessionRepositoryImpl(device_session_ds, _device_session_mapper)
@@ -303,8 +291,8 @@ def get_container(session: AsyncSession):
 
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
-        gossip_repo=gossip_repo,
         user_repo=user_repo,
+        agent_repo=agent_repo,
         history_tokens=settings.HISTORY_TOKENS,
     )
 
@@ -351,7 +339,6 @@ def get_container(session: AsyncSession):
     reflect_turn_uc = ReflectTurnUseCase(
         llm_client=_ollama_connector,
         memory_repo=memory_repo,
-        gossip_repo=gossip_repo,
         session_repo=session_repo,
         uow=uow,
         model_resolver=model_resolver,
@@ -616,11 +603,7 @@ def get_container(session: AsyncSession):
             calendar_secrets=calendar_secrets,
         ),
 
-        # Gossip Bus & Stage 3 Chat
-        pres_deps.get_publish_gossip_milestone_use_case: PublishGossipMilestoneUseCase(gossip_repo, uow),
-        pres_deps.get_list_household_milestones_use_case: ListHouseholdMilestonesUseCase(gossip_repo),
-        pres_deps.get_list_user_milestones_audit_use_case: ListUserMilestonesAuditUseCase(gossip_repo),
-        pres_deps.get_revoke_gossip_milestone_use_case: RevokeGossipMilestoneUseCase(gossip_repo, uow),
+        # Stage 3 Chat
         pres_deps.get_assemble_agent_context_use_case: context_assembler,
         pres_deps.get_process_chat_turn_use_case: chat_turn_uc,
         pres_deps.get_reflect_turn_use_case: reflect_turn_uc,
@@ -719,10 +702,6 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_delete_document_use_case,
         pres_deps.get_list_available_tools_use_case,
         pres_deps.get_execute_tool_use_case,
-        pres_deps.get_publish_gossip_milestone_use_case,
-        pres_deps.get_list_household_milestones_use_case,
-        pres_deps.get_list_user_milestones_audit_use_case,
-        pres_deps.get_revoke_gossip_milestone_use_case,
         pres_deps.get_assemble_agent_context_use_case,
         pres_deps.get_process_chat_turn_use_case,
         pres_deps.get_reflect_turn_use_case,

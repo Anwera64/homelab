@@ -320,3 +320,108 @@ def test_GIVEN_a_researcher_prompt_someone_rewrote_WHEN_migrated_THEN_it_is_left
 
     assert result["upgraded"] == {"researcher": "You only read Spanish sources."}
     assert result["downgraded"] == {"researcher": "You only read Spanish sources."}
+
+
+_BEFORE_ONE_STORE = "6f2a8d4c9e17"
+
+
+def test_one_store_starts_empty():
+    """
+    GIVEN a hub with a chat, a message and a memory WHEN migrated THEN chats, messages and memories
+    are empty and the proposals table exists (memory spec §3.3, §3.5). Nothing is carried over: the
+    hub is a development environment.
+    """
+    from sqlalchemy import inspect, text
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "one-store.db"
+        database_url = f"sqlite:///{db_path}"
+        config = _alembic_config(database_url)
+        command.upgrade(config, _BEFORE_ONE_STORE)
+
+        engine = create_engine(database_url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, full_name, hashed_pin, avatar_color, is_admin, is_active, "
+                        "failed_pin_attempts, token_version, created_at, updated_at) "
+                        "VALUES ('emma', 'Emma', 'x', 'sage', 1, 1, 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO conversation_sessions (id, user_id, title, is_secret, is_archived, "
+                        "created_at, updated_at) VALUES ('chat', 'emma', 'Boiler', 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO chat_messages (id, session_id, role, content, metadata_json, created_at) "
+                        "VALUES ('msg', 'chat', 'user', 'hi', '{}', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO agent_memories (id, user_id, scope, category, content, confidence, "
+                        "is_active, created_at, updated_at) "
+                        "VALUES ('mem', 'emma', 'household', 'fact', 'Boiler in November', 1.0, 1, "
+                        "'2026-01-01', '2026-01-01')"
+                    )
+                )
+
+            command.upgrade(config, "head")
+
+            with engine.connect() as conn:
+                for table in ("conversation_sessions", "chat_messages", "agent_memories"):
+                    assert conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() == 0, table
+                assert conn.execute(text("SELECT COUNT(*) FROM users")).scalar() == 1
+
+                assert "memory_proposals" in set(inspect(conn).get_table_names())
+
+            command.downgrade(config, _BEFORE_ONE_STORE)
+
+            with engine.connect() as conn:
+                assert "memory_proposals" not in set(inspect(conn).get_table_names())
+        finally:
+            engine.dispose()
+
+
+def test_the_gossip_bus_is_dropped():
+    """GIVEN a hub with milestones WHEN migrated THEN their table is gone; downgrading brings it back empty."""
+    from sqlalchemy import inspect, text
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "no-gossip.db"
+        config = _alembic_config(f"sqlite:///{db_path}")
+        command.upgrade(config, _BEFORE_ONE_STORE)
+
+        engine = create_engine(f"sqlite:///{db_path}")
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, full_name, hashed_pin, avatar_color, is_admin, is_active, "
+                        "failed_pin_attempts, token_version, created_at, updated_at) "
+                        "VALUES ('emma', 'Emma', 'x', 'sage', 1, 1, 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO gossip_milestones (id, source_user_id, source_username, "
+                        "reporting_agent_name, target_scope, category, summary, details_json, is_active, "
+                        "created_at, updated_at) VALUES ('gm', 'emma', 'Emma', 'Planner', 'household', "
+                        "'milestone', 'Boiler', '{}', 1, '2026-01-01', '2026-01-01')"
+                    )
+                )
+
+            command.upgrade(config, "head")
+            with engine.connect() as conn:
+                assert "gossip_milestones" not in set(inspect(conn).get_table_names())
+
+            command.downgrade(config, _BEFORE_ONE_STORE)
+            with engine.connect() as conn:
+                assert "gossip_milestones" in set(inspect(conn).get_table_names())
+                assert conn.execute(text("SELECT COUNT(*) FROM gossip_milestones")).scalar() == 0
+        finally:
+            engine.dispose()

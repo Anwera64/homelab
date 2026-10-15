@@ -5,10 +5,8 @@ import logging
 import re
 from typing import Callable, List, Optional
 
-from app.domain.entities.gossip_milestone import GossipMilestone
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.entities.memory import AgentMemory
-from app.domain.repositories.gossip_repository import IGossipRepository
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
@@ -19,7 +17,7 @@ from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUse
 logger = logging.getLogger(__name__)
 
 EXTRACTION_SYSTEM_PROMPT = """You are an autonomous memory reflection engine for a household AI assistant.
-Your task is to analyze the conversation turn and extract long-term memories and broadcastable household milestones.
+Your task is to analyze the conversation turn and extract long-term memories.
 
 Return a valid JSON object ONLY with the following schema:
 {
@@ -29,20 +27,16 @@ Return a valid JSON object ONLY with the following schema:
       "category": "preference" | "fact" | "milestone" | "health" | "project",
       "content": "concise statement of the fact/preference",
       "scope": "personal" | "household",
-      "confidence": 0.0 to 1.0
-    }
-  ],
-  "milestones": [
-    {
-      "category": "milestone" | "schedule_constraint" | "academic_deadline" | "dietary_preference" | "project_update",
-      "summary": "Brief broadcastable summary of important household event, schedule, or deadline",
-      "expires_at": "ISO-8601 timestamp string or null"
+      "confidence": 0.0 to 1.0,
+      "expires_at": "ISO-8601 timestamp string, or null if it stays true"
     }
   ]
 }
 
 Guidelines:
 - Only extract persistent facts, preferences, or significant milestones. Do NOT extract ephemeral chatter.
+- Use "household" scope for what the rest of the household should know: events, schedules, deadlines, shared plans.
+- Give expires_at to a memory that stops mattering on a date, such as an event or a deadline.
 - High confidence (>=0.7) should only be assigned to clear, factual, or explicit user statements.
 - Never output markdown formatting or commentary outside the JSON object.
 """
@@ -51,7 +45,7 @@ Guidelines:
 # Kept apart from EXTRACTION_SYSTEM_PROMPT so that prompt stays the same on every call.
 DATE_RESOLUTION_GUIDANCE = (
     "Write dates as absolute dates: turn relative ones such as \"tomorrow\" or \"on Friday\" into the "
-    "calendar date they mean, in memories and milestones alike, and count expires_at from today."
+    "calendar date they mean, and count expires_at from today."
 )
 
 
@@ -59,12 +53,22 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _parse_expiry(value) -> Optional[datetime]:
+    """An ISO-8601 expiry as the model wrote it; anything unreadable means the memory doesn't expire."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 @dataclass
 class ReflectTurnResult:
     session_title: Optional[str] = None
     memories_created: List[AgentMemory] = field(default_factory=list)
     memories_updated: List[AgentMemory] = field(default_factory=list)
-    milestones_created: List[GossipMilestone] = field(default_factory=list)
 
 
 
@@ -73,7 +77,6 @@ class ReflectTurnUseCase:
         self,
         llm_client: ILLMClient,
         memory_repo: IMemoryRepository,
-        gossip_repo: IGossipRepository,
         session_repo: ISessionRepository,
         uow: IUnitOfWork,
         model_resolver: ResolveAgentModelUseCase,
@@ -82,7 +85,6 @@ class ReflectTurnUseCase:
     ):
         self.llm_client = llm_client
         self.memory_repo = memory_repo
-        self.gossip_repo = gossip_repo
         self.session_repo = session_repo
         self.uow = uow
         self.confidence_threshold = confidence_threshold
@@ -108,7 +110,7 @@ class ReflectTurnUseCase:
         prompt = (
             f"User '{username}': {user_message}\n"
             f"Assistant '{agent_name}': {assistant_message}\n\n"
-            f"First turn: {is_first_turn}. Please extract title, memories, and milestones in JSON format."
+            f"First turn: {is_first_turn}. Please extract title and memories in JSON format."
         )
 
         messages = [
@@ -131,7 +133,6 @@ class ReflectTurnUseCase:
 
         memories_to_create: List[AgentMemory] = []
         memories_to_update: List[AgentMemory] = []
-        milestones_to_create: List[GossipMilestone] = []
         updated_title: Optional[str] = None
 
         is_secret = is_secret_session or is_turn_secret
@@ -196,62 +197,12 @@ class ReflectTurnUseCase:
                         content=mem_content,
                         confidence=conf,
                         source_session_id=session_id,
+                        expires_at=_parse_expiry(item.get("expires_at")),
+                        origin="reflection",
                     )
                     created_mem = await self.memory_repo.create(mem)
                     memories_to_create.append(created_mem)
                     existing_memories.append(created_mem)
-
-        # 3. Extract milestones (strictly dropped if secret)
-        if not is_secret:
-            raw_milestones = parsed.get("milestones", [])
-            if isinstance(raw_milestones, list):
-                active_milestones = await self.gossip_repo.get_active_household_milestones()
-                for item in raw_milestones:
-                    if not isinstance(item, dict):
-                        continue
-                    raw_summary = str(item.get("summary", "")).strip()
-                    if not raw_summary:
-                        continue
-
-                    category = str(item.get("category", "milestone")).lower()
-                    expires_at_val = item.get("expires_at")
-                    exp_dt = None
-                    if expires_at_val:
-                        try:
-                            exp_str = str(expires_at_val).replace("Z", "+00:00")
-                            exp_dt = datetime.fromisoformat(exp_str)
-                        except Exception:
-                            exp_dt = None
-
-                    milestone = GossipMilestone(
-                        source_user_id=user_id,
-                        source_username=username,
-                        reporting_agent_id=agent_id,
-                        reporting_agent_name=agent_name,
-                        category=category,
-                        summary=raw_summary,
-                        expires_at=exp_dt,
-                        source_session_id=session_id,
-                    )
-
-                    # Sanitize summary to strip prompt injection delimiters
-                    sanitized_summary = milestone.sanitize()
-                    if not sanitized_summary:
-                        continue
-                    milestone.summary = sanitized_summary
-
-                    # Check for duplicates among active milestones
-                    normalized_summary = sanitized_summary.lower()
-                    is_duplicate = any(
-                        m.summary.strip().lower() == normalized_summary
-                        for m in active_milestones
-                    )
-                    if is_duplicate:
-                        continue
-
-                    published = await self.gossip_repo.publish(milestone)
-                    milestones_to_create.append(published)
-                    active_milestones.append(published)
 
         async with self.uow:
             await self.uow.commit()
@@ -260,7 +211,6 @@ class ReflectTurnUseCase:
             session_title=updated_title,
             memories_created=memories_to_create,
             memories_updated=memories_to_update,
-            milestones_created=milestones_to_create,
         )
 
 

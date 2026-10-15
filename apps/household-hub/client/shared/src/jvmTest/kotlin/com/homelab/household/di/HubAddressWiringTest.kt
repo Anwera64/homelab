@@ -6,7 +6,6 @@ import com.homelab.household.data.datasource.remote.`interface`.ServerStatusRemo
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
-import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.SessionRepository
 import com.homelab.household.domain.repository.SpaceRepository
@@ -67,7 +66,6 @@ class HubAddressWiringTest : KoinTest {
                     "AgentRepository" to { get<AgentRepository>().listAgents() },
                     "SpaceRepository" to { get<SpaceRepository>().getHouseholdSpace() },
                     "MemoryRepository" to { get<MemoryRepository>().auditMemories() },
-                    "GossipRepository" to { get<GossipRepository>().listHouseholdMilestones() },
                     "ServerStatusRemoteDataSource" to { get<ServerStatusRemoteDataSource>().checkHealth() },
                 )
 

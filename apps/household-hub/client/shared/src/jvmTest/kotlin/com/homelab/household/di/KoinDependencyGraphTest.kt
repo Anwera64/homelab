@@ -6,7 +6,6 @@ import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.CalendarRepository
-import com.homelab.household.domain.repository.GossipRepository
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.repository.ServerStatusRepository
 import com.homelab.household.domain.repository.SessionRepository
@@ -58,7 +57,6 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<AgentRepository>())
         assertNotNull(get<SpaceRepository>())
         assertNotNull(get<MemoryRepository>())
-        assertNotNull(get<GossipRepository>())
         assertNotNull(get<CalendarRepository>())
 
         // Use cases

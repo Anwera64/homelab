@@ -1,11 +1,9 @@
 package com.homelab.household.presentation.memoryaudit
 
 import com.homelab.household.domain.model.AgentMemory
-import com.homelab.household.domain.model.HouseholdMilestone
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.usecase.AuditMemoriesUseCase
 import com.homelab.household.domain.usecase.RevokeMemoryUseCase
-import com.homelab.household.domain.usecase.RevokeMilestoneUseCase
 import com.homelab.household.domain.usecase.UpdateMemoryUseCase
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
@@ -32,7 +30,6 @@ class MemoryAuditViewModelTest {
     private val auditMemoriesUseCase = mock<AuditMemoriesUseCase>()
     private val deleteMemoryUseCase = mock<RevokeMemoryUseCase>()
     private val updateMemoryUseCase = mock<UpdateMemoryUseCase>()
-    private val revokeMilestoneUseCase = mock<RevokeMilestoneUseCase>()
 
     private lateinit var viewModel: MemoryAuditViewModel
 
@@ -44,7 +41,6 @@ class MemoryAuditViewModelTest {
                 auditMemoriesUseCase = auditMemoriesUseCase,
                 deleteMemoryUseCase = deleteMemoryUseCase,
                 updateMemoryUseCase = updateMemoryUseCase,
-                revokeMilestoneUseCase = revokeMilestoneUseCase,
             )
     }
 
@@ -86,16 +82,5 @@ class MemoryAuditViewModelTest {
             advanceUntilIdle()
 
             verifySuspend { deleteMemoryUseCase("mem-1") }
-        }
-
-    @Test
-    fun revoke_milestone_calls_usecase() =
-        runTest(testDispatcher) {
-            everySuspend { revokeMilestoneUseCase("mile-1") } returns Unit
-
-            viewModel.revokeMilestone("mile-1")
-            advanceUntilIdle()
-
-            verifySuspend { revokeMilestoneUseCase("mile-1") }
         }
 }

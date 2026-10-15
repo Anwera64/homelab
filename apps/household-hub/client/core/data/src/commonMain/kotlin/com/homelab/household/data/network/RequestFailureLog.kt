@@ -78,7 +78,6 @@ private val fixedSegments =
         "chat",
         "decision",
         "google",
-        "gossip",
         "health",
         "household",
         "integrations",
