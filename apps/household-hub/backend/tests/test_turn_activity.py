@@ -54,8 +54,11 @@ async def test_GIVEN_a_listener_WHEN_a_turn_starts_THEN_it_is_told():
     activity = HubTurnActivity()
     registry = SessionLockRegistry(turn_activity=activity)
     started = []
-    activity.on_turn_start(lambda: started.append(True))
+    stop = activity.on_turn_start(lambda: started.append(True))
 
+    assert await registry.try_acquire("chat-1")
+    stop()
+    await registry.release("chat-1")
     assert await registry.try_acquire("chat-1")
 
     assert started == [True]

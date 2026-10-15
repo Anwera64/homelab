@@ -1,10 +1,11 @@
 import logging
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Optional
 
 from app.domain.entities.memory import AgentMemory
 from app.domain.entities.user import User
 from app.domain.exceptions import EntityNotFoundException, ZeroLeakViolationException
+from app.domain.repositories.memory_proposal_repository import IMemoryProposalRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 
@@ -22,10 +23,18 @@ class RetireMemoryUseCase:
     household memory either.
     """
 
-    def __init__(self, memory_repo: IMemoryRepository, uow: IUnitOfWork, clock: Callable[[], datetime] = _utc_now):
+    def __init__(
+        self,
+        memory_repo: IMemoryRepository,
+        uow: IUnitOfWork,
+        clock: Callable[[], datetime] = _utc_now,
+        proposal_repo: Optional[IMemoryProposalRepository] = None,
+    ):
         self.memory_repo = memory_repo
         self.uow = uow
         self.clock = clock
+        # A removed memory's pending proposals are dropped, not answered (memory spec §3.5).
+        self.proposal_repo = proposal_repo
 
     async def execute(self, memory_id: str, current_user: User) -> AgentMemory:
         memory = await self.memory_repo.get_by_id(memory_id)
@@ -39,6 +48,11 @@ class RetireMemoryUseCase:
             memory.is_active = False
             memory.retired_at = self.clock()
             memory = await self.memory_repo.update(memory)
+            dropped = await self.proposal_repo.drop_pending_for(memory_id) if self.proposal_repo else []
             await self.uow.commit()
+        for proposal_id in dropped:
+            logger.info(
+                "Memory proposal dropped | memory=%s proposal=%s reason=memory_removed", memory_id, proposal_id
+            )
         logger.info("Memory removed | member=%s memory=%s", current_user.id, memory_id)
         return memory

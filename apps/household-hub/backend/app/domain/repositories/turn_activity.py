@@ -16,6 +16,7 @@ class ITurnActivity(Protocol):
     def any_running(self) -> bool:
         ...
 
-    def on_turn_start(self, listener: Callable[[], None]) -> None:
-        """Calls [listener] each time a turn starts, at once and on the event loop."""
+    def on_turn_start(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Calls [listener] each time a turn starts, at once and on the event loop. Returns the
+        function that stops it."""
         ...

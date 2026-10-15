@@ -33,5 +33,11 @@ class HubTurnActivity(ITurnActivity):
     def any_running(self) -> bool:
         return self._running > 0 or self._after_turn_busy()
 
-    def on_turn_start(self, listener: Callable[[], None]) -> None:
+    def on_turn_start(self, listener: Callable[[], None]) -> Callable[[], None]:
         self._listeners.append(listener)
+
+        def stop() -> None:
+            if listener in self._listeners:
+                self._listeners.remove(listener)
+
+        return stop
