@@ -57,7 +57,9 @@ from app.domain.use_cases.memories.list_household_memories import ListHouseholdM
 from app.domain.use_cases.memories.get_memory import GetMemoryUseCase
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
-from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
+from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
+from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
+from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
 
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
@@ -242,7 +244,13 @@ def get_create_memory_use_case() -> CreateMemoryUseCase:
 def get_update_memory_use_case() -> UpdateMemoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
-def get_delete_memory_use_case() -> DeleteMemoryUseCase:
+def get_list_memory_page_use_case() -> ListMemoryPageUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_retire_memory_use_case() -> RetireMemoryUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_restore_memory_use_case() -> RestoreMemoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_configure_calendar_use_case() -> ConfigureCalendarUseCase:

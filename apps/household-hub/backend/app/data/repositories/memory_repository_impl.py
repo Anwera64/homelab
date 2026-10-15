@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from app.domain.entities.memory import AgentMemory
 from app.domain.repositories.memory_repository import IMemoryRepository
@@ -34,6 +35,14 @@ class MemoryRepositoryImpl(IMemoryRepository):
         models = await self.data_source.list_household_memories(category=category)
         return [self.mapper.to_domain(m) for m in models]
 
+    async def list_current_personal(self, user_id: str, now: datetime) -> List[AgentMemory]:
+        models = await self.data_source.list_current(now, scope="personal", user_id=user_id)
+        return [self.mapper.to_domain(m) for m in models]
+
+    async def list_current_household(self, now: datetime) -> List[AgentMemory]:
+        models = await self.data_source.list_current(now, scope="household")
+        return [self.mapper.to_domain(m) for m in models]
+
     async def get_by_id(self, memory_id: str) -> Optional[AgentMemory]:
         model = await self.data_source.get_by_id(memory_id)
         return self.mapper.to_domain(model) if model else None
@@ -49,6 +58,7 @@ class MemoryRepositoryImpl(IMemoryRepository):
             model.content = memory.content
             model.confidence = memory.confidence
             model.is_active = memory.is_active
+            model.retired_at = memory.retired_at
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
         else:

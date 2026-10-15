@@ -135,7 +135,9 @@ from app.domain.use_cases.memories.list_household_memories import ListHouseholdM
 from app.domain.use_cases.memories.get_memory import GetMemoryUseCase
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
-from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
+from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
+from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
+from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
 
 # Integration Use Cases
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
@@ -566,7 +568,9 @@ def get_container(session: AsyncSession):
         pres_deps.get_memory_use_case: GetMemoryUseCase(memory_repo),
         pres_deps.get_create_memory_use_case: CreateMemoryUseCase(memory_repo, session_repo, agent_repo, uow),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow),
-        pres_deps.get_delete_memory_use_case: DeleteMemoryUseCase(memory_repo, uow),
+        pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(memory_repo, user_repo, agent_repo),
+        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow),
+        pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
 
         # Integrations
         pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(
@@ -684,7 +688,9 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_memory_use_case,
         pres_deps.get_create_memory_use_case,
         pres_deps.get_update_memory_use_case,
-        pres_deps.get_delete_memory_use_case,
+        pres_deps.get_list_memory_page_use_case,
+        pres_deps.get_retire_memory_use_case,
+        pres_deps.get_restore_memory_use_case,
         pres_deps.get_configure_calendar_use_case,
         pres_deps.get_user_calendar_use_case,
         pres_deps.get_delete_calendar_use_case,

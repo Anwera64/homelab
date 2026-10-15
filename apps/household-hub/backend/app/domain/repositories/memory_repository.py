@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol, List, Optional
 from app.domain.entities.memory import AgentMemory
 
@@ -17,6 +18,14 @@ class IMemoryRepository(Protocol):
         self,
         category: Optional[str] = None,
     ) -> List[AgentMemory]:
+        ...
+
+    async def list_current_personal(self, user_id: str, now: datetime) -> List[AgentMemory]:
+        """The member's active, unexpired personal memories, newest first."""
+        ...
+
+    async def list_current_household(self, now: datetime) -> List[AgentMemory]:
+        """Every active, unexpired household memory, newest first."""
         ...
 
     async def get_by_id(self, memory_id: str) -> Optional[AgentMemory]:
