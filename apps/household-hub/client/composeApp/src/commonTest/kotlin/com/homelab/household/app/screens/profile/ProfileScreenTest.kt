@@ -245,6 +245,33 @@ class ProfileScreenTest {
     }
 
     @Test
+    fun `GIVEN memories on the hub WHEN the profile is shown THEN the Memories row counts them and opens the memory page`() {
+        // GIVEN
+        val hub =
+            FakeMembersHub().apply {
+                remembers("p1", "Likes tea")
+                remembers("p2", "Studies architecture")
+                remembers("h1", "Bins go out on Wednesday", household = true, mine = false)
+            }
+        var opened = 0
+
+        runScreenTest {
+            profileScreen(hub, onMemories = { opened++ })
+
+            onProfile {
+                seesTheMemoryHeading()
+                seesMemoryCounts(yours = 2, household = 1)
+
+                // WHEN
+                tapsMemories()
+            }
+
+            // THEN
+            waitUntil(timeoutMillis = wait) { opened == 1 }
+        }
+    }
+
+    @Test
     fun `GIVEN agents add events without asking WHEN the profile is shown THEN the agents row counts it and opens When agents act`() {
         // GIVEN
         val hub = FakeMembersHub().apply { addsEventsAutomatically() }

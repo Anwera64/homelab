@@ -13,7 +13,7 @@ import com.homelab.household.presentation.join.JoinViewModel
 import com.homelab.household.presentation.launch.LaunchViewModel
 import com.homelab.household.presentation.leavehousehold.LeaveHouseholdViewModel
 import com.homelab.household.presentation.members.MembersViewModel
-import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
+import com.homelab.household.presentation.memories.MemoriesViewModel
 import com.homelab.household.presentation.pinapprove.PinApproveViewModel
 import com.homelab.household.presentation.pinentry.PinEntryViewModel
 import com.homelab.household.presentation.pinforgot.PinForgotViewModel
@@ -46,11 +46,11 @@ val presentationModule =
         factory { ChatsViewModel(get()) }
         factory { DashboardViewModel(get(), get(), get(), get()) }
         factory { LaunchViewModel(get(), get()) }
-        factory { MemoryAuditViewModel(get(), get(), get()) }
+        factory { MemoriesViewModel(get(), get(), get(), get()) }
         factory { FirstRunViewModel(get()) }
         factory { ProfilePickerViewModel(get()) }
         factory { InviteCodeViewModel(get()) }
-        factory { ProfileViewModel(get(), get(), get(), get(), get(), get()) }
+        factory { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
         factory { WhenAgentsActViewModel(get(), get()) }
         factory { MembersViewModel(get(), get()) }
         factory { InviteCreateViewModel(get()) }

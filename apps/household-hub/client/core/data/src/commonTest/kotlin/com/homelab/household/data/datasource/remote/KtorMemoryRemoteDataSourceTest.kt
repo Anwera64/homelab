@@ -1,7 +1,6 @@
 package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
-import com.homelab.household.data.dto.MemoryUpdateDto
 import com.homelab.household.domain.exception.ServerOfflineException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -12,7 +11,6 @@ import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.errors.IOException
@@ -23,20 +21,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
-/** The wire for what the agents remember about the household and its members. */
+/** The wire for the memory page: the list, ✕ and Undo. */
 class KtorMemoryRemoteDataSourceTest {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val memoryJson = """{
-        "id": "mem-1",
-        "user_id": "emma",
-        "agent_id": "a-1",
-        "content": "Emma prefers tea over coffee",
-        "category": "fact",
-        "scope": "personal",
-        "confidence": 0.9,
-        "is_active": true,
-        "created_at": "2026-09-13T00:00:00Z"
+    private val pageJson = """{
+        "yours": [{
+            "id": "mem-1",
+            "content": "Studio Jury on Friday 17 October, 09:00.",
+            "scope": "personal",
+            "origin": "reflection",
+            "created_at": "2026-10-13T09:00:00",
+            "expires_at": "2026-10-17T10:00:00Z",
+            "speaker_id": "emma",
+            "speaker_name": "Emma",
+            "is_mine": true,
+            "agent_name": "Researcher",
+            "agent_avatar": "📚",
+            "can_remove": true
+        }],
+        "household": []
     }"""
 
     private fun MockRequestHandleScope.respondJson(
@@ -50,129 +54,76 @@ class KtorMemoryRemoteDataSourceTest {
             baseUrl = DEFAULT_BASE_URL,
         )
 
-    private fun assertSameJson(
-        expected: String,
-        actual: String?,
-    ) = assertEquals(Json.parseToJsonElement(expected), Json.parseToJsonElement(actual ?: "null"))
-
     private fun unreachableHub() = MockEngine { throw IOException("Connection refused") }
 
-    // ---- auditMemories ------------------------------------------------------
-
     @Test
-    fun `GIVEN a scope to audit WHEN memories are asked for THEN it is sent as a query parameter`() =
+    fun `GIVEN the hub WHEN the memory page is asked for THEN both tabs come back from its page address`() =
         runTest {
-            // GIVEN
-            var path: String? = null
-            var query: String? = null
-            val engine =
-                MockEngine { request ->
-                    path = request.url.encodedPath
-                    query = request.url.parameters["scope"]
-                    respondJson("[$memoryJson]")
-                }
-
-            // WHEN
-            val memories = dataSource(engine).auditMemories("personal")
-
-            // THEN
-            assertEquals("/api/v1/memories", path)
-            assertEquals("personal", query)
-            assertEquals(1, memories.size)
-            assertEquals("mem-1", memories.first().id)
-        }
-
-    @Test
-    fun `GIVEN no scope WHEN every memory is audited THEN no scope parameter is sent`() =
-        runTest {
-            // GIVEN
-            var query: String? = null
-            var hadQuery = true
-            val engine =
-                MockEngine { request ->
-                    hadQuery = request.url.parameters.contains("scope")
-                    query = request.url.parameters["scope"]
-                    respondJson("[$memoryJson]")
-                }
-
-            // WHEN
-            dataSource(engine).auditMemories(null)
-
-            // THEN
-            assertEquals(false, hadQuery)
-            assertNull(query)
-        }
-
-    @Test
-    fun `GIVEN the hub cannot be reached WHEN memories are audited THEN it is reported as offline`() =
-        runTest {
-            // GIVEN
-            val engine = unreachableHub()
-
-            // WHEN / THEN
-            assertFailsWith<ServerOfflineException> { dataSource(engine).auditMemories(null) }
-        }
-
-    // ---- deleteMemory -------------------------------------------------------
-
-    @Test
-    fun `GIVEN a memory nobody wants kept WHEN it is deleted THEN its own address is asked to remove it`() =
-        runTest {
-            // GIVEN
             var path: String? = null
             var method: HttpMethod? = null
             val engine =
                 MockEngine { request ->
                     path = request.url.encodedPath
                     method = request.method
-                    respondJson("""{"message": "Memory deleted"}""")
+                    respondJson(pageJson)
                 }
 
-            // WHEN
-            dataSource(engine).deleteMemory("mem-1")
+            val page = dataSource(engine).getMemoryPage()
 
-            // THEN
+            assertEquals("/api/v1/memories/page", path)
+            assertEquals(HttpMethod.Get, method)
+            assertEquals("mem-1", page.yours.single().id)
+            assertEquals("📚", page.yours.single().agent_avatar)
+            assertEquals("2026-10-17T10:00:00Z", page.yours.single().expires_at)
+            assertEquals(emptyList(), page.household)
+        }
+
+    @Test
+    fun `GIVEN a memory WHEN it is removed THEN its own address is asked to delete it`() =
+        runTest {
+            var path: String? = null
+            var method: HttpMethod? = null
+            val engine =
+                MockEngine { request ->
+                    path = request.url.encodedPath
+                    method = request.method
+                    respond("", HttpStatusCode.NoContent)
+                }
+
+            dataSource(engine).removeMemory("mem-1")
+
             assertEquals("/api/v1/memories/mem-1", path)
             assertEquals(HttpMethod.Delete, method)
         }
 
-    // ---- updateMemory ---------------------------------------------------------
-
     @Test
-    fun `GIVEN changes to a memory WHEN it is updated THEN they are patched to that memory's own address`() =
+    fun `GIVEN a removed memory WHEN it is restored THEN its restore address is posted to`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var method: HttpMethod? = null
-            var sent: String? = null
+            var hadBody: String? = "unset"
             val engine =
                 MockEngine { request ->
                     path = request.url.encodedPath
                     method = request.method
-                    sent = (request.body as TextContent).text
-                    respondJson(memoryJson)
+                    hadBody = null
+                    respondJson("""{"id": "mem-1", "user_id": "emma", "content": "x", "is_active": true}""")
                 }
-            val update = MemoryUpdateDto(content = "Emma prefers tea", confidence = 0.95f, is_active = true)
 
-            // WHEN
-            val memory = dataSource(engine).updateMemory("mem-1", update)
+            dataSource(engine).restoreMemory("mem-1")
 
-            // THEN
-            assertEquals("/api/v1/memories/mem-1", path)
-            assertEquals(HttpMethod.Patch, method)
-            assertSameJson("""{"content": "Emma prefers tea", "confidence": 0.95, "is_active": true}""", sent)
-            assertEquals("mem-1", memory.id)
+            assertEquals("/api/v1/memories/mem-1/restore", path)
+            assertEquals(HttpMethod.Post, method)
+            assertNull(hadBody)
         }
 
     @Test
-    fun `GIVEN the hub cannot be reached WHEN a memory is updated THEN it is reported as offline`() =
+    fun `GIVEN the hub cannot be reached WHEN any memory call is made THEN it is reported as offline`() =
         runTest {
-            // GIVEN
-            val engine = unreachableHub()
+            val source = dataSource(unreachableHub())
 
-            // WHEN / THEN
-            assertFailsWith<ServerOfflineException> {
-                dataSource(engine).updateMemory("mem-1", MemoryUpdateDto(content = "Emma prefers tea"))
-            }
+            assertFailsWith<ServerOfflineException> { source.getMemoryPage() }
+            assertFailsWith<ServerOfflineException> { source.removeMemory("mem-1") }
+            assertFailsWith<ServerOfflineException> { source.restoreMemory("mem-1") }
         }
 }

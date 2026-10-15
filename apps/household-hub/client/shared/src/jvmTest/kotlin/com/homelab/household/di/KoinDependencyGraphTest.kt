@@ -20,7 +20,7 @@ import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.dashboard.DashboardViewModel
 import com.homelab.household.presentation.firstrun.FirstRunViewModel
 import com.homelab.household.presentation.launch.LaunchViewModel
-import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
+import com.homelab.household.presentation.memories.MemoriesViewModel
 import com.homelab.household.presentation.pinentry.PinEntryViewModel
 import com.homelab.household.presentation.profile.ProfileViewModel
 import com.homelab.household.presentation.profilepicker.ProfilePickerViewModel
@@ -70,7 +70,7 @@ class KoinDependencyGraphTest : KoinTest {
         assertNotNull(get<ChatSessionViewModel>())
         assertNotNull(get<DashboardViewModel>())
         assertNotNull(get<LaunchViewModel>())
-        assertNotNull(get<MemoryAuditViewModel>())
+        assertNotNull(get<MemoriesViewModel>())
         assertNotNull(get<FirstRunViewModel>())
         assertNotNull(get<ProfilePickerViewModel>())
         assertNotNull(get<ProfileViewModel>())

@@ -3,12 +3,13 @@ package com.homelab.household.data.mapper
 import com.homelab.household.data.dto.AgentReadDto
 import com.homelab.household.data.dto.ChatMessageReadDto
 import com.homelab.household.data.dto.MemberProfileDto
-import com.homelab.household.data.dto.MemoryReadDto
+import com.homelab.household.data.dto.MemoryPageItemDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.Member
+import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.SpaceType
@@ -19,7 +20,10 @@ import com.homelab.household.domain.model.ToolSummary
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
+@OptIn(ExperimentalTime::class)
 class DataMappersTest {
     @Test
     fun user_mapper_converts_dto_to_domain() {
@@ -421,22 +425,52 @@ class DataMappersTest {
     }
 
     @Test
-    fun memory_mapper_converts_dto_to_domain() {
+    fun `GIVEN a memory page row WHEN it is mapped THEN its times and origin and expiry come across`() {
         val dto =
-            MemoryReadDto(
+            MemoryPageItemDto(
                 id = "mem-1",
-                user_id = "u-1",
-                agent_id = "ag-1",
-                content = "Vegetarian",
-                category = "preference",
+                content = "Studio Jury on Friday 17 October, 09:00.",
                 scope = "personal",
-                confidence = 0.9f,
-                is_active = true,
+                origin = "tool",
+                created_at = "2026-10-13T09:00:00.123456",
+                expires_at = "2026-10-17T10:00:00+00:00",
+                speaker_id = "emma",
+                speaker_name = "Emma",
+                is_mine = true,
+                agent_name = "Researcher",
+                agent_avatar = "📚",
+                can_remove = true,
             )
-        val mem = MemoryDataMapper.toDomain(dto)
 
-        assertEquals("mem-1", mem.id)
-        assertEquals("Vegetarian", mem.content)
-        assertEquals(MemoryScope.PERSONAL, mem.scope)
+        val memory = MemoryDataMapper.toDomain(dto)
+
+        // The hub's SQLite hands back times without a zone; every one it writes is UTC.
+        assertEquals(Instant.parse("2026-10-13T09:00:00.123456Z"), memory.createdAt)
+        assertEquals(Instant.parse("2026-10-17T10:00:00Z"), memory.expiresAt)
+        assertEquals(MemoryOrigin.Tool, memory.origin)
+        assertEquals(MemoryScope.PERSONAL, memory.scope)
+        assertEquals("Researcher", memory.agentName)
+    }
+
+    @Test
+    fun `GIVEN an origin this phone doesn't know WHEN it is mapped THEN it reads as reflection`() {
+        val dto =
+            MemoryPageItemDto(
+                id = "mem-1",
+                content = "x",
+                scope = "household",
+                origin = "imported",
+                created_at = "2026-10-13T09:00:00Z",
+                speaker_id = "liam",
+                speaker_name = "Liam",
+                agent_name = "an agent",
+                agent_avatar = "🤖",
+            )
+
+        val memory = MemoryDataMapper.toDomain(dto)
+
+        assertEquals(MemoryOrigin.Reflection, memory.origin)
+        assertEquals(MemoryScope.HOUSEHOLD, memory.scope)
+        assertEquals(false, memory.canRemove)
     }
 }

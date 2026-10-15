@@ -11,11 +11,13 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * The hub as the members screens need it: who lives here, invites, PIN resets, changing a PIN,
- * removing someone and leaving, the profile's calendar, and which writes agents do without asking. Every body it was sent is kept, so a
- * test can check what was asked.
+ * removing someone and leaving, the profile's calendar, which writes agents do without asking, and
+ * the memory page. Every body it was sent is kept, so a test can check what was asked.
  */
 class FakeMembersHub {
     private val sent = mutableListOf<String>()
@@ -49,6 +51,13 @@ class FakeMembersHub {
             ("document_writer" to "replace") to false,
         )
     private var refusesSettings = false
+
+    /** What the agents remember, as the hub keeps it: id to (memory JSON, still active). */
+    private val memories = linkedMapOf<String, Pair<String, Boolean>>()
+    private var refusesRemoval = false
+
+    /** Whether the hub still has [memoryId] active. */
+    fun isRemembered(memoryId: String): Boolean = memories[memoryId]?.second == true
 
     /** Whether agents add events without asking, as the hub now has it. */
     fun isAutomatic(
@@ -92,6 +101,23 @@ class FakeMembersHub {
                     val action = Regex("\"action\":\"([a-z]+)\"").find(body)!!.groupValues[1]
                     approvals[tool to action] = body.contains("\"auto\":true")
                     json(approvalsJson())
+                }
+
+                path == "/api/v1/memories/page" -> {
+                    json(memoryPageJson())
+                }
+
+                path.startsWith("/api/v1/memories/") && request.method == HttpMethod.Delete -> {
+                    if (refusesRemoval) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    val id = path.removePrefix("/api/v1/memories/")
+                    memories[id] = memories.getValue(id).first to false
+                    respond("", HttpStatusCode.NoContent)
+                }
+
+                path.startsWith("/api/v1/memories/") && path.endsWith("/restore") -> {
+                    val id = path.removePrefix("/api/v1/memories/").removeSuffix("/restore")
+                    memories[id] = memories.getValue(id).first to true
+                    json("""{"id":"$id","user_id":"emma","content":"x","is_active":true}""")
                 }
 
                 path == "/api/v1/integrations/calendars" && request.method == HttpMethod.Delete -> {
@@ -206,6 +232,42 @@ class FakeMembersHub {
                 HttpStatusCode.Conflict,
             )
         }
+    }
+
+    /**
+     * Something an agent remembers. [mine] is Emma's own; [household] puts it on the Household tab.
+     * It was noted just now, so its row reads "today".
+     */
+    @OptIn(ExperimentalTime::class)
+    fun remembers(
+        id: String,
+        content: String,
+        household: Boolean = false,
+        mine: Boolean = true,
+        youAsked: Boolean = false,
+        expiresAt: String? = null,
+    ) {
+        val createdAt = Clock.System.now().toString()
+        val speaker = if (mine) "emma" else "liam"
+        val name = if (mine) "Emma Larsson" else "Liam"
+        memories[id] =
+            """{"id":"$id","content":"$content","scope":"${if (household) "household" else "personal"}",
+            "origin":"${if (youAsked) "tool" else "reflection"}","created_at":"$createdAt",
+            "expires_at":${expiresAt?.let { "\"$it\"" } ?: "null"},"speaker_id":"$speaker","speaker_name":"$name",
+            "is_mine":$mine,"agent_name":"Coordinator","agent_avatar":"🏡","can_remove":$mine}""" to true
+    }
+
+    /** The page lists, but ✕ never reaches the hub. */
+    fun refusesMemoryRemoval() {
+        refusesRemoval = true
+    }
+
+    private fun memoryPageJson(): String {
+        val active = memories.values.filter { it.second }.map { it.first }
+        val yours = active.filter { it.contains("\"scope\":\"personal\"") }
+        val household = active.filter { it.contains("\"scope\":\"household\"") }
+        return """{"yours":${yours.joinToString(prefix = "[", postfix = "]")},
+            "household":${household.joinToString(prefix = "[", postfix = "]")}}"""
     }
 
     /** 503: a proxy in front of a hub that isn't running. */

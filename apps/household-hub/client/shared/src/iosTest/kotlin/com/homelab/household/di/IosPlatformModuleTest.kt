@@ -15,7 +15,7 @@ import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.presentation.chatsession.ChatSessionViewModel
 import com.homelab.household.presentation.dashboard.DashboardViewModel
 import com.homelab.household.presentation.launch.LaunchViewModel
-import com.homelab.household.presentation.memoryaudit.MemoryAuditViewModel
+import com.homelab.household.presentation.memories.MemoriesViewModel
 import com.homelab.household.sdk.HouseholdHubSdk
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.DarwinClientEngineConfig
@@ -73,6 +73,6 @@ class IosPlatformModuleTest : KoinTest {
         assertNotNull(get<ChatSessionViewModel>())
         assertNotNull(get<DashboardViewModel>())
         assertNotNull(get<LaunchViewModel>())
-        assertNotNull(get<MemoryAuditViewModel>())
+        assertNotNull(get<MemoriesViewModel>())
     }
 }

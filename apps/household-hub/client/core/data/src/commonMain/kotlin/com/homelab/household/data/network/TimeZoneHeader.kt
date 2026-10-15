@@ -24,3 +24,6 @@ fun HttpClientConfig<*>.sendDeviceTimeZone(currentZoneId: () -> String) {
 
 /** This phone's current IANA timezone id, e.g. `"America/Mexico_City"`. */
 expect fun deviceTimeZoneId(): String
+
+/** This phone's offset from UTC at [epochMillis], in seconds, daylight saving included. */
+expect fun deviceUtcOffsetSeconds(epochMillis: Long): Int

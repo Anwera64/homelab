@@ -1,5 +1,6 @@
 package com.homelab.household.domain.usecase
 
-fun interface RevokeMemoryUseCase {
+/** Undo after ✕: the memory is kept again. */
+fun interface RestoreMemoryUseCase {
     suspend operator fun invoke(memoryId: String)
 }

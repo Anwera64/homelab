@@ -1,10 +1,13 @@
 package com.homelab.household.domain.usecase
 
-import com.homelab.household.domain.model.AgentMemory
+import com.homelab.household.domain.model.MemoryItem
+import com.homelab.household.domain.model.MemoryOrigin
+import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.repository.MemoryRepository
-import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
-import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RestoreMemoryUseCaseImpl
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
 import dev.mokkery.mock
@@ -13,45 +16,56 @@ import dev.mokkery.verifySuspend
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
+/** The memory page's three asks: the page, ✕, and Undo. Each is one call to the repository. */
+@OptIn(ExperimentalTime::class)
 class MemoryUseCasesTest {
-    private val memoryRepo = mock<MemoryRepository>()
+    private val repository = mock<MemoryRepository>()
 
-    private val auditMemoriesUseCase = AuditMemoriesUseCaseImpl(memoryRepo)
-    private val revokeMemoryUseCase = RevokeMemoryUseCaseImpl(memoryRepo)
-
-    private val dummyMemory =
-        AgentMemory(
+    private val item =
+        MemoryItem(
             id = "mem-1",
-            userId = "user-1",
-            agentId = "agent-1",
-            content = "Prefers oat milk in coffee",
-            category = "preference",
+            content = "Prefers dinner after 20:00 on weekdays.",
             scope = MemoryScope.PERSONAL,
-            confidence = 0.95f,
-            isActive = true,
-            createdAt = "2026-09-08T09:00:00Z",
+            origin = MemoryOrigin.Reflection,
+            createdAt = Instant.parse("2026-10-15T09:00:00Z"),
+            expiresAt = null,
+            speakerId = "emma",
+            speakerName = "Emma",
+            isMine = true,
+            agentName = "Coordinator",
+            agentAvatar = "🏡",
+            canRemove = true,
         )
 
     @Test
-    fun audit_memories_returns_memories_list() =
+    fun `GIVEN memories on the hub WHEN the page is asked for THEN the repository's page comes back`() =
         runTest {
-            everySuspend { memoryRepo.auditMemories(scope = MemoryScope.PERSONAL) } returns listOf(dummyMemory)
+            val page = MemoryPage(yours = listOf(item), household = emptyList())
+            everySuspend { repository.getMemoryPage() } returns page
 
-            val result = auditMemoriesUseCase(scope = MemoryScope.PERSONAL)
-
-            assertEquals(1, result.size)
-            assertEquals("mem-1", result.first().id)
-            assertEquals(MemoryScope.PERSONAL, result.first().scope)
+            assertEquals(page, GetMemoryPageUseCaseImpl(repository)())
         }
 
     @Test
-    fun revoke_memory_delegates_to_repo() =
+    fun `GIVEN a memory WHEN it is removed THEN the repository is asked to remove it`() =
         runTest {
-            everySuspend { memoryRepo.deleteMemory("mem-1") } returns Unit
+            everySuspend { repository.removeMemory("mem-1") } returns Unit
 
-            revokeMemoryUseCase("mem-1")
+            RemoveMemoryUseCaseImpl(repository)("mem-1")
 
-            verifySuspend(VerifyMode.exactly(1)) { memoryRepo.deleteMemory("mem-1") }
+            verifySuspend(VerifyMode.exactly(1)) { repository.removeMemory("mem-1") }
+        }
+
+    @Test
+    fun `GIVEN a removed memory WHEN Undo is tapped THEN the repository is asked to restore it`() =
+        runTest {
+            everySuspend { repository.restoreMemory("mem-1") } returns Unit
+
+            RestoreMemoryUseCaseImpl(repository)("mem-1")
+
+            verifySuspend(VerifyMode.exactly(1)) { repository.restoreMemory("mem-1") }
         }
 }

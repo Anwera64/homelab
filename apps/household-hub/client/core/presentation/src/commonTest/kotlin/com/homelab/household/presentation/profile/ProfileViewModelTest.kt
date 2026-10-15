@@ -5,11 +5,16 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
 import com.homelab.household.domain.model.HubTool
+import com.homelab.household.domain.model.MemoryItem
+import com.homelab.household.domain.model.MemoryOrigin
+import com.homelab.household.domain.model.MemoryPage
+import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolApproval
 import com.homelab.household.domain.model.User
 import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
+import com.homelab.household.domain.usecase.GetMemoryPageUseCase
 import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
@@ -49,6 +54,7 @@ class ProfileViewModelTest {
     private val getCalendar = mock<GetCalendarUseCase>()
     private val removeCalendar = mock<RemoveCalendarUseCase>()
     private val getToolApprovals = mock<GetToolApprovalsUseCase>()
+    private val getMemoryPage = mock<GetMemoryPageUseCase>()
 
     /** Four minutes after the hub last checked the calendar below. */
     private val clock =
@@ -83,6 +89,7 @@ class ProfileViewModelTest {
             getCalendar,
             removeCalendar,
             getToolApprovals,
+            getMemoryPage,
             clock,
         )
 
@@ -396,4 +403,50 @@ class ProfileViewModelTest {
 
             assertEquals(null, viewModel.uiState.value.automaticWrites)
         }
+
+    @Test
+    fun `GIVEN memories on the hub WHEN the profile is shown THEN the Memories row counts yours and the household's`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getMemoryPage() } returns
+                MemoryPage(yours = List(27) { memoryItem("p$it") }, household = List(14) { memoryItem("h$it") })
+            val viewModel = viewModel()
+            assertEquals(null, viewModel.uiState.value.memoryCounts)
+
+            viewModel.loadMemoryCounts()
+            advanceUntilIdle()
+
+            assertEquals(MemoryCounts(yours = 27, household = 14), viewModel.uiState.value.memoryCounts)
+        }
+
+    @Test
+    fun `GIVEN the hub can't count memories WHEN the profile is shown THEN the row makes no claim`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getMemoryPage() } throws ServerOfflineException("offline")
+            val viewModel = viewModel()
+
+            viewModel.loadMemoryCounts()
+            advanceUntilIdle()
+
+            assertEquals(null, viewModel.uiState.value.memoryCounts)
+        }
+
+    private fun memoryItem(id: String) =
+        MemoryItem(
+            id = id,
+            content = id,
+            scope = MemoryScope.PERSONAL,
+            origin = MemoryOrigin.Reflection,
+            createdAt = Instant.parse("2026-10-15T09:00:00Z"),
+            expiresAt = null,
+            speakerId = "emma",
+            speakerName = "Emma",
+            isMine = true,
+            agentName = "Coordinator",
+            agentAvatar = "🏡",
+            canRemove = true,
+        )
 }

@@ -21,16 +21,19 @@ fun ProfileScreen(
     onCalendar: () -> Unit,
     onCalendarSignInAgain: () -> Unit,
     onWhenAgentsAct: () -> Unit,
+    onMemories: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: ProfileViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Every time the profile is shown, not once: coming back from connecting a calendar shows it,
-    // and coming back from "When agents act" counts what was just switched.
+    // coming back from "When agents act" counts what was just switched, and coming back from the
+    // memory page counts what was just removed.
     LaunchedEffect(viewModel) {
         viewModel.loadCalendar()
         viewModel.loadAutomaticWrites()
+        viewModel.loadMemoryCounts()
     }
 
     ObserveEvents(viewModel.events) { event ->
@@ -49,6 +52,7 @@ fun ProfileScreen(
         onCalendar = onCalendar,
         onCalendarSignInAgain = onCalendarSignInAgain,
         onWhenAgentsAct = onWhenAgentsAct,
+        onMemories = onMemories,
         modifier = modifier,
         onDisconnectCalendar = viewModel::onDisconnectCalendar,
     )

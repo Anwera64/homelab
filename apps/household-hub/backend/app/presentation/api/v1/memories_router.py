@@ -1,15 +1,17 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.domain.entities.user import User
-from app.presentation.schemas.memory_schemas import MemoryCreate, MemoryRead, MemoryUpdate
+from app.presentation.schemas.memory_schemas import MemoryCreate, MemoryPageRead, MemoryRead, MemoryUpdate
 from app.presentation.mappers.memory_presentation_mapper import MemoryPresentationMapper
 from app.domain.use_cases.memories.list_user_memories import ListUserMemoriesUseCase
 from app.domain.use_cases.memories.list_household_memories import ListHouseholdMemoriesUseCase
 from app.domain.use_cases.memories.get_memory import GetMemoryUseCase
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
-from app.domain.use_cases.memories.delete_memory import DeleteMemoryUseCase
+from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
+from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
+from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
 from app.presentation.api.deps import (
     get_current_user,
     get_list_user_memories_use_case,
@@ -17,7 +19,9 @@ from app.presentation.api.deps import (
     get_memory_use_case,
     get_create_memory_use_case,
     get_update_memory_use_case,
-    get_delete_memory_use_case,
+    get_list_memory_page_use_case,
+    get_restore_memory_use_case,
+    get_retire_memory_use_case,
 )
 
 router = APIRouter(prefix="/memories", tags=["Agent Memories & Relationships"])
@@ -52,6 +56,15 @@ async def list_household_memories(
     """List shared household facts and constraints visible to all members and agents."""
     memories = await use_case.execute(category=category)
     return [MemoryPresentationMapper.to_response(m) for m in memories]
+
+
+@router.get("/page", response_model=MemoryPageRead)
+async def memory_page(
+    use_case: ListMemoryPageUseCase = Depends(get_list_memory_page_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """The memory page: your personal memories, and every household memory with who said it."""
+    return MemoryPresentationMapper.to_page(await use_case.execute(current_user))
 
 
 @router.post("", response_model=MemoryRead, status_code=status.HTTP_201_CREATED)
@@ -109,16 +122,23 @@ async def update_memory(
     return MemoryPresentationMapper.to_response(updated)
 
 
-@router.delete("/{memory_id}")
-async def delete_memory(
+@router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_memory(
     memory_id: str,
-    use_case: DeleteMemoryUseCase = Depends(get_delete_memory_use_case),
+    use_case: RetireMemoryUseCase = Depends(get_retire_memory_use_case),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Permanently revoke and delete an agent memory.
-    - Personal memory: Can only be deleted by its owner.
-    - Household memory: Can be deleted by the author or any Household Admin.
-    """
+    """✕ on the memory page. The memory is retired, not deleted, so it can be restored. Only its own member may."""
     await use_case.execute(memory_id=memory_id, current_user=current_user)
-    return {"message": "Memory revoked and deleted successfully"}
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{memory_id}/restore", response_model=MemoryRead)
+async def restore_memory(
+    memory_id: str,
+    use_case: RestoreMemoryUseCase = Depends(get_restore_memory_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Undo after ✕: the member's removed memory is active again."""
+    memory = await use_case.execute(memory_id=memory_id, current_user=current_user)
+    return MemoryPresentationMapper.to_response(memory)

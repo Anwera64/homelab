@@ -2,7 +2,6 @@ package com.homelab.household.di
 
 import com.homelab.household.domain.usecase.ApprovePinResetUseCase
 import com.homelab.household.domain.usecase.ArchiveSessionUseCase
-import com.homelab.household.domain.usecase.AuditMemoriesUseCase
 import com.homelab.household.domain.usecase.ChangePinUseCase
 import com.homelab.household.domain.usecase.CheckAuthStatusUseCase
 import com.homelab.household.domain.usecase.CheckServerHealthUseCase
@@ -19,6 +18,7 @@ import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
+import com.homelab.household.domain.usecase.GetMemoryPageUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
@@ -40,22 +40,21 @@ import com.homelab.household.domain.usecase.RedeemPinResetUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.RemoveCalendarUseCase
 import com.homelab.household.domain.usecase.RemoveMemberUseCase
+import com.homelab.household.domain.usecase.RemoveMemoryUseCase
 import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
+import com.homelab.household.domain.usecase.RestoreMemoryUseCase
 import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
-import com.homelab.household.domain.usecase.RevokeMemoryUseCase
 import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StartGoogleCalendarSignInUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.usecase.UnlockSecretSessionUseCase
 import com.homelab.household.domain.usecase.UpdateAgentUseCase
-import com.homelab.household.domain.usecase.UpdateMemoryUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
 import com.homelab.household.domain.usecase.impl.ApprovePinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
-import com.homelab.household.domain.usecase.impl.AuditMemoriesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ChangePinUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckAuthStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.CheckServerHealthUseCaseImpl
@@ -72,6 +71,7 @@ import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetToolApprovalsUseCaseImpl
@@ -93,18 +93,18 @@ import com.homelab.household.domain.usecase.impl.RedeemPinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RegenerateAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemberUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RestoreMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ResumeTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
-import com.homelab.household.domain.usecase.impl.RevokeMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.SetToolApprovalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateAgentUseCaseImpl
-import com.homelab.household.domain.usecase.impl.UpdateMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateSpaceSettingsUseCaseImpl
 import org.koin.dsl.module
 
@@ -156,9 +156,9 @@ val domainModule =
         factory<UnlockSecretSessionUseCase> { UnlockSecretSessionUseCaseImpl(get()) }
 
         // Memory use cases
-        factory<AuditMemoriesUseCase> { AuditMemoriesUseCaseImpl(get()) }
-        factory<RevokeMemoryUseCase> { RevokeMemoryUseCaseImpl(get()) }
-        factory<UpdateMemoryUseCase> { UpdateMemoryUseCaseImpl(get()) }
+        factory<GetMemoryPageUseCase> { GetMemoryPageUseCaseImpl(get()) }
+        factory<RemoveMemoryUseCase> { RemoveMemoryUseCaseImpl(get()) }
+        factory<RestoreMemoryUseCase> { RestoreMemoryUseCaseImpl(get()) }
 
         // Space & Agent use cases
         factory<GetPersonalSpaceUseCase> { GetPersonalSpaceUseCaseImpl(get()) }

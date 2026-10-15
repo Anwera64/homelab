@@ -160,10 +160,14 @@ fun AppNavHost(
                         onCalendar = { backStack.add(Destination.CalendarPicker) },
                         onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
                         onWhenAgentsAct = { backStack.add(Destination.WhenAgentsAct) },
+                        onMemories = { backStack.add(Destination.Memories) },
                     )
                 }
                 entry<Destination.WhenAgentsAct> {
                     screens.WhenAgentsAct(onBack = { backStack.removeLastOrNull() })
+                }
+                entry<Destination.Memories> {
+                    screens.Memories(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Members> {
                     screens.Members(

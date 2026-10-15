@@ -30,3 +30,21 @@ class AgentMemory:
     moved_from: datetime | None = None
     created_at: datetime = field(default_factory=get_utc_now)
     updated_at: datetime = field(default_factory=get_utc_now)
+
+
+@dataclass
+class MemoryPageItem:
+    """One row of the memory page: the memory, who said it, which agent noted it, and whether ✕ shows."""
+
+    memory: AgentMemory
+    speaker_name: str
+    is_mine: bool
+    agent_name: str
+    agent_avatar: str
+    can_remove: bool
+
+
+@dataclass
+class MemoryPage:
+    yours: list[MemoryPageItem]
+    household: list[MemoryPageItem]

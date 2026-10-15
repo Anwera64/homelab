@@ -158,19 +158,21 @@ async def test_user_can_edit_and_delete_memory(client: httpx.AsyncClient):
     assert update_resp.status_code == 200
     assert update_resp.json()["content"] == "Prefers oat milk, not almond milk"
 
-    # 3. User deletes/revokes memory
+    # 3. User removes the memory: it is retired, not deleted (memory spec §3.1)
     del_resp = await client.delete(
         f"/api/v1/memories/{mem_id}",
         headers={"Authorization": f"Bearer {member_token}"},
     )
-    assert del_resp.status_code == 200
+    assert del_resp.status_code == 204
 
-    # 4. Verify memory is gone
+    # 4. Verify memory is no longer active, and no longer listed
     get_resp = await client.get(
         f"/api/v1/memories/{mem_id}",
         headers={"Authorization": f"Bearer {member_token}"},
     )
-    assert get_resp.status_code == 404
+    assert get_resp.json()["is_active"] is False
+    list_resp = await client.get("/api/v1/memories", headers={"Authorization": f"Bearer {member_token}"})
+    assert list_resp.json() == []
 
 
 @pytest.mark.asyncio
@@ -205,8 +207,8 @@ async def test_secret_session_cannot_create_household_memory(client: httpx.Async
 @pytest.mark.asyncio
 async def test_household_memory_curation_by_admin(client: httpx.AsyncClient):
     """
-    Household-scoped memories can be curated (edited or deleted) by Household Admins
-    to prevent shared household knowledge lockout.
+    Household Admins can still edit a household memory, but only the member who said it can remove it
+    (memory spec §8: ✕ shows on your own memories only).
     """
     admin_token, member_token, agent_id, session_id = await setup_environment(client)
 
@@ -234,12 +236,12 @@ async def test_household_memory_curation_by_admin(client: httpx.AsyncClient):
     assert admin_edit.status_code == 200
     assert admin_edit.json()["content"] == "Trash pickup is Wednesday morning before 7:00 AM"
 
-    # 3. Admin deletes the household memory
+    # 3. Admin cannot remove it
     admin_del = await client.delete(
         f"/api/v1/memories/{mem_id}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    assert admin_del.status_code == 200
+    assert admin_del.status_code == 403
 
 
 @pytest.mark.asyncio

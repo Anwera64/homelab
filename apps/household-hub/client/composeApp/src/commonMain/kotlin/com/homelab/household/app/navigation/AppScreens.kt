@@ -14,6 +14,7 @@ import com.homelab.household.app.screens.join.JoinScreen
 import com.homelab.household.app.screens.launch.LaunchScreen
 import com.homelab.household.app.screens.leavehousehold.LeaveHouseholdScreen
 import com.homelab.household.app.screens.members.MembersScreen
+import com.homelab.household.app.screens.memories.MemoriesScreen
 import com.homelab.household.app.screens.pinapprove.PinApproveScreen
 import com.homelab.household.app.screens.pinentry.PinEntryScreen
 import com.homelab.household.app.screens.pinforgot.PinForgotScreen
@@ -123,9 +124,12 @@ interface AppScreens {
         onCalendar: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
         onWhenAgentsAct: () -> Unit,
+        onMemories: () -> Unit,
     )
 
     @Composable fun WhenAgentsAct(onBack: () -> Unit)
+
+    @Composable fun Memories(onBack: () -> Unit)
 
     @Composable fun Members(
         onBack: () -> Unit,
@@ -306,6 +310,7 @@ object RealAppScreens : AppScreens {
         onCalendar: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
         onWhenAgentsAct: () -> Unit,
+        onMemories: () -> Unit,
     ) {
         ProfileScreen(
             onBack = onBack,
@@ -316,12 +321,18 @@ object RealAppScreens : AppScreens {
             onCalendar = onCalendar,
             onCalendarSignInAgain = onCalendarSignInAgain,
             onWhenAgentsAct = onWhenAgentsAct,
+            onMemories = onMemories,
         )
     }
 
     @Composable
     override fun WhenAgentsAct(onBack: () -> Unit) {
         WhenAgentsActScreen(onBack = onBack)
+    }
+
+    @Composable
+    override fun Memories(onBack: () -> Unit) {
+        MemoriesScreen(onBack = onBack)
     }
 
     @Composable

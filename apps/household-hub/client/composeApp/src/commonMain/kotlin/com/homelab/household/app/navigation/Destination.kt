@@ -72,6 +72,9 @@ sealed interface Destination : NavKey {
     /** Which writes agents do for you without asking: the same settings as an approval card's box. */
     data object WhenAgentsAct : Destination
 
+    /** What the agents know: your memories and the household's, each of yours removable. */
+    data object Memories : Destination
+
     data object Members : Destination
 
     data object InviteCreate : Destination

@@ -1,10 +1,10 @@
 package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
-import com.homelab.household.data.dto.MemoryReadDto
-import com.homelab.household.data.dto.MemoryUpdateDto
+import com.homelab.household.data.dto.MemoryPageDto
+import com.homelab.household.data.dto.MemoryPageItemDto
 import com.homelab.household.domain.exception.ServerOfflineException
-import com.homelab.household.domain.model.AgentMemory
+import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryScope
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
@@ -16,115 +16,66 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
-/**
- * The memories repository maps DTOs to `AgentMemory`, and turns a `MemoryScope` into the wire's
- * lowercase name before it reaches the data source.
- */
+/** The memories repository maps the page's DTOs and passes ✕ and Undo straight through. */
+@OptIn(ExperimentalTime::class)
 class MemoryRepositoryTest {
-    private val memoryDto =
-        MemoryReadDto(
-            id = "mem-1",
-            user_id = "emma",
-            agent_id = "a-1",
-            content = "Emma prefers tea over coffee",
-            scope = "personal",
-            confidence = 0.9f,
-            created_at = "2026-09-13T00:00:00Z",
-        )
-
-    private val memory =
-        AgentMemory(
-            id = "mem-1",
-            userId = "emma",
-            agentId = "a-1",
-            content = "Emma prefers tea over coffee",
-            scope = MemoryScope.PERSONAL,
-            confidence = 0.9f,
-            createdAt = "2026-09-13T00:00:00Z",
-        )
-
-    private fun repository(remote: MemoryRemoteDataSource) = MemoryRepositoryImpl(remote = remote)
-
-    // ---- auditMemories ------------------------------------------------------
+    private fun dto(
+        id: String,
+        scope: String = "personal",
+    ) = MemoryPageItemDto(
+        id = id,
+        content = "Dinner together on Saturday 18 October, 20:00.",
+        scope = scope,
+        origin = "tool",
+        created_at = "2026-10-15T09:00:00Z",
+        expires_at = null,
+        speaker_id = "emma",
+        speaker_name = "Emma",
+        is_mine = true,
+        agent_name = "Coordinator",
+        agent_avatar = "🏡",
+        can_remove = true,
+    )
 
     @Test
-    fun `GIVEN a household scope to audit WHEN memories are asked for THEN it is sent to the data source in lowercase`() =
+    fun `GIVEN the hub's page WHEN it is asked for THEN each tab comes back as domain memories`() =
         runTest {
-            // GIVEN
             val remote = mock<MemoryRemoteDataSource>()
-            everySuspend { remote.auditMemories("household") } returns listOf(memoryDto)
+            everySuspend { remote.getMemoryPage() } returns
+                MemoryPageDto(yours = listOf(dto("p1")), household = listOf(dto("h1", scope = "household")))
 
-            // WHEN
-            val memories = repository(remote).auditMemories(MemoryScope.HOUSEHOLD)
+            val page = MemoryRepositoryImpl(remote).getMemoryPage()
 
-            // THEN
-            assertEquals(listOf(memory), memories)
-            verifySuspend(VerifyMode.exactly(1)) { remote.auditMemories("household") }
+            assertEquals(listOf("p1"), page.yours.map { it.id })
+            assertEquals(MemoryScope.HOUSEHOLD, page.household.single().scope)
+            assertEquals(MemoryOrigin.Tool, page.yours.single().origin)
+            assertEquals(Instant.parse("2026-10-15T09:00:00Z"), page.yours.single().createdAt)
         }
 
     @Test
-    fun `GIVEN no scope WHEN every memory is audited THEN no scope is sent to the data source`() =
+    fun `GIVEN the hub cannot be reached WHEN the page is asked for THEN the failure reaches the caller`() =
         runTest {
-            // GIVEN
             val remote = mock<MemoryRemoteDataSource>()
-            everySuspend { remote.auditMemories(null) } returns listOf(memoryDto)
+            everySuspend { remote.getMemoryPage() } throws ServerOfflineException()
 
-            // WHEN
-            repository(remote).auditMemories(null)
-
-            // THEN
-            verifySuspend(VerifyMode.exactly(1)) { remote.auditMemories(null) }
+            assertFailsWith<ServerOfflineException> { MemoryRepositoryImpl(remote).getMemoryPage() }
         }
 
     @Test
-    fun `GIVEN the hub cannot be reached WHEN memories are audited THEN the failure reaches the caller`() =
+    fun `GIVEN a memory WHEN it is removed and restored THEN the data source is asked for each`() =
         runTest {
-            // GIVEN
             val remote = mock<MemoryRemoteDataSource>()
-            everySuspend { remote.auditMemories(null) } throws ServerOfflineException()
+            everySuspend { remote.removeMemory("mem-1") } returns Unit
+            everySuspend { remote.restoreMemory("mem-1") } returns Unit
+            val repository = MemoryRepositoryImpl(remote)
 
-            // WHEN / THEN
-            assertFailsWith<ServerOfflineException> { repository(remote).auditMemories(null) }
-        }
+            repository.removeMemory("mem-1")
+            repository.restoreMemory("mem-1")
 
-    // ---- deleteMemory -------------------------------------------------------
-
-    @Test
-    fun `GIVEN a memory nobody wants kept WHEN it is deleted THEN the data source is asked to remove it`() =
-        runTest {
-            // GIVEN
-            val remote = mock<MemoryRemoteDataSource>()
-            everySuspend { remote.deleteMemory("mem-1") } returns Unit
-
-            // WHEN
-            repository(remote).deleteMemory("mem-1")
-
-            // THEN
-            verifySuspend(VerifyMode.exactly(1)) { remote.deleteMemory("mem-1") }
-        }
-
-    // ---- updateMemory -------------------------------------------------------
-
-    @Test
-    fun `GIVEN changes to a memory WHEN it is updated THEN they are built into an update request and the result comes back mapped`() =
-        runTest {
-            // GIVEN
-            val remote = mock<MemoryRemoteDataSource>()
-            val expectedUpdate = MemoryUpdateDto(content = "Emma prefers tea", confidence = 0.95f, is_active = true)
-            everySuspend { remote.updateMemory("mem-1", expectedUpdate) } returns memoryDto
-
-            // WHEN
-            val updated =
-                repository(remote).updateMemory(
-                    "mem-1",
-                    content = "Emma prefers tea",
-                    confidence = 0.95f,
-                    isActive = true,
-                )
-
-            // THEN
-            assertEquals(memory, updated)
-            verifySuspend(VerifyMode.exactly(1)) { remote.updateMemory("mem-1", expectedUpdate) }
+            verifySuspend(VerifyMode.exactly(1)) { remote.removeMemory("mem-1") }
+            verifySuspend(VerifyMode.exactly(1)) { remote.restoreMemory("mem-1") }
         }
 }

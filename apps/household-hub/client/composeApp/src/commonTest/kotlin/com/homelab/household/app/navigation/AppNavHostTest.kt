@@ -318,6 +318,24 @@ class AppNavHostTest {
         }
 
     @Test
+    fun the_profile_leads_to_the_memory_page_and_back() =
+        runComposeUiTest {
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
+
+                tapsGoToMemories()
+                seesMemories()
+                assertEquals(listOf(Destination.Profile, Destination.Memories), backStack.toList())
+
+                tapsBack()
+
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
+            }
+        }
+
+    @Test
     fun the_profile_leads_to_when_agents_act_and_back() =
         runComposeUiTest {
             onAppNavHost {

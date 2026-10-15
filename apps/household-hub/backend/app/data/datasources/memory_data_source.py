@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Protocol, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, or_
 
 from app.data.models.memory_model import MemoryModel
 
@@ -20,6 +21,9 @@ class IMemoryDataSource(Protocol):
         self,
         category: Optional[str] = None,
     ) -> List[MemoryModel]:
+        ...
+
+    async def list_current(self, now: datetime, scope: str, user_id: Optional[str] = None) -> List[MemoryModel]:
         ...
 
     async def get_by_id(self, memory_id: str) -> Optional[MemoryModel]:
@@ -73,6 +77,19 @@ class SqliteMemoryDataSource(IMemoryDataSource):
         stmt = select(MemoryModel).where(MemoryModel.scope == "household", MemoryModel.is_active.is_(True))
         if category:
             stmt = stmt.where(MemoryModel.category == category)
+        stmt = stmt.order_by(MemoryModel.created_at.desc())
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def list_current(self, now: datetime, scope: str, user_id: Optional[str] = None) -> List[MemoryModel]:
+        # Current = active and not expired; what the memory page shows.
+        stmt = select(MemoryModel).where(
+            MemoryModel.scope == scope,
+            MemoryModel.is_active.is_(True),
+            or_(MemoryModel.expires_at.is_(None), MemoryModel.expires_at > now),
+        )
+        if user_id is not None:
+            stmt = stmt.where(MemoryModel.user_id == user_id)
         stmt = stmt.order_by(MemoryModel.created_at.desc())
         res = await self.session.execute(stmt)
         return list(res.scalars().all())

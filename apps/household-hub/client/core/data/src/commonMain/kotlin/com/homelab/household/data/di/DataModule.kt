@@ -26,6 +26,7 @@ import com.homelab.household.data.datasource.remote.sse.DefensiveSseStreamReader
 import com.homelab.household.data.network.HubConfig
 import com.homelab.household.data.network.KermitKtorLogger
 import com.homelab.household.data.network.deviceTimeZoneId
+import com.homelab.household.data.network.deviceUtcOffsetSeconds
 import com.homelab.household.data.network.installBearerAuth
 import com.homelab.household.data.network.logFailedRequests
 import com.homelab.household.data.network.sendDeviceTimeZone
@@ -44,6 +45,7 @@ import com.homelab.household.data.telemetry.Telemetry
 import com.homelab.household.data.telemetry.TelemetryConfig
 import com.homelab.household.data.telemetry.createTelemetryLogWriter
 import com.homelab.household.data.telemetry.telemetryHeaders
+import com.homelab.household.domain.model.DeviceTimeZone
 import com.homelab.household.domain.repository.AgentRepository
 import com.homelab.household.domain.repository.AuthRepository
 import com.homelab.household.domain.repository.CalendarRepository
@@ -64,13 +66,14 @@ import io.opentelemetry.kotlin.logging.export.batchLogRecordProcessor
 import io.opentelemetry.kotlin.logging.export.otlpHttpLogRecordExporter
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
+import kotlin.time.ExperimentalTime
 
 const val DEFAULT_BASE_URL = BuildConfig.BASE_URL
 
 /** Where the app's logs go, from `telemetry.baseUrl`; empty turns telemetry off. */
 const val DEFAULT_TELEMETRY_URL = BuildConfig.TELEMETRY_URL
 
-@OptIn(ExperimentalApi::class)
+@OptIn(ExperimentalApi::class, ExperimentalTime::class)
 val dataModule =
     module {
         single {
@@ -144,6 +147,7 @@ val dataModule =
         single<AgentRepository> { AgentRepositoryImpl(get()) }
         single<SpaceRepository> { SpaceRepositoryImpl(get()) }
         single<MemoryRepository> { MemoryRepositoryImpl(get()) }
+        single<DeviceTimeZone> { DeviceTimeZone { deviceUtcOffsetSeconds(it.toEpochMilliseconds()) } }
         single<CalendarRepository> { CalendarRepositoryImpl(get()) }
         single<ToolApprovalRepository> { ToolApprovalRepositoryImpl(get()) }
     }

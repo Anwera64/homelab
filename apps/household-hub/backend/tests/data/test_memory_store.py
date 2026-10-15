@@ -87,3 +87,49 @@ async def test_a_new_memory_comes_from_reflection_unless_it_says_otherwise(sessi
     assert read.relevant_for is None
     assert read.event_id is None
     assert read.retired_at is None
+
+
+@pytest.mark.asyncio
+async def test_retiring_a_memory_is_kept_and_can_be_undone(session: AsyncSession):
+    """GIVEN a memory WHEN it is retired and then restored THEN the row stays, inactive with retired_at, then active again."""
+    repo = _repo(session)
+    saved = await repo.create(AgentMemory(user_id="emma", content="Likes tea"))
+
+    saved.is_active = False
+    saved.retired_at = NOW
+    await repo.update(saved)
+    retired = await repo.get_by_id(saved.id)
+    assert retired.is_active is False
+    assert _utc(retired.retired_at) == NOW
+
+    retired.is_active = True
+    retired.retired_at = None
+    await repo.update(retired)
+    back = await repo.get_by_id(saved.id)
+    assert back.is_active is True
+    assert back.retired_at is None
+
+
+@pytest.mark.asyncio
+async def test_the_memory_page_lists_only_active_unexpired_memories(session: AsyncSession):
+    """GIVEN personal and household memories, some retired or expired WHEN the page lists them THEN only current ones show, newest first."""
+    session.add(UserModel(id="liam", full_name="Liam", hashed_pin="x"))
+    await session.flush()
+    repo = _repo(session)
+    old = await repo.create(AgentMemory(user_id="emma", content="Old", created_at=NOW - timedelta(days=2)))
+    new = await repo.create(AgentMemory(user_id="emma", content="New", created_at=NOW - timedelta(hours=1)))
+    await repo.create(AgentMemory(user_id="emma", content="Retired", is_active=False, retired_at=NOW))
+    await repo.create(AgentMemory(user_id="emma", content="Expired", expires_at=NOW - timedelta(minutes=1)))
+    later = await repo.create(AgentMemory(user_id="emma", content="Until Friday", expires_at=NOW + timedelta(days=2)))
+    await repo.create(AgentMemory(user_id="liam", content="Liam's own"))
+    house = await repo.create(AgentMemory(user_id="liam", scope="household", content="Boiler in October"))
+    mine_house = await repo.create(AgentMemory(user_id="emma", scope="household", content="Dinner Saturday"))
+    await repo.create(
+        AgentMemory(user_id="liam", scope="household", content="Gone", expires_at=NOW - timedelta(days=1))
+    )
+
+    personal = await repo.list_current_personal("emma", now=NOW)
+    household = await repo.list_current_household(now=NOW)
+
+    assert [m.id for m in personal] == [later.id, new.id, old.id]
+    assert {m.id for m in household} == {house.id, mine_house.id}
