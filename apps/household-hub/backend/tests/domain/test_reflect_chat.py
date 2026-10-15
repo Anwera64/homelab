@@ -328,3 +328,43 @@ async def test_GIVEN_another_members_personal_memory_WHEN_prompted_THEN_it_is_ne
     await world.run()
 
     assert "mushrooms" not in world.llm.prompt
+
+
+# Cycle 13: logging (memory spec §9)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_memory_text_off_WHEN_reflected_THEN_lines_carry_ids_relations_and_counts_but_no_text(caplog):
+    stored = memory("veg", "Robin is vegetarian", scope="household")
+    world = World(
+        {"title": "Dinners for Robin", "facts": [_fact(relation="changed", about="m1"), _fact("Bins go out on Wednesday")]},
+        memories=[stored],
+        scores={"veg": 0.85},
+    )
+
+    with caplog.at_level(logging.INFO):
+        await world.run()
+
+    text = caplog.text
+    assert "Reflection run | member=emma session=chat messages=2 private=0 neighbours=similar offered=veg=0.850" in text
+    assert "prompt_tokens=900 answer_tokens=300 facts=2 added=1 proposed=1 same=0" in text
+    assert "Reflection fact | member=emma session=chat relation=changed about=veg score=0.850 outcome=proposal" in text
+    assert "relation=different about=None score=None outcome=saved" in text
+    assert "Memory proposal created | member=emma session=chat memory=veg" in text
+    assert "relation=changed answerer=emma" in text
+    assert "Chat titled by reflection | member=emma session=chat" in text
+    for secret in ("vegan", "Bins go out", "Dinners for Robin", "Robin is vegetarian"):
+        assert secret not in text
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_memory_text_on_WHEN_reflected_THEN_text_is_logged_cut_to_500(caplog):
+    world = World({"facts": [_fact("x" * 700)]})
+    world.use_case.log_text = True
+
+    with caplog.at_level(logging.INFO):
+        await world.run()
+
+    fact_line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("Reflection fact"))
+    assert "text='" + "x" * 500 + "'" in fact_line
+    assert "x" * 501 not in fact_line

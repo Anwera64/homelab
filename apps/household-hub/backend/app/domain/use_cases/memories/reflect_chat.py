@@ -201,7 +201,7 @@ class ReflectChatUseCase:
             return result
 
         visible = (await self.memory_block.execute(member_id, is_secret=False))
-        neighbours, how, scores = await self._neighbours(said, visible.visible)
+        neighbours, how, scores = await self._neighbours(session, said, visible.visible)
         labels = {f"m{index}": memory for index, memory in enumerate(neighbours, start=1)}
 
         member = await self.user_repo.get_by_id(member_id)
@@ -310,7 +310,7 @@ class ReflectChatUseCase:
         return result
 
     async def _neighbours(
-        self, said: List[ChatMessage], visible: List[AgentMemory]
+        self, session: ConversationSession, said: List[ChatMessage], visible: List[AgentMemory]
     ) -> Tuple[List[AgentMemory], str, Dict[str, float]]:
         """The stored memories closest to what the member said (memory spec §6 step 1), with a low bar."""
         if not visible:
@@ -318,7 +318,10 @@ class ReflectChatUseCase:
         try:
             queries = await self.embedder.embed([m.content for m in said])
         except Exception as exc:
-            logger.warning("Reflection neighbours | embed failed, offering the newest memories: %s", exc)
+            logger.warning(
+                "Reflection neighbours | member=%s session=%s embed failed, offering the newest memories: %s",
+                session.user_id, session.id, exc,
+            )
             newest = sorted(visible, key=lambda m: _aware(m.created_at), reverse=True)
             return newest[: self.neighbours_max], "newest", {}
         ids = [m.id for m in visible]
