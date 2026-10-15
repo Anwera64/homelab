@@ -352,7 +352,7 @@ services:
   # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
-    image: searxng/searxng:2026.10.13-22c64b8d3
+    image: searxng/searxng:2026.10.15-b00212a83
     container_name: searxng
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
@@ -509,7 +509,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.160.0
+    image: renovate/renovate:44.160.1
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
