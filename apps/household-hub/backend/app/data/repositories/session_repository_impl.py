@@ -1,5 +1,6 @@
-from typing import List, Optional
-from app.domain.entities.session import ConversationSession, ChatMessage
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from app.domain.entities.session import ChatAwaitingReflection, ConversationSession, ChatMessage
 from app.domain.exceptions import EntityNotFoundException
 from app.domain.repositories.session_repository import ISessionRepository
 from app.data.datasources.session_data_source import ISessionDataSource
@@ -75,3 +76,15 @@ class SessionRepositoryImpl(ISessionRepository):
 
     async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
         await self.data_source.save_history_summary(session_id, summary, through_id)
+
+    async def list_awaiting_reflection(self) -> List[ChatAwaitingReflection]:
+        rows = await self.data_source.list_awaiting_reflection()
+        return [
+            ChatAwaitingReflection(session=self.mapper.to_domain_session(model), newest_message_at=at)
+            for model, at in rows
+        ]
+
+    async def save_reflection(
+        self, session_id: str, through_id: str, at: datetime, outcome: Dict[str, Any]
+    ) -> None:
+        await self.data_source.save_reflection(session_id, through_id, at, outcome)

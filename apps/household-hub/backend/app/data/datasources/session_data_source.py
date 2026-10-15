@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Protocol, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Protocol, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import String, cast, delete, or_, select, update
 from sqlalchemy.orm import joinedload
@@ -62,6 +63,14 @@ class ISessionDataSource(Protocol):
         ...
 
     async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
+        ...
+
+    async def list_awaiting_reflection(self) -> List[Tuple[SessionModel, datetime]]:
+        ...
+
+    async def save_reflection(
+        self, session_id: str, through_id: str, at: datetime, outcome: Dict[str, Any]
+    ) -> None:
         ...
 
 
@@ -200,6 +209,50 @@ class SqliteSessionDataSource(ISessionDataSource):
             .values(
                 history_summary=summary,
                 summarized_through_id=through_id,
+                updated_at=SessionModel.updated_at,
+            )
+        )
+        await self.session.flush()
+
+    async def list_awaiting_reflection(self) -> List[Tuple[SessionModel, datetime]]:
+        # The newest message per chat, a seek on ix_chat_messages_session_created like the Chats list.
+        newest_id = (
+            select(MessageModel.id)
+            .where(MessageModel.session_id == SessionModel.id)
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+            .correlate(SessionModel)
+            .scalar_subquery()
+        )
+        newest_at = (
+            select(MessageModel.created_at)
+            .where(MessageModel.session_id == SessionModel.id)
+            .order_by(MessageModel.created_at.desc())
+            .limit(1)
+            .correlate(SessionModel)
+            .scalar_subquery()
+        )
+        stmt = (
+            select(SessionModel, newest_at.label("newest_at"))
+            .where(SessionModel.is_archived.is_(False))
+            .where(newest_id.is_not(None))
+            .where(or_(SessionModel.reflected_through_id.is_(None), SessionModel.reflected_through_id != newest_id))
+            .order_by(newest_at.asc())
+        )
+        res = await self.session.execute(stmt)
+        return [(model, at) for model, at in res.all()]
+
+    async def save_reflection(
+        self, session_id: str, through_id: str, at: datetime, outcome: Dict[str, Any]
+    ) -> None:
+        # Only the marker moves; updated_at is set back to itself so the Chats list isn't reordered.
+        await self.session.execute(
+            update(SessionModel)
+            .where(SessionModel.id == session_id)
+            .values(
+                reflected_through_id=through_id,
+                reflected_at=at,
+                last_reflection=dict(outcome),
                 updated_at=SessionModel.updated_at,
             )
         )

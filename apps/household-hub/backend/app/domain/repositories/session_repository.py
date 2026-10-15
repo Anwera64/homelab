@@ -1,5 +1,8 @@
 from typing import Protocol, List, Optional
-from app.domain.entities.session import ConversationSession, ChatMessage
+from datetime import datetime
+from typing import Any, Dict
+
+from app.domain.entities.session import ChatAwaitingReflection, ConversationSession, ChatMessage
 
 
 class ISessionRepository(Protocol):
@@ -48,4 +51,14 @@ class ISessionRepository(Protocol):
 
     async def save_history_summary(self, session_id: str, summary: str, through_id: str) -> None:
         """Stores the summary and the last message it covers, and nothing else about the session."""
+        ...
+
+    async def list_awaiting_reflection(self) -> List[ChatAwaitingReflection]:
+        """Chats, archived ones aside, whose newest message is not their reflection marker."""
+        ...
+
+    async def save_reflection(
+        self, session_id: str, through_id: str, at: datetime, outcome: Dict[str, Any]
+    ) -> None:
+        """Stores the reflection marker and what the run did, and nothing else about the session."""
         ...

@@ -29,6 +29,12 @@ class SessionModel(Base):
     history_summary = Column(Text, nullable=True)
     summarized_through_id = Column(String(36), nullable=True)
 
+    # The reflection marker (memory spec §3.4): the last message reflected, when, and what that run
+    # added, proposed and retired. Written only by save_reflection, like the summary above.
+    reflected_through_id = Column(String(36), nullable=True)
+    reflected_at = Column(DateTime(timezone=True), nullable=True)
+    last_reflection = Column(JSON, nullable=True)
+
     # Relationships
     user = relationship("UserModel", back_populates="sessions")
     agent = relationship("AgentModel", back_populates="sessions")
