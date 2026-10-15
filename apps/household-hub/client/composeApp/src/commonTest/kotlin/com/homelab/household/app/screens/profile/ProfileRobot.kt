@@ -2,7 +2,10 @@ package com.homelab.household.app.screens.profile
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -27,6 +30,9 @@ import com.homelab.household.app.resources.profile_calendar_sign_in_again
 import com.homelab.household.app.resources.profile_calendar_sign_in_needed
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
+import com.homelab.household.app.resources.profile_memories
+import com.homelab.household.app.resources.profile_memories_counts
+import com.homelab.household.app.resources.profile_memory_section
 import com.homelab.household.app.resources.profile_sign_out
 import com.homelab.household.app.resources.profile_when_agents_act
 import com.homelab.household.app.resources.profile_when_agents_act_automatic
@@ -126,14 +132,32 @@ class ProfileRobot(
         test.onNodeWithText(getString(Res.string.profile_when_agents_act)).performScrollTo().performClick()
     }
 
+    suspend fun seesTheMemoryHeading() = seesText(getString(Res.string.profile_memory_section).uppercase())
+
+    suspend fun seesMemoryCounts(
+        yours: Int,
+        household: Int,
+    ) = seesText(getString(Res.string.profile_memories_counts, yours, household))
+
+    suspend fun tapsMemories() {
+        test.onNodeWithText(getString(Res.string.profile_memories)).performScrollTo().performClick()
+    }
+
     private fun seesText(text: String) {
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
-        test.onNodeWithText(text).assertIsDisplayed()
+        inView(text).assertIsDisplayed()
     }
 
     private fun tapsText(text: String) {
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
-        test.onNodeWithText(text).performClick()
+        inView(text).performClick()
+    }
+
+    /** The profile scrolls, its sheets don't: a row further down the page is brought into view first. */
+    private fun inView(text: String): SemanticsNodeInteraction {
+        val node = test.onNodeWithText(text)
+        val onThePage = test.onAllNodes(hasText(text) and hasAnyAncestor(hasScrollAction())).fetchSemanticsNodes()
+        return if (onThePage.isNotEmpty()) node.performScrollTo() else node
     }
 
     private companion object {
@@ -161,6 +185,7 @@ fun ComposeUiTest.profileContent(state: ProfileUiState) {
                 onCalendar = {},
                 onCalendarSignInAgain = {},
                 onWhenAgentsAct = {},
+                onMemories = {},
             )
         }
     }
@@ -176,6 +201,7 @@ fun ComposeUiTest.profileScreen(
     onCalendar: () -> Unit = {},
     onCalendarSignInAgain: () -> Unit = {},
     onWhenAgentsAct: () -> Unit = {},
+    onMemories: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine, sessionStorage = sessionStorage) {
@@ -188,6 +214,7 @@ fun ComposeUiTest.profileScreen(
                 onCalendar = onCalendar,
                 onCalendarSignInAgain = onCalendarSignInAgain,
                 onWhenAgentsAct = onWhenAgentsAct,
+                onMemories = onMemories,
             )
         }
     }

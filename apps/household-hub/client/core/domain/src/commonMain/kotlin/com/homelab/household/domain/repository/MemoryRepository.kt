@@ -1,17 +1,13 @@
 package com.homelab.household.domain.repository
 
-import com.homelab.household.domain.model.AgentMemory
-import com.homelab.household.domain.model.MemoryScope
+import com.homelab.household.domain.model.MemoryPage
 
+/** What the agents remember, as the memory page shows it. */
 interface MemoryRepository {
-    suspend fun auditMemories(scope: MemoryScope? = null): List<AgentMemory>
+    suspend fun getMemoryPage(): MemoryPage
 
-    suspend fun deleteMemory(memoryId: String)
+    /** ✕: the hub retires the memory, so [restoreMemory] can bring it back. */
+    suspend fun removeMemory(memoryId: String)
 
-    suspend fun updateMemory(
-        memoryId: String,
-        content: String? = null,
-        confidence: Float? = null,
-        isActive: Boolean? = null,
-    ): AgentMemory
+    suspend fun restoreMemory(memoryId: String)
 }

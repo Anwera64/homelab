@@ -86,6 +86,7 @@ private val fixedSegments =
         "me",
         "members",
         "memories",
+        "page",
         "personal",
         "pin",
         "pin-resets",

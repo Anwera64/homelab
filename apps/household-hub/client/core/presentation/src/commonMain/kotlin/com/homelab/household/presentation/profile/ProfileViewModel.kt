@@ -6,6 +6,7 @@ import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
+import com.homelab.household.domain.usecase.GetMemoryPageUseCase
 import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
 import com.homelab.household.domain.usecase.ListHouseholdMembersUseCase
 import com.homelab.household.domain.usecase.LogoutUseCase
@@ -31,6 +32,7 @@ class ProfileViewModel(
     private val getCalendar: GetCalendarUseCase,
     private val removeCalendar: RemoveCalendarUseCase,
     private val getToolApprovals: GetToolApprovalsUseCase,
+    private val getMemoryPage: GetMemoryPageUseCase,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -96,6 +98,17 @@ class ProfileViewModel(
         viewModelScope.launch {
             val count = runCatchingSafe { getToolApprovals() }.getOrNull()?.count { it.automatic }
             _uiState.update { it.copy(automaticWrites = count) }
+        }
+    }
+
+    /**
+     * Counted each time the profile is shown, so coming back from the memory page shows what was
+     * just removed. A failure leaves the caption out rather than guessing.
+     */
+    fun loadMemoryCounts() {
+        viewModelScope.launch {
+            val page = runCatchingSafe { getMemoryPage() }.getOrNull()
+            _uiState.update { it.copy(memoryCounts = page?.let { MemoryCounts(it.yours.size, it.household.size) }) }
         }
     }
 

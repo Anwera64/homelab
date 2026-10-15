@@ -65,7 +65,7 @@ class HubAddressWiringTest : KoinTest {
                     "SessionRepository" to { get<SessionRepository>().listSessions() },
                     "AgentRepository" to { get<AgentRepository>().listAgents() },
                     "SpaceRepository" to { get<SpaceRepository>().getHouseholdSpace() },
-                    "MemoryRepository" to { get<MemoryRepository>().auditMemories() },
+                    "MemoryRepository" to { get<MemoryRepository>().getMemoryPage() },
                     "ServerStatusRemoteDataSource" to { get<ServerStatusRemoteDataSource>().checkHealth() },
                 )
 

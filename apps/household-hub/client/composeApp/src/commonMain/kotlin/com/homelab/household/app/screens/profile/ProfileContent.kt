@@ -61,6 +61,9 @@ import com.homelab.household.app.resources.profile_change_pin
 import com.homelab.household.app.resources.profile_delete_account
 import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
+import com.homelab.household.app.resources.profile_memories
+import com.homelab.household.app.resources.profile_memories_counts
+import com.homelab.household.app.resources.profile_memory_section
 import com.homelab.household.app.resources.profile_sign_out
 import com.homelab.household.app.resources.profile_when_agents_act
 import com.homelab.household.app.resources.profile_when_agents_act_automatic
@@ -71,6 +74,7 @@ import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.presentation.profile.CalendarRow
+import com.homelab.household.presentation.profile.MemoryCounts
 import com.homelab.household.presentation.profile.ProfileStatus
 import com.homelab.household.presentation.profile.ProfileUiState
 import org.jetbrains.compose.resources.pluralStringResource
@@ -98,6 +102,7 @@ fun ProfileContent(
     onDisconnectCalendar: () -> Unit = {},
     onCalendarSignInAgain: () -> Unit = {},
     onWhenAgentsAct: () -> Unit = {},
+    onMemories: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -160,6 +165,8 @@ fun ProfileContent(
                     }
                 }
             }
+
+            MemorySection(counts = state.memoryCounts, onMemories = onMemories)
 
             CalendarSection(
                 row = calendar,
@@ -294,6 +301,34 @@ private fun CalendarSection(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * What the agents know about you and the household. Its caption counts both tabs of the memory
+ * page; until the hub has said, or if it couldn't, the row makes no claim.
+ */
+@Composable
+private fun MemorySection(
+    counts: MemoryCounts?,
+    onMemories: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+        Text(
+            stringResource(Res.string.profile_memory_section).uppercase(),
+            modifier = Modifier.padding(start = HearthTheme.spacing.xs),
+            style = HearthTheme.typography.overline,
+            color = HearthTheme.colors.textMuted,
+        )
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+            SettingsRow(
+                label = stringResource(Res.string.profile_memories),
+                icon = HearthIcon.Memory,
+                caption = counts?.let { stringResource(Res.string.profile_memories_counts, it.yours, it.household) },
+                onClick = onMemories,
+            )
         }
     }
 }
