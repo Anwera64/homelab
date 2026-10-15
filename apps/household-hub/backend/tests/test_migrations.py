@@ -425,3 +425,54 @@ def test_the_gossip_bus_is_dropped():
                 assert conn.execute(text("SELECT COUNT(*) FROM gossip_milestones")).scalar() == 0
         finally:
             engine.dispose()
+
+
+_BEFORE_MEMORY_VECTORS = "b8e3f1a6c925"
+
+
+def test_memory_vectors_go_with_their_memory():
+    """
+    GIVEN a memory with a vector WHEN the memory row is deleted THEN its vector goes too, and
+    downgrading drops the table (memory spec §4.1: an ordinary table with a foreign key).
+    """
+    from sqlalchemy import inspect, text
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "vectors.db"
+        database_url = f"sqlite:///{db_path}"
+        config = _alembic_config(database_url)
+        command.upgrade(config, "head")
+
+        engine = create_engine(database_url)
+        try:
+            with engine.begin() as conn:
+                conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, full_name, hashed_pin, avatar_color, is_admin, is_active, "
+                        "failed_pin_attempts, token_version, created_at, updated_at) "
+                        "VALUES ('emma', 'Emma', 'x', 'sage', 1, 1, 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO agent_memories (id, user_id, scope, category, content, confidence, "
+                        "is_active, created_at, updated_at) "
+                        "VALUES ('mem', 'emma', 'personal', 'fact', 'Sam is vegetarian', 1.0, 1, "
+                        "'2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO memory_vectors (memory_id, kind, model, vector, created_at) "
+                        "VALUES ('mem', 'content', 'bge-m3', x'0000803f', '2026-01-01')"
+                    )
+                )
+                conn.execute(text("DELETE FROM agent_memories WHERE id = 'mem'"))
+                assert conn.execute(text("SELECT COUNT(*) FROM memory_vectors")).scalar() == 0
+
+            command.downgrade(config, _BEFORE_MEMORY_VECTORS)
+            with engine.connect() as conn:
+                assert "memory_vectors" not in set(inspect(conn).get_table_names())
+        finally:
+            engine.dispose()

@@ -252,6 +252,10 @@ sqlalchemy==2.1.4
     #   -c requirements.txt
     #   -r requirements.in
     #   alembic
+sqlite-vec==0.1.9
+    # via
+    #   -c requirements.txt
+    #   -r requirements.in
 starlette==1.7.0
     # via
     #   -c requirements.txt

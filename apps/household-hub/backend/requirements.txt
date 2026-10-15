@@ -143,6 +143,8 @@ sqlalchemy==2.1.4
     # via
     #   -r requirements.in
     #   alembic
+sqlite-vec==0.1.9
+    # via -r requirements.in
 starlette==1.7.0
     # via fastapi
 tld==0.13.2

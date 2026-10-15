@@ -34,6 +34,7 @@ import app.data.models.agent_model
 import app.data.models.session_model
 import app.data.models.memory_model
 import app.data.models.memory_proposal_model
+import app.data.models.memory_vector_model
 import app.data.models.system_setting_model
 import app.data.models.calendar_credential_model
 import app.data.models.document_model
@@ -41,6 +42,12 @@ import app.data.models.invite_model
 import app.data.models.pin_reset_model
 import app.data.models.tool_approval_model
 import app.data.models.device_session_model
+
+
+from app.data.datasources import sqlite_vec_extension
+
+# Memory vectors are ranked with sqlite-vec when it loads (memory spec §4.2).
+sqlite_vec_extension.install()
 
 
 # Ensure SQLite enables foreign keys and WAL mode on synchronous driver connection

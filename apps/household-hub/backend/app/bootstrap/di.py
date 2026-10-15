@@ -172,6 +172,11 @@ from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase
+from app.domain.use_cases.memories.recall_memories import RecallMemoriesUseCase
+from app.data.datasources.memory_vector_data_source import SqliteMemoryVectorDataSource
+from app.data.repositories.memory_vector_repository_impl import MemoryVectorRepositoryImpl
 
 # Singletons for stateless services
 _password_hasher = BcryptPasswordHasher()
@@ -222,6 +227,7 @@ def _build_embedder(settings) -> OllamaEmbedder:
         base_url=settings.EMBEDDING_BASE_URL,
         model=settings.EMBEDDING_MODEL,
         timeout_seconds=settings.EMBEDDING_TIMEOUT_SECONDS,
+        keep_alive=settings.EMBEDDING_KEEP_ALIVE,
     )
 
 
@@ -296,6 +302,25 @@ def get_container(session: AsyncSession):
         user_repo=user_repo,
         agent_repo=agent_repo,
         history_tokens=settings.HISTORY_TOKENS,
+        memory_block_tokens=settings.MEMORY_BLOCK_TOKENS,
+    )
+
+    # Memory vectors and recall (memory spec §4, §5.2).
+    memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
+    embed_memories_uc = EmbedMemoriesUseCase(
+        _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
+    )
+    recall_uc = RecallMemoriesUseCase(
+        embedder=_embedder,
+        vector_repo=memory_vector_repo,
+        memory_block=BuildMemoryBlockUseCase(
+            memory_repo, user_repo=user_repo, agent_repo=agent_repo, budget_tokens=settings.MEMORY_BLOCK_TOKENS
+        ),
+        model=settings.EMBEDDING_MODEL,
+        cutoff=settings.MEMORY_RECALL_CUTOFF,
+        max_attached=settings.MEMORY_RECALL_MAX,
+        wait_seconds=settings.MEMORY_RECALL_WAIT_SECONDS,
+        log_text=settings.MEMORY_LOG_TEXT,
     )
 
     tool_lister = ListAvailableToolsUseCase()
@@ -327,6 +352,7 @@ def get_container(session: AsyncSession):
         answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
         approval_repo=tool_approval_repo,
         event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+        recall=recall_uc,
     )
 
     summarize_history_uc = SummarizeHistoryUseCase(
@@ -345,6 +371,7 @@ def get_container(session: AsyncSession):
         uow=uow,
         model_resolver=model_resolver,
         confidence_threshold=settings.MEMORY_REFLECTION_CONFIDENCE_THRESHOLD,
+        embed_memories=embed_memories_uc,
     )
 
     async def _reflect_and_summarize(
@@ -379,6 +406,11 @@ def get_container(session: AsyncSession):
                 )
             except Exception as ref_exc:
                 logger.error("Background reflection failed for session %s: %s", session_id, ref_exc, exc_info=True)
+            # Memories saved while the embedder was down get their vectors here (memory spec §4.3).
+            try:
+                await bg_container[EmbedMemoriesUseCase].fill_missing()
+            except Exception as fill_exc:
+                logger.error("Filling memory vectors failed: %s", fill_exc, exc_info=True)
             # After reflection, so the facts it keeps are taken from the words before they are
             # folded into the summary.
             try:
@@ -566,8 +598,10 @@ def get_container(session: AsyncSession):
         pres_deps.get_list_user_memories_use_case: ListUserMemoriesUseCase(memory_repo),
         pres_deps.get_list_household_memories_use_case: ListHouseholdMemoriesUseCase(memory_repo),
         pres_deps.get_memory_use_case: GetMemoryUseCase(memory_repo),
-        pres_deps.get_create_memory_use_case: CreateMemoryUseCase(memory_repo, session_repo, agent_repo, uow),
-        pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow),
+        pres_deps.get_create_memory_use_case: CreateMemoryUseCase(
+            memory_repo, session_repo, agent_repo, uow, embed_memories=embed_memories_uc
+        ),
+        pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow, embed_memories=embed_memories_uc),
         pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(memory_repo, user_repo, agent_repo),
         pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow),
         pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
@@ -620,6 +654,7 @@ def get_container(session: AsyncSession):
         # Lifecycle & Background Maintenance
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
         SyncDefaultModelUseCase: SyncDefaultModelUseCase(llm_model_repo, uow),
+        EmbedMemoriesUseCase: embed_memories_uc,
         PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
         PurgeExpiredDeviceSessionsUseCase: PurgeExpiredDeviceSessionsUseCase(
             device_session_repo, uow, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

@@ -56,7 +56,18 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "bge-m3"
     # How long a turn waits for vectors before its index falls back to keywords.
     EMBEDDING_TIMEOUT_SECONDS: float = 60.0
+    # How long the embedder's Ollama keeps bge-m3 loaded: -1 never unloads it, so recall never
+    # waits 6 s for a load. The on-demand rule is for the chat model on the home PC (Anton, 15 Oct).
+    EMBEDDING_KEEP_ALIVE: Union[int, str] = -1
     MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
+    # Reading memories (memory spec §5). The fixed block's size, and recall's cut-off, how many it
+    # attaches, and how long a turn waits for the question's vector before going without.
+    MEMORY_BLOCK_TOKENS: int = 1000
+    MEMORY_RECALL_CUTOFF: float = 0.60
+    MEMORY_RECALL_MAX: int = 3
+    MEMORY_RECALL_WAIT_SECONDS: float = 1.0
+    # Memory text in log lines, cut to 500 characters; off unless tuning (§9).
+    MEMORY_LOG_TEXT: bool = False
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["https://spicy-llama.duckdns.org"]

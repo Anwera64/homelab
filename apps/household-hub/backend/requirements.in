@@ -19,3 +19,4 @@ cryptography==50.0.2
 python-multipart==0.0.32
 tzdata==2026.5
 trafilatura==2.3.1
+sqlite-vec==0.1.9

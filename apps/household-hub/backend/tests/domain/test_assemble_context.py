@@ -335,7 +335,7 @@ async def test_the_agent_is_told_the_date_at_the_end_of_the_primacy_zone():
     # The recency zone keeps its order: memories, then the closing secret-mode reminder.
     assert blocks[4:] == [
         "[What I Know About You]:",
-        "- [Added Sep 2026] Prefers almond milk with matcha (confidence: 0.95)",
+        "- [Added Sep 2026] Prefers almond milk with matcha",
         "[Reminder: Secret Mode is active. Keep all disclosures confidential.]",
     ]
 

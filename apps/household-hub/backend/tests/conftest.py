@@ -76,6 +76,13 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     await test_engine.dispose()
 
 
+class OfflineEmbedder:
+    async def embed(self, texts):
+        from app.domain.exceptions import EmbeddingException
+
+        raise EmbeddingException("no embedder in tests")
+
+
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[httpx.AsyncClient, None]:
     """HTTP async test client with database dependency override."""
@@ -88,6 +95,8 @@ async def client(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> A
 
     monkeypatch.setattr(di_module, "AsyncSessionLocal", TestingSessionLocal)
     monkeypatch.setattr(db_module, "AsyncSessionLocal", TestingSessionLocal)
+    # No embedder in tests: memories are saved without vectors and recall finds nothing.
+    monkeypatch.setattr(di_module, "_embedder", OfflineEmbedder())
 
 
 

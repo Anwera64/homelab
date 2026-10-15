@@ -226,3 +226,19 @@ async def test_GIVEN_a_non_streamed_turn_WHEN_reflection_runs_THEN_the_history_i
 
 def test_settings_pause_searching_for_five_minutes_when_the_engines_throttle_us(settings_without_overrides: Settings):
     assert settings_without_overrides.SEARCH_THROTTLE_COOLDOWN_SECONDS == 300
+
+
+def test_GIVEN_no_override_THEN_memory_reading_starts_at_the_spec_defaults(settings_without_overrides: Settings):
+    """Memory spec §5 and §12 q7, q11; the embedder stays loaded on the server (Anton, 15 Oct)."""
+    s = settings_without_overrides
+    assert s.MEMORY_BLOCK_TOKENS == 1000
+    assert s.MEMORY_RECALL_CUTOFF == 0.60
+    assert s.MEMORY_RECALL_MAX == 3
+    assert s.MEMORY_RECALL_WAIT_SECONDS == 1.0
+    assert s.MEMORY_LOG_TEXT is False
+    assert s.EMBEDDING_KEEP_ALIVE == -1
+
+
+def test_GIVEN_a_duration_WHEN_set_THEN_the_embedders_keep_alive_is_kept_as_written(monkeypatch):
+    monkeypatch.setenv("EMBEDDING_KEEP_ALIVE", "30m")
+    assert Settings(_env_file=None).EMBEDDING_KEEP_ALIVE == "30m"
