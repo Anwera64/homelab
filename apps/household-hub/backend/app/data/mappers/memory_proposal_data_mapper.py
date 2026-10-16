@@ -14,6 +14,7 @@ class MemoryProposalDataMapper:
             source_session_id=model.source_session_id,
             source_user_id=model.source_user_id,
             state=model.state,
+            new_memory_id=model.new_memory_id,
             created_at=model.created_at,
             answered_at=model.answered_at,
         )
@@ -29,6 +30,7 @@ class MemoryProposalDataMapper:
             source_session_id=entity.source_session_id,
             source_user_id=entity.source_user_id,
             state=entity.state,
+            new_memory_id=entity.new_memory_id,
             created_at=entity.created_at,
             answered_at=entity.answered_at,
         )

@@ -421,6 +421,21 @@ class ProfileViewModelTest {
         }
 
     @Test
+    fun `GIVEN changes waiting for the member WHEN the profile is shown THEN the Memories row counts them`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getMemoryPage() } returns
+                MemoryPage(yours = emptyList(), household = emptyList(), toCheck = 2)
+            val viewModel = viewModel()
+
+            viewModel.loadMemoryCounts()
+            advanceUntilIdle()
+
+            assertEquals(MemoryCounts(yours = 0, household = 0, toCheck = 2), viewModel.uiState.value.memoryCounts)
+        }
+
+    @Test
     fun `GIVEN the hub can't count memories WHEN the profile is shown THEN the row makes no claim`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma

@@ -19,6 +19,9 @@ from app.presentation.schemas.chat_schemas import (
     ToolDecisionRequest,
 )
 from app.presentation.mappers.session_presentation_mapper import SessionPresentationMapper
+from app.presentation.mappers.memory_presentation_mapper import MemoryPresentationMapper
+from app.presentation.schemas.memory_schemas import LookedOverRead
+from app.domain.use_cases.memories.changes_to_check import LookedOverUseCase
 from app.domain.use_cases.sessions.list_user_sessions import ListUserSessionsUseCase
 from app.domain.use_cases.sessions.get_session import GetSessionUseCase
 from app.domain.use_cases.sessions.create_session import CreateSessionUseCase
@@ -46,6 +49,7 @@ from app.presentation.api.deps import (
     get_after_turn_runner,
     get_background_chat_stream_runner,
     get_turn_log_registry,
+    get_looked_over_use_case,
 )
 
 
@@ -101,6 +105,7 @@ async def get_session(
     before_id: Optional[str] = Query(None),
     use_case: GetSessionUseCase = Depends(get_session_use_case),
     lock_registry: SessionLockRegistry = Depends(get_session_lock_registry),
+    looked_over: LookedOverUseCase = Depends(get_looked_over_use_case),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -119,7 +124,20 @@ async def get_session(
     )
     detail = SessionPresentationMapper.to_detail_response(session, messages)
     detail.turn_running = lock_registry.is_locked(session_id)
+    detail.looked_over = MemoryPresentationMapper.to_looked_over_summary(
+        await looked_over.summary(session, current_user)
+    )
     return detail
+
+
+@router.get("/{session_id}/looked-over", response_model=LookedOverRead)
+async def get_looked_over(
+    session_id: str,
+    use_case: LookedOverUseCase = Depends(get_looked_over_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """The sheet "Remembered from this chat": changes to check, the ones waiting, and what was remembered."""
+    return MemoryPresentationMapper.to_looked_over(await use_case.execute(session_id, current_user))
 
 
 @router.patch("/{session_id}/secret", response_model=SessionRead)

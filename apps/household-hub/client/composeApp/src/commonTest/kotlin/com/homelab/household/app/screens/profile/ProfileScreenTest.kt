@@ -272,6 +272,21 @@ class ProfileScreenTest {
     }
 
     @Test
+    fun `GIVEN a change to check WHEN the profile is shown THEN the Memories row says 1 to check`() {
+        val hub =
+            FakeMembersHub().apply {
+                remembers("p1", "Likes tea")
+                readsAChange("c1", stored = "Likes tea", read = "Prefers coffee now")
+            }
+
+        runScreenTest {
+            profileScreen(hub)
+
+            onProfile { seesToCheck(count = 1) }
+        }
+    }
+
+    @Test
     fun `GIVEN agents add events without asking WHEN the profile is shown THEN the agents row counts it and opens When agents act`() {
         // GIVEN
         val hub = FakeMembersHub().apply { addsEventsAutomatically() }

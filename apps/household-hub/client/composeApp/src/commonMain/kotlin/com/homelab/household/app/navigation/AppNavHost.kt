@@ -148,6 +148,8 @@ fun AppNavHost(
                         onBack = { backStack.removeLastOrNull() },
                         // A failed calendar step's fix: connecting lands back here, to ask again.
                         onConnectCalendar = { backStack.add(Destination.CalendarPicker) },
+                        // "All memories" at the foot of the chat's look-over sheet.
+                        onAllMemories = { backStack.add(Destination.Memories) },
                     )
                 }
                 entry<Destination.Profile> {
@@ -167,7 +169,13 @@ fun AppNavHost(
                     screens.WhenAgentsAct(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Memories> {
-                    screens.Memories(onBack = { backStack.removeLastOrNull() })
+                    screens.Memories(
+                        onBack = { backStack.removeLastOrNull() },
+                        onChangesToCheck = { backStack.add(Destination.ChangesToCheck) },
+                    )
+                }
+                entry<Destination.ChangesToCheck> {
+                    screens.ChangesToCheck(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Members> {
                     screens.Members(

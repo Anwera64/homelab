@@ -48,6 +48,7 @@ class MemoriesViewModel(
                             status = MemoriesStatus.Ready,
                             yours = page.yours.map(::rowOf),
                             household = page.household.map(::rowOf),
+                            toCheck = page.toCheck,
                         )
                     }
                 },
@@ -57,6 +58,24 @@ class MemoriesViewModel(
                     _uiState.update { it.copy(status = status) }
                 },
             )
+        }
+    }
+
+    /**
+     * Coming back from Changes to check: the band recounts and the lists pick up what an answer added
+     * or retired, without the loading rows.
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            runCatchingSafe { getMemoryPage() }.onSuccess { page ->
+                _uiState.update {
+                    it.copy(
+                        yours = page.yours.map(::rowOf),
+                        household = page.household.map(::rowOf),
+                        toCheck = page.toCheck,
+                    )
+                }
+            }
         }
     }
 
@@ -114,12 +133,5 @@ class MemoriesViewModel(
         )
     }
 
-    private fun rowOf(item: MemoryItem): MemoryRow {
-        val now = clock.now()
-        return MemoryRow(
-            item = item,
-            age = memoryAge(item.createdAt, now, deviceTimeZone.offsetSecondsAt(now)),
-            until = item.expiresAt?.let { localDay(it, deviceTimeZone.offsetSecondsAt(it)) },
-        )
-    }
+    private fun rowOf(item: MemoryItem): MemoryRow = memoryRowOf(item, deviceTimeZone, clock)
 }

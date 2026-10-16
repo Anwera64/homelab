@@ -48,3 +48,5 @@ class MemoryPageItem:
 class MemoryPage:
     yours: list[MemoryPageItem]
     household: list[MemoryPageItem]
+    # The member's changes to check: the band on the page and the chip on Profile.
+    to_check: int = 0

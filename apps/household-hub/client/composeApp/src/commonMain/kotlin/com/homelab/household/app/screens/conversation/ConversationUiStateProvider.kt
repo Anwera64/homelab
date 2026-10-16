@@ -7,6 +7,7 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -20,6 +21,9 @@ import com.homelab.household.presentation.chatsession.AgentOwner
 import com.homelab.household.presentation.chatsession.AutomaticWrite
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
+import com.homelab.household.presentation.memories.LocalTime
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * A conversation in each state the canvas draws, including the four ways a turn ends.
@@ -35,6 +39,15 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
         status: MessageStatus = MessageStatus.SENT,
         parts: List<AnswerPart> = emptyList(),
     ) = ChatMessage(id = id, sessionId = "s-1", role = role, content = content, status = status, parts = parts)
+
+    @OptIn(ExperimentalTime::class)
+    private val lookedOver =
+        LookedOverLine(
+            throughMessageId = "m-2",
+            at = Instant.parse("2026-10-16T10:52:00Z"),
+            remembered = 2,
+            toCheck = 1,
+        )
 
     private val agent =
         ChatSessionUiState(
@@ -618,6 +631,29 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                     madeAutomatic = AutomaticWrite("calendar_write", ToolAction.Create),
+                ),
+            // Canvas: MemChatLine. The chat went quiet after the answer, was looked over, then went on.
+            "Looked over" to
+                agent.copy(
+                    session = session.copy(lookedOver = lookedOver),
+                    lookedOverAt = LocalTime(hour = 10, minute = 52),
+                    messages =
+                        listOf(
+                            question,
+                            said("m-2", "The panel review is tomorrow at 14:30.", MessageRole.ASSISTANT),
+                            said("m-3", "And what about Friday?", MessageRole.USER),
+                        ),
+                ),
+            // Canvas: MemChatLineNothing. Looked over, and nothing was worth keeping.
+            "Looked over, nothing new" to
+                agent.copy(
+                    session = session.copy(lookedOver = lookedOver.copy(remembered = 0, toCheck = 0)),
+                    lookedOverAt = LocalTime(hour = 10, minute = 52),
+                    messages =
+                        listOf(
+                            question,
+                            said("m-2", "The panel review is tomorrow at 14:30.", MessageRole.ASSISTANT),
+                        ),
                 ),
         )
 

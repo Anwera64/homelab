@@ -557,3 +557,34 @@ def test_reflection_starts_from_a_clean_hub_and_chats_get_a_marker():
                 assert not {"reflected_through_id", "reflected_at", "last_reflection"} & columns
         finally:
             engine.dispose()
+
+
+_BEFORE_ANSWERS = "d7a1c3e9f402"
+
+
+def test_a_proposal_remembers_the_memory_its_answer_made():
+    """
+    GIVEN a hub from before answers WHEN migrated THEN a proposal can record the memory Keep both or Use
+    new created, so Undo can take it away again (PR 5). Downgrading drops the column.
+    """
+    from sqlalchemy import inspect
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "answers.db"
+        database_url = f"sqlite:///{db_path}"
+        config = _alembic_config(database_url)
+        command.upgrade(config, _BEFORE_ANSWERS)
+
+        engine = create_engine(database_url)
+        try:
+            command.upgrade(config, "head")
+            with engine.connect() as conn:
+                columns = {c["name"] for c in inspect(conn).get_columns("memory_proposals")}
+                assert "new_memory_id" in columns
+
+            command.downgrade(config, _BEFORE_ANSWERS)
+            with engine.connect() as conn:
+                columns = {c["name"] for c in inspect(conn).get_columns("memory_proposals")}
+                assert "new_memory_id" not in columns
+        finally:
+            engine.dispose()

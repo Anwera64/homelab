@@ -70,6 +70,7 @@ import com.homelab.household.app.theme.StillMotion
 import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.AnswerPart
+import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -83,6 +84,7 @@ const val CONVERSATION_TRANSCRIPT_TAG = "ConversationTranscript"
 
 /** The Undo line's place in the transcript, which no message id can take. */
 private const val MADE_AUTOMATIC_KEY = "made-automatic"
+private const val LOOKED_OVER_KEY = "looked-over"
 
 /**
  * A conversation, and a new one — the same screen.
@@ -115,6 +117,7 @@ fun ConversationContent(
         edited: ProposalDetails?,
     ) -> Unit = { id, edited -> onDecide(id, true, edited) },
     onUndoAutomatic: () -> Unit = {},
+    onLookedOver: () -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -153,7 +156,15 @@ fun ConversationContent(
     // Counted from the state rather than read off the layout, because the first pass runs before
     // there is any layout to read and the answer is already on screen by then.
     val turnIsDrawn = state.streamingMessage != null || state.turnState == TurnState.Failed
-    val itemCount = state.messages.size + if (turnIsDrawn) 1 else 0
+    val lookedOverDrawn = state.session?.lookedOver != null && state.lookedOverAt != null
+    val itemCount = state.messages.size + (if (turnIsDrawn) 1 else 0) + if (lookedOverDrawn) 1 else 0
+
+    // How many messages come before the look-over line: through the last one it read, or all of them
+    // when that message isn't in the transcript.
+    val lookedOverCut =
+        state.session?.lookedOver?.let { line ->
+            state.messages.indexOfLast { it.id == line.throughMessageId }.takeIf { it >= 0 }?.plus(1)
+        } ?: state.messages.size
 
     // An answer arrives faster than anyone reads it, and it arrives at the bottom: without this the
     // words land below the fold and the screen sits still while the agent talks.
@@ -317,6 +328,45 @@ fun ConversationContent(
             return@HearthScaffold
         }
 
+        // A message as the transcript draws it, on either side of the quiet look-over line.
+        val drawMessage: @Composable (ChatMessage) -> Unit = { message ->
+            val undelivered =
+                message.role == MessageRole.USER &&
+                    (message.status == MessageStatus.FAILED_OFFLINE || message.status == MessageStatus.FAILED_ERROR)
+            // The receipt belongs to the newest question only: under every one it is noise.
+            val receipted = message.id == latestQuestionId && message.status == MessageStatus.SENT
+
+            if (message.role == MessageRole.ASSISTANT) {
+                // A fixed step can ask its question again only while this is the latest answer:
+                // after a newer message the conversation has moved on (canvas: ToolFixedLater).
+                val question = askAgainQuestion(state, message.id)
+                // Finished, so its steps fold away and it reads as the answer.
+                Answer(
+                    parts = message.parts,
+                    written = message.content,
+                    folded = true,
+                    onDecide = onDecide,
+                    onConnectCalendar = onConnectCalendar,
+                    onAskAgain = question?.let { { onSend(it) } },
+                    onApproveAutomatically = onApproveAutomatically,
+                )
+            } else {
+                MessageBubble(
+                    content = message.content,
+                    fromMe = message.role == MessageRole.USER,
+                    status =
+                        if (receipted) {
+                            { SentReceipt() }
+                        } else if (undelivered) {
+                            // Only this case re-sends: the question itself never landed.
+                            { NotSentReceipt(onRetry = { onRetry(message.content) }) }
+                        } else {
+                            null
+                        },
+                )
+            }
+        }
+
         LazyColumn(
             state = transcript,
             modifier = Modifier
@@ -327,43 +377,16 @@ fun ConversationContent(
             contentPadding = PaddingValues(HearthTheme.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.lg),
         ) {
-            items(state.messages, key = { it.id }) { message ->
-                val undelivered =
-                    message.role == MessageRole.USER &&
-                        (message.status == MessageStatus.FAILED_OFFLINE || message.status == MessageStatus.FAILED_ERROR)
-                // The receipt belongs to the newest question only: under every one it is noise.
-                val receipted = message.id == latestQuestionId && message.status == MessageStatus.SENT
+            items(state.messages.take(lookedOverCut), key = { it.id }) { message -> drawMessage(message) }
 
-                if (message.role == MessageRole.ASSISTANT) {
-                    // A fixed step can ask its question again only while this is the latest answer:
-                    // after a newer message the conversation has moved on (canvas: ToolFixedLater).
-                    val question = askAgainQuestion(state, message.id)
-                    // Finished, so its steps fold away and it reads as the answer.
-                    Answer(
-                        parts = message.parts,
-                        written = message.content,
-                        folded = true,
-                        onDecide = onDecide,
-                        onConnectCalendar = onConnectCalendar,
-                        onAskAgain = question?.let { { onSend(it) } },
-                        onApproveAutomatically = onApproveAutomatically,
-                    )
-                } else {
-                    MessageBubble(
-                        content = message.content,
-                        fromMe = message.role == MessageRole.USER,
-                        status =
-                            if (receipted) {
-                                { SentReceipt() }
-                            } else if (undelivered) {
-                                // Only this case re-sends: the question itself never landed.
-                                { NotSentReceipt(onRetry = { onRetry(message.content) }) }
-                            } else {
-                                null
-                            },
-                    )
-                }
+            // After the last message the look-over read; the chat went on below it.
+            val lookedOver = state.session?.lookedOver
+            val lookedOverAt = state.lookedOverAt
+            if (lookedOver != null && lookedOverAt != null) {
+                item(key = LOOKED_OVER_KEY) { LookedOverLine(lookedOver, lookedOverAt, onOpen = onLookedOver) }
             }
+
+            items(state.messages.drop(lookedOverCut), key = { it.id }) { message -> drawMessage(message) }
 
             // The answer being written, with whatever has become of it sitting where it stopped.
             if (state.streamingMessage != null || state.turnState == TurnState.Failed) {

@@ -24,4 +24,6 @@ data class ConversationSession(
     val turnRunning: Boolean = false,
     /** Whether the newest answer is paused on a card the member has still to answer. */
     val awaitingApproval: Boolean = false,
+    /** The quiet line after the last message looked over; null before the first look-over and when secret. */
+    val lookedOver: LookedOverLine? = null,
 )

@@ -1,5 +1,24 @@
+from typing import Optional
+
 from app.domain.entities.memory import AgentMemory, MemoryPage, MemoryPageItem
-from app.presentation.schemas.memory_schemas import MemoryPageItemRead, MemoryPageRead, MemoryRead
+from app.domain.entities.memory_proposal import (
+    ChangeCard,
+    ChangesToCheck,
+    LookedOver,
+    LookedOverSummary,
+    MemoryProposal,
+)
+from app.presentation.schemas.memory_schemas import (
+    ChangeCardRead,
+    ChangeSourceRead,
+    ChangesToCheckRead,
+    LookedOverRead,
+    LookedOverSummaryRead,
+    MemoryPageItemRead,
+    MemoryPageRead,
+    MemoryRead,
+    ProposalRead,
+)
 
 
 class MemoryPresentationMapper:
@@ -42,4 +61,58 @@ class MemoryPresentationMapper:
         return MemoryPageRead(
             yours=[MemoryPresentationMapper.to_page_item(i) for i in page.yours],
             household=[MemoryPresentationMapper.to_page_item(i) for i in page.household],
+            to_check=page.to_check,
+        )
+
+    @staticmethod
+    def to_card(card: ChangeCard) -> ChangeCardRead:
+        return ChangeCardRead(
+            id=card.proposal.id,
+            content=card.proposal.content,
+            stored=MemoryPresentationMapper.to_page_item(card.stored),
+            can_answer=card.can_answer,
+            answerer_name=card.answerer_name,
+            source=ChangeSourceRead(
+                title=card.source_title,
+                owner_name=card.source_owner_name,
+                read_at=card.proposal.created_at,
+            ),
+        )
+
+    @staticmethod
+    def to_changes(changes: ChangesToCheck) -> ChangesToCheckRead:
+        return ChangesToCheckRead(
+            to_check=[MemoryPresentationMapper.to_card(c) for c in changes.to_check],
+            waiting=[MemoryPresentationMapper.to_card(c) for c in changes.waiting],
+        )
+
+    @staticmethod
+    def to_proposal(proposal: MemoryProposal) -> ProposalRead:
+        return ProposalRead(
+            id=proposal.id,
+            memory_id=proposal.memory_id,
+            content=proposal.content,
+            state=proposal.state,
+            new_memory_id=proposal.new_memory_id,
+            answered_at=proposal.answered_at,
+        )
+
+    @staticmethod
+    def to_looked_over_summary(summary: Optional[LookedOverSummary]) -> Optional[LookedOverSummaryRead]:
+        if summary is None:
+            return None
+        return LookedOverSummaryRead(
+            through_message_id=summary.through_message_id,
+            at=summary.at,
+            remembered=summary.remembered,
+            to_check=summary.to_check,
+        )
+
+    @staticmethod
+    def to_looked_over(looked_over: LookedOver) -> LookedOverRead:
+        return LookedOverRead(
+            at=looked_over.at,
+            to_check=[MemoryPresentationMapper.to_card(c) for c in looked_over.to_check],
+            waiting=[MemoryPresentationMapper.to_card(c) for c in looked_over.waiting],
+            remembered=[MemoryPresentationMapper.to_page_item(i) for i in looked_over.remembered],
         )

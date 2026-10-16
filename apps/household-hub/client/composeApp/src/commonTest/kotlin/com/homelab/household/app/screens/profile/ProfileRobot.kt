@@ -32,6 +32,7 @@ import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_memories
 import com.homelab.household.app.resources.profile_memories_counts
+import com.homelab.household.app.resources.profile_memories_to_check
 import com.homelab.household.app.resources.profile_memory_section
 import com.homelab.household.app.resources.profile_sign_out
 import com.homelab.household.app.resources.profile_when_agents_act
@@ -138,6 +139,8 @@ class ProfileRobot(
         yours: Int,
         household: Int,
     ) = seesText(getString(Res.string.profile_memories_counts, yours, household))
+
+    suspend fun seesToCheck(count: Int) = seesText(getString(Res.string.profile_memories_to_check, count))
 
     suspend fun tapsMemories() {
         test.onNodeWithText(getString(Res.string.profile_memories)).performScrollTo().performClick()

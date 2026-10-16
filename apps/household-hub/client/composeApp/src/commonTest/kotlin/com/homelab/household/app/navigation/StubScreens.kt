@@ -209,6 +209,7 @@ class StubScreens : AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
+        onAllMemories: () -> Unit,
     ) {
         TakeViewModel()
         // Listens as the real screen does, so a test sees what the connect flow sends back.
@@ -216,6 +217,7 @@ class StubScreens : AppScreens {
         Column {
             Text(if (sessionId == null) NEW_CONVERSATION else conversationOf(sessionId))
             Text(RECONNECT_CALENDAR, modifier = Modifier.clickable { onConnectCalendar() })
+            Text(GO_TO_ALL_MEMORIES, modifier = Modifier.clickable { onAllMemories() })
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -247,9 +249,21 @@ class StubScreens : AppScreens {
     }
 
     @Composable
-    override fun Memories(onBack: () -> Unit) {
+    override fun Memories(
+        onBack: () -> Unit,
+        onChangesToCheck: () -> Unit,
+    ) {
         Column {
             Text(MEMORIES)
+            Text(GO_TO_CHANGES_TO_CHECK, modifier = Modifier.clickable { onChangesToCheck() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
+    override fun ChangesToCheck(onBack: () -> Unit) {
+        Column {
+            Text(CHANGES_TO_CHECK)
             Text(BACK, modifier = Modifier.clickable { onBack() })
         }
     }
@@ -393,6 +407,9 @@ class StubScreens : AppScreens {
         const val GO_TO_WHEN_AGENTS_ACT = "go to when agents act"
         const val MEMORIES = "memories screen"
         const val GO_TO_MEMORIES = "go to memories"
+        const val CHANGES_TO_CHECK = "changes to check screen"
+        const val GO_TO_CHANGES_TO_CHECK = "go to changes to check"
+        const val GO_TO_ALL_MEMORIES = "go to all memories"
         const val MEMBERS = "members screen"
         const val INVITE_CREATE = "invite create screen"
         const val LEAVE = "leave household screen"

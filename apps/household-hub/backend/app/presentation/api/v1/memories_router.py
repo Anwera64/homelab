@@ -2,7 +2,17 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Response, status
 
 from app.domain.entities.user import User
-from app.presentation.schemas.memory_schemas import MemoryCreate, MemoryPageRead, MemoryRead, MemoryUpdate
+from app.presentation.schemas.memory_schemas import (
+    ChangesToCheckRead,
+    MemoryCreate,
+    MemoryPageRead,
+    MemoryRead,
+    MemoryUpdate,
+    ProposalAnswer,
+    ProposalRead,
+)
+from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
+from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase
 from app.presentation.mappers.memory_presentation_mapper import MemoryPresentationMapper
 from app.domain.use_cases.memories.list_user_memories import ListUserMemoriesUseCase
 from app.domain.use_cases.memories.list_household_memories import ListHouseholdMemoriesUseCase
@@ -22,6 +32,9 @@ from app.presentation.api.deps import (
     get_list_memory_page_use_case,
     get_restore_memory_use_case,
     get_retire_memory_use_case,
+    get_list_proposals_use_case,
+    get_answer_proposal_use_case,
+    get_undo_proposal_answer_use_case,
 )
 
 router = APIRouter(prefix="/memories", tags=["Agent Memories & Relationships"])
@@ -65,6 +78,36 @@ async def memory_page(
 ):
     """The memory page: your personal memories, and every household memory with who said it."""
     return MemoryPresentationMapper.to_page(await use_case.execute(current_user))
+
+
+@router.get("/proposals", response_model=ChangesToCheckRead)
+async def list_proposals(
+    use_case: ListProposalsUseCase = Depends(get_list_proposals_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Changes to check: yours to answer, then the ones from your chats waiting for someone else."""
+    return MemoryPresentationMapper.to_changes(await use_case.execute(current_user))
+
+
+@router.post("/proposals/{proposal_id}/answer", response_model=ProposalRead)
+async def answer_proposal(
+    proposal_id: str,
+    payload: ProposalAnswer,
+    use_case: AnswerProposalUseCase = Depends(get_answer_proposal_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Keep stored, Keep both or Use new. Only the member who said the stored memory may answer."""
+    return MemoryPresentationMapper.to_proposal(await use_case.execute(proposal_id, payload.answer, current_user))
+
+
+@router.post("/proposals/{proposal_id}/undo", response_model=ProposalRead)
+async def undo_proposal_answer(
+    proposal_id: str,
+    use_case: UndoProposalAnswerUseCase = Depends(get_undo_proposal_answer_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Undo after answering: the change is open again and everything is as before."""
+    return MemoryPresentationMapper.to_proposal(await use_case.execute(proposal_id, current_user))
 
 
 @router.post("", response_model=MemoryRead, status_code=status.HTTP_201_CREATED)

@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.presentation.schemas.memory_schemas import LookedOverSummaryRead
+
 
 class ChatMessageBase(BaseModel):
     role: Literal["user", "assistant", "system", "tool"]
@@ -65,3 +67,6 @@ class SessionDetailRead(SessionRead):
     # The newest answer is paused on a card: its parts hold the proposals still waiting. A new
     # message answers 409 approval_pending until each has been decided.
     awaiting_approval: bool = False
+    # The quiet line after the last message looked over (memory spec §8); none before the first
+    # look-over and in a secret chat.
+    looked_over: Optional[LookedOverSummaryRead] = None

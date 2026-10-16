@@ -5,6 +5,7 @@ import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
 import com.homelab.household.app.screens.calendarconnect.GoogleCalendarSignInScreen
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderScreen
 import com.homelab.household.app.screens.changepin.ChangePinScreen
+import com.homelab.household.app.screens.changes.ChangesToCheckScreen
 import com.homelab.household.app.screens.chats.ChatsScreen
 import com.homelab.household.app.screens.conversation.ConversationScreen
 import com.homelab.household.app.screens.firstrun.FirstRunScreen
@@ -113,6 +114,7 @@ interface AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
+        onAllMemories: () -> Unit,
     )
 
     @Composable fun Profile(
@@ -129,7 +131,12 @@ interface AppScreens {
 
     @Composable fun WhenAgentsAct(onBack: () -> Unit)
 
-    @Composable fun Memories(onBack: () -> Unit)
+    @Composable fun Memories(
+        onBack: () -> Unit,
+        onChangesToCheck: () -> Unit,
+    )
+
+    @Composable fun ChangesToCheck(onBack: () -> Unit)
 
     @Composable fun Members(
         onBack: () -> Unit,
@@ -296,8 +303,14 @@ object RealAppScreens : AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
+        onAllMemories: () -> Unit,
     ) {
-        ConversationScreen(sessionId = sessionId, onBack = onBack, onConnectCalendar = onConnectCalendar)
+        ConversationScreen(
+            sessionId = sessionId,
+            onBack = onBack,
+            onConnectCalendar = onConnectCalendar,
+            onAllMemories = onAllMemories,
+        )
     }
 
     @Composable
@@ -331,8 +344,16 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun Memories(onBack: () -> Unit) {
-        MemoriesScreen(onBack = onBack)
+    override fun Memories(
+        onBack: () -> Unit,
+        onChangesToCheck: () -> Unit,
+    ) {
+        MemoriesScreen(onBack = onBack, onChangesToCheck = onChangesToCheck)
+    }
+
+    @Composable
+    override fun ChangesToCheck(onBack: () -> Unit) {
+        ChangesToCheckScreen(onBack = onBack)
     }
 
     @Composable

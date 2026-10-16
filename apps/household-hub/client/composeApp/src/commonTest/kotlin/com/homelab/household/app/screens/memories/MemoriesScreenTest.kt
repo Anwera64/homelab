@@ -104,6 +104,38 @@ class MemoriesScreenTest {
     }
 
     @Test
+    fun `GIVEN changes to check WHEN the page opens THEN a band counts them and opens Changes to check`() {
+        val hub =
+            household().apply {
+                readsAChange("c1", stored = "Is vegetarian.", read = "Eats fish again.")
+                readsAChange("c2", stored = "Works late on Thursdays.", read = "Works late on Fridays.")
+            }
+        var opened = 0
+
+        runScreenTest {
+            memoriesScreen(hub, onChangesToCheck = { opened++ })
+
+            onMemories {
+                seesTheBand(count = 2)
+                opensTheBand()
+            }
+            waitUntil(timeoutMillis = wait) { opened == 1 }
+        }
+    }
+
+    @Test
+    fun `GIVEN nothing to check WHEN the page opens THEN there is no band`() {
+        runScreenTest {
+            memoriesScreen(household())
+
+            onMemories {
+                seesTheTitle()
+                seesNoBand()
+            }
+        }
+    }
+
+    @Test
     fun `GIVEN nothing is remembered WHEN the page opens THEN it says so`() {
         runScreenTest {
             memoriesScreen(FakeMembersHub())

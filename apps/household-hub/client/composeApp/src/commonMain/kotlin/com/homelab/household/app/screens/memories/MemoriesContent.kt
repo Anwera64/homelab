@@ -45,29 +45,15 @@ import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
-import com.homelab.household.app.resources.memories_age_last_week
-import com.homelab.household.app.resources.memories_age_month_year
-import com.homelab.household.app.resources.memories_age_today
-import com.homelab.household.app.resources.memories_age_yesterday
+import com.homelab.household.app.resources.changes_title
 import com.homelab.household.app.resources.memories_back
+import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_empty_line
 import com.homelab.household.app.resources.memories_empty_title
 import com.homelab.household.app.resources.memories_failed_line
 import com.homelab.household.app.resources.memories_failed_title
 import com.homelab.household.app.resources.memories_household_note
 import com.homelab.household.app.resources.memories_intro
-import com.homelab.household.app.resources.memories_month_apr
-import com.homelab.household.app.resources.memories_month_aug
-import com.homelab.household.app.resources.memories_month_dec
-import com.homelab.household.app.resources.memories_month_feb
-import com.homelab.household.app.resources.memories_month_jan
-import com.homelab.household.app.resources.memories_month_jul
-import com.homelab.household.app.resources.memories_month_jun
-import com.homelab.household.app.resources.memories_month_mar
-import com.homelab.household.app.resources.memories_month_may
-import com.homelab.household.app.resources.memories_month_nov
-import com.homelab.household.app.resources.memories_month_oct
-import com.homelab.household.app.resources.memories_month_sep
 import com.homelab.household.app.resources.memories_offline_line
 import com.homelab.household.app.resources.memories_offline_title
 import com.homelab.household.app.resources.memories_remove
@@ -87,37 +73,17 @@ import com.homelab.household.app.resources.memories_undo_unreachable
 import com.homelab.household.app.resources.memories_until
 import com.homelab.household.app.resources.memories_you
 import com.homelab.household.app.resources.memories_you_asked
-import com.homelab.household.app.resources.tool_card_month_apr
-import com.homelab.household.app.resources.tool_card_month_aug
-import com.homelab.household.app.resources.tool_card_month_dec
-import com.homelab.household.app.resources.tool_card_month_feb
-import com.homelab.household.app.resources.tool_card_month_jan
-import com.homelab.household.app.resources.tool_card_month_jul
-import com.homelab.household.app.resources.tool_card_month_jun
-import com.homelab.household.app.resources.tool_card_month_mar
-import com.homelab.household.app.resources.tool_card_month_may
-import com.homelab.household.app.resources.tool_card_month_nov
-import com.homelab.household.app.resources.tool_card_month_oct
-import com.homelab.household.app.resources.tool_card_month_sep
-import com.homelab.household.app.resources.tool_card_weekday_fri
-import com.homelab.household.app.resources.tool_card_weekday_mon
-import com.homelab.household.app.resources.tool_card_weekday_sat
-import com.homelab.household.app.resources.tool_card_weekday_sun
-import com.homelab.household.app.resources.tool_card_weekday_thu
-import com.homelab.household.app.resources.tool_card_weekday_tue
-import com.homelab.household.app.resources.tool_card_weekday_wed
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.MemoryOrigin
-import com.homelab.household.presentation.memories.LocalDay
 import com.homelab.household.presentation.memories.MemoriesStatus
 import com.homelab.household.presentation.memories.MemoriesUiState
 import com.homelab.household.presentation.memories.MemoryActionFailure
-import com.homelab.household.presentation.memories.MemoryAge
 import com.homelab.household.presentation.memories.MemoryRow
 import com.homelab.household.presentation.memories.MemoryTab
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -132,6 +98,7 @@ fun MemoriesContent(
     state: MemoriesUiState,
     onBack: () -> Unit,
     onTab: (MemoryTab) -> Unit,
+    onChangesToCheck: () -> Unit,
     onRemove: (String) -> Unit,
     onUndo: (String) -> Unit,
     onRetry: () -> Unit,
@@ -157,6 +124,10 @@ fun MemoriesContent(
             ) {
                 Text(stringResource(Res.string.memories_title), style = type.title, color = colors.textPrimary)
                 Text(stringResource(Res.string.memories_intro), style = type.body, color = colors.textMuted)
+            }
+
+            if (ready && state.toCheck > 0) {
+                ChangesBand(count = state.toCheck, onClick = onChangesToCheck)
             }
 
             MemoryTabs(
@@ -235,6 +206,46 @@ fun MemoriesContent(
                 }
             }
         }
+    }
+}
+
+/** "2 changes to check" at the top of the page (board MemList); a tap opens Changes to check. */
+@Composable
+private fun ChangesBand(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = HearthTheme.size.touchTarget)
+            .clip(HearthShapes.item)
+            .background(colors.secondaryContainer)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(HearthTheme.spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)) {
+            Text(
+                pluralStringResource(Res.plurals.changes_title, count, count),
+                style = HearthTheme.typography.bodyStrong,
+                color = colors.onSecondaryContainer,
+            )
+            Text(
+                stringResource(Res.string.memories_band_line),
+                style = HearthTheme.typography.caption,
+                color = colors.onSecondaryContainer,
+            )
+        }
+        HearthIconImage(
+            icon = HearthIcon.ChevronRight,
+            contentDescription = null,
+            size = HearthTheme.size.iconMd,
+            tint = colors.onSecondaryContainer,
+        )
     }
 }
 
@@ -370,7 +381,7 @@ private fun MemoryCard(
 }
 
 @Composable
-private fun RemoveButton(
+internal fun RemoveButton(
     content: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -395,7 +406,7 @@ private fun RemoveButton(
 
 /** The row after ✕ (board MemListRemoved): quiet, with Undo, until the page is left. */
 @Composable
-private fun RemovedRow(
+internal fun RemovedRow(
     row: MemoryRow,
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -491,76 +502,13 @@ private fun LoadingRows(modifier: Modifier = Modifier) {
 
 private const val LOADING_ROWS = 3
 
-@Composable
-private fun ageWords(age: MemoryAge): String =
-    when (age) {
-        MemoryAge.Today -> stringResource(Res.string.memories_age_today)
-
-        MemoryAge.Yesterday -> stringResource(Res.string.memories_age_yesterday)
-
-        is MemoryAge.Weekday -> stringResource(WEEKDAYS[age.isoDay - 1])
-
-        MemoryAge.LastWeek -> stringResource(Res.string.memories_age_last_week)
-
-        is MemoryAge.Month -> stringResource(MONTHS[age.month - 1])
-
-        is MemoryAge.MonthYear -> stringResource(
-            Res.string.memories_age_month_year,
-            stringResource(MONTHS[age.month - 1]),
-            age.year,
-        )
-    }
-
-private fun MemoryActionFailure.words(): StringResource =
+internal fun MemoryActionFailure.words(): StringResource =
     when (this) {
         MemoryActionFailure.RemoveUnreachable -> Res.string.memories_remove_unreachable
         MemoryActionFailure.RemoveFailed -> Res.string.memories_remove_failed
         MemoryActionFailure.UndoUnreachable -> Res.string.memories_undo_unreachable
         MemoryActionFailure.UndoFailed -> Res.string.memories_undo_failed
     }
-
-private val WEEKDAYS =
-    listOf(
-        Res.string.tool_card_weekday_mon,
-        Res.string.tool_card_weekday_tue,
-        Res.string.tool_card_weekday_wed,
-        Res.string.tool_card_weekday_thu,
-        Res.string.tool_card_weekday_fri,
-        Res.string.tool_card_weekday_sat,
-        Res.string.tool_card_weekday_sun,
-    )
-
-private val MONTHS =
-    listOf(
-        Res.string.memories_month_jan,
-        Res.string.memories_month_feb,
-        Res.string.memories_month_mar,
-        Res.string.memories_month_apr,
-        Res.string.memories_month_may,
-        Res.string.memories_month_jun,
-        Res.string.memories_month_jul,
-        Res.string.memories_month_aug,
-        Res.string.memories_month_sep,
-        Res.string.memories_month_oct,
-        Res.string.memories_month_nov,
-        Res.string.memories_month_dec,
-    )
-
-private val SHORT_MONTHS =
-    listOf(
-        Res.string.tool_card_month_jan,
-        Res.string.tool_card_month_feb,
-        Res.string.tool_card_month_mar,
-        Res.string.tool_card_month_apr,
-        Res.string.tool_card_month_may,
-        Res.string.tool_card_month_jun,
-        Res.string.tool_card_month_jul,
-        Res.string.tool_card_month_aug,
-        Res.string.tool_card_month_sep,
-        Res.string.tool_card_month_oct,
-        Res.string.tool_card_month_nov,
-        Res.string.tool_card_month_dec,
-    )
 
 @PreviewDayNight
 @Composable
@@ -572,6 +520,7 @@ private fun MemoriesContentPreview(
             state = state,
             onBack = {},
             onTab = {},
+            onChangesToCheck = {},
             onRemove = {},
             onUndo = {},
             onRetry = {},

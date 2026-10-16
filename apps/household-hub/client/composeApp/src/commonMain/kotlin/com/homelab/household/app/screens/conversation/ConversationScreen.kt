@@ -3,6 +3,9 @@ package com.homelab.household.app.screens.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,6 +31,7 @@ fun ConversationScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onConnectCalendar: () -> Unit = {},
+    onAllMemories: () -> Unit = {},
 ) {
     val viewModel: ChatSessionViewModel = koinViewModel()
     val profileViewModel: ProfileViewModel = koinViewModel()
@@ -35,11 +39,30 @@ fun ConversationScreen(
     val profile by profileViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(sessionId) { viewModel.open(sessionId) }
+    // Back from the memory page: answers made there change the quiet line.
+    LaunchedEffect(viewModel) { viewModel.onShown() }
     // Back from connecting a calendar from a fix card: the hub has marked those steps fixed.
     ResultEffect<CalendarConnected> { viewModel.refresh() }
     LifecycleResumeEffect(viewModel) {
         viewModel.onForeground()
         onPauseOrDispose {}
+    }
+
+    // "Remembered from this chat". Closing it recounts the quiet line, since answers inside change it.
+    var lookingOver by rememberSaveable { mutableStateOf(false) }
+    val lookedOverSession = state.session?.id
+    if (lookingOver && lookedOverSession != null) {
+        LookedOverSheet(
+            sessionId = lookedOverSession,
+            onDismiss = {
+                lookingOver = false
+                viewModel.refreshLookedOver()
+            },
+            onAllMemories = {
+                lookingOver = false
+                onAllMemories()
+            },
+        )
     }
 
     ConversationContent(
@@ -56,6 +79,7 @@ fun ConversationScreen(
         onConnectCalendar = onConnectCalendar,
         onApproveAutomatically = viewModel::approveAutomatically,
         onUndoAutomatic = viewModel::undoAutomatic,
+        onLookedOver = { lookingOver = true },
         modifier = modifier,
     )
 }

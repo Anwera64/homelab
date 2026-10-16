@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 data class MemoryPageDto(
     val yours: List<MemoryPageItemDto> = emptyList(),
     val household: List<MemoryPageItemDto> = emptyList(),
+    @SerialName("to_check") val to_check: Int = 0,
 )
 
 @Serializable
@@ -24,4 +25,54 @@ data class MemoryPageItemDto(
     @SerialName("agent_name") val agent_name: String,
     @SerialName("agent_avatar") val agent_avatar: String,
     @SerialName("can_remove") val can_remove: Boolean = false,
+)
+
+/** Where a change's new sentence was read. [title] is only given to the chat's owner. */
+@Serializable
+data class ChangeSourceDto(
+    val title: String? = null,
+    @SerialName("owner_name") val owner_name: String = "",
+    @SerialName("read_at") val read_at: String,
+)
+
+/** One change to check: the stored memory beside the new sentence. */
+@Serializable
+data class ChangeCardDto(
+    val id: String,
+    val content: String,
+    val stored: MemoryPageItemDto,
+    @SerialName("can_answer") val can_answer: Boolean = false,
+    @SerialName("answerer_name") val answerer_name: String = "",
+    val source: ChangeSourceDto,
+)
+
+/** `GET /api/v1/memories/proposals`. */
+@Serializable
+data class ChangesToCheckDto(
+    @SerialName("to_check") val to_check: List<ChangeCardDto> = emptyList(),
+    val waiting: List<ChangeCardDto> = emptyList(),
+)
+
+/** The body of `POST /api/v1/memories/proposals/{id}/answer`. */
+@Serializable
+data class ChangeAnswerDto(
+    val answer: String,
+)
+
+/** `GET /api/v1/sessions/{id}/looked-over`: the sheet "Remembered from this chat". */
+@Serializable
+data class LookedOverDto(
+    val at: String,
+    @SerialName("to_check") val to_check: List<ChangeCardDto> = emptyList(),
+    val waiting: List<ChangeCardDto> = emptyList(),
+    val remembered: List<MemoryPageItemDto> = emptyList(),
+)
+
+/** The quiet line in a chat after the last message looked over. */
+@Serializable
+data class LookedOverSummaryDto(
+    @SerialName("through_message_id") val through_message_id: String? = null,
+    val at: String,
+    val remembered: Int = 0,
+    @SerialName("to_check") val to_check: Int = 0,
 )

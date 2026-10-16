@@ -91,3 +91,18 @@ private fun civil(
     val isoDay = ((epochDay + 3).mod(7L) + 1).toInt()
     return Civil(epochDay, year, month, day, isoDay)
 }
+
+/** A clock time as the member's phone sees it, for "today 10:42". */
+data class LocalTime(
+    val hour: Int,
+    val minute: Int,
+)
+
+@OptIn(ExperimentalTime::class)
+fun localTime(
+    at: Instant,
+    offsetSeconds: Int,
+): LocalTime {
+    val secondOfDay = (at.epochSeconds + offsetSeconds).mod(SECONDS_PER_DAY)
+    return LocalTime(hour = (secondOfDay / 3_600).toInt(), minute = (secondOfDay % 3_600 / 60).toInt())
+}
