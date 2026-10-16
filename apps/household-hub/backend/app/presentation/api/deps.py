@@ -60,6 +60,8 @@ from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
 from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
 from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
+from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
+from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase, LookedOverUseCase
 
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
@@ -250,6 +252,18 @@ def get_retire_memory_use_case() -> RetireMemoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_restore_memory_use_case() -> RestoreMemoryUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_list_proposals_use_case() -> ListProposalsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_answer_proposal_use_case() -> AnswerProposalUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_undo_proposal_answer_use_case() -> UndoProposalAnswerUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_looked_over_use_case() -> LookedOverUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_configure_calendar_use_case() -> ConfigureCalendarUseCase:

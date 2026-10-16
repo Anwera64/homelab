@@ -82,3 +82,80 @@ async def test_GIVEN_pending_and_answered_proposals_WHEN_dropped_for_a_memory_TH
     assert dropped == [pending.id]
     states = {row.id: row.state for row in (await session.execute(select(MemoryProposalModel))).scalars()}
     assert states == {pending.id: "dropped", answered.id: "kept", elsewhere.id: "pending"}
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_proposal_WHEN_read_by_id_THEN_it_comes_back_and_an_unknown_id_is_none(session):
+    repo = _repo(session)
+    created = await repo.create(_proposal())
+
+    found = await repo.get_by_id(created.id)
+
+    assert found is not None
+    assert (found.id, found.content, found.state, found.new_memory_id) == (
+        created.id, "Boiler service in October", "pending", None
+    )
+    assert await repo.get_by_id("nope") is None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_answered_proposal_WHEN_updated_THEN_its_state_time_and_new_memory_are_stored(session):
+    repo = _repo(session)
+    proposal = await repo.create(_proposal())
+    session.add(MemoryModel(id="new", user_id="emma", scope="household", content="Boiler service in October"))
+    await session.flush()
+
+    proposal.state = "replaced"
+    proposal.answered_at = NOW
+    proposal.new_memory_id = "new"
+    await repo.update(proposal)
+
+    row = (await session.execute(select(MemoryProposalModel))).scalars().one()
+    assert (row.state, row.new_memory_id) == ("replaced", "new")
+    assert row.answered_at is not None
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_proposals_WHEN_listing_what_a_member_answers_THEN_only_their_pending_ones_newest_first(session):
+    repo = _repo(session)
+    older = _proposal(content="Boiler service in October")
+    older.created_at = NOW.replace(hour=9)
+    older = await repo.create(older)
+    newer = await repo.create(_proposal(memory_id="other", content="Bins on Wednesday"))
+    answered = _proposal(content="Boiler service in December")
+    answered.state = "kept"
+    await repo.create(answered)
+
+    listed = await repo.list_pending_for_answerer("liam")
+
+    assert [p.id for p in listed] == [newer.id, older.id]
+    assert await repo.list_pending_for_answerer("emma") == []
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_proposals_from_a_members_chats_WHEN_listing_THEN_only_pending_ones_others_answer(session):
+    repo = _repo(session)
+    for_liam = await repo.create(_proposal())
+    own = _proposal(memory_id="other", content="Bins on Wednesday")
+    own.answerer_id = "emma"
+    await repo.create(own)
+    dropped = _proposal(content="Boiler service in December")
+    dropped.state = "dropped"
+    await repo.create(dropped)
+
+    listed = await repo.list_pending_from_user("emma")
+
+    assert [p.id for p in listed] == [for_liam.id]
+    assert await repo.list_pending_from_user("liam") == []
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_proposals_WHEN_read_by_ids_THEN_the_known_ones_come_back(session):
+    repo = _repo(session)
+    one = await repo.create(_proposal())
+    two = await repo.create(_proposal(memory_id="other", content="Bins on Wednesday"))
+
+    found = await repo.get_many([two.id, "nope", one.id])
+
+    assert {p.id for p in found} == {one.id, two.id}
+    assert await repo.get_many([]) == []

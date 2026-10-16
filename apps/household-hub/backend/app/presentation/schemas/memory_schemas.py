@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -53,3 +53,60 @@ class MemoryPageItemRead(BaseModel):
 class MemoryPageRead(BaseModel):
     yours: List[MemoryPageItemRead]
     household: List[MemoryPageItemRead]
+    # The member's changes to check: the band on this page and the chip on Profile.
+    to_check: int = 0
+
+
+class ChangeSourceRead(BaseModel):
+    """Where the new sentence was read. The chat's title is only for the chat's owner (memory spec §6.1)."""
+
+    title: Optional[str] = None
+    owner_name: str
+    read_at: datetime
+
+
+class ChangeCardRead(BaseModel):
+    """One change to check: the stored memory beside the new sentence (memory spec §6.1)."""
+
+    id: str
+    content: str
+    stored: MemoryPageItemRead
+    can_answer: bool
+    answerer_name: str
+    source: ChangeSourceRead
+
+
+class ChangesToCheckRead(BaseModel):
+    to_check: List[ChangeCardRead]
+    waiting: List[ChangeCardRead]
+
+
+class ProposalAnswer(BaseModel):
+    answer: Literal["keep_stored", "keep_both", "use_new"]
+
+
+class ProposalRead(BaseModel):
+    id: str
+    memory_id: str
+    content: str
+    state: str
+    new_memory_id: Optional[str] = None
+    answered_at: Optional[datetime] = None
+
+
+class LookedOverSummaryRead(BaseModel):
+    """The quiet line after the last message looked over (memory spec §8)."""
+
+    through_message_id: Optional[str] = None
+    at: datetime
+    remembered: int
+    to_check: int
+
+
+class LookedOverRead(BaseModel):
+    """The sheet the line opens: "Remembered from this chat"."""
+
+    at: datetime
+    to_check: List[ChangeCardRead]
+    waiting: List[ChangeCardRead]
+    remembered: List[MemoryPageItemRead]

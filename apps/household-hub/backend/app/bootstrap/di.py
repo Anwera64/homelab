@@ -139,6 +139,8 @@ from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
 from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
 from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
+from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
+from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase, LookedOverUseCase
 
 # Integration Use Cases
 from app.domain.use_cases.integrations.configure_calendar import ConfigureCalendarUseCase
@@ -533,9 +535,21 @@ def get_container(session: AsyncSession):
             memory_repo, session_repo, agent_repo, uow, embed_memories=embed_memories_uc
         ),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow, embed_memories=embed_memories_uc),
-        pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(memory_repo, user_repo, agent_repo),
+        pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(
+            memory_repo, user_repo, agent_repo, proposal_repo=proposal_repo
+        ),
         pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
         pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
+        pres_deps.get_list_proposals_use_case: ListProposalsUseCase(
+            proposal_repo, memory_repo, session_repo, user_repo, agent_repo
+        ),
+        pres_deps.get_answer_proposal_use_case: AnswerProposalUseCase(
+            proposal_repo, memory_repo, session_repo, uow, embed_memories_uc, log_text=settings.MEMORY_LOG_TEXT
+        ),
+        pres_deps.get_undo_proposal_answer_use_case: UndoProposalAnswerUseCase(proposal_repo, memory_repo, uow),
+        pres_deps.get_looked_over_use_case: LookedOverUseCase(
+            proposal_repo, memory_repo, session_repo, user_repo, agent_repo
+        ),
 
         # Integrations
         pres_deps.get_configure_calendar_use_case: ConfigureCalendarUseCase(
@@ -681,6 +695,10 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_list_memory_page_use_case,
         pres_deps.get_retire_memory_use_case,
         pres_deps.get_restore_memory_use_case,
+        pres_deps.get_list_proposals_use_case,
+        pres_deps.get_answer_proposal_use_case,
+        pres_deps.get_undo_proposal_answer_use_case,
+        pres_deps.get_looked_over_use_case,
         pres_deps.get_configure_calendar_use_case,
         pres_deps.get_user_calendar_use_case,
         pres_deps.get_delete_calendar_use_case,

@@ -97,6 +97,11 @@ class AlreadyDecidedException(InvalidOperationException):
     pass
 
 
+class ProposalStateException(InvalidOperationException):
+    """Raised when a change to check is answered twice, or an answer is undone that was never given."""
+    pass
+
+
 class AlwaysAsksException(InvalidOperationException):
     """Raised for turning on auto-approve for an action that always asks: removing or replacing."""
     pass

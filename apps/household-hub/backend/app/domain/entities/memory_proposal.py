@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
 
+from app.domain.entities.memory import MemoryPageItem
+
 # What reflection names a new fact against its closest stored memory (memory spec §6). Same is
 # dropped, different is saved, and the other four raise a proposal.
 SAME = "same"
@@ -15,6 +17,11 @@ RELATIONS = (SAME, DIFFERENT) + PROPOSING
 
 PENDING = "pending"
 DROPPED = "dropped"
+# The three answers (memory spec §6.1): Keep stored, Keep both, Use new.
+KEPT = "kept"
+BOTH = "both"
+REPLACED = "replaced"
+ANSWERS = (KEPT, BOTH, REPLACED)
 
 
 def get_utc_now() -> datetime:
@@ -36,5 +43,50 @@ class MemoryProposal:
     source_session_id: str | None = None
     source_user_id: str | None = None
     state: str = PENDING  # pending, then kept, both, replaced or dropped
+    # The memory Keep both or Use new saved, so Undo can take it away again.
+    new_memory_id: str | None = None
     created_at: datetime = field(default_factory=get_utc_now)
     answered_at: datetime | None = None
+
+
+@dataclass
+class ChangeCard:
+    """One change as its card draws it (memory spec §6.1): the stored memory, the new sentence and its source.
+
+    The chat's title is only for the chat's owner; anyone else sees whose chat it was.
+    """
+
+    proposal: MemoryProposal
+    stored: MemoryPageItem
+    can_answer: bool
+    answerer_name: str
+    source_title: str | None
+    source_owner_name: str
+
+
+@dataclass
+class ChangesToCheck:
+    """The member's changes to answer, then the ones from their chats waiting for someone else."""
+
+    to_check: list[ChangeCard]
+    waiting: list[ChangeCard]
+
+
+@dataclass
+class LookedOverSummary:
+    """The quiet line in a chat after the last message looked over (memory spec §8)."""
+
+    through_message_id: str | None
+    at: datetime
+    remembered: int
+    to_check: int
+
+
+@dataclass
+class LookedOver:
+    """The chat's sheet, "Remembered from this chat": changes to check, waiting ones, and what was saved."""
+
+    at: datetime
+    to_check: list[ChangeCard]
+    waiting: list[ChangeCard]
+    remembered: list[MemoryPageItem]

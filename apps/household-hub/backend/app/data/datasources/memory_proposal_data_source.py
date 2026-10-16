@@ -1,4 +1,4 @@
-from typing import List, Protocol
+from typing import List, Optional, Protocol
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,22 @@ class IMemoryProposalDataSource(Protocol):
     async def create(self, model: MemoryProposalModel) -> MemoryProposalModel:
         ...
 
+    async def get_by_id(self, proposal_id: str) -> Optional[MemoryProposalModel]:
+        ...
+
+    async def get_many(self, proposal_ids: List[str]) -> List[MemoryProposalModel]:
+        ...
+
+    async def update(self, model: MemoryProposalModel) -> MemoryProposalModel:
+        ...
+
     async def drop_pending_for(self, memory_id: str) -> List[str]:
+        ...
+
+    async def list_pending_for_answerer(self, user_id: str) -> List[MemoryProposalModel]:
+        ...
+
+    async def list_pending_from_user(self, user_id: str) -> List[MemoryProposalModel]:
         ...
 
 
@@ -25,6 +40,20 @@ class SqliteMemoryProposalDataSource(IMemoryProposalDataSource):
         self.session.add(model)
         await self.session.flush()
         return model
+
+    async def get_by_id(self, proposal_id: str) -> Optional[MemoryProposalModel]:
+        return await self.session.get(MemoryProposalModel, proposal_id)
+
+    async def get_many(self, proposal_ids: List[str]) -> List[MemoryProposalModel]:
+        if not proposal_ids:
+            return []
+        stmt = select(MemoryProposalModel).where(MemoryProposalModel.id.in_(proposal_ids))
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def update(self, model: MemoryProposalModel) -> MemoryProposalModel:
+        merged = await self.session.merge(model)
+        await self.session.flush()
+        return merged
 
     async def drop_pending_for(self, memory_id: str) -> List[str]:
         pending = (
@@ -41,3 +70,23 @@ class SqliteMemoryProposalDataSource(IMemoryProposalDataSource):
             )
             await self.session.flush()
         return ids
+
+    async def list_pending_for_answerer(self, user_id: str) -> List[MemoryProposalModel]:
+        stmt = (
+            select(MemoryProposalModel)
+            .where(MemoryProposalModel.answerer_id == user_id, MemoryProposalModel.state == _PENDING)
+            .order_by(MemoryProposalModel.created_at.desc())
+        )
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def list_pending_from_user(self, user_id: str) -> List[MemoryProposalModel]:
+        stmt = (
+            select(MemoryProposalModel)
+            .where(
+                MemoryProposalModel.source_user_id == user_id,
+                MemoryProposalModel.answerer_id != user_id,
+                MemoryProposalModel.state == _PENDING,
+            )
+            .order_by(MemoryProposalModel.created_at.desc())
+        )
+        return list((await self.session.execute(stmt)).scalars())

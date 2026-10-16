@@ -77,15 +77,38 @@ class FakeMemories:
     async def update(self, memory):
         return memory
 
+    async def delete(self, memory_id):
+        self.memories = [m for m in self.memories if m.id != memory_id]
+
 
 class FakeProposals:
-    def __init__(self):
-        self.created = []
+    def __init__(self, proposals=()):
+        self.created = list(proposals)
         self.dropped_for = []
+        self.updated = []
 
     async def create(self, proposal):
         self.created.append(proposal)
         return proposal
+
+    async def get_by_id(self, proposal_id):
+        return next((p for p in self.created if p.id == proposal_id), None)
+
+    async def get_many(self, proposal_ids):
+        return [p for p in self.created if p.id in proposal_ids]
+
+    async def update(self, proposal):
+        self.updated.append(proposal.state)
+        return proposal
+
+    async def list_pending_for_answerer(self, user_id):
+        return [p for p in self.created if p.answerer_id == user_id and p.state == "pending"]
+
+    async def list_pending_from_user(self, user_id):
+        return [
+            p for p in self.created
+            if p.source_user_id == user_id and p.answerer_id != user_id and p.state == "pending"
+        ]
 
     async def drop_pending_for(self, memory_id):
         self.dropped_for.append(memory_id)
