@@ -18,7 +18,11 @@ import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
+import com.homelab.household.domain.usecase.AnswerChangeUseCase
+import com.homelab.household.domain.usecase.GetChangesToCheckUseCase
+import com.homelab.household.domain.usecase.GetLookedOverUseCase
 import com.homelab.household.domain.usecase.GetMemoryPageUseCase
+import com.homelab.household.domain.usecase.UndoChangeAnswerUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
@@ -71,7 +75,11 @@ import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
+import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetLookedOverUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetToolApprovalsUseCaseImpl
@@ -159,6 +167,10 @@ val domainModule =
         factory<GetMemoryPageUseCase> { GetMemoryPageUseCaseImpl(get()) }
         factory<RemoveMemoryUseCase> { RemoveMemoryUseCaseImpl(get()) }
         factory<RestoreMemoryUseCase> { RestoreMemoryUseCaseImpl(get()) }
+        factory<GetChangesToCheckUseCase> { GetChangesToCheckUseCaseImpl(get()) }
+        factory<AnswerChangeUseCase> { AnswerChangeUseCaseImpl(get()) }
+        factory<UndoChangeAnswerUseCase> { UndoChangeAnswerUseCaseImpl(get()) }
+        factory<GetLookedOverUseCase> { GetLookedOverUseCaseImpl(get()) }
 
         // Space & Agent use cases
         factory<GetPersonalSpaceUseCase> { GetPersonalSpaceUseCaseImpl(get()) }

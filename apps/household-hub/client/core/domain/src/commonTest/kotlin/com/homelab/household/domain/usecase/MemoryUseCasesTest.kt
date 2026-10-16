@@ -1,9 +1,16 @@
 package com.homelab.household.domain.usecase
 
+import com.homelab.household.domain.model.ChangesToCheck
+import com.homelab.household.domain.model.LookedOver
 import com.homelab.household.domain.model.MemoryItem
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
+import com.homelab.household.domain.model.ProposalAnswer
+import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetLookedOverUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
@@ -67,5 +74,42 @@ class MemoryUseCasesTest {
             RestoreMemoryUseCaseImpl(repository)("mem-1")
 
             verifySuspend(VerifyMode.exactly(1)) { repository.restoreMemory("mem-1") }
+        }
+
+    @Test
+    fun `GIVEN changes on the hub WHEN they are asked for THEN the repository's lists come back`() =
+        runTest {
+            val changes = ChangesToCheck(toCheck = emptyList(), waiting = emptyList())
+            everySuspend { repository.getChangesToCheck() } returns changes
+
+            assertEquals(changes, GetChangesToCheckUseCaseImpl(repository)())
+        }
+
+    @Test
+    fun `GIVEN a change WHEN it is answered and undone THEN the repository is asked for each`() =
+        runTest {
+            everySuspend { repository.answerChange("p-1", ProposalAnswer.UseNew) } returns Unit
+            everySuspend { repository.undoChangeAnswer("p-1") } returns Unit
+
+            AnswerChangeUseCaseImpl(repository)("p-1", ProposalAnswer.UseNew)
+            UndoChangeAnswerUseCaseImpl(repository)("p-1")
+
+            verifySuspend(VerifyMode.exactly(1)) { repository.answerChange("p-1", ProposalAnswer.UseNew) }
+            verifySuspend(VerifyMode.exactly(1)) { repository.undoChangeAnswer("p-1") }
+        }
+
+    @Test
+    fun `GIVEN a looked-over chat WHEN its sheet is asked for THEN the repository's sheet comes back`() =
+        runTest {
+            val sheet =
+                LookedOver(
+                    at = Instant.parse("2026-10-16T10:52:00Z"),
+                    toCheck = emptyList(),
+                    waiting = emptyList(),
+                    remembered = listOf(item),
+                )
+            everySuspend { repository.getLookedOver("chat-1") } returns sheet
+
+            assertEquals(sheet, GetLookedOverUseCaseImpl(repository)("chat-1"))
         }
 }

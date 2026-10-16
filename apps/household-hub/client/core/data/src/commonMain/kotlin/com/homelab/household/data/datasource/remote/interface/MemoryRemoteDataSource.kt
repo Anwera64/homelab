@@ -1,6 +1,9 @@
 package com.homelab.household.data.datasource.remote.`interface`
 
+import com.homelab.household.data.dto.ChangesToCheckDto
+import com.homelab.household.data.dto.LookedOverDto
 import com.homelab.household.data.dto.MemoryPageDto
+import com.homelab.household.domain.model.ProposalAnswer
 
 /**
  * Everything the hub is asked about what the agents remember. Each function is one call, returning
@@ -12,4 +15,15 @@ interface MemoryRemoteDataSource {
     suspend fun removeMemory(memoryId: String)
 
     suspend fun restoreMemory(memoryId: String)
+
+    suspend fun getChangesToCheck(): ChangesToCheckDto
+
+    suspend fun answerChange(
+        changeId: String,
+        answer: ProposalAnswer,
+    )
+
+    suspend fun undoChangeAnswer(changeId: String)
+
+    suspend fun getLookedOver(sessionId: String): LookedOverDto
 }

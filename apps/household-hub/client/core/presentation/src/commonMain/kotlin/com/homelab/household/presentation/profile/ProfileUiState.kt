@@ -18,4 +18,6 @@ data class ProfileUiState(
 data class MemoryCounts(
     val yours: Int,
     val household: Int,
+    /** The "2 to check" chip; none at 0. */
+    val toCheck: Int = 0,
 )

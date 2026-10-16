@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.homelab.household.data.datasource.local.SessionCacheLocalDataSource
 import com.homelab.household.data.datasource.remote.`interface`.SessionRemoteDataSource
 import com.homelab.household.data.dto.ChatMessageReadDto
+import com.homelab.household.data.dto.LookedOverSummaryDto
 import com.homelab.household.data.dto.SessionDetailReadDto
 import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.network.TurnGoneException
@@ -35,7 +36,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * What the repository decides, with the hub and the cache both mocked: which conversations read as
@@ -46,6 +51,7 @@ import kotlin.test.assertTrue
  * here crosses a dispatcher, so `delay` runs on `runTest`'s virtual clock and the whole 60-second
  * timeout is checked in no time at all.
  */
+@OptIn(ExperimentalTime::class)
 class SessionRepositoryTest {
     private fun sessionDto(
         id: String,
@@ -66,6 +72,7 @@ class SessionRepositoryTest {
         isSecret: Boolean = false,
         turnRunning: Boolean = false,
         awaitingApproval: Boolean = false,
+        lookedOver: LookedOverSummaryDto? = null,
     ) = SessionDetailReadDto(
         id = id,
         user_id = "u-1",
@@ -74,6 +81,7 @@ class SessionRepositoryTest {
         messages = messages,
         turn_running = turnRunning,
         awaiting_approval = awaitingApproval,
+        looked_over = lookedOver,
     )
 
     private fun repository(
@@ -820,6 +828,45 @@ class SessionRepositoryTest {
 
             // WHEN / THEN
             assertFailsWith<DomainException> { repository(remote).retryMessage("m-nowhere") }
+        }
+
+    // ---- the look-over line (slice 5) --------------------------------------
+
+    @Test
+    fun `GIVEN a chat that was looked over WHEN it is opened THEN its line says where, when and what`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            everySuspend { remote.fetchSession("s-1") } returns
+                detailDto(
+                    "s-1",
+                    listOf(messageDto("m1", "s-1", "user", "Dinner?")),
+                    lookedOver =
+                        LookedOverSummaryDto(
+                            through_message_id = "m1",
+                            at = "2026-10-16T10:52:00",
+                            remembered = 2,
+                            to_check = 1,
+                        ),
+                )
+
+            val (session, _) = repository(remote).getSession("s-1")
+
+            val line = assertNotNull(session.lookedOver)
+            assertEquals("m1", line.throughMessageId)
+            assertEquals(Instant.parse("2026-10-16T10:52:00Z"), line.at)
+            assertEquals(2, line.remembered)
+            assertEquals(1, line.toCheck)
+        }
+
+    @Test
+    fun `GIVEN a chat never looked over WHEN it is opened THEN it has no line`() =
+        runTest {
+            val remote = mock<SessionRemoteDataSource>()
+            everySuspend { remote.fetchSession("s-1") } returns detailDto("s-1", emptyList())
+
+            val (session, _) = repository(remote).getSession("s-1")
+
+            assertNull(session.lookedOver)
         }
 
     // ---- approval cards (slice 4, PR 3) -----------------------------------

@@ -35,8 +35,12 @@ data class MemoryItem(
     val canRemove: Boolean,
 )
 
-/** The memory page's two tabs: the member's personal memories, and every household memory. */
+/**
+ * The memory page's two tabs: the member's personal memories, and every household memory. [toCheck]
+ * counts the changes waiting for the member: the band on the page and the chip on Profile.
+ */
 data class MemoryPage(
     val yours: List<MemoryItem>,
     val household: List<MemoryItem>,
+    val toCheck: Int = 0,
 )

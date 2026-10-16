@@ -34,5 +34,6 @@ object SessionDataMapper {
             updatedAt = dto.updated_at,
             turnRunning = dto.turn_running,
             awaitingApproval = dto.awaiting_approval,
+            lookedOver = dto.looked_over?.let(MemoryDataMapper::toDomain),
         )
 }

@@ -48,6 +48,7 @@ class MemoriesViewModel(
                             status = MemoriesStatus.Ready,
                             yours = page.yours.map(::rowOf),
                             household = page.household.map(::rowOf),
+                            toCheck = page.toCheck,
                         )
                     }
                 },
@@ -57,6 +58,13 @@ class MemoriesViewModel(
                     _uiState.update { it.copy(status = status) }
                 },
             )
+        }
+    }
+
+    /** Coming back from Changes to check: only the band's count is asked for again. */
+    fun refreshToCheck() {
+        viewModelScope.launch {
+            runCatchingSafe { getMemoryPage() }.onSuccess { page -> _uiState.update { it.copy(toCheck = page.toCheck) } }
         }
     }
 

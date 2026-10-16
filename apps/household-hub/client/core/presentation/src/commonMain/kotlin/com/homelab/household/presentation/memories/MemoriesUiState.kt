@@ -10,6 +10,8 @@ data class MemoriesUiState(
     val household: List<MemoryRow> = emptyList(),
     /** The last ✕ or Undo the hub didn't take, said in a line until the next tap. */
     val failure: MemoryActionFailure? = null,
+    /** Changes waiting for the member: the band at the top shows when there are any. */
+    val toCheck: Int = 0,
 ) {
     /** A removed row still shows, with Undo, but no longer counts. */
     val yoursCount: Int get() = yours.count { !it.removed }

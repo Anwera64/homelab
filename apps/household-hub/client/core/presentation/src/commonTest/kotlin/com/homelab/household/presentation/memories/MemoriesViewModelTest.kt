@@ -266,4 +266,20 @@ class MemoriesViewModelTest {
 
             assertEquals(listOf("p2"), viewModel.uiState.value.yours.map { it.item.id })
         }
+
+    @Test
+    fun `GIVEN changes waiting WHEN the page loads THEN the band counts them, and coming back recounts`() =
+        runTest(testDispatcher) {
+            everySuspend { getMemoryPage() } returns page.copy(toCheck = 2)
+            val viewModel = viewModel()
+            advanceUntilIdle()
+            assertEquals(2, viewModel.uiState.value.toCheck)
+
+            everySuspend { getMemoryPage() } returns page.copy(toCheck = 0)
+            viewModel.refreshToCheck()
+            advanceUntilIdle()
+
+            assertEquals(0, viewModel.uiState.value.toCheck)
+            assertEquals(MemoriesStatus.Ready, viewModel.uiState.value.status)
+        }
 }
