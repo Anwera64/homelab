@@ -305,7 +305,7 @@ services:
   # ==============================================================================
   cleanuparr:
     profiles: ["media"]
-    image: ghcr.io/cleanuparr/cleanuparr:2.10.10
+    image: ghcr.io/cleanuparr/cleanuparr:2.10.11
     container_name: cleanuparr
     ports:
       - 11011:11011
