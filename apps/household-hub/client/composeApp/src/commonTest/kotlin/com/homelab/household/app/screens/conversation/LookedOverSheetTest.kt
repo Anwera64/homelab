@@ -2,6 +2,7 @@ package com.homelab.household.app.screens.conversation
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.homelab.household.domain.model.ProposalAnswer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +50,14 @@ class LookedOverSheetTest {
             assertEquals(listOf("c1" to ProposalAnswer.UseNew), answers)
             assertEquals(listOf("r1"), removed)
             assertEquals(1, allMemories)
+        }
+
+    @Test
+    fun `GIVEN a sheet taller than the screen WHEN it draws THEN every row is laid out at once so its height never shifts`() =
+        runComposeUiTest {
+            lookedOverSheetContent(sheet, height = 300.dp)
+
+            onLookedOverSheet { laysOutEveryRowAtOnce() }
         }
 
     @Test

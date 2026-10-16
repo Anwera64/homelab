@@ -5,13 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -20,6 +19,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,67 +129,69 @@ fun LookedOverSheetContent(
     modifier: Modifier = Modifier,
 ) {
     val spacing = HearthTheme.spacing
-    LazyColumn(
+    // A plain scrolling column, not a lazy list: the sheet sizes itself to what it holds, and a lazy
+    // list's height shifts with the rows on screen, so a hard fling set the sheet bouncing for good.
+    // It only ever holds a handful of rows.
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(LOOKED_OVER_SHEET_TAG),
-        contentPadding = PaddingValues(start = spacing.xl, end = spacing.xl, bottom = spacing.xxxl),
+            .verticalScroll(rememberScrollState())
+            .testTag(LOOKED_OVER_SHEET_TAG)
+            .padding(start = spacing.xl, end = spacing.xl, bottom = spacing.xxxl),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        item(key = "heading") { SheetHeading(state = state) }
+        SheetHeading(state = state)
 
         when (state.status) {
             MemoriesStatus.Loading -> {
-                item(key = "loading") { LoadingCard() }
+                LoadingCard()
             }
 
             MemoriesStatus.Unreachable, MemoriesStatus.Failed -> {
-                item(key = "failed") { SheetFailed(unreachable = state.status == MemoriesStatus.Unreachable, onRetry) }
+                SheetFailed(unreachable = state.status == MemoriesStatus.Unreachable, onRetry)
             }
 
             MemoriesStatus.Ready -> {
                 state.failure?.let { failure ->
-                    item(key = "failure") {
-                        Text(
-                            stringResource(failure.words()),
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                            style = HearthTheme.typography.caption,
-                            color = HearthTheme.colors.error,
-                        )
-                    }
+                    Text(
+                        stringResource(failure.words()),
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        style = HearthTheme.typography.caption,
+                        color = HearthTheme.colors.error,
+                    )
                 }
                 if (state.toCheck.isNotEmpty()) {
-                    item(key = "to-check") {
-                        SectionLabel(stringResource(Res.string.looked_over_to_check, state.openCount))
-                    }
-                    items(state.toCheck, key = { it.card.id }) { row ->
-                        ChangeCard(
-                            row = row,
-                            onAnswer = { answer -> onAnswer(row.card.id, answer) },
-                            onUndo = { onUndo(row.card.id) },
-                            showSource = false,
-                        )
-                    }
-                }
-                state.waitingByAnswerer.forEach { (name, rows) ->
-                    item(key = "waiting-$name") { WaitingHeading(name = name) }
-                    items(rows, key = { it.card.id }) { row ->
-                        ChangeCard(row = row, onAnswer = {}, onUndo = {}, showSource = false)
-                    }
-                }
-                if (state.remembered.isNotEmpty()) {
-                    item(key = "remembered") {
-                        SectionLabel(stringResource(Res.string.looked_over_remembered, state.rememberedCount))
-                    }
-                    items(state.remembered, key = { it.item.id }) { row ->
-                        if (row.removed) {
-                            RemovedRow(row = row, onUndo = { onRestore(row.item.id) })
-                        } else {
-                            RememberedRow(row = row, onRemove = { onRemove(row.item.id) })
+                    SectionLabel(stringResource(Res.string.looked_over_to_check, state.openCount))
+                    state.toCheck.forEach { row ->
+                        key(row.card.id) {
+                            ChangeCard(
+                                row = row,
+                                onAnswer = { answer -> onAnswer(row.card.id, answer) },
+                                onUndo = { onUndo(row.card.id) },
+                                showSource = false,
+                            )
                         }
                     }
                 }
-                item(key = "all-memories") { AllMemoriesLink(onClick = onAllMemories) }
+                state.waitingByAnswerer.forEach { (name, rows) ->
+                    WaitingHeading(name = name)
+                    rows.forEach { row ->
+                        key(row.card.id) { ChangeCard(row = row, onAnswer = {}, onUndo = {}, showSource = false) }
+                    }
+                }
+                if (state.remembered.isNotEmpty()) {
+                    SectionLabel(stringResource(Res.string.looked_over_remembered, state.rememberedCount))
+                    state.remembered.forEach { row ->
+                        key(row.item.id) {
+                            if (row.removed) {
+                                RemovedRow(row = row, onUndo = { onRestore(row.item.id) })
+                            } else {
+                                RememberedRow(row = row, onRemove = { onRemove(row.item.id) })
+                            }
+                        }
+                    }
+                }
+                AllMemoriesLink(onClick = onAllMemories)
             }
         }
     }

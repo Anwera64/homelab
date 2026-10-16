@@ -1,16 +1,17 @@
 package com.homelab.household.app.screens.conversation
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import androidx.compose.ui.unit.Dp
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.changes_source_title
 import com.homelab.household.app.resources.changes_use_new
@@ -55,21 +56,25 @@ class LookedOverSheetRobot(
 
     suspend fun removes(content: String) {
         val button = hasContentDescription(getString(Res.string.memories_remove, content))
-        test.onNodeWithTag(LOOKED_OVER_SHEET_TAG).performScrollToNode(button)
         test.waitUntilExactlyOneExists(button, timeoutMillis = WAIT_MILLIS)
         test.onNode(button).performScrollTo().performClick()
     }
 
     suspend fun opensAllMemories() = tapsText(getString(Res.string.looked_over_all_memories))
 
+    /** Its last row is laid out before any scrolling: the sheet measures all it holds at once. */
+    suspend fun laysOutEveryRowAtOnce() {
+        test.waitForIdle()
+        val link = getString(Res.string.looked_over_all_memories)
+        assertEquals(1, test.onAllNodes(hasText(link)).fetchSemanticsNodes().size)
+    }
+
     private fun seesText(text: String) {
-        test.onNodeWithTag(LOOKED_OVER_SHEET_TAG).performScrollToNode(hasText(text))
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
         test.onNodeWithText(text).performScrollTo().assertIsDisplayed()
     }
 
     private fun tapsText(text: String) {
-        test.onNodeWithTag(LOOKED_OVER_SHEET_TAG).performScrollToNode(hasText(text))
         test.waitUntilExactlyOneExists(hasText(text), timeoutMillis = WAIT_MILLIS)
         test.onNodeWithText(text).performScrollTo().performClick()
     }
@@ -91,6 +96,7 @@ fun ComposeUiTest.lookedOverSheetContent(
     onAnswer: (String, ProposalAnswer) -> Unit = { _, _ -> },
     onRemove: (String) -> Unit = {},
     onAllMemories: () -> Unit = {},
+    height: Dp = Dp.Unspecified,
 ) {
     setContent {
         StillTheme {
@@ -102,6 +108,7 @@ fun ComposeUiTest.lookedOverSheetContent(
                 onRestore = {},
                 onRetry = {},
                 onAllMemories = onAllMemories,
+                modifier = if (height == Dp.Unspecified) Modifier else Modifier.height(height),
             )
         }
     }
