@@ -7,14 +7,14 @@ import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.ProposalAnswer
+import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetLookedOverUseCaseImpl
-import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
-import com.homelab.household.domain.repository.MemoryRepository
 import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
 import dev.mokkery.mock

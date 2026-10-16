@@ -9,6 +9,7 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
+import com.homelab.household.domain.model.DeviceTimeZone
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -29,6 +30,8 @@ import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
+import com.homelab.household.presentation.memories.LocalTime
+import com.homelab.household.presentation.memories.localTime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +42,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -59,6 +63,8 @@ class ChatSessionViewModel(
     private val listHouseholdMembersUseCase: ListHouseholdMembersUseCase,
     /** Makes a write automatic from its card's checkbox, and asks again on Undo. */
     private val setToolApprovalUseCase: SetToolApprovalUseCase,
+    /** Reads the quiet "Looked over" line's time on the phone's own clock. */
+    private val deviceTimeZone: DeviceTimeZone,
     /** Times each stretch of thinking for the answer's "Thought for N s". Injected so a test can move it. */
     private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
@@ -202,10 +208,19 @@ class ChatSessionViewModel(
         val sessionId = _uiState.value.session?.id ?: return
         viewModelScope.launch {
             runCatchingSafe { getSessionUseCase(sessionId) }.onSuccess { (fresh, _) ->
-                _uiState.update { state -> state.copy(session = state.session?.copy(lookedOver = fresh.lookedOver)) }
+                _uiState.update { state ->
+                    state.copy(
+                        session = state.session?.copy(lookedOver = fresh.lookedOver),
+                        lookedOverAt = lookedOverAt(fresh),
+                    )
+                }
             }
         }
     }
+
+    @OptIn(ExperimentalTime::class)
+    private fun lookedOverAt(session: ConversationSession): LocalTime? =
+        session.lookedOver?.at?.let { at -> localTime(at, deviceTimeZone.offsetSecondsAt(at)) }
 
     fun loadSession(sessionId: String) {
         viewModelScope.launch {
@@ -222,6 +237,7 @@ class ChatSessionViewModel(
                     it.copy(
                         isLoading = false,
                         session = session,
+                        lookedOverAt = lookedOverAt(session),
                         messages = messages,
                         agentName = agent?.name ?: session.agentName.orEmpty(),
                         agentAvatar = agent?.avatar ?: session.agentAvatar.orEmpty(),

@@ -1,5 +1,6 @@
 package com.homelab.household.di
 
+import com.homelab.household.domain.usecase.AnswerChangeUseCase
 import com.homelab.household.domain.usecase.ApprovePinResetUseCase
 import com.homelab.household.domain.usecase.ArchiveSessionUseCase
 import com.homelab.household.domain.usecase.ChangePinUseCase
@@ -15,14 +16,12 @@ import com.homelab.household.domain.usecase.DeleteSessionUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
 import com.homelab.household.domain.usecase.GetCalendarUseCase
+import com.homelab.household.domain.usecase.GetChangesToCheckUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
 import com.homelab.household.domain.usecase.GetHouseholdSpaceUseCase
 import com.homelab.household.domain.usecase.GetHubHostUseCase
-import com.homelab.household.domain.usecase.AnswerChangeUseCase
-import com.homelab.household.domain.usecase.GetChangesToCheckUseCase
 import com.homelab.household.domain.usecase.GetLookedOverUseCase
 import com.homelab.household.domain.usecase.GetMemoryPageUseCase
-import com.homelab.household.domain.usecase.UndoChangeAnswerUseCase
 import com.homelab.household.domain.usecase.GetPersonalSpaceUseCase
 import com.homelab.household.domain.usecase.GetSessionUseCase
 import com.homelab.household.domain.usecase.GetToolApprovalsUseCase
@@ -54,9 +53,11 @@ import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StartGoogleCalendarSignInUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import com.homelab.household.domain.usecase.UndoChangeAnswerUseCase
 import com.homelab.household.domain.usecase.UnlockSecretSessionUseCase
 import com.homelab.household.domain.usecase.UpdateAgentUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
+import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ApprovePinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ChangePinUseCaseImpl
@@ -72,14 +73,12 @@ import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHouseholdSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetHubHostUseCaseImpl
-import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
-import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetLookedOverUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
-import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetPersonalSpaceUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetToolApprovalsUseCaseImpl
@@ -111,6 +110,7 @@ import com.homelab.household.domain.usecase.impl.SetToolApprovalUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StreamChatTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ToggleSecretModeUseCaseImpl
+import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateSpaceSettingsUseCaseImpl

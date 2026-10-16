@@ -45,6 +45,38 @@ class ConversationScreenTest {
         }
 
     @Test
+    fun `GIVEN a chat that was looked over WHEN drawn THEN the line sits after the last message read and a tap opens what it remembered`() =
+        runComposeUiTest {
+            var opened = 0
+            conversationScreen(stateNamed("Looked over"), onLookedOver = { opened++ })
+
+            onConversation {
+                seesTheLookedOverLine(remembered = 2, toCheck = 1, time = "10:52")
+                val line = boundsOfTheLookedOverLine()
+                assertTrue(boundsOfWords("The panel review is tomorrow at 14:30.").bottom <= line.top)
+                assertTrue(line.bottom <= boundsOfWords("And what about Friday?").top)
+                assertTrue(line.bottom - line.top >= 48.dp)
+                tapsTheLookedOverLine()
+            }
+
+            assertEquals(1, opened)
+        }
+
+    @Test
+    fun `GIVEN a look-over that kept nothing WHEN drawn THEN the line says nothing new and opens nothing`() =
+        runComposeUiTest {
+            var opened = 0
+            conversationScreen(stateNamed("Looked over, nothing new"), onLookedOver = { opened++ })
+
+            onConversation {
+                seesNothingNewAt("10:52")
+                tapsTheLookedOverLine()
+            }
+
+            assertEquals(0, opened)
+        }
+
+    @Test
     fun a_question_that_never_arrived_is_marked_on_your_own_bubble_and_offers_to_resend() =
         runComposeUiTest {
             val resent = mutableListOf<String>()

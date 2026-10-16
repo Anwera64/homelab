@@ -148,6 +148,8 @@ fun AppNavHost(
                         onBack = { backStack.removeLastOrNull() },
                         // A failed calendar step's fix: connecting lands back here, to ask again.
                         onConnectCalendar = { backStack.add(Destination.CalendarPicker) },
+                        // "All memories" at the foot of the chat's look-over sheet.
+                        onAllMemories = { backStack.add(Destination.Memories) },
                     )
                 }
                 entry<Destination.Profile> {

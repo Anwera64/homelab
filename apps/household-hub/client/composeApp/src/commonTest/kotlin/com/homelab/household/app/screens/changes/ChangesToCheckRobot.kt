@@ -56,8 +56,7 @@ class ChangesToCheckRobot(
         seesInList(getString(Res.string.changes_read).uppercase(), atLeastOne = true)
     }
 
-    suspend fun seesItWasReadIn(title: String) =
-        seesSubstring(getString(Res.string.changes_source_title, title))
+    suspend fun seesItWasReadIn(title: String) = seesSubstring(getString(Res.string.changes_source_title, title))
 
     suspend fun seesItWasReadInTheChatOf(owner: String) =
         seesSubstring(getString(Res.string.changes_source_owner, owner))

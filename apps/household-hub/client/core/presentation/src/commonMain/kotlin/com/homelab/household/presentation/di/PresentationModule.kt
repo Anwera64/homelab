@@ -43,6 +43,7 @@ val presentationModule =
                 get(),
                 get(),
                 get(),
+                get(),
             )
         }
         factory { ChatsViewModel(get()) }

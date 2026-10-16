@@ -108,7 +108,9 @@ class ProfileViewModel(
     fun loadMemoryCounts() {
         viewModelScope.launch {
             val page = runCatchingSafe { getMemoryPage() }.getOrNull()
-            _uiState.update { it.copy(memoryCounts = page?.let { MemoryCounts(it.yours.size, it.household.size, it.toCheck) }) }
+            _uiState.update {
+                it.copy(memoryCounts = page?.let { MemoryCounts(it.yours.size, it.household.size, it.toCheck) })
+            }
         }
     }
 

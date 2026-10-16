@@ -6,6 +6,7 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.ToolAction
+import com.homelab.household.presentation.memories.LocalTime
 
 /**
  * How the answer being written is going.
@@ -46,6 +47,8 @@ data class AutomaticWrite(
 data class ChatSessionUiState(
     val isLoading: Boolean = false,
     val session: ConversationSession? = null,
+    /** When the chat was last looked over, on the phone's clock: the quiet line's "10:52". */
+    val lookedOverAt: LocalTime? = null,
     val messages: List<ChatMessage> = emptyList(),
     val streamingMessage: String? = null,
     /**

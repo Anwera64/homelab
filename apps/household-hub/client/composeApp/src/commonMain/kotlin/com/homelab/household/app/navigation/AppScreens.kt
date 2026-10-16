@@ -1,11 +1,11 @@
 package com.homelab.household.app.navigation
 
-import com.homelab.household.app.screens.changes.ChangesToCheckScreen
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
 import com.homelab.household.app.screens.calendarconnect.GoogleCalendarSignInScreen
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderScreen
 import com.homelab.household.app.screens.changepin.ChangePinScreen
+import com.homelab.household.app.screens.changes.ChangesToCheckScreen
 import com.homelab.household.app.screens.chats.ChatsScreen
 import com.homelab.household.app.screens.conversation.ConversationScreen
 import com.homelab.household.app.screens.firstrun.FirstRunScreen
@@ -114,6 +114,7 @@ interface AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
+        onAllMemories: () -> Unit,
     )
 
     @Composable fun Profile(
@@ -302,8 +303,14 @@ object RealAppScreens : AppScreens {
         sessionId: String?,
         onBack: () -> Unit,
         onConnectCalendar: () -> Unit,
+        onAllMemories: () -> Unit,
     ) {
-        ConversationScreen(sessionId = sessionId, onBack = onBack, onConnectCalendar = onConnectCalendar)
+        ConversationScreen(
+            sessionId = sessionId,
+            onBack = onBack,
+            onConnectCalendar = onConnectCalendar,
+            onAllMemories = onAllMemories,
+        )
     }
 
     @Composable

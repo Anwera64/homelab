@@ -76,7 +76,12 @@ class ChangesToCheckScreenTest {
     fun `GIVEN a change about Liam's memory from your chat WHEN the page opens THEN it waits for Liam, with no answers`() {
         val hub =
             FakeMembersHub().apply {
-                readsAChange("c2", stored = "Works late on Thursdays.", read = "Now works late on Fridays.", mine = false)
+                readsAChange(
+                    "c2",
+                    stored = "Works late on Thursdays.",
+                    read = "Now works late on Fridays.",
+                    mine = false,
+                )
             }
 
         runScreenTest {

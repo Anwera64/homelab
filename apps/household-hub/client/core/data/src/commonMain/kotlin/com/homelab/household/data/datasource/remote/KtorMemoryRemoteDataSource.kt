@@ -7,6 +7,7 @@ import com.homelab.household.data.dto.LookedOverDto
 import com.homelab.household.data.dto.MemoryPageDto
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub
+import com.homelab.household.domain.model.ProposalAnswer
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -15,7 +16,6 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import com.homelab.household.domain.model.ProposalAnswer
 
 class KtorMemoryRemoteDataSource(
     private val client: HttpClient,

@@ -60,7 +60,10 @@ class ChangesToCheckViewModelTest {
             waiting = listOf(card("p-boiler", canAnswer = false, answerer = "Liam")),
         )
 
-    private fun viewModel() = ChangesToCheckViewModel(getChanges, answerChange, undoAnswer, deviceTimeZone = { 0 }, clock = clock)
+    private fun viewModel() =
+        ChangesToCheckViewModel(getChanges, answerChange, undoAnswer, deviceTimeZone = {
+            0
+        }, clock = clock)
 
     private fun ChangesToCheckUiState.row(id: String) = (toCheck + waiting).first { it.card.id == id }
 
@@ -76,7 +79,13 @@ class ChangesToCheckViewModelTest {
             assertEquals(MemoriesStatus.Ready, state.status)
             assertEquals(2, state.openCount)
             assertEquals(listOf("p-sam", "p-office"), state.toCheck.map { it.card.id })
-            assertEquals(listOf("Liam" to listOf("p-boiler")), state.waitingByAnswerer.map { (who, rows) -> who to rows.map { it.card.id } })
+            assertEquals(
+                listOf("Liam" to listOf("p-boiler")),
+                state.waitingByAnswerer.map { (who, rows) ->
+                    who to
+                        rows.map { it.card.id }
+                },
+            )
             assertEquals(MemoryAge.Today, state.row("p-sam").readAge)
             assertEquals(LocalTime(hour = 10, minute = 42), state.row("p-sam").readTime)
             assertEquals(MemoryAge.Month(3), state.row("p-sam").storedAge)

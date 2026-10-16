@@ -196,4 +196,3 @@ private fun ChangesToCheckContentPreview(
         ChangesToCheckContent(state = state, onBack = {}, onAnswer = { _, _ -> }, onUndo = {}, onRetry = {})
     }
 }
-

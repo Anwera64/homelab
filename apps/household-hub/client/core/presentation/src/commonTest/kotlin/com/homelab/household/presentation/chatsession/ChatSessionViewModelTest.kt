@@ -8,10 +8,10 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
-import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventScope
 import com.homelab.household.domain.model.HubTool
+import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -34,6 +34,7 @@ import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import com.homelab.household.presentation.memories.LocalTime
 import com.homelab.household.presentation.whenagentsact.WhenAgentsActViewModel
 import dev.mokkery.MockMode
 import dev.mokkery.answering.calls
@@ -105,6 +106,7 @@ class ChatSessionViewModelTest {
                 getCurrentUserUseCase = getCurrentUserUseCase,
                 listHouseholdMembersUseCase = listHouseholdMembersUseCase,
                 setToolApprovalUseCase = setToolApprovalUseCase,
+                deviceTimeZone = { ONE_HOUR },
             )
     }
 
@@ -123,6 +125,7 @@ class ChatSessionViewModelTest {
             getCurrentUserUseCase = getCurrentUserUseCase,
             listHouseholdMembersUseCase = listHouseholdMembersUseCase,
             setToolApprovalUseCase = setToolApprovalUseCase,
+            deviceTimeZone = { ONE_HOUR },
             timeSource = timeSource,
         )
 
@@ -155,21 +158,33 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a chat that was looked over WHEN its sheet closes THEN only the line is fetched again`() =
         runTest(testDispatcher) {
-            val line = LookedOverLine(throughMessageId = "m-1", at = kotlin.time.Instant.parse("2026-10-16T10:52:00Z"), remembered = 2, toCheck = 1)
+            val line =
+                LookedOverLine(
+                    throughMessageId = "m-1",
+                    at = kotlin.time.Instant.parse("2026-10-16T10:52:00Z"),
+                    remembered = 2,
+                    toCheck = 1,
+                )
             val messages = listOf(ChatMessage(id = "m-1", sessionId = "s-1", role = MessageRole.USER, content = "Hi"))
             val session = ConversationSession(id = "s-1", userId = "u-1", lookedOver = line)
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, messages)
             viewModel.loadSession("s-1")
             advanceUntilIdle()
             assertEquals(line, viewModel.uiState.value.session?.lookedOver)
+            assertEquals(LocalTime(hour = 11, minute = 52), viewModel.uiState.value.lookedOverAt)
 
-            val answered = line.copy(remembered = 3, toCheck = 0)
+            val answered = line.copy(
+                remembered = 3,
+                toCheck = 0,
+                at = kotlin.time.Instant.parse("2026-10-16T12:05:00Z"),
+            )
             everySuspend { getSessionUseCase("s-1") } returns Pair(session.copy(lookedOver = answered), messages)
             viewModel.refreshLookedOver()
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
             assertEquals(answered, state.session?.lookedOver)
+            assertEquals(LocalTime(hour = 13, minute = 5), state.lookedOverAt)
             assertEquals(false, state.isLoading)
             assertEquals(1, state.messages.size)
         }
@@ -1789,4 +1804,9 @@ class ChatSessionViewModelTest {
             verifySuspend { setToolApprovalUseCase("calendar_write", ToolAction.Update, true) }
             verify { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) }
         }
+
+    private companion object {
+        /** The phone is an hour ahead of UTC, so 10:52Z reads 11:52. */
+        const val ONE_HOUR = 3_600
+    }
 }

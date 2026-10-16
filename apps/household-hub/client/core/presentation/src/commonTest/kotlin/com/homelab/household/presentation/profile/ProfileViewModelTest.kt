@@ -425,7 +425,8 @@ class ProfileViewModelTest {
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
-            everySuspend { getMemoryPage() } returns MemoryPage(yours = emptyList(), household = emptyList(), toCheck = 2)
+            everySuspend { getMemoryPage() } returns
+                MemoryPage(yours = emptyList(), household = emptyList(), toCheck = 2)
             val viewModel = viewModel()
 
             viewModel.loadMemoryCounts()

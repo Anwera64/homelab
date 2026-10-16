@@ -804,4 +804,12 @@
     <string name="changes_waiting_line">%1$s said this. Waiting for %1$s to choose.</string>
     <string name="changes_source_title">“%1$s”</string>
     <string name="changes_source_owner">%1$s’s chat</string>
+    <string name="chat_looked_over">Looked over</string>
+    <string name="chat_looked_over_remembered">Remembered %1$d</string>
+    <string name="chat_looked_over_nothing">Looked over · %1$s · nothing new</string>
+    <string name="looked_over_title">Remembered from this chat</string>
+    <string name="looked_over_caption">Looked over at %1$s, after the chat went quiet.</string>
+    <string name="looked_over_to_check">To check · %1$d</string>
+    <string name="looked_over_remembered">Remembered · %1$d</string>
+    <string name="looked_over_all_memories">All memories</string>
 </resources>

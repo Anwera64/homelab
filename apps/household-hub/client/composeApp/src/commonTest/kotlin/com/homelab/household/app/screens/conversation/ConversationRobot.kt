@@ -46,6 +46,8 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.agent_owner_member
 import com.homelab.household.app.resources.agent_picker_failed_title
 import com.homelab.household.app.resources.agent_picker_title
+import com.homelab.household.app.resources.chat_looked_over_nothing
+import com.homelab.household.app.resources.chat_looked_over_remembered
 import com.homelab.household.app.resources.conversation_change_agent
 import com.homelab.household.app.resources.conversation_composer_leave
 import com.homelab.household.app.resources.conversation_composer_waiting
@@ -64,6 +66,7 @@ import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.field_changed
+import com.homelab.household.app.resources.profile_memories_to_check
 import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.steps_label_and
 import com.homelab.household.app.resources.steps_label_failed
@@ -265,6 +268,27 @@ class ConversationRobot(
     suspend fun doesNotSeeTryAgain() {
         node(getString(Res.string.conversation_try_again)).assertDoesNotExist()
     }
+
+    // ---- the quiet line after a look-over -----------------------------------------------------
+
+    suspend fun seesTheLookedOverLine(
+        remembered: Int,
+        toCheck: Int,
+        time: String,
+    ) {
+        seesText(getString(Res.string.chat_looked_over_remembered, remembered), unmerged = true)
+        seesText(getString(Res.string.profile_memories_to_check, toCheck), unmerged = true)
+        seesText(time, unmerged = true)
+    }
+
+    suspend fun seesNothingNewAt(time: String) =
+        seesText(getString(Res.string.chat_looked_over_nothing, time), unmerged = true)
+
+    fun tapsTheLookedOverLine() {
+        test.onNodeWithTag(LOOKED_OVER_LINE_TAG).performClick()
+    }
+
+    fun boundsOfTheLookedOverLine(): DpRect = test.onNodeWithTag(LOOKED_OVER_LINE_TAG).getUnclippedBoundsInRoot()
 
     // ---- where each piece sits -----------------------------------------------------------------
 
@@ -911,6 +935,7 @@ fun ComposeUiTest.conversationScreen(
     onConnectCalendar: () -> Unit = {},
     onApproveAutomatically: (String, ProposalDetails?) -> Unit = { _, _ -> },
     onUndoAutomatic: () -> Unit = {},
+    onLookedOver: () -> Unit = {},
 ) {
     setContent {
         StillTheme(darkTheme = darkTheme) {
@@ -926,6 +951,7 @@ fun ComposeUiTest.conversationScreen(
                 onConnectCalendar = onConnectCalendar,
                 onApproveAutomatically = onApproveAutomatically,
                 onUndoAutomatic = onUndoAutomatic,
+                onLookedOver = onLookedOver,
                 onBack = {},
                 memberName = "Emma",
             )

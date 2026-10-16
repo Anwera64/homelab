@@ -3,6 +3,9 @@ package com.homelab.household.app.screens.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,6 +31,7 @@ fun ConversationScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onConnectCalendar: () -> Unit = {},
+    onAllMemories: () -> Unit = {},
 ) {
     val viewModel: ChatSessionViewModel = koinViewModel()
     val profileViewModel: ProfileViewModel = koinViewModel()
@@ -40,6 +44,24 @@ fun ConversationScreen(
     LifecycleResumeEffect(viewModel) {
         viewModel.onForeground()
         onPauseOrDispose {}
+    }
+
+    // "Remembered from this chat". Closing it recounts the quiet line, since answers inside change it.
+    var lookingOver by rememberSaveable { mutableStateOf(false) }
+    val lookedOverSession = state.session?.id
+    if (lookingOver && lookedOverSession != null) {
+        LookedOverSheet(
+            sessionId = lookedOverSession,
+            onDismiss = {
+                lookingOver = false
+                viewModel.refreshLookedOver()
+            },
+            onAllMemories = {
+                lookingOver = false
+                viewModel.refreshLookedOver()
+                onAllMemories()
+            },
+        )
     }
 
     ConversationContent(
@@ -56,6 +78,7 @@ fun ConversationScreen(
         onConnectCalendar = onConnectCalendar,
         onApproveAutomatically = viewModel::approveAutomatically,
         onUndoAutomatic = viewModel::undoAutomatic,
+        onLookedOver = { lookingOver = true },
         modifier = modifier,
     )
 }

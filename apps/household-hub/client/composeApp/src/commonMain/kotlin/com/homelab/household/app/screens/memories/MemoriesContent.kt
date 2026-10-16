@@ -46,8 +46,8 @@ import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.changes_title
-import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_back
+import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_empty_line
 import com.homelab.household.app.resources.memories_empty_title
 import com.homelab.household.app.resources.memories_failed_line
@@ -381,7 +381,7 @@ private fun MemoryCard(
 }
 
 @Composable
-private fun RemoveButton(
+internal fun RemoveButton(
     content: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -406,7 +406,7 @@ private fun RemoveButton(
 
 /** The row after ✕ (board MemListRemoved): quiet, with Undo, until the page is left. */
 @Composable
-private fun RemovedRow(
+internal fun RemovedRow(
     row: MemoryRow,
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -502,7 +502,7 @@ private fun LoadingRows(modifier: Modifier = Modifier) {
 
 private const val LOADING_ROWS = 3
 
-private fun MemoryActionFailure.words(): StringResource =
+internal fun MemoryActionFailure.words(): StringResource =
     when (this) {
         MemoryActionFailure.RemoveUnreachable -> Res.string.memories_remove_unreachable
         MemoryActionFailure.RemoveFailed -> Res.string.memories_remove_failed

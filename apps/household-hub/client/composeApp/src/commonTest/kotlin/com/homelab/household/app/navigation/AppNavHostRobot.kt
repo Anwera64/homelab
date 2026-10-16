@@ -118,6 +118,8 @@ class AppNavHostRobot(
 
     fun tapsGoToChangesToCheck() = tapsText(StubScreens.GO_TO_CHANGES_TO_CHECK)
 
+    fun tapsGoToAllMemories() = tapsText(StubScreens.GO_TO_ALL_MEMORIES)
+
     fun tapsGoToInvite() = tapsText(StubScreens.GO_TO_INVITE)
 
     fun tapsResetLiamsPin() = tapsText(StubScreens.RESET_LIAMS_PIN)
