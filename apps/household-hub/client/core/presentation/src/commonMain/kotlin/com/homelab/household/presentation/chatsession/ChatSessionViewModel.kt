@@ -204,6 +204,18 @@ class ChatSessionViewModel(
      * After the look-over sheet closes: its answers and removals change the line's counts, so only
      * the line is taken from a fresh fetch. The transcript is left as it is.
      */
+    private var shownBefore = false
+
+    /**
+     * Each time the chat is on screen. Coming back to it, from the memory page or Changes to check,
+     * may follow answers made there, so the quiet line is asked for again; the first showing is
+     * already loading.
+     */
+    fun onShown() {
+        if (shownBefore) refreshLookedOver()
+        shownBefore = true
+    }
+
     fun refreshLookedOver() {
         val sessionId = _uiState.value.session?.id ?: return
         viewModelScope.launch {

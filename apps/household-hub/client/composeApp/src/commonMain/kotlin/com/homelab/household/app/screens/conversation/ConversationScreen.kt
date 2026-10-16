@@ -39,6 +39,8 @@ fun ConversationScreen(
     val profile by profileViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(sessionId) { viewModel.open(sessionId) }
+    // Back from the memory page: answers made there change the quiet line.
+    LaunchedEffect(viewModel) { viewModel.onShown() }
     // Back from connecting a calendar from a fix card: the hub has marked those steps fixed.
     ResultEffect<CalendarConnected> { viewModel.refresh() }
     LifecycleResumeEffect(viewModel) {
@@ -58,7 +60,6 @@ fun ConversationScreen(
             },
             onAllMemories = {
                 lookingOver = false
-                viewModel.refreshLookedOver()
                 onAllMemories()
             },
         )
