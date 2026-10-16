@@ -20,7 +20,7 @@ class ChangesToCheckScreenTest {
     private fun hubWithAChange() = FakeMembersHub().apply { readsAChange("c1", stored = stored, read = read) }
 
     @Test
-    fun `GIVEN a change WHEN the page opens THEN it shows Stored beside what was read, the chat, and the three answers`() {
+    fun `GIVEN a change WHEN the page opens THEN it shows Stored beside what was read the chat and the three answers`() {
         runScreenTest {
             changesToCheckScreen(hubWithAChange())
 
@@ -34,7 +34,7 @@ class ChangesToCheckScreenTest {
     }
 
     @Test
-    fun `GIVEN a change WHEN Use new is tapped THEN it turns into Replaced with Undo, and Undo opens it again`() {
+    fun `GIVEN a change WHEN Use new is tapped THEN it turns into Replaced with Undo and Undo opens it again`() {
         val hub = hubWithAChange()
 
         runScreenTest {
@@ -73,7 +73,7 @@ class ChangesToCheckScreenTest {
     }
 
     @Test
-    fun `GIVEN a change about Liam's memory from your chat WHEN the page opens THEN it waits for Liam, with no answers`() {
+    fun `GIVEN a change about Liam's memory from your chat WHEN the page opens THEN it waits for Liam with no answers`() {
         val hub =
             FakeMembersHub().apply {
                 readsAChange(
@@ -97,7 +97,7 @@ class ChangesToCheckScreenTest {
     }
 
     @Test
-    fun `GIVEN a change read in someone else's chat WHEN the page opens THEN it names whose chat, never its title`() {
+    fun `GIVEN a change read in someone else's chat WHEN the page opens THEN it names whose chat never its title`() {
         val hub = FakeMembersHub().apply { readsAChange("c3", stored = stored, read = read, title = null) }
 
         runScreenTest {

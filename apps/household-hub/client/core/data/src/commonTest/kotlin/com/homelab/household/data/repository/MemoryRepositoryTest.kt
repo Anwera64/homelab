@@ -126,19 +126,19 @@ class MemoryRepositoryTest {
     fun `GIVEN a change WHEN it is answered and undone THEN the data source is asked for each`() =
         runTest {
             val remote = mock<MemoryRemoteDataSource>()
-            everySuspend { remote.answerChange("p1", ProposalAnswer.KeepBoth) } returns Unit
+            everySuspend { remote.answerChange("p1", "keep_both") } returns Unit
             everySuspend { remote.undoChangeAnswer("p1") } returns Unit
             val repository = MemoryRepositoryImpl(remote)
 
             repository.answerChange("p1", ProposalAnswer.KeepBoth)
             repository.undoChangeAnswer("p1")
 
-            verifySuspend(VerifyMode.exactly(1)) { remote.answerChange("p1", ProposalAnswer.KeepBoth) }
+            verifySuspend(VerifyMode.exactly(1)) { remote.answerChange("p1", "keep_both") }
             verifySuspend(VerifyMode.exactly(1)) { remote.undoChangeAnswer("p1") }
         }
 
     @Test
-    fun `GIVEN a looked-over chat WHEN its sheet is asked for THEN the time, cards and remembered memories map`() =
+    fun `GIVEN a looked-over chat WHEN its sheet is asked for THEN the time cards and remembered memories map`() =
         runTest {
             val remote = mock<MemoryRemoteDataSource>()
             everySuspend { remote.getLookedOver("chat-1") } returns

@@ -253,7 +253,11 @@ private fun RememberedRow(
                     HearthChip(
                         label =
                             stringResource(
-                                if (household) Res.string.memories_tab_household_plain else Res.string.memories_tab_yours_plain,
+                                if (household) {
+                                    Res.string.memories_tab_household_plain
+                                } else {
+                                    Res.string.memories_tab_yours_plain
+                                },
                             ),
                         variant = if (household) ChipVariant.Neutral else ChipVariant.Primary,
                     )

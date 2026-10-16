@@ -55,7 +55,8 @@ internal fun LookedOverLine(
             .clip(HearthShapes.item)
             .then(
                 if (line.isNothingNew) Modifier else Modifier.clickable(role = Role.Button, onClick = onOpen),
-            ).testTag(LOOKED_OVER_LINE_TAG),
+            )
+            .testTag(LOOKED_OVER_LINE_TAG),
         horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

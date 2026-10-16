@@ -12,7 +12,7 @@ class LookedOverSheetTest {
     private val sheet = LookedOverUiStateProvider().values.first()
 
     @Test
-    fun `GIVEN a looked-over chat WHEN the sheet opens THEN it shows what to check, what waits for Liam, and what was remembered`() =
+    fun `GIVEN a looked-over chat WHEN the sheet opens THEN it shows what to check what waits for Liam and what was remembered`() =
         runComposeUiTest {
             lookedOverSheetContent(sheet)
 
@@ -28,7 +28,7 @@ class LookedOverSheetTest {
         }
 
     @Test
-    fun `GIVEN the sheet WHEN Use new, X and All memories are tapped THEN each reaches its callback`() =
+    fun `GIVEN the sheet WHEN Use new X and All memories are tapped THEN each reaches its callback`() =
         runComposeUiTest {
             val answers = mutableListOf<Pair<String, ProposalAnswer>>()
             val removed = mutableListOf<String>()

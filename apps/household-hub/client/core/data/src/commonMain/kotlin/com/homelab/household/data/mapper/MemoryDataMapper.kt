@@ -14,6 +14,7 @@ import com.homelab.household.domain.model.MemoryItem
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
+import com.homelab.household.domain.model.ProposalAnswer
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -96,3 +97,11 @@ object MemoryDataMapper {
             "manual" to MemoryOrigin.Manual,
         )
 }
+
+/** The hub's word for each answer on a change card. */
+fun ProposalAnswer.toWire(): String =
+    when (this) {
+        ProposalAnswer.KeepStored -> "keep_stored"
+        ProposalAnswer.KeepBoth -> "keep_both"
+        ProposalAnswer.UseNew -> "use_new"
+    }

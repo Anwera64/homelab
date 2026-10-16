@@ -3,7 +3,6 @@ package com.homelab.household.data.datasource.remote.`interface`
 import com.homelab.household.data.dto.ChangesToCheckDto
 import com.homelab.household.data.dto.LookedOverDto
 import com.homelab.household.data.dto.MemoryPageDto
-import com.homelab.household.domain.model.ProposalAnswer
 
 /**
  * Everything the hub is asked about what the agents remember. Each function is one call, returning
@@ -20,7 +19,8 @@ interface MemoryRemoteDataSource {
 
     suspend fun answerChange(
         changeId: String,
-        answer: ProposalAnswer,
+        /** The hub's word for the answer: "keep_stored", "keep_both" or "use_new". */
+        answer: String,
     )
 
     suspend fun undoChangeAnswer(changeId: String)

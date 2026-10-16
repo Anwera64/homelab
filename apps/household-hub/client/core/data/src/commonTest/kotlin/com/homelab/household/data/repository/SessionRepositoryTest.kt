@@ -833,7 +833,7 @@ class SessionRepositoryTest {
     // ---- the look-over line (slice 5) --------------------------------------
 
     @Test
-    fun `GIVEN a chat that was looked over WHEN it is opened THEN its line says where, when and what`() =
+    fun `GIVEN a chat that was looked over WHEN it is opened THEN its line says where when and what`() =
         runTest {
             val remote = mock<SessionRemoteDataSource>()
             everySuspend { remote.fetchSession("s-1") } returns

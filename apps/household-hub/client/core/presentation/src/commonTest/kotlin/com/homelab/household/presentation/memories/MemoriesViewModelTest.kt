@@ -268,7 +268,7 @@ class MemoriesViewModelTest {
         }
 
     @Test
-    fun `GIVEN changes waiting WHEN the page loads THEN the band counts them, and coming back recounts and relists quietly`() =
+    fun `GIVEN changes waiting WHEN the page loads THEN the band counts them and coming back recounts and relists quietly`() =
         runTest(testDispatcher) {
             everySuspend { getMemoryPage() } returns page.copy(toCheck = 2)
             val viewModel = viewModel()

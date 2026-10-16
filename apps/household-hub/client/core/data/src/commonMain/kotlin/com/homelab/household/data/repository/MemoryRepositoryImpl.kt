@@ -2,6 +2,7 @@ package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.remote.`interface`.MemoryRemoteDataSource
 import com.homelab.household.data.mapper.MemoryDataMapper
+import com.homelab.household.data.mapper.toWire
 import com.homelab.household.domain.model.ChangesToCheck
 import com.homelab.household.domain.model.LookedOver
 import com.homelab.household.domain.model.MemoryPage
@@ -23,7 +24,7 @@ class MemoryRepositoryImpl(
     override suspend fun answerChange(
         changeId: String,
         answer: ProposalAnswer,
-    ) = remote.answerChange(changeId, answer)
+    ) = remote.answerChange(changeId, answer.toWire())
 
     override suspend fun undoChangeAnswer(changeId: String) = remote.undoChangeAnswer(changeId)
 

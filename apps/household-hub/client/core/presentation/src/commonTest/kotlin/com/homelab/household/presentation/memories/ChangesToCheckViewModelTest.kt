@@ -108,7 +108,7 @@ class ChangesToCheckViewModelTest {
         }
 
     @Test
-    fun `GIVEN a change WHEN Use new is tapped THEN it saves, then becomes a done row and stops counting`() =
+    fun `GIVEN a change WHEN Use new is tapped THEN it saves then becomes a done row and stops counting`() =
         runTest(testDispatcher) {
             everySuspend { getChanges() } returns changes
             val gate = CompletableDeferred<Unit>()

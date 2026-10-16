@@ -70,6 +70,10 @@ private val fixedSegments =
     setOf(
         "api",
         "v1",
+        "answer",
+        "looked-over",
+        "proposals",
+        "undo",
         "agents",
         "archive",
         "audit",

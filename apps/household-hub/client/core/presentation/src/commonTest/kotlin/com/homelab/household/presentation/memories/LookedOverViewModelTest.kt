@@ -91,7 +91,7 @@ class LookedOverViewModelTest {
         )
 
     @Test
-    fun `GIVEN a looked-over chat WHEN the sheet opens THEN it shows the time, the changes and what was remembered`() =
+    fun `GIVEN a looked-over chat WHEN the sheet opens THEN it shows the time the changes and what was remembered`() =
         runTest(testDispatcher) {
             everySuspend { getLookedOver("chat-1") } returns sheet
             val viewModel = viewModel()

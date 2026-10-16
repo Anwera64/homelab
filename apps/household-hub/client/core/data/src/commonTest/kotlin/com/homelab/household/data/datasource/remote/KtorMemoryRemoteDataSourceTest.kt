@@ -2,7 +2,6 @@ package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.domain.exception.ServerOfflineException
-import com.homelab.household.domain.model.ProposalAnswer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -171,7 +170,7 @@ class KtorMemoryRemoteDataSourceTest {
                     respondJson("""{"id": "p-sam", "memory_id": "sam", "content": "x", "state": "replaced"}""")
                 }
 
-            dataSource(engine).answerChange("p-sam", ProposalAnswer.UseNew)
+            dataSource(engine).answerChange("p-sam", "use_new")
 
             assertEquals("/api/v1/memories/proposals/p-sam/answer", path)
             assertEquals(HttpMethod.Post, method)
@@ -222,7 +221,7 @@ class KtorMemoryRemoteDataSourceTest {
             assertFailsWith<ServerOfflineException> { source.removeMemory("mem-1") }
             assertFailsWith<ServerOfflineException> { source.restoreMemory("mem-1") }
             assertFailsWith<ServerOfflineException> { source.getChangesToCheck() }
-            assertFailsWith<ServerOfflineException> { source.answerChange("p-sam", ProposalAnswer.KeepStored) }
+            assertFailsWith<ServerOfflineException> { source.answerChange("p-sam", "keep_stored") }
             assertFailsWith<ServerOfflineException> { source.undoChangeAnswer("p-sam") }
             assertFailsWith<ServerOfflineException> { source.getLookedOver("chat-1") }
         }

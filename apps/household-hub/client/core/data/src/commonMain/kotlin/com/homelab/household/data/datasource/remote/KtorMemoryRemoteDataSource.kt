@@ -7,7 +7,6 @@ import com.homelab.household.data.dto.LookedOverDto
 import com.homelab.household.data.dto.MemoryPageDto
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.reachingHub
-import com.homelab.household.domain.model.ProposalAnswer
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -43,13 +42,13 @@ class KtorMemoryRemoteDataSource(
 
     override suspend fun answerChange(
         changeId: String,
-        answer: ProposalAnswer,
+        answer: String,
     ): Unit =
         reachingHub {
             client
                 .post("$baseUrl/api/v1/memories/proposals/$changeId/answer") {
                     contentType(ContentType.Application.Json)
-                    setBody(ChangeAnswerDto(answer = WIRE_ANSWERS.getValue(answer)))
+                    setBody(ChangeAnswerDto(answer = answer))
                 }.ensureJsonSuccess()
         }
 
@@ -62,13 +61,4 @@ class KtorMemoryRemoteDataSource(
         reachingHub {
             client.get("$baseUrl/api/v1/sessions/$sessionId/looked-over").ensureJsonSuccess().body()
         }
-
-    private companion object {
-        val WIRE_ANSWERS =
-            mapOf(
-                ProposalAnswer.KeepStored to "keep_stored",
-                ProposalAnswer.KeepBoth to "keep_both",
-                ProposalAnswer.UseNew to "use_new",
-            )
-    }
 }
