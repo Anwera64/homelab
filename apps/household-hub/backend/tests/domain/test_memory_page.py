@@ -219,3 +219,21 @@ async def test_listing_the_page_logs_counts(caplog):
         await ListMemoryPageUseCase(repo, FakeUserRepo(), FakeAgentRepo(), clock=lambda: NOW).execute(EMMA)
 
     assert "Memory page listed | member=emma yours=1 household=0" in [r.getMessage() for r in caplog.records]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_pending_proposal_WHEN_its_memory_is_removed_THEN_the_proposal_is_dropped(caplog):
+    """A proposal is dropped, not answered, when its stored memory is removed (memory spec §3.5)."""
+    from tests.domain.reflection_fakes import FakeProposals
+    from app.domain.entities.memory_proposal import MemoryProposal
+
+    proposals = FakeProposals()
+    await proposals.create(MemoryProposal(memory_id="veg", content="Robin is vegan", answerer_id="emma"))
+    repo = FakeMemoryRepo([AgentMemory(id="veg", user_id="emma", content="Robin is vegetarian")])
+
+    with caplog.at_level(logging.INFO):
+        await RetireMemoryUseCase(repo, FakeUow(), clock=lambda: NOW, proposal_repo=proposals).execute("veg", EMMA)
+
+    assert proposals.dropped_for == ["veg"]
+    assert proposals.created[0].state == "dropped"
+    assert "reason=memory_removed" in caplog.text

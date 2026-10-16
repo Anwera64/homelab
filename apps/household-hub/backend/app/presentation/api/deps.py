@@ -84,7 +84,6 @@ from app.domain.use_cases.integrations.list_available_tools import ListAvailable
 from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
-from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
 from app.domain.repositories.llm_client import ILLMClient
 from app.presentation.api.session_lock import SessionLockRegistry
@@ -320,13 +319,10 @@ def get_assemble_agent_context_use_case() -> AssembleAgentContextUseCase:
 def get_process_chat_turn_use_case() -> ProcessChatTurnUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
-def get_reflect_turn_use_case() -> ReflectTurnUseCase:
-    raise NotImplementedError("Wired by bootstrap coordinator")
-
 def get_summarize_history_use_case() -> SummarizeHistoryUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
-def get_background_reflection_runner():
+def get_after_turn_runner():
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_background_chat_stream_runner():

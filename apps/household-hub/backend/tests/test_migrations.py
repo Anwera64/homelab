@@ -476,3 +476,84 @@ def test_memory_vectors_go_with_their_memory():
                 assert "memory_vectors" not in set(inspect(conn).get_table_names())
         finally:
             engine.dispose()
+
+
+_BEFORE_REFLECTION = "c4f9a2d7e510"
+
+
+def test_reflection_starts_from_a_clean_hub_and_chats_get_a_marker():
+    """
+    GIVEN a hub with a chat, a message, a memory, its vector and a proposal WHEN migrated THEN all of
+    them are gone (memory spec §3.3: the new reflection is tested from a clean start) and chats carry
+    the reflection marker (§3.4). Downgrading drops the marker columns.
+    """
+    from sqlalchemy import inspect, text
+
+    with tempfile.TemporaryDirectory() as workspace:
+        db_path = Path(workspace) / "reflection.db"
+        database_url = f"sqlite:///{db_path}"
+        config = _alembic_config(database_url)
+        command.upgrade(config, _BEFORE_REFLECTION)
+
+        engine = create_engine(database_url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, full_name, hashed_pin, avatar_color, is_admin, is_active, "
+                        "failed_pin_attempts, token_version, created_at, updated_at) "
+                        "VALUES ('emma', 'Emma', 'x', 'sage', 1, 1, 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO conversation_sessions (id, user_id, title, is_secret, is_archived, "
+                        "created_at, updated_at) VALUES ('chat', 'emma', 'Boiler', 0, 0, '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO chat_messages (id, session_id, role, content, metadata_json, created_at) "
+                        "VALUES ('msg', 'chat', 'user', 'hi', '{}', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO agent_memories (id, user_id, scope, category, content, confidence, "
+                        "is_active, origin, created_at, updated_at) "
+                        "VALUES ('mem', 'emma', 'household', 'fact', 'Boiler in November', 1.0, 1, "
+                        "'reflection', '2026-01-01', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO memory_vectors (memory_id, kind, model, vector, created_at) "
+                        "VALUES ('mem', 'content', 'bge-m3', x'0000803f', '2026-01-01')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO memory_proposals (id, memory_id, content, relation, answerer_id, state, "
+                        "created_at) VALUES ('prop', 'mem', 'Boiler in October', 'changed', 'emma', "
+                        "'pending', '2026-01-01')"
+                    )
+                )
+
+            command.upgrade(config, "head")
+
+            with engine.connect() as conn:
+                for table in (
+                    "memory_vectors", "memory_proposals", "agent_memories", "chat_messages", "conversation_sessions"
+                ):
+                    assert conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() == 0, table
+                assert conn.execute(text("SELECT COUNT(*) FROM users")).scalar() == 1
+                columns = {c["name"] for c in inspect(conn).get_columns("conversation_sessions")}
+                assert {"reflected_through_id", "reflected_at", "last_reflection"} <= columns
+
+            command.downgrade(config, _BEFORE_REFLECTION)
+
+            with engine.connect() as conn:
+                columns = {c["name"] for c in inspect(conn).get_columns("conversation_sessions")}
+                assert not {"reflected_through_id", "reflected_at", "last_reflection"} & columns
+        finally:
+            engine.dispose()

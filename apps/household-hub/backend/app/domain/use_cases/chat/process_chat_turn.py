@@ -14,6 +14,8 @@ from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.llm_client import ILLMClient
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.tool_approval_repository import IToolApprovalRepository
+from app.domain.use_cases.chat.chat_title import title_from_first_message
+from app.domain.use_cases.chat.current_date_line import zone_of
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.memories.recall_memories import RECALLED, RecallMemoriesUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
@@ -98,6 +100,8 @@ class ChatTurnResult:
     privacy_trigger_detected: bool = False
     suggest_secret_mode: bool = False
     is_turn_secret: bool = False
+    # The chat's title after the turn: a first message titles it (memory spec §2.3).
+    session_title: Optional[str] = None
 
 
 class _AnswerParts:
@@ -352,12 +356,13 @@ class ProcessChatTurnUseCase:
         suggest_secret_mode = privacy_trigger_detected and not session.is_secret
 
         # 2. Persist User Message
+        await self._title_a_new_chat(session, content)
         async with self.uow:
             user_msg = ChatMessage(
                 session_id=session.id,
                 role="user",
                 content=content,
-                metadata_json={"privacy_trigger_detected": privacy_trigger_detected},
+                metadata_json=self._question_metadata(privacy_trigger_detected, timezone_name),
             )
             await self.session_repo.add_message(user_msg)
             session.touch()
@@ -516,6 +521,7 @@ class ProcessChatTurnUseCase:
             privacy_trigger_detected=privacy_trigger_detected,
             suggest_secret_mode=suggest_secret_mode,
             is_turn_secret=is_turn_secret,
+            session_title=session.title,
         )
 
     async def _open_turn(self, session_id: str, current_user: User):
@@ -606,12 +612,13 @@ class ProcessChatTurnUseCase:
 
         privacy_trigger_detected = self._check_privacy_triggers(content)
 
+        await self._title_a_new_chat(session, content)
         async with self.uow:
             user_msg = ChatMessage(
                 session_id=session.id,
                 role="user",
                 content=content,
-                metadata_json={"privacy_trigger_detected": privacy_trigger_detected},
+                metadata_json=self._question_metadata(privacy_trigger_detected, timezone_name),
             )
             await self.session_repo.add_message(user_msg)
             session.touch()
@@ -635,6 +642,19 @@ class ProcessChatTurnUseCase:
             timezone_name=timezone_name,
         ):
             yield event
+
+    @staticmethod
+    def _question_metadata(privacy_trigger_detected: bool, timezone_name: Optional[str]) -> Dict[str, Any]:
+        """The zone is kept so reflection, long after, reads "tomorrow" as the day it meant (§2.2)."""
+        metadata: Dict[str, Any] = {"privacy_trigger_detected": privacy_trigger_detected}
+        if zone_of(timezone_name):
+            metadata["timezone"] = timezone_name
+        return metadata
+
+    async def _title_a_new_chat(self, session: ConversationSession, content: str) -> None:
+        """The first message titles the chat at once (memory spec §2.3); saved with the message."""
+        if not await self.session_repo.get_messages(session.id, limit=1):
+            session.title = title_from_first_message(content)
 
     async def _answer_or_say_it_failed(self, **kwargs):
         """

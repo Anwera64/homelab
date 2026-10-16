@@ -59,7 +59,13 @@ class Settings(BaseSettings):
     # How long the embedder's Ollama keeps bge-m3 loaded: -1 never unloads it, so recall never
     # waits 6 s for a load. The on-demand rule is for the chat model on the home PC (Anton, 15 Oct).
     EMBEDDING_KEEP_ALIVE: Union[int, str] = -1
-    MEMORY_REFLECTION_CONFIDENCE_THRESHOLD: float = 0.70
+    # The reflection sweep (memory spec §2.2): a chat is reflected once it has been quiet this long,
+    # checked this often. Neighbours are the stored memories offered beside the chat (§6 step 1),
+    # with a low bar so a changed fact's old version is still among them.
+    REFLECTION_IDLE_MINUTES: float = 10
+    REFLECTION_SWEEP_SECONDS: float = 60
+    REFLECTION_NEIGHBOUR_BAR: float = 0.45
+    REFLECTION_NEIGHBOURS_MAX: int = 15
     # Reading memories (memory spec §5). The fixed block's size, and recall's cut-off, how many it
     # attaches, and how long a turn waits for the question's vector before going without.
     MEMORY_BLOCK_TOKENS: int = 1000

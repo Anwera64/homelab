@@ -1,25 +1,16 @@
 """Embedding on write and the filling pass (memory spec §4.3)."""
 
-import json
 import logging
 
 import pytest
 
 from app.domain.entities.memory import AgentMemory
-from app.domain.entities.session import ConversationSession
 from app.domain.entities.user import User
 from app.domain.exceptions import EmbeddingException
 from app.domain.use_cases.memories.create_memory import CreateMemoryUseCase
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
-from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
 from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
-from tests.domain.test_reflect_turn import (
-    FakeLLMClient,
-    FakeMemoryRepository as ReflectMemoryRepository,
-    FakeSessionRepository as ReflectSessionRepository,
-    FakeUnitOfWork,
-    _house_resolver,
-)
+from tests.domain.reflection_fakes import FakeUnitOfWork
 
 
 class FakeEmbedder:
@@ -168,45 +159,3 @@ async def test_GIVEN_a_memory_is_reworded_THEN_it_is_embedded_again_but_not_when
 
     await use_case.execute("m", me, content="Bins on Tuesday")
     assert embedder.asked == [["Bins on Tuesday"]]
-
-
-@pytest.mark.asyncio
-async def test_GIVEN_reflection_saves_memories_THEN_each_new_one_is_embedded_with_its_relevant_for():
-    """And relevant_for comes from the model's reply (memory spec §5.2)."""
-    reply = json.dumps({
-        "memories": [
-            {
-                "category": "preference", "content": "Sam is vegetarian", "scope": "household",
-                "confidence": 0.9, "relevant_for": ["dinner plans", "  ", "restaurants", 3],
-            },
-            {"category": "fact", "content": "Emma runs on Sundays", "scope": "personal", "confidence": 0.9,
-             "relevant_for": "not a list"},
-        ]
-    })
-    memories = ReflectMemoryRepository()
-    embedder, vectors = FakeEmbedder(), FakeVectorRepository()
-    use_case = ReflectTurnUseCase(
-        llm_client=FakeLLMClient(reply),
-        memory_repo=memories,
-        session_repo=ReflectSessionRepository(ConversationSession(id="s1", user_id="u1", agent_id="a1")),
-        uow=FakeUnitOfWork(),
-        model_resolver=_house_resolver(),
-        embed_memories=_embedder_use_case(embedder, vectors),
-    )
-
-    result = await use_case.execute(
-        session_id="s1", user_id="u1", username="emma", agent_id="a1", agent_name="Planner",
-        user_message="Sam is vegetarian, and I run on Sundays", assistant_message="Noted",
-    )
-
-    veg, run = result.memories_created
-    assert veg.relevant_for == ["dinner plans", "restaurants"]
-    assert run.relevant_for is None
-    assert embedder.asked == [["Sam is vegetarian", "dinner plans; restaurants", "Emma runs on Sundays"]]
-    assert {key[1] for key in vectors.saved} == {"content", "relevant_for"}
-
-
-def test_reflection_asks_for_relevant_for():
-    from app.domain.use_cases.memories.reflect_turn import EXTRACTION_SYSTEM_PROMPT
-
-    assert '"relevant_for"' in EXTRACTION_SYSTEM_PROMPT

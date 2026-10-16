@@ -81,6 +81,9 @@ class SessionDataMapper:
             updated_at=model.updated_at,
             history_summary=model.history_summary,
             summarized_through_id=model.summarized_through_id,
+            reflected_through_id=model.reflected_through_id,
+            reflected_at=model.reflected_at,
+            last_reflection=model.last_reflection,
         )
 
     @staticmethod
@@ -96,6 +99,9 @@ class SessionDataMapper:
             updated_at=entity.updated_at,
             history_summary=entity.history_summary,
             summarized_through_id=entity.summarized_through_id,
+            reflected_through_id=entity.reflected_through_id,
+            reflected_at=entity.reflected_at,
+            last_reflection=entity.last_reflection,
         )
 
     @staticmethod

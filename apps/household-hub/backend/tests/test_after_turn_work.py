@@ -1,5 +1,5 @@
 """
-The work a turn leaves behind once its answer is sent: reflection, then the history summary (#53).
+The work a turn leaves behind once its answer is sent: the history summary (#53).
 
 It runs after the chat's lock is let go, so it needs an order of its own: one chat's jobs one at a
 time, in the order they were handed over, so two summaries never rewrite the same history at once.

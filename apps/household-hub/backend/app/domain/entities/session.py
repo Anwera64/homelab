@@ -46,6 +46,12 @@ class ConversationSession:
     history_summary: str | None = None
     summarized_through_id: str | None = None
 
+    # The reflection marker (memory spec §3.4): the last message reflected, when, and what that run
+    # added, proposed and retired. Like the summary, written only by save_reflection.
+    reflected_through_id: str | None = None
+    reflected_at: datetime | None = None
+    last_reflection: Dict[str, Any] | None = None
+
     # What a Chats row draws beside the title. They belong to the agent and the newest message
     # rather than to the session itself, which is why they are read-only here: nothing sets them
     # on the way in, and the list query fills them on the way out.
@@ -55,3 +61,11 @@ class ConversationSession:
 
     def touch(self) -> None:
         self.updated_at = get_utc_now()
+
+
+@dataclass
+class ChatAwaitingReflection:
+    """A chat with messages after its reflection marker, and when its newest one was sent."""
+
+    session: ConversationSession
+    newest_message_at: datetime

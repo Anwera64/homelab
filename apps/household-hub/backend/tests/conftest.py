@@ -104,7 +104,7 @@ async def client(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> A
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 
-    # Reflection and the summary outlive the turn that started them (#53); let them finish before
+    # The summary outlives the turn that started it (#53); let it finish before
     # the database they write to is dropped.
     for _ in range(500):
         if di_module._after_turn_work.running == 0:

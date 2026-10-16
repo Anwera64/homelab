@@ -448,52 +448,6 @@ async def test_chat_turn_stream_concurrent_lock_rejection(client: httpx.AsyncCli
 
 
 @pytest.mark.asyncio
-async def test_chat_turn_agent_provenance(client: httpx.AsyncClient, monkeypatch):
-    import asyncio
-    from app.bootstrap.di import _ollama_connector
-    from app.domain.entities.llm_message import LLMResponse
-    from app.presentation.api import deps as pres_deps
-    from app.main import app
-
-    captured_reflection = {}
-
-    async def fake_chat(messages, model, temperature=0.7, top_p=0.9, tools=None):
-        return LLMResponse(content="Hello, I am Assistant!")
-
-    monkeypatch.setattr(_ollama_connector, "chat_completion", fake_chat)
-
-    _, member_token, agent_id = await setup_environment(client)
-
-    sess_resp = await client.post(
-        "/api/v1/sessions",
-        json={"agent_id": agent_id, "title": "Provenance Test"},
-        headers={"Authorization": f"Bearer {member_token}"},
-    )
-    session_id = sess_resp.json()["id"]
-
-    def mock_reflection_runner():
-        async def _runner(**kwargs):
-            captured_reflection.update(kwargs)
-        return _runner
-
-    app.dependency_overrides[pres_deps.get_background_reflection_runner] = mock_reflection_runner
-
-    try:
-        turn_resp = await client.post(
-            f"/api/v1/sessions/{session_id}/chat",
-            json={"content": "Hello!"},
-            headers={"Authorization": f"Bearer {member_token}"},
-        )
-        assert turn_resp.status_code == 200
-        await asyncio.sleep(0.05)
-
-        assert captured_reflection.get("agent_name") != ""
-        assert captured_reflection.get("agent_id") == agent_id
-    finally:
-        app.dependency_overrides.pop(pres_deps.get_background_reflection_runner, None)
-
-
-@pytest.mark.asyncio
 async def test_chat_turn_llm_inference_exception_returns_502_or_504(client: httpx.AsyncClient, monkeypatch):
     from app.bootstrap.di import _ollama_connector
     from app.domain.exceptions import LLMInferenceException

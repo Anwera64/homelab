@@ -10,6 +10,7 @@ from app.core.database import AsyncSessionLocal
 from app.domain.entities.user import User
 from app.presentation.api import deps as pres_deps
 from app.bootstrap.after_turn import AfterTurnWork
+from app.bootstrap.turn_activity import HubTurnActivity
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,11 @@ from app.domain.use_cases.chat.prepare_turn import PrepareChatTurnUseCase, Prepa
 from app.domain.use_cases.chat.process_chat_turn import ProcessChatTurnUseCase
 from app.domain.use_cases.chat.tool_approval_settings import ListToolApprovalsUseCase, SetToolApprovalUseCase
 from app.domain.use_cases.chat.summarize_history import SummarizeHistoryUseCase
-from app.domain.use_cases.memories.reflect_turn import ReflectTurnUseCase
+from app.domain.use_cases.memories.reflect_chat import ReflectChatUseCase
+from app.domain.use_cases.memories.reflection_sweep import ReflectionSweepUseCase
+from app.data.datasources.memory_proposal_data_source import SqliteMemoryProposalDataSource
+from app.data.mappers.memory_proposal_data_mapper import MemoryProposalDataMapper
+from app.data.repositories.memory_proposal_repository_impl import MemoryProposalRepositoryImpl
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
 from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase
 from app.domain.use_cases.memories.recall_memories import RecallMemoriesUseCase
@@ -189,12 +194,17 @@ _dummy_pin_hash = _password_hasher.hash("dummy-constant-time-pin-hash")
 _pin_locks = MemberPinLocks()
 _code_guess_lock = CodeGuessLock()
 _after_turn_work = AfterTurnWork()
+# Whether a turn runs anywhere on the hub (memory spec §2.2). The chat locks report every turn, and
+# the history summary a turn leaves behind counts as the turn still running.
+_turn_activity = HubTurnActivity(after_turn_busy=lambda: _after_turn_work.running > 0)
+pres_deps.get_session_lock_registry().turn_activity = _turn_activity
 
 _user_mapper = UserDataMapper()
 _space_mapper = SpaceDataMapper()
 _agent_mapper = AgentDataMapper()
 _session_mapper = SessionDataMapper()
 _memory_mapper = MemoryDataMapper()
+_memory_proposal_mapper = MemoryProposalDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
 _llm_model_mapper = LLMModelDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
@@ -307,6 +317,7 @@ def get_container(session: AsyncSession):
 
     # Memory vectors and recall (memory spec §4, §5.2).
     memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
+    proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
     embed_memories_uc = EmbedMemoriesUseCase(
         _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
     )
@@ -364,55 +375,10 @@ def get_container(session: AsyncSession):
         summary_tokens=settings.HISTORY_SUMMARY_TOKENS,
     )
 
-    reflect_turn_uc = ReflectTurnUseCase(
-        llm_client=_ollama_connector,
-        memory_repo=memory_repo,
-        session_repo=session_repo,
-        uow=uow,
-        model_resolver=model_resolver,
-        confidence_threshold=settings.MEMORY_REFLECTION_CONFIDENCE_THRESHOLD,
-        embed_memories=embed_memories_uc,
-    )
-
-    async def _reflect_and_summarize(
-        session_id: str,
-        user_id: str,
-        username: str,
-        agent_id: str,
-        agent_name: str,
-        user_message: str,
-        assistant_message: str,
-        is_secret_session: bool,
-        is_turn_secret: bool,
-        is_first_turn: bool,
-        timezone_name: Optional[str] = None,
-    ):
+    async def _summarize(session_id: str, timezone_name: Optional[str] = None):
         # On a database session of its own: it runs after the turn's has been closed.
         async with AsyncSessionLocal() as bg_sess:
             bg_container = get_container(bg_sess)
-            try:
-                await bg_container[pres_deps.get_reflect_turn_use_case].execute(
-                    session_id=session_id,
-                    user_id=user_id,
-                    username=username,
-                    agent_id=agent_id,
-                    agent_name=agent_name,
-                    user_message=user_message,
-                    assistant_message=assistant_message,
-                    is_secret_session=is_secret_session,
-                    is_turn_secret=is_turn_secret,
-                    is_first_turn=is_first_turn,
-                    timezone_name=timezone_name,
-                )
-            except Exception as ref_exc:
-                logger.error("Background reflection failed for session %s: %s", session_id, ref_exc, exc_info=True)
-            # Memories saved while the embedder was down get their vectors here (memory spec §4.3).
-            try:
-                await bg_container[EmbedMemoriesUseCase].fill_missing()
-            except Exception as fill_exc:
-                logger.error("Filling memory vectors failed: %s", fill_exc, exc_info=True)
-            # After reflection, so the facts it keeps are taken from the words before they are
-            # folded into the summary.
             try:
                 await bg_container[pres_deps.get_summarize_history_use_case].execute(
                     session_id, timezone_name=timezone_name
@@ -420,36 +386,15 @@ def get_container(session: AsyncSession):
             except Exception as sum_exc:
                 logger.error("Background history summary failed for session %s: %s", session_id, sum_exc, exc_info=True)
 
-    async def _run_background_reflection(
-        session_id: str,
-        user_id: str,
-        username: str,
-        agent_id: str,
-        agent_name: str,
-        user_message: str,
-        assistant_message: str,
-        is_secret_session: bool,
-        is_turn_secret: bool,
-        is_first_turn: bool,
-        timezone_name: Optional[str] = None,
-    ):
-        """The plain `POST chat` path's reflection, queued behind the chat's earlier ones."""
-        _after_turn_work.spawn(
-            session_id,
-            lambda: _reflect_and_summarize(
-                session_id, user_id, username, agent_id, agent_name, user_message, assistant_message,
-                is_secret_session, is_turn_secret, is_first_turn, timezone_name,
-            ),
-        )
+    async def _run_after_turn(session_id: str, timezone_name: Optional[str] = None):
+        """The plain `POST chat` path's history summary, queued behind the chat's earlier work."""
+        _after_turn_work.spawn(session_id, lambda: _summarize(session_id, timezone_name))
 
     async def _run_background_chat_stream(
         session_id: str,
         current_user: User,
         content: str,
         queue: asyncio.Queue,
-        agent_id: str = "",
-        agent_name: str = "",
-        is_first_turn: bool = False,
         regenerate: bool = False,
         timezone_name: Optional[str] = None,
         decision: Optional[Dict[str, Any]] = None,
@@ -459,11 +404,8 @@ def get_container(session: AsyncSession):
                 bg_container = get_container(bg_sess)
                 bg_stream_uc = bg_container[pres_deps.get_process_chat_turn_use_case]
                 final_event = None
-                # Regenerating answers the question already in the transcript, so `content` is
-                # only what reflection is told about afterwards — the turn itself reads it back
-                # from the conversation rather than being handed it again.
-                # A decision carries on the answer that paused for it; `content` is again only the
-                # question, for reflection once the answer is done.
+                # Regenerating answers the question already in the transcript, and a decision
+                # carries on the answer that paused for it; neither is handed `content` again.
                 if decision is not None:
                     turn = bg_stream_uc.decide_stream(
                         session_id=session_id,
@@ -491,20 +433,9 @@ def get_container(session: AsyncSession):
 
                 if final_event:
                     # Handed on rather than awaited: the chat's lock is let go when this returns,
-                    # so the member can write again while reflection and the summary run (#53).
-                    after_turn = dict(
-                        user_id=current_user.id,
-                        username=current_user.full_name,
-                        agent_id=agent_id or final_event.get("agent_id", ""),
-                        agent_name=agent_name or final_event.get("agent_name", ""),
-                        user_message=content,
-                        assistant_message=final_event.get("assistant_content", ""),
-                        is_secret_session=final_event.get("is_secret", False),
-                        is_turn_secret=final_event.get("is_turn_secret", False),
-                        is_first_turn=is_first_turn,
-                        timezone_name=timezone_name,
-                    )
-                    _after_turn_work.spawn(session_id, lambda: _reflect_and_summarize(session_id, **after_turn))
+                    # so the member can write again while the summary runs (#53). Memories are
+                    # written by the reflection sweep once the chat goes quiet (memory spec §2.2).
+                    _after_turn_work.spawn(session_id, lambda: _summarize(session_id, timezone_name))
         except Exception as exc:
             logger.error("Background chat stream failed for session %s: %s", session_id, exc, exc_info=True)
             await queue.put({"type": "error", "error": str(exc)})
@@ -603,7 +534,7 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow, embed_memories=embed_memories_uc),
         pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(memory_repo, user_repo, agent_repo),
-        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow),
+        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
         pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
 
         # Integrations
@@ -644,9 +575,8 @@ def get_container(session: AsyncSession):
         # Stage 3 Chat
         pres_deps.get_assemble_agent_context_use_case: context_assembler,
         pres_deps.get_process_chat_turn_use_case: chat_turn_uc,
-        pres_deps.get_reflect_turn_use_case: reflect_turn_uc,
         pres_deps.get_summarize_history_use_case: summarize_history_uc,
-        pres_deps.get_background_reflection_runner: _run_background_reflection,
+        pres_deps.get_after_turn_runner: _run_after_turn,
         pres_deps.get_background_chat_stream_runner: _run_background_chat_stream,
         pres_deps.get_llm_client: _ollama_connector,
 
@@ -655,6 +585,31 @@ def get_container(session: AsyncSession):
         SeedBuiltinAgentsUseCase: SeedBuiltinAgentsUseCase(agent_repo, uow),
         SyncDefaultModelUseCase: SyncDefaultModelUseCase(llm_model_repo, uow),
         EmbedMemoriesUseCase: embed_memories_uc,
+        ReflectionSweepUseCase: ReflectionSweepUseCase(
+            session_repo=session_repo,
+            agent_repo=agent_repo,
+            model_resolver=model_resolver,
+            residency=_ollama_connector,
+            turn_activity=_turn_activity,
+            reflect_chat=ReflectChatUseCase(
+                llm_client=_ollama_connector,
+                session_repo=session_repo,
+                memory_repo=memory_repo,
+                proposal_repo=proposal_repo,
+                user_repo=user_repo,
+                memory_block=BuildMemoryBlockUseCase(memory_repo, user_repo=user_repo, agent_repo=agent_repo),
+                embedder=_embedder,
+                vector_repo=memory_vector_repo,
+                embed_memories=embed_memories_uc,
+                uow=uow,
+                embedding_model=settings.EMBEDDING_MODEL,
+                neighbour_bar=settings.REFLECTION_NEIGHBOUR_BAR,
+                neighbours_max=settings.REFLECTION_NEIGHBOURS_MAX,
+                log_text=settings.MEMORY_LOG_TEXT,
+            ),
+            embed_memories=embed_memories_uc,
+            idle_minutes=settings.REFLECTION_IDLE_MINUTES,
+        ),
         PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
         PurgeExpiredDeviceSessionsUseCase: PurgeExpiredDeviceSessionsUseCase(
             device_session_repo, uow, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -745,8 +700,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_execute_tool_use_case,
         pres_deps.get_assemble_agent_context_use_case,
         pres_deps.get_process_chat_turn_use_case,
-        pres_deps.get_reflect_turn_use_case,
-        pres_deps.get_background_reflection_runner,
+        pres_deps.get_after_turn_runner,
         pres_deps.get_background_chat_stream_runner,
         pres_deps.get_llm_client,
     ]:
