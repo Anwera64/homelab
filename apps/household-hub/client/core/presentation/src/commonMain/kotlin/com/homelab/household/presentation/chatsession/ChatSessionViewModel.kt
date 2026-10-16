@@ -194,6 +194,19 @@ class ChatSessionViewModel(
         return agents.firstOrNull { it.slug == BUILT_IN_AGENT_SLUG } ?: agents.firstOrNull()
     }
 
+    /**
+     * After the look-over sheet closes: its answers and removals change the line's counts, so only
+     * the line is taken from a fresh fetch. The transcript is left as it is.
+     */
+    fun refreshLookedOver() {
+        val sessionId = _uiState.value.session?.id ?: return
+        viewModelScope.launch {
+            runCatchingSafe { getSessionUseCase(sessionId) }.onSuccess { (fresh, _) ->
+                _uiState.update { state -> state.copy(session = state.session?.copy(lookedOver = fresh.lookedOver)) }
+            }
+        }
+    }
+
     fun loadSession(sessionId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }

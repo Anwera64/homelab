@@ -122,12 +122,5 @@ class MemoriesViewModel(
         )
     }
 
-    private fun rowOf(item: MemoryItem): MemoryRow {
-        val now = clock.now()
-        return MemoryRow(
-            item = item,
-            age = memoryAge(item.createdAt, now, deviceTimeZone.offsetSecondsAt(now)),
-            until = item.expiresAt?.let { localDay(it, deviceTimeZone.offsetSecondsAt(it)) },
-        )
-    }
+    private fun rowOf(item: MemoryItem): MemoryRow = memoryRowOf(item, deviceTimeZone, clock)
 }
