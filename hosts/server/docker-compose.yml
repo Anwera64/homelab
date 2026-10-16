@@ -491,7 +491,7 @@ services:
   #   docker compose --profile render up -d grafana-renderer
   grafana-renderer:
     profiles: ["render"]
-    image: grafana/grafana-image-renderer:v5.12.6
+    image: grafana/grafana-image-renderer:v5.12.7
     container_name: grafana-renderer
     environment:
       - AUTH_TOKEN=${GRAFANA_RENDERER_TOKEN:-homelab-renderer}
@@ -509,7 +509,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.164.9
+    image: renovate/renovate:44.164.10
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
