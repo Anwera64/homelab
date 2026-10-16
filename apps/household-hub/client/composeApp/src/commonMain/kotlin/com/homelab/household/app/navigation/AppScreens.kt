@@ -1,5 +1,6 @@
 package com.homelab.household.app.navigation
 
+import com.homelab.household.app.screens.changes.ChangesToCheckScreen
 import androidx.compose.runtime.Composable
 import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
 import com.homelab.household.app.screens.calendarconnect.GoogleCalendarSignInScreen
@@ -129,7 +130,12 @@ interface AppScreens {
 
     @Composable fun WhenAgentsAct(onBack: () -> Unit)
 
-    @Composable fun Memories(onBack: () -> Unit)
+    @Composable fun Memories(
+        onBack: () -> Unit,
+        onChangesToCheck: () -> Unit,
+    )
+
+    @Composable fun ChangesToCheck(onBack: () -> Unit)
 
     @Composable fun Members(
         onBack: () -> Unit,
@@ -331,8 +337,16 @@ object RealAppScreens : AppScreens {
     }
 
     @Composable
-    override fun Memories(onBack: () -> Unit) {
-        MemoriesScreen(onBack = onBack)
+    override fun Memories(
+        onBack: () -> Unit,
+        onChangesToCheck: () -> Unit,
+    ) {
+        MemoriesScreen(onBack = onBack, onChangesToCheck = onChangesToCheck)
+    }
+
+    @Composable
+    override fun ChangesToCheck(onBack: () -> Unit) {
+        ChangesToCheckScreen(onBack = onBack)
     }
 
     @Composable

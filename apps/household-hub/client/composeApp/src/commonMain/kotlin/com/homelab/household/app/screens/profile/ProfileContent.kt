@@ -63,6 +63,7 @@ import com.homelab.household.app.resources.profile_delete_blocked
 import com.homelab.household.app.resources.profile_members
 import com.homelab.household.app.resources.profile_memories
 import com.homelab.household.app.resources.profile_memories_counts
+import com.homelab.household.app.resources.profile_memories_to_check
 import com.homelab.household.app.resources.profile_memory_section
 import com.homelab.household.app.resources.profile_sign_out
 import com.homelab.household.app.resources.profile_when_agents_act
@@ -328,6 +329,21 @@ private fun MemorySection(
                 icon = HearthIcon.Memory,
                 caption = counts?.let { stringResource(Res.string.profile_memories_counts, it.yours, it.household) },
                 onClick = onMemories,
+                trailing =
+                    counts?.toCheck?.takeIf { it > 0 }?.let { toCheck ->
+                        {
+                            HearthChip(
+                                label = stringResource(Res.string.profile_memories_to_check, toCheck),
+                                variant = ChipVariant.Secondary,
+                            )
+                            HearthIconImage(
+                                icon = HearthIcon.ChevronRight,
+                                contentDescription = null,
+                                size = HearthTheme.size.iconMd,
+                                tint = HearthTheme.colors.textMuted,
+                            )
+                        }
+                    },
             )
         }
     }

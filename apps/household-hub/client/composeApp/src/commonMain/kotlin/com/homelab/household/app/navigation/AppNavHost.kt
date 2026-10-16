@@ -167,7 +167,13 @@ fun AppNavHost(
                     screens.WhenAgentsAct(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Memories> {
-                    screens.Memories(onBack = { backStack.removeLastOrNull() })
+                    screens.Memories(
+                        onBack = { backStack.removeLastOrNull() },
+                        onChangesToCheck = { backStack.add(Destination.ChangesToCheck) },
+                    )
+                }
+                entry<Destination.ChangesToCheck> {
+                    screens.ChangesToCheck(onBack = { backStack.removeLastOrNull() })
                 }
                 entry<Destination.Members> {
                     screens.Members(

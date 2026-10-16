@@ -56,6 +56,13 @@ class FakeMembersHub {
     private val memories = linkedMapOf<String, Pair<String, Boolean>>()
     private var refusesRemoval = false
 
+    /** Changes to check, as the hub keeps them: id to the card's JSON, who answers, and the answer so far. */
+    private val changes = linkedMapOf<String, Triple<String, Boolean, String?>>()
+    private var refusesAnswers = false
+
+    /** The answer the hub has for change [changeId] ("use_new", …), or null while it is open. */
+    fun answerTo(changeId: String): String? = changes[changeId]?.third
+
     /** Whether the hub still has [memoryId] active. */
     fun isRemembered(memoryId: String): Boolean = memories[memoryId]?.second == true
 
@@ -101,6 +108,24 @@ class FakeMembersHub {
                     val action = Regex("\"action\":\"([a-z]+)\"").find(body)!!.groupValues[1]
                     approvals[tool to action] = body.contains("\"auto\":true")
                     json(approvalsJson())
+                }
+
+                path == "/api/v1/memories/proposals" -> {
+                    json(changesJson())
+                }
+
+                path.startsWith("/api/v1/memories/proposals/") && path.endsWith("/answer") -> {
+                    if (refusesAnswers) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    val id = path.removePrefix("/api/v1/memories/proposals/").removeSuffix("/answer")
+                    val answer = Regex("\"answer\":\"([a-z_]+)\"").find(sent.last())!!.groupValues[1]
+                    changes[id] = changes.getValue(id).copy(third = answer)
+                    json("""{"id":"$id","memory_id":"s-$id","content":"x","state":"kept"}""")
+                }
+
+                path.startsWith("/api/v1/memories/proposals/") && path.endsWith("/undo") -> {
+                    val id = path.removePrefix("/api/v1/memories/proposals/").removeSuffix("/undo")
+                    changes[id] = changes.getValue(id).copy(third = null)
+                    json("""{"id":"$id","memory_id":"s-$id","content":"x","state":"pending"}""")
                 }
 
                 path == "/api/v1/memories/page" -> {
@@ -266,8 +291,53 @@ class FakeMembersHub {
         val active = memories.values.filter { it.second }.map { it.first }
         val yours = active.filter { it.contains("\"scope\":\"personal\"") }
         val household = active.filter { it.contains("\"scope\":\"household\"") }
+        val toCheck = changes.values.count { it.second && it.third == null }
         return """{"yours":${yours.joinToString(prefix = "[", postfix = "]")},
-            "household":${household.joinToString(prefix = "[", postfix = "]")}}"""
+            "household":${household.joinToString(prefix = "[", postfix = "]")},"to_check":$toCheck}"""
+    }
+
+    /**
+     * An agent read [read] in a chat where [stored] is remembered. [mine] means Emma said the stored
+     * memory and answers it; otherwise it waits for Liam. [title] is the chat's, shown only to its owner;
+     * without one the card says whose chat it was.
+     */
+    @OptIn(ExperimentalTime::class)
+    fun readsAChange(
+        id: String,
+        stored: String,
+        read: String,
+        mine: Boolean = true,
+        household: Boolean = false,
+        title: String? = "Dinner ideas",
+    ) {
+        val now = Clock.System.now().toString()
+        val speaker = if (mine) "emma" else "liam"
+        val name = if (mine) "Emma Larsson" else "Liam"
+        val storedJson =
+            """{"id":"s-$id","content":"$stored","scope":"${if (household) "household" else "personal"}",
+            "origin":"reflection","created_at":"$now","expires_at":null,"speaker_id":"$speaker",
+            "speaker_name":"$name","is_mine":$mine,"agent_name":"Planner","agent_avatar":"🗓️","can_remove":$mine}"""
+        val firstName = name.substringBefore(" ")
+        changes[id] =
+            Triple(
+                """{"id":"$id","content":"$read","stored":$storedJson,"can_answer":$mine,
+                "answerer_name":"$firstName","source":{"title":${title?.let { "\"$it\"" } ?: "null"},
+                "owner_name":"Liam","read_at":"$now"}}""",
+                mine,
+                null,
+            )
+    }
+
+    /** Changes list, but no answer reaches the hub. */
+    fun refusesAnswers() {
+        refusesAnswers = true
+    }
+
+    private fun changesJson(): String {
+        val open = changes.values.filter { it.second && it.third == null }.map { it.first }
+        val waiting = changes.values.filter { !it.second }.map { it.first }
+        return """{"to_check":${open.joinToString(prefix = "[", postfix = "]")},
+            "waiting":${waiting.joinToString(prefix = "[", postfix = "]")}}"""
     }
 
     /** 503: a proxy in front of a hub that isn't running. */

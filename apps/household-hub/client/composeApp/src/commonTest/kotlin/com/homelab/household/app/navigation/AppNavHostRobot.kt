@@ -56,6 +56,8 @@ class AppNavHostRobot(
 
     fun seesMemories() = seesText(StubScreens.MEMORIES)
 
+    fun seesChangesToCheck() = seesText(StubScreens.CHANGES_TO_CHECK)
+
     fun seesProfile() = seesText(StubScreens.PROFILE)
 
     fun seesTheInviteCreate() = seesText(StubScreens.INVITE_CREATE)
@@ -113,6 +115,8 @@ class AppNavHostRobot(
     fun tapsGoToWhenAgentsAct() = tapsText(StubScreens.GO_TO_WHEN_AGENTS_ACT)
 
     fun tapsGoToMemories() = tapsText(StubScreens.GO_TO_MEMORIES)
+
+    fun tapsGoToChangesToCheck() = tapsText(StubScreens.GO_TO_CHANGES_TO_CHECK)
 
     fun tapsGoToInvite() = tapsText(StubScreens.GO_TO_INVITE)
 

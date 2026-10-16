@@ -75,6 +75,9 @@ sealed interface Destination : NavKey {
     /** What the agents know: your memories and the household's, each of yours removable. */
     data object Memories : Destination
 
+    /** Changes an agent read in a chat that differ from what's stored, each answered in place. */
+    data object ChangesToCheck : Destination
+
     data object Members : Destination
 
     data object InviteCreate : Destination

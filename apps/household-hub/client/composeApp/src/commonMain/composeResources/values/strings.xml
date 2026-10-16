@@ -779,4 +779,29 @@
     <string name="memories_month_oct">October</string>
     <string name="memories_month_nov">November</string>
     <string name="memories_month_dec">December</string>
+    <plurals name="changes_title">
+        <item quantity="one">%1$d change to check</item>
+        <item quantity="other">%1$d changes to check</item>
+    </plurals>
+    <string name="memories_band_line">An agent read something in a chat that differs from what’s stored.</string>
+    <string name="profile_memories_to_check">%1$d to check</string>
+    <string name="changes_back">Back to memories</string>
+    <string name="changes_intro">Nothing changes until you choose. Until then, agents keep using what’s stored.</string>
+    <string name="changes_none_title">Nothing left to check</string>
+    <string name="changes_none_line">Agents use these from now on.</string>
+    <string name="changes_stored">Stored</string>
+    <string name="changes_read">Read in a chat</string>
+    <string name="changes_keep_stored">Keep stored</string>
+    <string name="changes_keep_both">Keep both</string>
+    <string name="changes_use_new">Use new</string>
+    <string name="changes_saving">Saving…</string>
+    <string name="changes_failed">Couldn’t save your choice. Nothing changed.</string>
+    <string name="changes_undo_failed">Couldn’t undo it. Your choice stands.</string>
+    <string name="changes_done_replaced">Replaced “%1$s”</string>
+    <string name="changes_done_kept">Kept. “%1$s” wasn’t saved.</string>
+    <string name="changes_done_both">Kept beside “%1$s”</string>
+    <string name="changes_waiting_for">Waiting for %1$s</string>
+    <string name="changes_waiting_line">%1$s said this. Waiting for %1$s to choose.</string>
+    <string name="changes_source_title">“%1$s”</string>
+    <string name="changes_source_owner">%1$s’s chat</string>
 </resources>

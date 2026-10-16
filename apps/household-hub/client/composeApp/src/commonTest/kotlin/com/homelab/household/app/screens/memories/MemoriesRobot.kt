@@ -12,6 +12,8 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.changes_title
+import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_empty_title
 import com.homelab.household.app.resources.memories_household_note
 import com.homelab.household.app.resources.memories_offline_title
@@ -31,6 +33,7 @@ import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.app.testing.TestApp
 import com.homelab.household.data.datasource.local.InMemorySessionStorage
 import com.homelab.household.presentation.memories.MemoriesUiState
+import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 import kotlin.test.assertEquals
 
@@ -48,6 +51,16 @@ class MemoriesRobot(
         seesText(getString(Res.string.memories_tab_yours, yours))
         seesText(getString(Res.string.memories_tab_household, household))
     }
+
+    suspend fun seesTheBand(count: Int) {
+        seesText(getPluralString(Res.plurals.changes_title, count, count))
+        seesText(getString(Res.string.memories_band_line))
+    }
+
+    suspend fun seesNoBand() =
+        test.waitUntilDoesNotExist(hasText(getString(Res.string.memories_band_line)), timeoutMillis = WAIT_MILLIS)
+
+    suspend fun opensTheBand() = tapsText(getString(Res.string.memories_band_line))
 
     suspend fun opensHousehold(count: Int) = tapsText(getString(Res.string.memories_tab_household, count))
 
@@ -135,10 +148,11 @@ suspend fun ComposeUiTest.onMemories(block: suspend MemoriesRobot.() -> Unit) {
 fun ComposeUiTest.memoriesScreen(
     hub: FakeMembersHub,
     onBack: () -> Unit = {},
+    onChangesToCheck: () -> Unit = {},
 ) {
     setContent {
         TestApp(hub.engine, sessionStorage = InMemorySessionStorage().apply { saveTokens("signed-in-token") }) {
-            MemoriesScreen(onBack = onBack)
+            MemoriesScreen(onBack = onBack, onChangesToCheck = onChangesToCheck)
         }
     }
 }
@@ -152,6 +166,7 @@ fun ComposeUiTest.memoriesContent(state: MemoriesUiState) {
                 state = state,
                 onBack = {},
                 onTab = {},
+                onChangesToCheck = {},
                 onRemove = {},
                 onUndo = {},
                 onRetry = {},

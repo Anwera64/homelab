@@ -61,10 +61,21 @@ class MemoriesViewModel(
         }
     }
 
-    /** Coming back from Changes to check: only the band's count is asked for again. */
-    fun refreshToCheck() {
+    /**
+     * Coming back from Changes to check: the band recounts and the lists pick up what an answer added
+     * or retired, without the loading rows.
+     */
+    fun refresh() {
         viewModelScope.launch {
-            runCatchingSafe { getMemoryPage() }.onSuccess { page -> _uiState.update { it.copy(toCheck = page.toCheck) } }
+            runCatchingSafe { getMemoryPage() }.onSuccess { page ->
+                _uiState.update {
+                    it.copy(
+                        yours = page.yours.map(::rowOf),
+                        household = page.household.map(::rowOf),
+                        toCheck = page.toCheck,
+                    )
+                }
+            }
         }
     }
 
