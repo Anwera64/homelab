@@ -366,7 +366,7 @@ services:
   # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
   # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
   ollama:
-    image: ollama/ollama:0.40.5
+    image: ollama/ollama:0.40.6
     container_name: ollama
     environment:
       - TZ=${TZ:-Europe/Madrid}
