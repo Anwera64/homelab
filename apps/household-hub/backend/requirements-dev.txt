@@ -75,7 +75,7 @@ dnspython==2.9.0
     # via
     #   -c requirements.txt
     #   caldav
-fastapi==0.143.0
+fastapi==0.143.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -180,7 +180,7 @@ pydantic-core==2.50.1
     # via
     #   -c requirements.txt
     #   pydantic
-pydantic-settings==2.15.0
+pydantic-settings==2.16.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -278,6 +278,7 @@ typing-extensions==4.16.0
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
+    #   pydantic-settings
     #   pytest-asyncio
     #   sqlalchemy
     #   starlette
