@@ -49,7 +49,7 @@ val presentationModule =
         factory { ChatsViewModel(get()) }
         factory { DashboardViewModel(get(), get(), get(), get()) }
         factory { LaunchViewModel(get(), get()) }
-        factory { MemoriesViewModel(get(), get(), get(), get()) }
+        factory { MemoriesViewModel(get(), get(), get(), get(), get(), get()) }
         factory { ChangesToCheckViewModel(get(), get(), get(), get()) }
         factory { LookedOverViewModel(get(), get(), get(), get(), get(), get()) }
         factory { FirstRunViewModel(get()) }

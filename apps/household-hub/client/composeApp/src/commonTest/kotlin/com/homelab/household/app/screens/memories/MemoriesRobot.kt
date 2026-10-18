@@ -12,6 +12,7 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.changes_stored
 import com.homelab.household.app.resources.changes_title
 import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_empty_title
@@ -26,6 +27,11 @@ import com.homelab.household.app.resources.memories_title
 import com.homelab.household.app.resources.memories_try_again
 import com.homelab.household.app.resources.memories_undo
 import com.homelab.household.app.resources.memories_until
+import com.homelab.household.app.resources.memories_waiting_caption
+import com.homelab.household.app.resources.memories_waiting_on
+import com.homelab.household.app.resources.memories_waiting_yours
+import com.homelab.household.app.resources.memories_withdraw
+import com.homelab.household.app.resources.memories_withdrawn
 import com.homelab.household.app.resources.memories_you_asked
 import com.homelab.household.app.resources.tool_card_month_oct
 import com.homelab.household.app.testing.FakeMembersHub
@@ -109,6 +115,33 @@ class MemoriesRobot(
         seesText(getString(Res.string.memories_offline_title))
         seesText(getString(Res.string.memories_try_again))
     }
+
+    // ---- a sentence of Emma's waiting on Liam (canvas: MemWaitingB, MemWaitingWithdrawn) ---------
+
+    /** The card: what's stored, Emma's sentence beside it "not used yet", and who picks. */
+    suspend fun seesItWaitsOn(
+        name: String,
+        stored: String,
+        mine: String,
+    ) {
+        seesInList(getString(Res.string.memories_waiting_on, name).uppercase())
+        seesInList(getString(Res.string.changes_stored).uppercase())
+        seesMemory(stored)
+        seesInList(getString(Res.string.memories_waiting_yours).uppercase())
+        seesMemory(mine)
+        seesInList(getString(Res.string.memories_waiting_caption, name))
+    }
+
+    suspend fun withdraws(content: String) {
+        val button = hasContentDescription(getString(Res.string.memories_withdraw, content))
+        test.waitUntilExactlyOneExists(button, timeoutMillis = WAIT_MILLIS)
+        test.onNode(button).performScrollTo().performClick()
+    }
+
+    suspend fun seesItWithdrawn() = seesInList(getString(Res.string.memories_withdrawn))
+
+    suspend fun doesNotSeeYouAsked() =
+        test.waitUntilDoesNotExist(hasText(getString(Res.string.memories_you_asked)), timeoutMillis = WAIT_MILLIS)
 
     private suspend fun removeButton(content: String) =
         hasContentDescription(getString(Res.string.memories_remove, content))

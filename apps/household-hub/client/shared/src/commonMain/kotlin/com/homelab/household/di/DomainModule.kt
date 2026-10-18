@@ -46,6 +46,7 @@ import com.homelab.household.domain.usecase.RemoveMemberUseCase
 import com.homelab.household.domain.usecase.RemoveMemoryUseCase
 import com.homelab.household.domain.usecase.RenewSessionUseCase
 import com.homelab.household.domain.usecase.RestoreAgentUseCase
+import com.homelab.household.domain.usecase.RestoreChangeUseCase
 import com.homelab.household.domain.usecase.RestoreMemoryUseCase
 import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.RetryMessageUseCase
@@ -57,6 +58,7 @@ import com.homelab.household.domain.usecase.UndoChangeAnswerUseCase
 import com.homelab.household.domain.usecase.UnlockSecretSessionUseCase
 import com.homelab.household.domain.usecase.UpdateAgentUseCase
 import com.homelab.household.domain.usecase.UpdateSpaceSettingsUseCase
+import com.homelab.household.domain.usecase.WithdrawChangeUseCase
 import com.homelab.household.domain.usecase.impl.AnswerChangeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ApprovePinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ArchiveSessionUseCaseImpl
@@ -103,6 +105,7 @@ import com.homelab.household.domain.usecase.impl.RemoveMemberUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RenewSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RestoreChangeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ResumeTurnUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RetryMessageUseCaseImpl
@@ -114,6 +117,7 @@ import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UnlockSecretSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UpdateSpaceSettingsUseCaseImpl
+import com.homelab.household.domain.usecase.impl.WithdrawChangeUseCaseImpl
 import org.koin.dsl.module
 
 val domainModule =
@@ -167,6 +171,8 @@ val domainModule =
         factory<GetMemoryPageUseCase> { GetMemoryPageUseCaseImpl(get()) }
         factory<RemoveMemoryUseCase> { RemoveMemoryUseCaseImpl(get()) }
         factory<RestoreMemoryUseCase> { RestoreMemoryUseCaseImpl(get()) }
+        factory<WithdrawChangeUseCase> { WithdrawChangeUseCaseImpl(get()) }
+        factory<RestoreChangeUseCase> { RestoreChangeUseCaseImpl(get()) }
         factory<GetChangesToCheckUseCase> { GetChangesToCheckUseCaseImpl(get()) }
         factory<AnswerChangeUseCase> { AnswerChangeUseCaseImpl(get()) }
         factory<UndoChangeAnswerUseCase> { UndoChangeAnswerUseCaseImpl(get()) }

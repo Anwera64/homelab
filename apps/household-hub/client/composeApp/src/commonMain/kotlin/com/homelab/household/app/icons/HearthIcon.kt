@@ -69,6 +69,9 @@ enum class HearthIcon(
         ),
     ),
     Revoke("revoke", strokes(circle(12.0, 12.0, 8.2), "M9.4 9.4 14.6 14.6M14.6 9.4 9.4 14.6")),
+
+    /** A sentence waiting on another member's answer: the Memory page's MemWaitingB board. */
+    Waiting("waiting", strokes(circle(12.0, 12.0, 8.2), "M12 7.6V12l3 2")),
     Shared("shared", strokes(circle(9.4, 12.0, 5.8), circle(14.6, 12.0, 5.8))),
     BiometricUnlock(
         "biometricUnlock",

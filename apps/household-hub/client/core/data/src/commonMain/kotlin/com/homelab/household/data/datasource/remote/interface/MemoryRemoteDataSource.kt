@@ -26,4 +26,8 @@ interface MemoryRemoteDataSource {
     suspend fun undoChangeAnswer(changeId: String)
 
     suspend fun getLookedOver(sessionId: String): LookedOverDto
+
+    suspend fun withdrawChange(changeId: String)
+
+    suspend fun restoreChange(changeId: String)
 }

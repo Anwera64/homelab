@@ -49,7 +49,8 @@ sealed interface ProposalDetails {
 
 /**
  * A memory already kept, as a Remember or Forget card shows it: its sentence, who said it ([mine]
- * when it was the member), the agent that noted it and when.
+ * when it was the member), the agent that noted it and when. A Forget card for a sentence the
+ * member asked to remember that still waits names whose answer it waits on: [waitingOn].
  */
 data class StoredMemory(
     val content: String,
@@ -57,6 +58,7 @@ data class StoredMemory(
     val mine: Boolean,
     val agentName: String? = null,
     val addedAt: Instant? = null,
+    val waitingOn: String? = null,
 )
 
 /**

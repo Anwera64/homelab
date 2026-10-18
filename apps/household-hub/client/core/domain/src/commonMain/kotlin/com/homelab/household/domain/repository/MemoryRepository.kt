@@ -26,4 +26,9 @@ interface MemoryRepository {
 
     /** A chat's sheet, "Remembered from this chat". */
     suspend fun getLookedOver(sessionId: String): LookedOver
+
+    /** ✕ on a waiting card: the sentence stops waiting, so [restoreChange] can bring it back. */
+    suspend fun withdrawChange(changeId: String)
+
+    suspend fun restoreChange(changeId: String)
 }

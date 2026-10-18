@@ -36,11 +36,28 @@ data class MemoryItem(
 )
 
 /**
+ * A sentence the member asked an agent to remember over someone else's memory, still waiting on
+ * their answer (canvas: MemWaitingB). It isn't stored yet: agents keep using [stored] until then.
+ */
+@OptIn(ExperimentalTime::class)
+data class WaitingChange(
+    val id: String,
+    val content: String,
+    val agentName: String,
+    val createdAt: Instant,
+    val expiresAt: Instant?,
+    val answererName: String,
+    val stored: MemoryItem,
+)
+
+/**
  * The memory page's two tabs: the member's personal memories, and every household memory. [toCheck]
- * counts the changes waiting for the member: the band on the page and the chip on Profile.
+ * counts the changes waiting for the member: the band on the page and the chip on Profile. [waiting]
+ * are the member's own sentences waiting on someone else; their stored memories aren't in [household].
  */
 data class MemoryPage(
     val yours: List<MemoryItem>,
     val household: List<MemoryItem>,
     val toCheck: Int = 0,
+    val waiting: List<WaitingChange> = emptyList(),
 )

@@ -107,6 +107,7 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
 
     private val vegetarian = "Sam is vegetarian and doesn’t eat fish."
     private val jury = "Studio Jury on Friday 17 October, 09:00."
+    private val november = "The boiler service moved to November this year."
 
     @OptIn(ExperimentalTime::class)
     private val march = Instant.parse("2026-03-04T10:00:00Z")
@@ -729,6 +730,43 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                                             mine = true,
                                                             agentName = "Researcher",
                                                             addedAt = march,
+                                                        ),
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
+            // Canvas: MemForgetHeld. Emma's own sentence, still waiting on Liam: forgetting takes it back.
+            "Forgetting a sentence still waiting on Liam" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Forget the November thing, the boiler is fine", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "You asked me to remember this, and it’s still waiting on Liam. Shall I take it back?",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(HubTool.MEMORY_LOOKUP, ToolSummary()),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = HubTool.FORGET,
+                                            action = ToolAction.Delete,
+                                            details =
+                                                ProposalDetails.Memory(
+                                                    content = november,
+                                                    household = null,
+                                                    stored =
+                                                        StoredMemory(
+                                                            november,
+                                                            saidBy = "Emma",
+                                                            mine = true,
+                                                            agentName = "Planner",
+                                                            addedAt = march,
+                                                            waitingOn = "Liam",
                                                         ),
                                                 ),
                                         ),

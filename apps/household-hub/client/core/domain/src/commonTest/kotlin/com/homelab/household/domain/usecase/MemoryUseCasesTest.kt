@@ -13,8 +13,10 @@ import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetLookedOverUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetMemoryPageUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveMemoryUseCaseImpl
+import com.homelab.household.domain.usecase.impl.RestoreChangeUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RestoreMemoryUseCaseImpl
 import com.homelab.household.domain.usecase.impl.UndoChangeAnswerUseCaseImpl
+import com.homelab.household.domain.usecase.impl.WithdrawChangeUseCaseImpl
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
 import dev.mokkery.mock
@@ -111,5 +113,18 @@ class MemoryUseCasesTest {
             everySuspend { repository.getLookedOver("chat-1") } returns sheet
 
             assertEquals(sheet, GetLookedOverUseCaseImpl(repository)("chat-1"))
+        }
+
+    @Test
+    fun `GIVEN a sentence waiting on someone WHEN it is withdrawn and undone THEN the repository is asked for each`() =
+        runTest {
+            everySuspend { repository.withdrawChange("p-1") } returns Unit
+            everySuspend { repository.restoreChange("p-1") } returns Unit
+
+            WithdrawChangeUseCaseImpl(repository)("p-1")
+            RestoreChangeUseCaseImpl(repository)("p-1")
+
+            verifySuspend(VerifyMode.exactly(1)) { repository.withdrawChange("p-1") }
+            verifySuspend(VerifyMode.exactly(1)) { repository.restoreChange("p-1") }
         }
 }

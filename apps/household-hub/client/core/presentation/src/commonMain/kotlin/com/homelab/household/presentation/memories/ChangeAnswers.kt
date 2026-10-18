@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.memories
 
+import com.homelab.household.domain.exception.ChangeWithdrawnException
 import com.homelab.household.domain.model.ChangeCard
 import com.homelab.household.domain.model.DeviceTimeZone
 import com.homelab.household.domain.model.ProposalAnswer
@@ -26,6 +27,11 @@ sealed interface ChangeStatus {
     data class Done(
         val answer: ProposalAnswer,
         val undoFailed: Boolean = false,
+    ) : ChangeStatus
+
+    /** Its asker took the sentence back before it was answered: [message] is the hub's "Emma took this back." */
+    data class Withdrawn(
+        val message: String,
     ) : ChangeStatus
 }
 
@@ -54,8 +60,9 @@ fun changeRowOf(
     )
 }
 
-/** The changes still to answer: open, saving or failed, but not done. */
-fun List<ChangeRow>.openCount(): Int = count { it.card.canAnswer && it.status !is ChangeStatus.Done }
+/** The changes still to answer: open, saving or failed, but not done or taken back. */
+fun List<ChangeRow>.openCount(): Int =
+    count { it.card.canAnswer && it.status !is ChangeStatus.Done && it.status !is ChangeStatus.Withdrawn }
 
 /** The read-only changes, grouped under "Waiting for <name>". */
 fun List<ChangeRow>.byAnswerer(): List<Pair<String, List<ChangeRow>>> = groupBy { it.card.answererName }.toList()
@@ -82,7 +89,15 @@ class ChangeAnswers(
         scope.launch {
             runCatchingSafe { answerChange(changeId, answer) }.fold(
                 onSuccess = { set(changeId, ChangeStatus.Done(answer)) },
-                onFailure = { set(changeId, ChangeStatus.Open(failed = true)) },
+                onFailure = { error ->
+                    val status =
+                        if (error is ChangeWithdrawnException) {
+                            ChangeStatus.Withdrawn(error.message.orEmpty())
+                        } else {
+                            ChangeStatus.Open(failed = true)
+                        }
+                    set(changeId, status)
+                },
             )
             onSettled()
         }

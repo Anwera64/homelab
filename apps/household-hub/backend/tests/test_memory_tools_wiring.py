@@ -13,8 +13,17 @@ def test_the_chat_turn_remembers_forgets_and_looks_memories_up_for_cards():
     assert isinstance(turn.tool_executor.remember, RememberUseCase)
     assert isinstance(turn.tool_executor.forget, ForgetUseCase)
     assert isinstance(turn.memory_card, MemoryOnCardUseCase)
-    # Forgetting removes the memory's pending changes too, as ✕ does.
-    assert turn.tool_executor.forget.retire.proposal_repo is not None
+    # Forgetting removes the memory's pending changes too, as ✕ does, and saves a `remember` waiting on it.
+    retire = turn.tool_executor.forget.retire
+    assert retire.proposal_repo is not None and retire.session_repo is not None and retire.embed_memories is not None
+    # And finds a sentence still waiting on someone else, which forgetting takes back.
+    assert turn.tool_executor.forget.withdraw is not None and turn.memory_card.session_repo is not None
+
+
+def test_removing_a_memory_on_the_page_saves_a_remember_waiting_on_it():
+    retire = get_container(MagicMock())[pres_deps.get_retire_memory_use_case]
+
+    assert retire.session_repo is not None and retire.embed_memories is not None
 
 
 def test_the_match_bar_is_a_setting(monkeypatch):

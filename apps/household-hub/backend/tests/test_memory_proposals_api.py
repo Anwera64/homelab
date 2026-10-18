@@ -152,3 +152,108 @@ async def test_a_chat_never_looked_over_has_no_line(client: httpx.AsyncClient, d
 
     assert detail["looked_over"] is None
     assert (await client.get(f"/api/v1/sessions/{house}/looked-over", headers=admin)).status_code == 404
+
+
+# --- A `remember` over the admin's memory, held until the admin answers ---------------------------
+
+
+async def _remembered(db: AsyncSession, expires_at=None):
+    """The member's chat asked to remember over the admin's boiler memory: p-boiler holds it."""
+    await db.execute(
+        update(MemoryProposalModel)
+        .where(MemoryProposalModel.id == "p-boiler")
+        .values(origin="tool", expires_at=expires_at)
+    )
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_the_member_withdraws_their_waiting_remember_and_undoes_it(client: httpx.AsyncClient, db_session):
+    admin, member, *_ = await _world(client, db_session)
+    await _remembered(db_session)
+
+    withdrawn = await client.delete("/api/v1/memories/proposals/p-boiler", headers=member)
+
+    assert withdrawn.status_code == 200 and withdrawn.json()["state"] == "withdrawn"
+    assert [c["id"] for c in (await client.get("/api/v1/memories/proposals", headers=admin)).json()["to_check"]] == []
+    late = await client.post("/api/v1/memories/proposals/p-boiler/answer", json={"answer": "use_new"}, headers=admin)
+    assert late.status_code == 409
+    assert late.json() == {"detail": "Member User took this back.", "code": "change_withdrawn"}
+
+    restored = await client.post("/api/v1/memories/proposals/p-boiler/restore", headers=member)
+
+    assert restored.status_code == 200 and restored.json()["state"] == "pending"
+    assert [c["id"] for c in (await client.get("/api/v1/memories/proposals", headers=admin)).json()["to_check"]] == ["p-boiler"]
+
+
+@pytest.mark.asyncio
+async def test_only_the_asker_withdraws_and_only_a_remember(client: httpx.AsyncClient, db_session):
+    admin, member, *_ = await _world(client, db_session)
+    await _remembered(db_session)
+
+    assert (await client.delete("/api/v1/memories/proposals/p-boiler", headers=admin)).status_code == 403
+    assert (await client.delete("/api/v1/memories/proposals/p-bins", headers=admin)).status_code == 409  # reflection's
+    assert (await client.delete("/api/v1/memories/proposals/nope", headers=member)).status_code == 404
+    assert (await client.post("/api/v1/memories/proposals/p-boiler/restore", headers=member)).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_a_held_remember_keeps_its_end_date_once_saved(client: httpx.AsyncClient, db_session):
+    admin, member, *_ = await _world(client, db_session)
+    until = datetime(2026, 12, 1, tzinfo=timezone.utc)
+    await _remembered(db_session, expires_at=until)
+
+    body = (await client.post("/api/v1/memories/proposals/p-boiler/answer", json={"answer": "keep_both"}, headers=admin)).json()
+
+    saved = (await db_session.execute(select(MemoryModel).where(MemoryModel.id == body["new_memory_id"]))).scalar_one()
+    assert saved.expires_at.replace(tzinfo=timezone.utc) == until
+    assert saved.origin == "tool"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_remembers_waiting_both_ways_WHEN_the_member_is_removed_THEN_theirs_go_and_the_admins_is_saved(
+    client: httpx.AsyncClient, db_session
+):
+    admin, member, _, bins, *_ = await _world(client, db_session)
+    await _remembered(db_session)  # the member's sentence, waiting on the admin's boiler memory
+    await db_session.execute(update(MemoryProposalModel).where(MemoryProposalModel.id == "p-bins").values(origin="tool"))
+    await db_session.commit()
+    member_id = (await db_session.execute(select(MemoryModel.user_id).where(MemoryModel.id == bins))).scalar_one()
+
+    assert (await client.delete(f"/api/v1/users/{member_id}", headers=admin)).status_code in (200, 204)
+
+    states = dict((await db_session.execute(select(MemoryProposalModel.id, MemoryProposalModel.state))).all())
+    assert states == {"p-boiler": "withdrawn", "p-bins": "both"}
+    saved_id = (await db_session.execute(
+        select(MemoryProposalModel.new_memory_id).where(MemoryProposalModel.id == "p-bins")
+    )).scalar_one()
+    saved = (await db_session.execute(select(MemoryModel).where(MemoryModel.id == saved_id))).scalar_one()
+    assert (saved.content, saved.scope, saved.is_active) == ("Bins go out on Wednesday.", "household", True)
+
+
+@pytest.mark.asyncio
+async def test_the_askers_page_shows_their_waiting_remember_beside_the_memory_it_waits_on(client: httpx.AsyncClient, db_session):
+    admin, member, _, _, boiler, *_ = await _world(client, db_session)
+    await _remembered(db_session)
+
+    mine = (await client.get("/api/v1/memories/page", headers=member)).json()
+    theirs = (await client.get("/api/v1/memories/page", headers=admin)).json()
+
+    (card,) = mine["waiting"]
+    assert card["id"] == "p-boiler" and card["content"] == "Boiler moved to November."
+    assert card["answerer_name"] == "Admin User" and card["agent_name"]
+    assert card["created_at"].startswith("2026-10-16T10:52")
+    assert card["stored"]["id"] == boiler and card["stored"]["speaker_name"] == "Admin User"
+    # Drawn once, in its card: not again in the household list.
+    assert boiler not in [m["id"] for m in mine["household"]]
+    # The admin answers it in Changes to check; their own page lists their memory as always.
+    assert theirs["waiting"] == [] and boiler in [m["id"] for m in theirs["household"]]
+
+
+@pytest.mark.asyncio
+async def test_reflections_waiting_changes_are_not_waiting_cards(client: httpx.AsyncClient, db_session):
+    admin, member, _, _, boiler, *_ = await _world(client, db_session)
+
+    page = (await client.get("/api/v1/memories/page", headers=member)).json()
+
+    assert page["waiting"] == [] and boiler in [m["id"] for m in page["household"]]

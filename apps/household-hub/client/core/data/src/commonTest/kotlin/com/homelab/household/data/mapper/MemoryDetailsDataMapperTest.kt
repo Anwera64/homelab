@@ -107,4 +107,19 @@ class MemoryDetailsDataMapperTest {
 
         assertEquals(json("""{"scope": "personal"}"""), arguments)
     }
+
+    @Test
+    fun `GIVEN a forget of a sentence still waiting on Liam WHEN read THEN the card knows whose answer it waits on`() {
+        val details =
+            ProposalDetailsDataMapper.fromJson(
+                "forget",
+                json(
+                    """{"memory": "the November thing", "proposal_id": "p-boiler",
+                    "stored": {"content": "The boiler service moved to November this year.", "said_by": "Emma",
+                    "mine": true, "agent": "Planner", "created_at": "2026-10-18T09:00:00+00:00", "waiting_on": "Liam"}}""",
+                ),
+            )
+
+        assertEquals("Liam", (details as ProposalDetails.Memory).stored?.waitingOn)
+    }
 }

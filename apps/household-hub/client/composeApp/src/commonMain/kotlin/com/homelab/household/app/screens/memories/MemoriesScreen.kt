@@ -36,6 +36,8 @@ fun MemoriesScreen(
         onChangesToCheck = onChangesToCheck,
         onRemove = viewModel::onRemove,
         onUndo = viewModel::onUndo,
+        onWithdraw = viewModel::onWithdraw,
+        onUndoWithdraw = viewModel::onUndoWithdraw,
         onRetry = viewModel::load,
         modifier = modifier,
     )

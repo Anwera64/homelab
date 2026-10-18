@@ -7,6 +7,7 @@ import com.homelab.household.data.dto.ChangesToCheckDto
 import com.homelab.household.data.dto.LookedOverDto
 import com.homelab.household.data.dto.MemoryPageDto
 import com.homelab.household.data.dto.MemoryPageItemDto
+import com.homelab.household.data.dto.WaitingChangeDto
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryScope
@@ -163,5 +164,50 @@ class MemoryRepositoryTest {
             everySuspend { remote.getMemoryPage() } returns MemoryPageDto(to_check = 2)
 
             assertEquals(2, MemoryRepositoryImpl(remote).getMemoryPage().toCheck)
+        }
+
+    @Test
+    fun `GIVEN a sentence waiting on Liam WHEN the page is asked for THEN it maps beside the memory it waits on`() =
+        runTest {
+            val remote = mock<MemoryRemoteDataSource>()
+            everySuspend { remote.getMemoryPage() } returns
+                MemoryPageDto(
+                    waiting =
+                        listOf(
+                            WaitingChangeDto(
+                                id = "p-boiler",
+                                content = "The boiler service moved to November this year.",
+                                agent_name = "Planner",
+                                created_at = "2026-10-18T09:00:00",
+                                expires_at = "2026-12-01T00:00:00Z",
+                                answerer_name = "Liam",
+                                stored = dto("boiler", scope = "household"),
+                            ),
+                        ),
+                )
+
+            val waiting = MemoryRepositoryImpl(remote).getMemoryPage().waiting.single()
+
+            assertEquals("p-boiler", waiting.id)
+            assertEquals("Planner", waiting.agentName)
+            assertEquals("Liam", waiting.answererName)
+            assertEquals(Instant.parse("2026-10-18T09:00:00Z"), waiting.createdAt)
+            assertEquals(Instant.parse("2026-12-01T00:00:00Z"), waiting.expiresAt)
+            assertEquals("boiler", waiting.stored.id)
+        }
+
+    @Test
+    fun `GIVEN a waiting sentence WHEN it is withdrawn and restored THEN the data source is asked for each`() =
+        runTest {
+            val remote = mock<MemoryRemoteDataSource>()
+            everySuspend { remote.withdrawChange("p1") } returns Unit
+            everySuspend { remote.restoreChange("p1") } returns Unit
+            val repository = MemoryRepositoryImpl(remote)
+
+            repository.withdrawChange("p1")
+            repository.restoreChange("p1")
+
+            verifySuspend(VerifyMode.exactly(1)) { remote.withdrawChange("p1") }
+            verifySuspend(VerifyMode.exactly(1)) { remote.restoreChange("p1") }
         }
 }

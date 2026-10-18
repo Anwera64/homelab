@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.DeviceTimeZone
 import com.homelab.household.domain.model.MemoryItem
+import com.homelab.household.domain.model.WaitingChange
 import com.homelab.household.domain.usecase.GetMemoryPageUseCase
 import com.homelab.household.domain.usecase.RemoveMemoryUseCase
+import com.homelab.household.domain.usecase.RestoreChangeUseCase
 import com.homelab.household.domain.usecase.RestoreMemoryUseCase
+import com.homelab.household.domain.usecase.WithdrawChangeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +30,8 @@ class MemoriesViewModel(
     private val getMemoryPage: GetMemoryPageUseCase,
     private val removeMemory: RemoveMemoryUseCase,
     private val restoreMemory: RestoreMemoryUseCase,
+    private val withdrawChange: WithdrawChangeUseCase,
+    private val restoreChange: RestoreChangeUseCase,
     private val deviceTimeZone: DeviceTimeZone,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
@@ -49,6 +54,7 @@ class MemoriesViewModel(
                             yours = page.yours.map(::rowOf),
                             household = page.household.map(::rowOf),
                             toCheck = page.toCheck,
+                            waiting = page.waiting.map(::waitingOf),
                         )
                     }
                 },
@@ -73,6 +79,7 @@ class MemoriesViewModel(
                         yours = page.yours.map(::rowOf),
                         household = page.household.map(::rowOf),
                         toCheck = page.toCheck,
+                        waiting = page.waiting.map(::waitingOf),
                     )
                 }
             }
@@ -114,6 +121,66 @@ class MemoriesViewModel(
                 _uiState.update { it.copy(failure = failure) }
             }
         }
+    }
+
+    /** ✕ on a waiting card: it turns into "Withdrawn · Undo" at once, as a removed row does. */
+    fun onWithdraw(changeId: String) {
+        if (waitingOf(changeId)?.withdrawn != false) return
+        markWithdrawn(changeId, withdrawn = true, clearFailure = true)
+        viewModelScope.launch {
+            runCatchingSafe { withdrawChange(changeId) }.onFailure { error ->
+                markWithdrawn(changeId, withdrawn = false)
+                val failure =
+                    if (error is ServerOfflineException) {
+                        MemoryActionFailure.RemoveUnreachable
+                    } else {
+                        MemoryActionFailure.RemoveFailed
+                    }
+                _uiState.update { it.copy(failure = failure) }
+            }
+        }
+    }
+
+    fun onUndoWithdraw(changeId: String) {
+        if (waitingOf(changeId)?.withdrawn != true) return
+        markWithdrawn(changeId, withdrawn = false, clearFailure = true)
+        viewModelScope.launch {
+            runCatchingSafe { restoreChange(changeId) }.onFailure { error ->
+                markWithdrawn(changeId, withdrawn = true)
+                val failure =
+                    if (error is ServerOfflineException) {
+                        MemoryActionFailure.UndoUnreachable
+                    } else {
+                        MemoryActionFailure.UndoFailed
+                    }
+                _uiState.update { it.copy(failure = failure) }
+            }
+        }
+    }
+
+    private fun waitingOf(changeId: String): WaitingRow? =
+        _uiState.value.waiting.firstOrNull {
+            it.change.id == changeId
+        }
+
+    private fun markWithdrawn(
+        changeId: String,
+        withdrawn: Boolean,
+        clearFailure: Boolean = false,
+    ) = _uiState.update { state ->
+        state.copy(
+            waiting = state.waiting.map { if (it.change.id == changeId) it.copy(withdrawn = withdrawn) else it },
+            failure = if (clearFailure) null else state.failure,
+        )
+    }
+
+    private fun waitingOf(change: WaitingChange): WaitingRow {
+        val now = clock.now()
+        return WaitingRow(
+            change = change,
+            age = memoryAge(change.createdAt, now, deviceTimeZone.offsetSecondsAt(now)),
+            stored = rowOf(change.stored),
+        )
     }
 
     private fun rowOf(memoryId: String): MemoryRow? =

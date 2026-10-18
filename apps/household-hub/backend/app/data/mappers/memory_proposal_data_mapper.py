@@ -16,6 +16,7 @@ class MemoryProposalDataMapper:
             state=model.state,
             new_memory_id=model.new_memory_id,
             origin=model.origin or "reflection",
+            expires_at=model.expires_at,
             created_at=model.created_at,
             answered_at=model.answered_at,
         )
@@ -33,6 +34,7 @@ class MemoryProposalDataMapper:
             state=entity.state,
             new_memory_id=entity.new_memory_id,
             origin=entity.origin,
+            expires_at=entity.expires_at,
             created_at=entity.created_at,
             answered_at=entity.answered_at,
         )

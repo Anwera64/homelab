@@ -24,10 +24,13 @@ class MemoryProposalModel(Base):
     answerer_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     source_session_id = Column(String(36), ForeignKey("conversation_sessions.id", ondelete="SET NULL"), nullable=True)
     source_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    state = Column(String(16), default="pending", nullable=False, index=True)  # pending, kept, both, replaced, dropped
+    # pending, kept, both, replaced, dropped or withdrawn
+    state = Column(String(16), default="pending", nullable=False, index=True)
     # The memory Keep both or Use new saved, so Undo can take it away again.
     new_memory_id = Column(String(36), ForeignKey("agent_memories.id", ondelete="SET NULL"), nullable=True)
-    # "reflection", or "tool" when `remember` saved its sentence first and asked whoever said the stored one.
+    # "reflection", or "tool" when a member asked to `remember` it over whoever said the stored one.
     origin = Column(String(16), default="reflection", server_default="reflection", nullable=False)
+    # A `remember`'s end date, given to the memory once it's saved.
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     answered_at = Column(DateTime(timezone=True), nullable=True)

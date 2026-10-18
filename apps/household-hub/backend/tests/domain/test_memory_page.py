@@ -218,7 +218,9 @@ async def test_listing_the_page_logs_counts(caplog):
     with caplog.at_level(logging.INFO, logger="app"):
         await ListMemoryPageUseCase(repo, FakeUserRepo(), FakeAgentRepo(), clock=lambda: NOW).execute(EMMA)
 
-    assert "Memory page listed | member=emma yours=1 household=0 to_check=0" in [r.getMessage() for r in caplog.records]
+    assert "Memory page listed | member=emma yours=1 household=0 to_check=0 waiting=0" in [
+        r.getMessage() for r in caplog.records
+    ]
 
 
 @pytest.mark.asyncio

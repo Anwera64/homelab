@@ -752,7 +752,8 @@
     <string name="tool_card_memory_yours">Yours · only your agents use it</string>
     <string name="tool_card_memory_replaces">This replaces</string>
     <string name="tool_card_memory_said">%1$s said</string>
-    <string name="tool_card_memory_kept_too">This is kept too. %1$s will be asked which one is right.</string>
+    <string name="tool_card_memory_kept_too">%1$s will be asked which one is right. Agents won’t use yours until then.</string>
+    <string name="tool_card_memory_waiting_on">waiting on %1$s</string>
     <string name="tool_card_field_memory">What to remember</string>
     <string name="tool_card_field_whose">Whose it is</string>
     <string name="conversation_thinking">Thinking…</string>
@@ -781,6 +782,12 @@
     <string name="memories_remove">Remove: %1$s</string>
     <string name="memories_removed">Removed</string>
     <string name="memories_undo">Undo</string>
+    <!-- A sentence you asked to remember over someone else's memory, waiting on them (canvas MemWaitingB) -->
+    <string name="memories_waiting_on">Waiting on %1$s</string>
+    <string name="memories_waiting_yours">Yours, not used yet</string>
+    <string name="memories_waiting_caption">Agents keep using what’s stored until %1$s picks.</string>
+    <string name="memories_withdraw">Withdraw: %1$s</string>
+    <string name="memories_withdrawn">Withdrawn</string>
     <string name="memories_household_note">Every member’s agents use these. Nothing said in Secret Mode reaches this list.</string>
     <string name="memories_empty_title">Nothing remembered yet</string>
     <string name="memories_empty_line">When a chat goes quiet, its agent looks back over what you said and notes what’s worth keeping. Say “remember that…” and it asks you first.</string>

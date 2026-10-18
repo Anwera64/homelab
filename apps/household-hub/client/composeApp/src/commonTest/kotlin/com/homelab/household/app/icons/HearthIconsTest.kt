@@ -66,6 +66,8 @@ class HearthIconsTest {
             "calendarFixed",
             // How often an event repeats, on its approval card: the Tools page's "Repeating events" row
             "repeat",
+            // A sentence waiting on another member's answer: the Memory page's MemWaitingB board
+            "waiting",
         )
 
     private val solidShapeCounts =

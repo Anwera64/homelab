@@ -15,6 +15,7 @@ import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.ProposalAnswer
+import com.homelab.household.domain.model.WaitingChange
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -25,6 +26,18 @@ object MemoryDataMapper {
             yours = dto.yours.map(::toDomain),
             household = dto.household.map(::toDomain),
             toCheck = dto.to_check,
+            waiting =
+                dto.waiting.map { waiting ->
+                    WaitingChange(
+                        id = waiting.id,
+                        content = waiting.content,
+                        agentName = waiting.agent_name,
+                        createdAt = instantOf(waiting.created_at),
+                        expiresAt = waiting.expires_at?.let(::instantOf),
+                        answererName = waiting.answerer_name,
+                        stored = toDomain(waiting.stored),
+                    )
+                },
         )
 
     fun toDomain(dto: ChangeCardDto): ChangeCard =

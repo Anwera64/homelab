@@ -139,4 +139,19 @@ class ChangesToCheckScreenTest {
             }
         }
     }
+
+    @Test
+    fun `GIVEN Liam took his sentence back WHEN Use new is tapped THEN the card says so and nothing is left to check`() {
+        val hub = hubWithAChange().apply { changeIsTakenBackBy("Liam") }
+
+        runScreenTest {
+            changesToCheckScreen(hub)
+
+            onChangesToCheck {
+                usesNew()
+                seesItWasTakenBack("Liam took this back.")
+                seesNothingLeft()
+            }
+        }
+    }
 }

@@ -45,6 +45,7 @@ import com.homelab.household.app.components.SkeletonGroup
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.changes_stored
 import com.homelab.household.app.resources.changes_title
 import com.homelab.household.app.resources.memories_back
 import com.homelab.household.app.resources.memories_band_line
@@ -71,8 +72,14 @@ import com.homelab.household.app.resources.memories_undo
 import com.homelab.household.app.resources.memories_undo_failed
 import com.homelab.household.app.resources.memories_undo_unreachable
 import com.homelab.household.app.resources.memories_until
+import com.homelab.household.app.resources.memories_waiting_caption
+import com.homelab.household.app.resources.memories_waiting_on
+import com.homelab.household.app.resources.memories_waiting_yours
+import com.homelab.household.app.resources.memories_withdraw
+import com.homelab.household.app.resources.memories_withdrawn
 import com.homelab.household.app.resources.memories_you
 import com.homelab.household.app.resources.memories_you_asked
+import com.homelab.household.app.screens.changes.SentenceBox
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
@@ -82,6 +89,7 @@ import com.homelab.household.presentation.memories.MemoriesUiState
 import com.homelab.household.presentation.memories.MemoryActionFailure
 import com.homelab.household.presentation.memories.MemoryRow
 import com.homelab.household.presentation.memories.MemoryTab
+import com.homelab.household.presentation.memories.WaitingRow
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -103,6 +111,8 @@ fun MemoriesContent(
     onUndo: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onWithdraw: (String) -> Unit = {},
+    onUndoWithdraw: (String) -> Unit = {},
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -187,8 +197,10 @@ fun MemoriesContent(
                     }
 
                     MemoriesStatus.Ready -> {
-                        val rows = if (state.tab == MemoryTab.Yours) state.yours else state.household
-                        if (rows.isEmpty()) {
+                        val household = state.tab == MemoryTab.Household
+                        val rows = if (household) state.household else state.yours
+                        val waiting = if (household) state.waiting else emptyList()
+                        if (rows.isEmpty() && waiting.isEmpty()) {
                             EmptyState(
                                 icon = HearthIcon.Memory,
                                 title = stringResource(Res.string.memories_empty_title),
@@ -197,9 +209,12 @@ fun MemoriesContent(
                         } else {
                             MemoryList(
                                 rows = rows,
-                                household = state.tab == MemoryTab.Household,
+                                household = household,
                                 onRemove = onRemove,
                                 onUndo = onUndo,
+                                waiting = waiting,
+                                onWithdraw = onWithdraw,
+                                onUndoWithdraw = onUndoWithdraw,
                             )
                         }
                     }
@@ -299,11 +314,22 @@ private fun MemoryList(
     onRemove: (String) -> Unit,
     onUndo: (String) -> Unit,
     modifier: Modifier = Modifier,
+    waiting: List<WaitingRow> = emptyList(),
+    onWithdraw: (String) -> Unit = {},
+    onUndoWithdraw: (String) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
     ) {
+        // First: each waits on someone, and the memory it waits on is drawn in it rather than below.
+        items(waiting, key = { "waiting-${it.change.id}" }) { card ->
+            if (card.withdrawn) {
+                WithdrawnRow(content = card.change.content, onUndo = { onUndoWithdraw(card.change.id) })
+            } else {
+                WaitingCard(card = card, onWithdraw = { onWithdraw(card.change.id) })
+            }
+        }
         items(rows, key = { it.item.id }) { row ->
             if (row.removed) {
                 RemovedRow(row = row, onUndo = { onUndo(row.item.id) })
@@ -368,7 +394,8 @@ private fun MemoryCard(
                             icon = HearthIcon.Schedule,
                         )
                     }
-                    if (item.origin == MemoryOrigin.Tool) {
+                    // Asked for by whoever said it: only yours read "You asked".
+                    if (item.isMine && item.origin == MemoryOrigin.Tool) {
                         HearthChip(label = stringResource(Res.string.memories_you_asked), variant = ChipVariant.Primary)
                     }
                 }
@@ -427,6 +454,128 @@ internal fun RemovedRow(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
             Text(stringResource(Res.string.memories_removed), style = type.labelStrong, color = colors.textMuted)
             Text(row.item.content, style = type.body, color = colors.textMuted)
+        }
+        Box(
+            modifier = Modifier
+                .heightIn(min = HearthTheme.size.touchTarget)
+                .widthIn(min = HearthTheme.size.touchTarget)
+                .clip(HearthShapes.button)
+                .clickable(role = Role.Button, onClick = onUndo)
+                .padding(horizontal = HearthTheme.spacing.sm),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(stringResource(Res.string.memories_undo), style = type.labelStrong, color = colors.primary)
+        }
+    }
+}
+
+/**
+ * A sentence you asked to remember over someone else's memory, waiting on them (board MemWaitingB):
+ * what's stored, and yours beside it, not used yet. ✕ takes it back.
+ */
+@Composable
+private fun WaitingCard(
+    card: WaitingRow,
+    onWithdraw: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+    val change = card.change
+    val stored = card.stored.item
+    BentoCard(modifier = modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HearthIconImage(
+                    icon = HearthIcon.Waiting,
+                    contentDescription = null,
+                    size = HearthTheme.size.iconSm,
+                    tint = colors.textMuted,
+                )
+                Text(
+                    stringResource(Res.string.memories_waiting_on, change.answererName).uppercase(),
+                    style = type.overline,
+                    color = colors.textMuted,
+                )
+            }
+            WithdrawButton(content = change.content, onClick = onWithdraw)
+        }
+        SentenceBox(
+            label = stringResource(Res.string.changes_stored),
+            sentence = stored.content,
+            meta = "${stored.speakerName} · ${stored.agentName} · ${ageWords(card.stored.age)}",
+            container = colors.secondaryContainer,
+            ink = colors.onSecondaryContainer,
+        )
+        SentenceBox(
+            label = stringResource(Res.string.memories_waiting_yours),
+            sentence = change.content,
+            meta = "${change.agentName} · ${ageWords(card.age)}",
+            container = colors.surfaceAlt,
+            ink = colors.textPrimary,
+        )
+        Text(
+            stringResource(Res.string.memories_waiting_caption, change.answererName),
+            style = type.caption,
+            color = colors.textMuted,
+        )
+    }
+}
+
+@Composable
+private fun WithdrawButton(
+    content: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val description = stringResource(Res.string.memories_withdraw, content)
+    Box(
+        modifier = modifier
+            .size(HearthTheme.size.touchTarget)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        HearthIconImage(
+            icon = HearthIcon.Revoke,
+            contentDescription = null,
+            size = HearthTheme.size.iconMd,
+            tint = HearthTheme.colors.textMuted,
+        )
+    }
+}
+
+/** The card after ✕ (board MemWaitingWithdrawn): the removed row's look, with Undo. */
+@Composable
+private fun WithdrawnRow(
+    content: String,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(HearthShapes.bento)
+            .background(colors.surfaceAlt)
+            .border(HearthTheme.size.hairline, colors.outlineSoft, HearthShapes.bento)
+            .padding(HearthTheme.spacing.lg)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
+            Text(stringResource(Res.string.memories_withdrawn), style = type.labelStrong, color = colors.textMuted)
+            Text(content, style = type.body, color = colors.textMuted)
         }
         Box(
             modifier = Modifier

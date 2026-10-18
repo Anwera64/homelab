@@ -45,8 +45,23 @@ class MemoryPageItem:
 
 
 @dataclass
+class WaitingChange:
+    """A sentence the member asked to remember over someone else's memory, still waiting on their answer:
+    its card on the memory page shows it beside the stored memory, which agents keep using until then."""
+
+    proposal_id: str
+    content: str
+    agent_name: str
+    created_at: datetime
+    answerer_name: str
+    stored: MemoryPageItem
+    expires_at: datetime | None = None
+
+
+@dataclass
 class MemoryPage:
     yours: list[MemoryPageItem]
     household: list[MemoryPageItem]
     # The member's changes to check: the band on the page and the chip on Profile.
     to_check: int = 0
+    waiting: list[WaitingChange] = field(default_factory=list)

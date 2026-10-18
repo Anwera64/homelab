@@ -1379,4 +1379,24 @@ class ConversationScreenTest {
 
             assertEquals(listOf("c-1" to true, "c-1" to false), decided)
         }
+
+    /** Canvas: MemForgetHeld. Not stored yet: the card says whose answer it waits on, and Forget takes it back. */
+    @Test
+    fun `GIVEN a forget of a sentence still waiting on Liam WHEN drawn THEN it says it waits on him and asks Keep it or Forget`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            conversationScreen(
+                stateNamed("Forgetting a sentence still waiting on Liam"),
+                onDecide = { id, ok, _ -> decided += id to ok },
+            )
+
+            onConversation {
+                seesTheForgetCard()
+                seesWords("The boiler service moved to November this year.")
+                seesItWaitsOn("Liam", meta = "Yours · Planner · March")
+                tapsForget()
+            }
+
+            assertEquals(listOf("c-1" to true), decided)
+        }
 }

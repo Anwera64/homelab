@@ -9,6 +9,19 @@ data class MemoryPageDto(
     val yours: List<MemoryPageItemDto> = emptyList(),
     val household: List<MemoryPageItemDto> = emptyList(),
     @SerialName("to_check") val to_check: Int = 0,
+    val waiting: List<WaitingChangeDto> = emptyList(),
+)
+
+/** A sentence the member asked to remember over someone else's memory, still waiting on their answer. */
+@Serializable
+data class WaitingChangeDto(
+    val id: String,
+    val content: String,
+    @SerialName("agent_name") val agent_name: String,
+    @SerialName("created_at") val created_at: String,
+    @SerialName("expires_at") val expires_at: String? = null,
+    @SerialName("answerer_name") val answerer_name: String = "",
+    val stored: MemoryPageItemDto,
 )
 
 @Serializable

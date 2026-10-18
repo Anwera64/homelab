@@ -50,11 +50,24 @@ class MemoryPageItemRead(BaseModel):
     can_remove: bool
 
 
+class WaitingChangeRead(BaseModel):
+    """A sentence you asked to remember over someone else's memory, still waiting on their answer."""
+
+    id: str
+    content: str
+    agent_name: str
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    answerer_name: str
+    stored: MemoryPageItemRead
+
+
 class MemoryPageRead(BaseModel):
     yours: List[MemoryPageItemRead]
     household: List[MemoryPageItemRead]
     # The member's changes to check: the band on this page and the chip on Profile.
     to_check: int = 0
+    waiting: List[WaitingChangeRead] = []
 
 
 class ChangeSourceRead(BaseModel):

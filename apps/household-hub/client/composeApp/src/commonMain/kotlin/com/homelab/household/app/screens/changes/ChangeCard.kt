@@ -73,6 +73,10 @@ internal fun ChangeCard(
             ChangeDoneRow(row = row, done = status, onUndo = onUndo, modifier = modifier)
         }
 
+        is ChangeStatus.Withdrawn -> {
+            ChangeWithdrawnRow(words = status.message, modifier = modifier)
+        }
+
         else -> {
             ChangeOpenCard(row = row, onAnswer = onAnswer, showSource = showSource, modifier = modifier)
         }
@@ -133,7 +137,7 @@ private fun ChangeOpenCard(
 
 /** A labelled box: the stored memory in the accent's container, what was read on a neutral one. */
 @Composable
-private fun SentenceBox(
+internal fun SentenceBox(
     label: String,
     sentence: String,
     meta: String?,
@@ -235,6 +239,27 @@ private fun ChangeDoneRow(
             Text(stringResource(Res.string.memories_undo), style = type.labelStrong, color = colors.primary)
         }
     }
+}
+
+/** A late answer to a sentence its asker took back: the hub's words, quiet, with nothing left to tap. */
+@Composable
+private fun ChangeWithdrawnRow(
+    words: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    Text(
+        words,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(HearthShapes.bento)
+            .background(colors.surfaceAlt)
+            .border(HearthTheme.size.hairline, colors.outlineSoft, HearthShapes.bento)
+            .padding(HearthTheme.spacing.lg)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        style = HearthTheme.typography.body,
+        color = colors.textMuted,
+    )
 }
 
 /** "“Dinner ideas” · today 10:42" in your own chat; someone else's shows only "Liam’s chat · yesterday". */

@@ -418,20 +418,32 @@ class ExecuteToolUseCase:
                 session_id=session_id,
                 agent_id=agent_id,
             )
+            if done.held is not None:
+                # Over another member's memory nothing is saved yet: the model must not say it is.
+                name = done.speaker_name
+                return ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=True,
+                    data={
+                        "action": "remembered",
+                        "memory": done.held.content,
+                        "held": f"Saved for {name} to check. Agents won't use it until {name} says which is right.",
+                    },
+                )
             data: Dict[str, Any] = {"action": "remembered", "memory": done.memory.content}
             if done.replaced is not None:
                 data["replaced"] = done.replaced.content
-            if done.kept_beside is not None:
-                data["kept_beside"] = (
-                    f"{done.speaker_name} said \"{done.kept_beside.content}\". It is kept too, and "
-                    f"{done.speaker_name} will be asked which one is right."
-                )
             return ToolExecutionResult(tool_name=tool_name, success=True, data=data)
 
         if self.forget is None:
             return ToolExecutionResult(tool_name=tool_name, success=False, error="Memories can't be forgotten here.")
         try:
-            forgotten = await self.forget.execute(member, str(arguments.get("memory") or ""), memory_id=memory_id)
+            forgotten = await self.forget.execute(
+                member,
+                str(arguments.get("memory") or ""),
+                memory_id=memory_id,
+                proposal_id=arguments.get("proposal_id") or None,
+            )
         except EntityNotFoundException as e:
             return ToolExecutionResult(
                 tool_name=tool_name, success=False, error=e.message, reason=ToolFailureReason.NOT_FOUND

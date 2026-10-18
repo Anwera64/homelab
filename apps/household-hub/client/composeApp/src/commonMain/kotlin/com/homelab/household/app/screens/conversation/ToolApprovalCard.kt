@@ -91,6 +91,7 @@ import com.homelab.household.app.resources.tool_card_memory_household
 import com.homelab.household.app.resources.tool_card_memory_kept_too
 import com.homelab.household.app.resources.tool_card_memory_replaces
 import com.homelab.household.app.resources.tool_card_memory_said
+import com.homelab.household.app.resources.tool_card_memory_waiting_on
 import com.homelab.household.app.resources.tool_card_memory_yours
 import com.homelab.household.app.resources.tool_card_month_apr
 import com.homelab.household.app.resources.tool_card_month_aug
@@ -384,7 +385,13 @@ private fun MemoryDetails(
                 when {
                     forget -> {
                         stored?.let {
-                            storedMeta(it, memoryAge, yours = stringResource(Res.string.memories_tab_yours_plain))
+                            val meta =
+                                storedMeta(it, memoryAge, yours = stringResource(Res.string.memories_tab_yours_plain))
+                            // Not stored yet (canvas: MemForgetHeld): whose answer it still waits on.
+                            val waiting = it.waitingOn?.let { name ->
+                                stringResource(Res.string.tool_card_memory_waiting_on, name)
+                            }
+                            listOfNotNull(meta, waiting).joinToString(SEPARATOR).ifEmpty { null }
                         }
                     }
 

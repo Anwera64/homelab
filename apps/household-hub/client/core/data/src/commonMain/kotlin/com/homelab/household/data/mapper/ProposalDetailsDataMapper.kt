@@ -84,6 +84,7 @@ object ProposalDetailsDataMapper {
             mine = stored.boolean(MINE) == true,
             agentName = stored.text(AGENT)?.ifBlank { null },
             addedAt = stored.text(CREATED_AT)?.let(Instant::parseOrNull),
+            waitingOn = stored.text(WAITING_ON)?.ifBlank { null },
         )
     }
 
@@ -251,6 +252,7 @@ object ProposalDetailsDataMapper {
     private const val MINE = "mine"
     private const val AGENT = "agent"
     private const val CREATED_AT = "created_at"
+    private const val WAITING_ON = "waiting_on"
     private val WEEKDAYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     private const val MONTHS = 12
     private const val MAX_DAY = 31

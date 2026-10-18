@@ -106,6 +106,7 @@ import com.homelab.household.app.resources.tool_card_memory_household
 import com.homelab.household.app.resources.tool_card_memory_kept_too
 import com.homelab.household.app.resources.tool_card_memory_replaces
 import com.homelab.household.app.resources.tool_card_memory_said
+import com.homelab.household.app.resources.tool_card_memory_waiting_on
 import com.homelab.household.app.resources.tool_card_remove
 import com.homelab.household.app.resources.tool_card_repeat_daily
 import com.homelab.household.app.resources.tool_card_repeat_last
@@ -586,6 +587,12 @@ class ConversationRobot(
         seesText(getString(Res.string.tool_card_memory_kept_too, name))
 
     suspend fun seesAnOfferToRememberWithoutAsking() = seesText(getString(Res.string.tool_remember_automatic_ask))
+
+    /** A Forget card's caption for a sentence not stored yet: "Yours · Planner · March · waiting on Liam". */
+    suspend fun seesItWaitsOn(
+        name: String,
+        meta: String,
+    ) = seesText("$meta · ${getString(Res.string.tool_card_memory_waiting_on, name)}")
 
     /** The card's title says Forget too, so the button is the one that can be tapped. */
     private suspend fun forgetButton(): SemanticsNodeInteraction {

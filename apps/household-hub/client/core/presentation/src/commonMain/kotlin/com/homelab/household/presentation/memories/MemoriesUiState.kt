@@ -2,6 +2,7 @@ package com.homelab.household.presentation.memories
 
 import com.homelab.household.domain.model.DeviceTimeZone
 import com.homelab.household.domain.model.MemoryItem
+import com.homelab.household.domain.model.WaitingChange
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -15,11 +16,24 @@ data class MemoriesUiState(
     val failure: MemoryActionFailure? = null,
     /** Changes waiting for the member: the band at the top shows when there are any. */
     val toCheck: Int = 0,
+    /** The member's sentences waiting on someone else, each beside the memory it waits on (Household tab). */
+    val waiting: List<WaitingRow> = emptyList(),
 ) {
-    /** A removed row still shows, with Undo, but no longer counts. */
+    /** A removed row still shows, with Undo, but no longer counts. A waiting card's stored memory does. */
     val yoursCount: Int get() = yours.count { !it.removed }
-    val householdCount: Int get() = household.count { !it.removed }
+    val householdCount: Int get() = household.count { !it.removed } + waiting.size
 }
+
+/**
+ * A waiting card (canvas: MemWaitingB): the member's sentence, its [age], and the [stored] memory it
+ * waits on. [withdrawn] turns it into "Withdrawn · Undo" until the page is left.
+ */
+data class WaitingRow(
+    val change: WaitingChange,
+    val age: MemoryAge,
+    val stored: MemoryRow,
+    val withdrawn: Boolean = false,
+)
 
 enum class MemoriesStatus {
     Loading,

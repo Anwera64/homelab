@@ -17,14 +17,16 @@ RELATIONS = (SAME, DIFFERENT) + PROPOSING
 
 PENDING = "pending"
 DROPPED = "dropped"
+# A `remember` the member who asked took back before it was answered (✕ on its waiting card, or forget).
+WITHDRAWN = "withdrawn"
 # The three answers (memory spec §6.1): Keep stored, Keep both, Use new.
 KEPT = "kept"
 BOTH = "both"
 REPLACED = "replaced"
 ANSWERS = (KEPT, BOTH, REPLACED)
 
-# Where a proposal came from. Reflection proposes a sentence it read; `remember` has already saved
-# its sentence beside the stored memory, so the answers mean something else (memory spec §2.1).
+# Where a proposal came from: a sentence reflection read, or one a member asked to `remember` over
+# another member's memory. Either way nothing is saved until whoever said the stored one answers.
 FROM_REFLECTION = "reflection"
 FROM_REMEMBER = "tool"
 
@@ -47,11 +49,12 @@ class MemoryProposal:
     answerer_id: str = ""
     source_session_id: str | None = None
     source_user_id: str | None = None
-    state: str = PENDING  # pending, then kept, both, replaced or dropped
-    # The memory Keep both or Use new saved, so Undo can take it away again. From `remember`, the
-    # memory it saved, set from the start.
+    state: str = PENDING  # pending, then kept, both, replaced, dropped or withdrawn
+    # The memory Keep both or Use new saved, so Undo can take it away again.
     new_memory_id: str | None = None
     origin: str = FROM_REFLECTION
+    # A `remember`'s end date, given to the memory once it's saved.
+    expires_at: datetime | None = None
     created_at: datetime = field(default_factory=get_utc_now)
     answered_at: datetime | None = None
 

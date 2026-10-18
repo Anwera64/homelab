@@ -5,9 +5,12 @@ import com.homelab.household.domain.model.MemoryItem
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryPage
 import com.homelab.household.domain.model.MemoryScope
+import com.homelab.household.domain.model.WaitingChange
 import com.homelab.household.domain.usecase.GetMemoryPageUseCase
 import com.homelab.household.domain.usecase.RemoveMemoryUseCase
+import com.homelab.household.domain.usecase.RestoreChangeUseCase
 import com.homelab.household.domain.usecase.RestoreMemoryUseCase
+import com.homelab.household.domain.usecase.WithdrawChangeUseCase
 import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
@@ -40,6 +43,8 @@ class MemoriesViewModelTest {
     private val getMemoryPage = mock<GetMemoryPageUseCase>()
     private val removeMemory = mock<RemoveMemoryUseCase>()
     private val restoreMemory = mock<RestoreMemoryUseCase>()
+    private val withdrawChange = mock<WithdrawChangeUseCase>()
+    private val restoreChange = mock<RestoreChangeUseCase>()
     private val now = Instant.parse("2026-10-15T18:00:00Z")
     private val clock =
         object : Clock {
@@ -84,7 +89,15 @@ class MemoriesViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel() =
-        MemoriesViewModel(getMemoryPage, removeMemory, restoreMemory, deviceTimeZone = { 0 }, clock = clock)
+        MemoriesViewModel(
+            getMemoryPage,
+            removeMemory,
+            restoreMemory,
+            withdrawChange,
+            restoreChange,
+            deviceTimeZone = { 0 },
+            clock = clock,
+        )
 
     private fun MemoriesUiState.row(id: String) = (yours + household).first { it.item.id == id }
 
@@ -282,5 +295,69 @@ class MemoriesViewModelTest {
             assertEquals(0, viewModel.uiState.value.toCheck)
             assertEquals(listOf("p2"), viewModel.uiState.value.yours.map { it.item.id })
             assertEquals(MemoriesStatus.Ready, viewModel.uiState.value.status)
+        }
+
+    // ---- a sentence of yours waiting on Liam (canvas: MemWaitingB, MemWaitingWithdrawn) -----------
+
+    private val waiting =
+        WaitingChange(
+            id = "p-boiler",
+            content = "The boiler service moved to November this year.",
+            agentName = "Planner",
+            createdAt = Instant.parse("2026-10-15T09:00:00Z"),
+            expiresAt = null,
+            answererName = "Liam",
+            stored = memory("boiler", MemoryScope.HOUSEHOLD, mine = false),
+        )
+
+    @Test
+    fun `GIVEN a sentence waiting on Liam WHEN the page opens THEN its card counts in Household beside his memory`() =
+        runTest(testDispatcher) {
+            everySuspend { getMemoryPage() } returns page.copy(waiting = listOf(waiting))
+
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            val card = state.waiting.single()
+            assertEquals("p-boiler", card.change.id)
+            assertEquals(MemoryAge.Today, card.age)
+            assertEquals(MemoryAge.Today, card.stored.age)
+            assertEquals(4, state.householdCount)
+        }
+
+    @Test
+    fun `GIVEN a waiting card WHEN X is tapped and then Undo THEN it is withdrawn at once and then waits again`() =
+        runTest(testDispatcher) {
+            everySuspend { getMemoryPage() } returns page.copy(waiting = listOf(waiting))
+            everySuspend { withdrawChange("p-boiler") } returns Unit
+            everySuspend { restoreChange("p-boiler") } returns Unit
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            viewModel.onWithdraw("p-boiler")
+            assertEquals(true, viewModel.uiState.value.waiting.single().withdrawn)
+            advanceUntilIdle()
+            viewModel.onUndoWithdraw("p-boiler")
+            assertEquals(false, viewModel.uiState.value.waiting.single().withdrawn)
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.exactly(1)) { withdrawChange("p-boiler") }
+            verifySuspend(VerifyMode.exactly(1)) { restoreChange("p-boiler") }
+        }
+
+    @Test
+    fun `GIVEN the hub won't take the withdraw WHEN X is tapped THEN the card comes back and the page says why`() =
+        runTest(testDispatcher) {
+            everySuspend { getMemoryPage() } returns page.copy(waiting = listOf(waiting))
+            everySuspend { withdrawChange("p-boiler") } throws ServerOfflineException()
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            viewModel.onWithdraw("p-boiler")
+            advanceUntilIdle()
+
+            assertEquals(false, viewModel.uiState.value.waiting.single().withdrawn)
+            assertEquals(MemoryActionFailure.RemoveUnreachable, viewModel.uiState.value.failure)
         }
 }

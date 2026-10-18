@@ -1,6 +1,7 @@
 package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
+import com.homelab.household.domain.exception.ChangeWithdrawnException
 import com.homelab.household.domain.exception.ServerOfflineException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -224,5 +225,71 @@ class KtorMemoryRemoteDataSourceTest {
             assertFailsWith<ServerOfflineException> { source.answerChange("p-sam", "keep_stored") }
             assertFailsWith<ServerOfflineException> { source.undoChangeAnswer("p-sam") }
             assertFailsWith<ServerOfflineException> { source.getLookedOver("chat-1") }
+            assertFailsWith<ServerOfflineException> { source.withdrawChange("p-boiler") }
+            assertFailsWith<ServerOfflineException> { source.restoreChange("p-boiler") }
+        }
+
+    @Test
+    fun `GIVEN a sentence waiting on Liam WHEN the page is asked for THEN it comes beside the memory it waits on`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respondJson(
+                        """{"yours": [], "household": [], "waiting": [{
+                            "id": "p-boiler", "content": "The boiler service moved to November this year.",
+                            "agent_name": "Planner", "created_at": "2026-10-18T09:00:00", "expires_at": null,
+                            "answerer_name": "Liam", "stored": ${pageItem(
+                            "boiler",
+                            "The boiler service is booked yearly in October.",
+                        )}
+                        }]}""",
+                    )
+                }
+
+            val waiting = dataSource(engine).getMemoryPage().waiting.single()
+
+            assertEquals("p-boiler", waiting.id)
+            assertEquals("Liam", waiting.answerer_name)
+            assertEquals("boiler", waiting.stored.id)
+        }
+
+    @Test
+    fun `GIVEN a waiting sentence WHEN it is withdrawn and undone THEN its address is deleted and then restored`() =
+        runTest {
+            val calls = mutableListOf<Pair<HttpMethod, String>>()
+            val engine =
+                MockEngine { request ->
+                    calls += request.method to request.url.encodedPath
+                    respondJson("""{"id": "p-boiler", "memory_id": "boiler", "content": "x", "state": "withdrawn"}""")
+                }
+            val source = dataSource(engine)
+
+            source.withdrawChange("p-boiler")
+            source.restoreChange("p-boiler")
+
+            assertEquals(
+                listOf(
+                    HttpMethod.Delete to "/api/v1/memories/proposals/p-boiler",
+                    HttpMethod.Post to "/api/v1/memories/proposals/p-boiler/restore",
+                ),
+                calls,
+            )
+        }
+
+    @Test
+    fun `GIVEN Emma took her sentence back WHEN Liam answers it THEN it is refused with her words`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respondJson(
+                        """{"detail": "Emma took this back.", "code": "change_withdrawn"}""",
+                        HttpStatusCode.Conflict,
+                    )
+                }
+
+            val refused =
+                assertFailsWith<ChangeWithdrawnException> { dataSource(engine).answerChange("p-boiler", "use_new") }
+
+            assertEquals("Emma took this back.", refused.message)
         }
 }

@@ -142,6 +142,7 @@ from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
 from app.domain.use_cases.memories.match_memory import MatchMemoryUseCase
 from app.domain.use_cases.memories.remember_forget import ForgetUseCase, MemoryOnCardUseCase, RememberUseCase
 from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
+from app.domain.use_cases.memories.withdraw_change import RestoreChangeUseCase, WithdrawChangeUseCase
 from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase, LookedOverUseCase
 
 # Integration Use Cases
@@ -299,18 +300,6 @@ def get_container(session: AsyncSession):
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
     sign_in_device_uc = SignInDeviceUseCase(device_session_repo, _jwt_token_service, uow)
-    deactivate_member_uc = DeactivateMemberUseCase(
-        user_repo,
-        space_repo,
-        agent_repo,
-        memory_repo,
-        session_repo,
-        document_repo,
-        calendar_cred_repo,
-        device_session_repo,
-        uow,
-    )
-
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
         user_repo=user_repo,
@@ -324,6 +313,19 @@ def get_container(session: AsyncSession):
     proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
     embed_memories_uc = EmbedMemoriesUseCase(
         _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
+    )
+    deactivate_member_uc = DeactivateMemberUseCase(
+        user_repo,
+        space_repo,
+        agent_repo,
+        memory_repo,
+        session_repo,
+        document_repo,
+        calendar_cred_repo,
+        device_session_repo,
+        uow,
+        proposal_repo=proposal_repo,
+        embed_memories=embed_memories_uc,
     )
     recall_uc = RecallMemoriesUseCase(
         embedder=_embedder,
@@ -357,8 +359,12 @@ def get_container(session: AsyncSession):
     )
     forget_uc = ForgetUseCase(
         match=memory_match,
-        retire=RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
+        retire=RetireMemoryUseCase(
+            memory_repo, uow, proposal_repo=proposal_repo, session_repo=session_repo, embed_memories=embed_memories_uc
+        ),
         user_repo=user_repo,
+        proposal_repo=proposal_repo,
+        withdraw=WithdrawChangeUseCase(proposal_repo, memory_repo, uow),
     )
 
     tool_lister = ListAvailableToolsUseCase()
@@ -394,7 +400,7 @@ def get_container(session: AsyncSession):
         event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
         recall=recall_uc,
         memory_card=MemoryOnCardUseCase(
-            match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo
+            match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo, session_repo=session_repo
         ),
     )
 
@@ -566,17 +572,22 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow, embed_memories=embed_memories_uc),
         pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(
-            memory_repo, user_repo, agent_repo, proposal_repo=proposal_repo
+            memory_repo, user_repo, agent_repo, proposal_repo=proposal_repo, session_repo=session_repo
         ),
-        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
+        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(
+            memory_repo, uow, proposal_repo=proposal_repo, session_repo=session_repo, embed_memories=embed_memories_uc
+        ),
         pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
         pres_deps.get_list_proposals_use_case: ListProposalsUseCase(
             proposal_repo, memory_repo, session_repo, user_repo, agent_repo
         ),
         pres_deps.get_answer_proposal_use_case: AnswerProposalUseCase(
-            proposal_repo, memory_repo, session_repo, uow, embed_memories_uc, log_text=settings.MEMORY_LOG_TEXT
+            proposal_repo, memory_repo, session_repo, uow, embed_memories_uc, log_text=settings.MEMORY_LOG_TEXT,
+            user_repo=user_repo,
         ),
         pres_deps.get_undo_proposal_answer_use_case: UndoProposalAnswerUseCase(proposal_repo, memory_repo, uow),
+        pres_deps.get_withdraw_change_use_case: WithdrawChangeUseCase(proposal_repo, memory_repo, uow),
+        pres_deps.get_restore_change_use_case: RestoreChangeUseCase(proposal_repo, memory_repo, uow),
         pres_deps.get_looked_over_use_case: LookedOverUseCase(
             proposal_repo, memory_repo, session_repo, user_repo, agent_repo
         ),
@@ -728,6 +739,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_list_proposals_use_case,
         pres_deps.get_answer_proposal_use_case,
         pres_deps.get_undo_proposal_answer_use_case,
+        pres_deps.get_withdraw_change_use_case,
+        pres_deps.get_restore_change_use_case,
         pres_deps.get_looked_over_use_case,
         pres_deps.get_configure_calendar_use_case,
         pres_deps.get_user_calendar_use_case,

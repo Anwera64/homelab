@@ -155,7 +155,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def proposal_state_handler(request: Request, exc: ProposalStateException):
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
-            content={"detail": str(exc), "code": "proposal_state"},
+            content={"detail": str(exc), "code": exc.code},
         )
 
     # A card is waiting: the phone keeps what was typed and asks for the card to be answered first.

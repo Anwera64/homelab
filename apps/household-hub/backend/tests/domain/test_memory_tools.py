@@ -7,6 +7,7 @@ import pytest
 from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.llm_message import LLMResponseChunk, LLMToolCall
 from app.domain.entities.memory import AgentMemory
+from app.domain.entities.memory_proposal import MemoryProposal
 from app.domain.entities.tool_definition import ToolDefinition
 from app.domain.entities.user import User
 from app.domain.exceptions import EntityNotFoundException, ZeroLeakViolationException
@@ -105,7 +106,8 @@ class FakeRemember:
     async def execute(self, member, content, **kwargs):
         self.calls.append({"member": member.id, "content": content, **kwargs})
         old = AgentMemory(id="veg", user_id="liam", content="Sam is vegetarian.")
-        return Remembered(memory=AgentMemory(id="new", content=content), kept_beside=old, speaker_name="Liam")
+        held = MemoryProposal(memory_id="veg", content=content, answerer_id="liam", source_user_id=member.id)
+        return Remembered(memory=None, kept_beside=old, speaker_name="Liam", held=held)
 
 
 class FakeForget:
@@ -113,8 +115,8 @@ class FakeForget:
         self.refuse = refuse
         self.calls = []
 
-    async def execute(self, member, text, memory_id=None):
-        self.calls.append((member.id, text, memory_id))
+    async def execute(self, member, text, memory_id=None, proposal_id=None):
+        self.calls.append((member.id, text, memory_id, proposal_id))
         if self.refuse:
             raise self.refuse
         return AgentMemory(id="jury", user_id=member.id, content="Studio Jury on Friday.")
@@ -135,7 +137,7 @@ def _executor(remember=None, forget=None):
 
 
 @pytest.mark.asyncio
-async def test_remember_runs_for_the_member_in_their_chat_and_tells_the_model_who_will_be_asked():
+async def test_remember_over_liams_memory_tells_the_model_it_waits_for_him_and_is_not_used_yet():
     remember = FakeRemember()
 
     result = await _executor(remember=remember).execute(
@@ -161,8 +163,11 @@ async def test_remember_runs_for_the_member_in_their_chat_and_tells_the_model_wh
             "agent_id": "planner",
         }
     ]
-    assert result.data["action"] == "remembered"
-    assert "Liam will be asked which one is right" in result.data["kept_beside"]
+    assert result.data == {
+        "action": "remembered",
+        "memory": "Sam is vegan now.",
+        "held": "Saved for Liam to check. Agents won't use it until Liam says which is right.",
+    }
 
 
 @pytest.mark.asyncio
@@ -177,7 +182,21 @@ async def test_forget_runs_on_the_memory_its_card_showed():
     )
 
     assert result.success and result.data == {"action": "forgot", "memory": "Studio Jury on Friday."}
-    assert forget.calls == [("emma", "the jury thing", "jury")]
+    assert forget.calls == [("emma", "the jury thing", "jury", None)]
+
+
+@pytest.mark.asyncio
+async def test_forget_takes_back_the_waiting_sentence_its_card_showed():
+    forget = FakeForget()
+
+    await _executor(forget=forget).execute(
+        tool_name="forget",
+        arguments={"memory": "the November thing", "proposal_id": "p-1"},
+        user_id="emma",
+        agent_tool_permissions=[],
+    )
+
+    assert forget.calls == [("emma", "the November thing", None, "p-1")]
 
 
 @pytest.mark.asyncio
