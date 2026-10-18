@@ -178,11 +178,35 @@ Some ProtonVPN servers refuse the forwarded port or lose it every few minutes, a
 | It sees | It does |
 |---|---|
 | No forwarded port for ten minutes, or the port lost more than six times in an hour | Recreates gluetun, flaresolverr and qbittorrent together (qbittorrent only while the media disk is mounted). Gluetun then picks a server again. |
-| After three recreations that brought no port | Lets Gluetun use any server in the country, ignoring `VPN_SERVER_HOSTNAMES`. It goes back to the named servers at 04:00. |
+| After three recreations that brought no port | Lets Gluetun use any server in the country, ignoring `VPN_SERVER_HOSTNAMES`, picked from the same server list (see below: a stale list widens to stale servers). It goes back to the named servers at 04:00. |
 | Six recreations in a row without a port | Tries only once an hour, because each recreate restarts qBittorrent. |
 | A forwarded port, and qBittorrent listens on another port | Gives qBittorrent the forwarded port. Gluetun gives it only when forwarding comes up, so a qBittorrent that did not answer then would stay without it. |
 
 Each recreate and each port given is one line in the journal: `journalctl -u server-vpn-watchdog.service`. The Downloads dashboard marks the recreations. To switch it off: `sudo systemctl disable --now server-vpn-watchdog.timer`.
+
+### Refreshing the server list
+
+Gluetun picks servers from a list built into its image, which ages: Proton renames servers, takes them out of P2P, or they go down, and Gluetun keeps connecting to their old addresses. Refresh the list when the named servers stop holding a port, or are missing from Proton's server page. The list is kept in `config/gluetun/servers.json`, so it survives recreates.
+
+The pinned release cannot sign in to a Proton account with two-factor authentication; `qmcgaw/gluetun:latest` can. Run it once, outside the stack. It asks for the account's email, password and a fresh authenticator code (valid 30 seconds), and stores none of them:
+
+```bash
+mkdir -p ~/gluetun-refresh && \
+read -rp "Proton email: " PE && IFS= read -rsp "Proton password: " PP && echo && \
+read -rp "Authenticator code: " PT && \
+docker run --rm -v ~/gluetun-refresh:/gluetun qmcgaw/gluetun:latest \
+  update -providers protonvpn -proton-email "$PE" -proton-password "$PP" -proton-totp-code "$PT"; \
+unset PE PP PT
+```
+
+"Incorrect login credentials" means the password, not the code. The latest image writes one file per provider; the pinned release reads only `servers.json`, which may hold just the Proton part (the other providers keep the built-in list). Copy it over and recreate:
+
+```bash
+cd ~/homelab && jq '{version: 1, protonvpn: .}' ~/gluetun-refresh/servers/protonvpn.json > config/gluetun/servers.json && \
+cd hosts/server && docker compose up -d --force-recreate gluetun flaresolverr qbittorrent
+```
+
+Gluetun's log then says "Using protonvpn servers from file". Check that the hostnames in `VPN_SERVER_HOSTNAMES` are still in the new list with port forwarding: `jq -r '.servers[] | select(.vpn == "wireguard" and .port_forward and .country == "Netherlands") | "\(.server_name) \(.hostname)"' config/gluetun/servers.json`.
 
 ### HTTP proxy for indexers
 
