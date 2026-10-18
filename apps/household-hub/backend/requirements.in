@@ -1,7 +1,7 @@
 # The packages the hub names itself. The image installs requirements.txt, the lock
 # generated from this file; regenerate it after any change here:
 #   uv pip compile requirements.in --output-file=requirements.txt --python-version=3.12 --universal
-fastapi==0.143.1
+fastapi==0.143.2
 uvicorn[standard]==0.54.0
 pydantic==2.14.1
 pydantic-settings==2.16.0
@@ -12,7 +12,7 @@ pyjwt==2.15.1
 bcrypt==5.0.0
 httpx==0.28.1
 pymupdf==1.28.2
-caldav==3.4.0
+caldav==3.5.0
 icalendar==7.3.0
 python-dateutil==2.9.0.post0
 cryptography==50.0.2
