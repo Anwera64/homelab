@@ -19,7 +19,7 @@ bcrypt==5.0.0
     # via -r requirements.in
 caldav==3.5.0
     # via -r requirements.in
-certifi==2026.7.22
+certifi==2026.10.18
     # via
     #   httpcore
     #   httpx
@@ -145,7 +145,7 @@ sqlalchemy==2.1.4
     #   alembic
 sqlite-vec==0.1.9
     # via -r requirements.in
-starlette==1.7.0
+starlette==1.9.0
     # via fastapi
 tld==0.13.2
     # via courlan

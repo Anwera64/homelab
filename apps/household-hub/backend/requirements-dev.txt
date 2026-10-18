@@ -34,7 +34,7 @@ caldav==3.5.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
-certifi==2026.7.22
+certifi==2026.10.18
     # via
     #   -c requirements.txt
     #   httpcore
@@ -162,7 +162,7 @@ opentelemetry-api==1.45.1
     #   fastapi
 packaging==26.3
     # via pytest
-pluggy==1.6.0
+pluggy==1.7.0
     # via
     #   pytest
     #   pytest-cov
@@ -256,7 +256,7 @@ sqlite-vec==0.1.9
     # via
     #   -c requirements.txt
     #   -r requirements.in
-starlette==1.7.0
+starlette==1.9.0
     # via
     #   -c requirements.txt
     #   fastapi
