@@ -283,7 +283,7 @@ services:
   # ==============================================================================
   maintainerr:
     profiles: ["media"]
-    image: ghcr.io/maintainerr/maintainerr:3.30.1
+    image: ghcr.io/maintainerr/maintainerr:3.30.2
     container_name: maintainerr
     ports:
       - 6246:6246
@@ -512,7 +512,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.167.1
+    image: renovate/renovate:44.167.5
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
