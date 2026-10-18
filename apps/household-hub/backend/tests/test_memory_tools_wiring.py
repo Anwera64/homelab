@@ -20,6 +20,12 @@ def test_the_chat_turn_remembers_forgets_and_looks_memories_up_for_cards():
     assert turn.tool_executor.forget.withdraw is not None and turn.memory_card.session_repo is not None
 
 
+def test_the_chat_turn_tells_the_agent_which_of_your_sentences_still_wait():
+    turn = get_container(MagicMock())[pres_deps.get_process_chat_turn_use_case]
+
+    assert turn.context_assembler.proposal_repo is not None
+
+
 def test_removing_a_memory_on_the_page_saves_a_remember_waiting_on_it():
     retire = get_container(MagicMock())[pres_deps.get_retire_memory_use_case]
 

@@ -300,17 +300,17 @@ def get_container(session: AsyncSession):
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
     sign_in_device_uc = SignInDeviceUseCase(device_session_repo, _jwt_token_service, uow)
+    # Memory vectors and recall (memory spec §4, §5.2).
+    memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
+    proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
         user_repo=user_repo,
         agent_repo=agent_repo,
         history_tokens=settings.HISTORY_TOKENS,
         memory_block_tokens=settings.MEMORY_BLOCK_TOKENS,
+        proposal_repo=proposal_repo,
     )
-
-    # Memory vectors and recall (memory spec §4, §5.2).
-    memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
-    proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
     embed_memories_uc = EmbedMemoriesUseCase(
         _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
     )
