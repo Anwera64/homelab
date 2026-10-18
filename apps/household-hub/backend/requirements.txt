@@ -17,7 +17,7 @@ babel==2.18.0
     # via courlan
 bcrypt==5.0.0
     # via -r requirements.in
-caldav==3.4.0
+caldav==3.5.0
     # via -r requirements.in
 certifi==2026.7.22
     # via
@@ -43,7 +43,7 @@ dateparser==1.4.3
     # via htmldate
 dnspython==2.9.0
     # via caldav
-fastapi==0.143.1
+fastapi==0.143.2
     # via -r requirements.in
 greenlet==3.5.6
     # via sqlalchemy
@@ -67,7 +67,7 @@ icalendar==7.3.0
     #   icalendar-searcher
     #   recurring-ical-events
     #   x-wr-timezone
-icalendar-searcher==1.0.7
+icalendar-searcher==1.2.0
     # via caldav
 idna==3.20
     # via
