@@ -93,7 +93,7 @@ class MemoriesViewModel(
         if (!row.item.canRemove || row.removed) return
         mark(memoryId, removed = true, clearFailure = true)
         viewModelScope.launch {
-            runCatchingSafe { removeMemory(memoryId) }.onFailure { error ->
+            runCatchingSafe { removeMemory(memoryId) }.onSuccess { recount() }.onFailure { error ->
                 mark(memoryId, removed = false)
                 val failure =
                     if (error is ServerOfflineException) {
@@ -110,7 +110,7 @@ class MemoriesViewModel(
         if (rowOf(memoryId)?.removed != true) return
         mark(memoryId, removed = false, clearFailure = true)
         viewModelScope.launch {
-            runCatchingSafe { restoreMemory(memoryId) }.onFailure { error ->
+            runCatchingSafe { restoreMemory(memoryId) }.onSuccess { recount() }.onFailure { error ->
                 mark(memoryId, removed = true)
                 val failure =
                     if (error is ServerOfflineException) {
@@ -128,7 +128,7 @@ class MemoriesViewModel(
         if (waitingOf(changeId)?.withdrawn != false) return
         markWithdrawn(changeId, withdrawn = true, clearFailure = true)
         viewModelScope.launch {
-            runCatchingSafe { withdrawChange(changeId) }.onFailure { error ->
+            runCatchingSafe { withdrawChange(changeId) }.onSuccess { recount() }.onFailure { error ->
                 markWithdrawn(changeId, withdrawn = false)
                 val failure =
                     if (error is ServerOfflineException) {
@@ -145,7 +145,7 @@ class MemoriesViewModel(
         if (waitingOf(changeId)?.withdrawn != true) return
         markWithdrawn(changeId, withdrawn = false, clearFailure = true)
         viewModelScope.launch {
-            runCatchingSafe { restoreChange(changeId) }.onFailure { error ->
+            runCatchingSafe { restoreChange(changeId) }.onSuccess { recount() }.onFailure { error ->
                 markWithdrawn(changeId, withdrawn = true)
                 val failure =
                     if (error is ServerOfflineException) {
@@ -156,6 +156,14 @@ class MemoriesViewModel(
                 _uiState.update { it.copy(failure = failure) }
             }
         }
+    }
+
+    /**
+     * The band's count after ✕, Undo or a withdraw: removing a memory can settle a change waiting on
+     * it. Only the count is read again, so the row the tap turned into "Removed · Undo" stays.
+     */
+    private suspend fun recount() {
+        runCatchingSafe { getMemoryPage() }.onSuccess { page -> _uiState.update { it.copy(toCheck = page.toCheck) } }
     }
 
     private fun waitingOf(changeId: String): WaitingRow? =

@@ -360,4 +360,21 @@ class MemoriesViewModelTest {
             assertEquals(false, viewModel.uiState.value.waiting.single().withdrawn)
             assertEquals(MemoryActionFailure.RemoveUnreachable, viewModel.uiState.value.failure)
         }
+
+    @Test
+    fun `GIVEN a change waits on Emma WHEN she removes the memory it was about THEN the band recounts and the row stays Removed`() =
+        runTest(testDispatcher) {
+            var toCheck = 1
+            everySuspend { getMemoryPage() } calls { page.copy(toCheck = toCheck) }
+            everySuspend { removeMemory("h1") } calls { toCheck = 0 }
+            val viewModel = viewModel()
+            advanceUntilIdle()
+            assertEquals(1, viewModel.uiState.value.toCheck)
+
+            viewModel.onRemove("h1")
+            advanceUntilIdle()
+
+            assertEquals(0, viewModel.uiState.value.toCheck)
+            assertEquals(true, viewModel.uiState.value.row("h1").removed)
+        }
 }
