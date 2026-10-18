@@ -66,6 +66,9 @@ services:
       - 6881:6881/udp   # qBittorrent Torrent Protocol (UDP)
       - 8080:8080       # qBittorrent WebUI (qbittorrent shares this network)
       - 8000:8000       # Gluetun control API, for the Pi's Homepage widget
+    volumes:
+      # servers.json: a refreshed server list survives recreates (README.md, "Refreshing the server list").
+      - ${CONFIG_PATH}/gluetun:/gluetun
     mem_limit: 256m
     restart: unless-stopped
     logging: *default-logging

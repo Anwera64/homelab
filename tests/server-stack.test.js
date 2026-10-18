@@ -243,6 +243,12 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.match(envExample, /comma-separated/i, 'how to name more than one server');
   });
 
+  await t.test('Gluetun keeps its server list across recreates', () => {
+    const gluetun = block('gluetun');
+    // A refreshed list (README.md, "Refreshing the server list") would otherwise be lost at the watchdog's next recreate.
+    assert.ok(gluetun.includes('- ${CONFIG_PATH}/gluetun:/gluetun'), 'Gluetun must keep /gluetun in the config folder');
+  });
+
   await t.test('Gluetun enables the HTTP proxy for stack services like Prowlarr', () => {
     const gluetun = block('gluetun');
     assert.ok(gluetun.includes('- HTTPPROXY=${HTTPPROXY:-on}'), 'Gluetun must enable the HTTP proxy');
@@ -538,6 +544,23 @@ test('Server README', async (t) => {
     // How to switch it off, and that a provider without forwarding does so by itself.
     assert.match(watchdog[1], /systemctl disable --now server-vpn-watchdog\.timer/);
     assert.match(watchdog[1], /`VPN_PORT_FORWARDING`/);
+  });
+
+  await t.test('says how to refresh Gluetun\'s server list, and that the watchdog widens to the same list', () => {
+    const section = readme.match(/## VPN provider\n([\s\S]*?)(?=\n## |(?![\s\S]))/)[1];
+    const refresh = section.match(/### Refreshing the server list\n([\s\S]*?)(?=\n### |(?![\s\S]))/);
+    assert.ok(refresh, 'the VPN provider section must have a part for refreshing the server list');
+    // The pinned release cannot log in with two-factor authentication; the latest image can.
+    assert.ok(refresh[1].includes('qmcgaw/gluetun:latest'));
+    assert.ok(refresh[1].includes('-proton-totp-code'));
+    // The password is typed, never written down.
+    assert.match(refresh[1], /read -rsp/);
+    // The latest image writes one file per provider; the pinned release reads servers.json.
+    assert.ok(refresh[1].includes("jq '{version: 1, protonvpn: .}'"));
+    assert.ok(refresh[1].includes('config/gluetun/servers.json'));
+    assert.match(refresh[1], /docker compose up -d --force-recreate gluetun flaresolverr qbittorrent/);
+    const watchdog = section.match(/### The VPN watchdog\n([\s\S]*?)(?=\n### |(?![\s\S]))/)[1];
+    assert.match(watchdog, /same server list/, 'widening picks from the list Gluetun has');
   });
 
   await t.test('says qBittorrent keeps the forwarded port across its own restarts, and that the watchdog gives it back', () => {
