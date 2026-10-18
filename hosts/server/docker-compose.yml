@@ -75,7 +75,7 @@ services:
   # ==============================================================================
   qbittorrent:
     profiles: ["media"]
-    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls480
+    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls481
     container_name: qbittorrent
     network_mode: "service:gluetun"
     environment:
