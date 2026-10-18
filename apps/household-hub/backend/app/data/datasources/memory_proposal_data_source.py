@@ -22,7 +22,7 @@ class IMemoryProposalDataSource(Protocol):
     async def update(self, model: MemoryProposalModel) -> MemoryProposalModel:
         ...
 
-    async def drop_pending_for(self, memory_id: str) -> List[str]:
+    async def drop_pending_for(self, memory_id: str, origin: Optional[str] = None) -> List[str]:
         ...
 
     async def list_pending_for_answerer(self, user_id: str) -> List[MemoryProposalModel]:
@@ -55,8 +55,10 @@ class SqliteMemoryProposalDataSource(IMemoryProposalDataSource):
         await self.session.flush()
         return merged
 
-    async def drop_pending_for(self, memory_id: str) -> List[str]:
+    async def drop_pending_for(self, memory_id: str, origin: Optional[str] = None) -> List[str]:
         pending = (MemoryProposalModel.memory_id == memory_id, MemoryProposalModel.state == _PENDING)
+        if origin is not None:
+            pending += (MemoryProposalModel.origin == origin,)
         ids = list((await self.session.execute(select(MemoryProposalModel.id).where(*pending))).scalars())
         if ids:
             await self.session.execute(

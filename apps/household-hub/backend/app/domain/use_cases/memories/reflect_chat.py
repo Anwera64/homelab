@@ -8,7 +8,16 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.entities.memory import AgentMemory
-from app.domain.entities.memory_proposal import DIFFERENT, PROPOSING, RELATIONS, SAME, UNCLEAR, MemoryProposal
+from app.domain.entities.memory_proposal import (
+    DIFFERENT,
+    FROM_REFLECTION,
+    FROM_REMEMBER,
+    PROPOSING,
+    RELATIONS,
+    SAME,
+    UNCLEAR,
+    MemoryProposal,
+)
 from app.domain.entities.session import ChatMessage, ConversationSession
 from app.domain.repositories.embedder import IEmbedder
 from app.domain.repositories.llm_client import ILLMClient
@@ -230,6 +239,11 @@ class ReflectChatUseCase:
             title = " ".join(parsed["title"].split())[:255]
 
         visible_text = {_normalized(m.content) for m in visible.visible}
+        # Memories the member already asked, with `remember`, to change: their ask stands, so reading
+        # the same change in the chat raises no second one (memory spec §2.1).
+        asked = {
+            p.memory_id for p in await self.proposal_repo.list_pending_from_user(member_id) if p.origin == FROM_REMEMBER
+        }
         new_memories: List[AgentMemory] = []
         new_proposals: List[MemoryProposal] = []
         facts = parsed.get("facts") if isinstance(parsed.get("facts"), list) else []
@@ -250,6 +264,8 @@ class ReflectChatUseCase:
             elif relation == SAME and about is not None:
                 outcome, target = "dropped_same", about.id
                 result.same += 1
+            elif relation in PROPOSING and about is not None and about.id in asked:
+                outcome, target = "skipped_already_asked", about.id
             elif relation in PROPOSING and about is not None:
                 proposal = MemoryProposal(
                     memory_id=about.id,
@@ -374,7 +390,8 @@ class ReflectChatUseCase:
                 await self.memory_repo.create(memory)
                 result.added.append(memory.id)
             for proposal in proposals:
-                dropped = await self.proposal_repo.drop_pending_for(proposal.memory_id)
+                # Only reflection's own older changes: one a member asked for is never dropped by it.
+                dropped = await self.proposal_repo.drop_pending_for(proposal.memory_id, origin=FROM_REFLECTION)
                 for dropped_id in dropped:
                     logger.info(
                         "Memory proposal dropped | memory=%s proposal=%s reason=newer_proposal",
