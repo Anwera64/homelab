@@ -1215,7 +1215,7 @@ test('Server waits for DNS before Docker', async (t) => {
 
   await t.test('the drop-in runs the wait before dockerd, and bootstrap installs it without a restart', () => {
     assert.match(dropIn, /^\[Service\]$/m);
-    assert.match(dropIn, /^ExecStartPre=@SERVER_DIR@\/system\/server-wait-dns\.sh$/m);
+    assert.match(dropIn, /^ExecStartPre=-@SERVER_DIR@\/system\/server-wait-dns\.sh$/m);
     assert.match(bootstrap, /^place_unit docker\.service\.d\/10-wait-for-dns\.conf && systemctl daemon-reload$/m);
     // It only matters at boot: restarting Docker here would restart every container.
     const step = bootstrap.slice(at(bootstrap, 'place_unit docker.service.d/'));
