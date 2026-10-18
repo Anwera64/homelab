@@ -5,7 +5,11 @@
 #
 #   nothing new           -> nothing happens
 #   new commits           -> fast-forward, server-stack-up.sh, prune old images
+#   a start that failed   -> tried again the next night
 #   local edits or commits -> stop, change nothing
+#
+# The last commit the stack started from is kept as the ref APPLIED_REF, so a
+# night whose pull failed after the fast-forward is not mistaken for up to date.
 #
 # Host setup (packages, units, the firewall) is bootstrap.sh's job: when a merge
 # touches it, this says so and leaves it to a human. Runs from server-update.timer.
@@ -22,6 +26,7 @@ REPO_DIR="$(cd "$SERVER_DIR/../.." && pwd)"
 OWNER="$(stat -c %U "$REPO_DIR")"
 TEXTFILE_DIR="${SERVER_TEXTFILE_DIR:-/var/lib/node_exporter/textfile}"
 PROM="$TEXTFILE_DIR/server_update.prom"
+APPLIED_REF=refs/server-update/applied
 APPLIED=0
 
 log() { echo "server update: $*"; }
@@ -59,7 +64,9 @@ if ! repo diff --quiet HEAD; then
   exit 1
 fi
 
-before="$(repo rev-parse HEAD)"
+# Before the ref existed, the checkout's HEAD was what the stack ran.
+repo rev-parse --verify -q "$APPLIED_REF" >/dev/null || repo update-ref "$APPLIED_REF" HEAD
+before="$(repo rev-parse "$APPLIED_REF")"
 repo fetch --quiet
 if ! repo merge --ff-only --quiet '@{upstream}'; then
   log "the checkout has commits origin does not; nothing applied. See: git -C $REPO_DIR status"
@@ -75,6 +82,7 @@ fi
 log "${before:0:7} -> ${after:0:7}"
 "$SERVER_DIR/system/server-stack-up.sh"
 docker image prune -f
+repo update-ref "$APPLIED_REF" "$after"
 APPLIED=1
 
 if [ -n "$(repo diff --name-only "$before" "$after" -- hosts/server/bootstrap.sh hosts/server/system)" ]; then

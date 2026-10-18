@@ -23,6 +23,7 @@ A Lenovo Legion Y540 (i7-9750HF, 16 GB, GTX 1660 Ti) on Debian 13 server, at the
 | Battery watcher | Holds the charge near 60%. In a power cut it stops the containers and powers off at 10%. |
 | Wi-Fi band (systemd timer) | Once every minute, moves the Wi-Fi back to 5 GHz when the card has settled on 2.4 GHz. |
 | unattended-upgrades | Installs Debian security updates and Docker updates, and reboots at 05:00 when one needs it. |
+| Wait for DNS (Docker drop-in) | At boot, holds Docker back until the Wi-Fi's DHCP lease has written a DNS server, for up to two minutes. Containers keep the DNS servers they started with: started too early, every one without `dns:` in the compose file cannot look up outside names until it is recreated. |
 | Renovate (Docker, systemd timer) | Runs every hour: opens the version bump PRs on GitHub and merges the ones that may merge themselves once CI is green. |
 | Nightly update (systemd timer) | At 04:00, brings in what was merged on GitHub and restarts the stack when something changed. |
 
@@ -69,7 +70,7 @@ Every image in `docker-compose.yml` is pinned to a release, so the repo says wha
 - **The Hub's Python packages** and its base image come in a PR of their own, merged once the backend's tests and image build pass. Renovate edits `requirements.in` and regenerates the lock files; on Mondays a weekly PR refreshes the packages nobody names (the indirect ones). A new Python version (3.12 to 3.13) waits for you.
 - **Major bumps** get a PR each and wait for you. So does **Jellyfin**, whose upgrades migrate the library database. **Postgres** majors are never proposed: they need a dump and restore by hand.
 
-`server-update.timer` applies what was merged at 04:00. It fast-forwards the checkout and, if anything changed, rebuilds and restarts the stack and removes the old images. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
+`server-update.timer` applies what was merged at 04:00. It fast-forwards the checkout and, if anything changed, rebuilds and restarts the stack and removes the old images. When the restart fails (a registry dropping the pull, say), the next night tries again: the last commit the stack started from is kept as the ref `refs/server-update/applied`. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
 
 ```sh
 journalctl -u server-update

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(ROOT_DIR, 'hosts/server');
@@ -11,7 +11,7 @@ const SYSTEM_DIR = path.join(SERVER_DIR, 'system');
 const SCRIPTS = [
   'bootstrap.sh', 'system/server-firewall.sh', 'system/server-media.sh', 'system/server-battery.sh',
   'system/server-stack-up.sh', 'system/server-update.sh', 'system/server-renovate.sh', 'system/server-metrics.sh',
-  'system/server-wifi-band.sh', 'system/server-vpn-watchdog.sh',
+  'system/server-wifi-band.sh', 'system/server-vpn-watchdog.sh', 'system/server-wait-dns.sh',
 ];
 
 // Missing files read as empty so each check fails with its own message. CRLF checkouts are normalised.
@@ -496,7 +496,9 @@ test('Server nightly update', async (t) => {
     fs.mkdirSync(system, { recursive: true });
     fs.copyFileSync(path.join(SYSTEM_DIR, 'server-update.sh'), path.join(system, 'server-update.sh'));
     fs.chmodSync(path.join(system, 'server-update.sh'), 0o755);
-    fs.writeFileSync(path.join(system, 'server-stack-up.sh'), `#!/bin/sh\necho "stack-up" >> "${log}"\n`, { mode: 0o755 });
+    // Fails while fail-stack exists, as a pull does when the registry drops the connection.
+    const failFlag = path.join(root, 'fail-stack');
+    fs.writeFileSync(path.join(system, 'server-stack-up.sh'), `#!/bin/sh\necho "stack-up" >> "${log}"\n[ ! -e "${failFlag}" ]\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(seed, 'hosts/server/docker-compose.yml'), 'image: app:1.0.0\n');
     fs.writeFileSync(path.join(seed, 'hosts/server/bootstrap.sh'), '#!/bin/sh\n');
     git(seed, 'add', '-A');
@@ -519,7 +521,9 @@ test('Server nightly update', async (t) => {
       git(seed, 'commit', '-qam', `change ${file}`);
       git(seed, 'push', '-q', 'origin', 'HEAD:master');
     };
-    return { root, seed, checkout, run, calls, upstream, prom, textfile };
+    const failStack = (on) => (on ? fs.writeFileSync(failFlag, '') : fs.rmSync(failFlag, { force: true }));
+    const clearCalls = () => fs.rmSync(log, { force: true });
+    return { root, seed, checkout, run, calls, clearCalls, upstream, prom, textfile, failStack };
   };
 
   await t.test('leaves its numbers where the node exporter reads them', () => {
@@ -580,6 +584,47 @@ test('Server nightly update', async (t) => {
     assert.equal(fs.readFileSync(path.join(checkout, 'hosts/server/docker-compose.yml'), 'utf8'), 'image: app:1.0.1\n');
     assert.deepEqual(calls().trim().split('\n'), ['stack-up', 'docker image prune -f']);
     assert.doesNotMatch(result.stdout, /bootstrap/, 'no host change, no reminder');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('a bump whose stack start failed is applied the next night', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, seed, checkout, run, calls, clearCalls, upstream, prom, failStack } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    failStack(true);
+    assert.notEqual(run().status, 0);
+    assert.equal(prom().server_update_last_run_success, 0);
+    // The checkout moved before the start failed: the next night sees nothing new on origin.
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), git(seed, 'rev-parse', 'HEAD'));
+    failStack(false);
+    clearCalls();
+    const started = Math.floor(Date.now() / 1000);
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls().trim().split('\n'), ['stack-up', 'docker image prune -f']);
+    assert.ok(prom().server_update_last_applied_timestamp_seconds >= started);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('a host change merged on a failed night is still pointed out the next night', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, upstream, failStack } = setup();
+    upstream('hosts/server/bootstrap.sh', '#!/bin/sh\necho new step\n');
+    failStack(true);
+    assert.notEqual(run().status, 0);
+    failStack(false);
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /sudo hosts\/server\/bootstrap\.sh/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('after an applied bump, the next quiet night touches nothing', { skip: !canRun && 'needs bash and git' }, () => {
+    const { root, run, calls, clearCalls, upstream } = setup();
+    upstream('hosts/server/docker-compose.yml', 'image: app:1.0.1\n');
+    assert.equal(run().status, 0);
+    clearCalls();
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(calls(), '');
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -1160,6 +1205,66 @@ test('Server Renovate runs', async (t) => {
     assert.equal(calls().trim(), `docker compose --project-directory ${serverDir} --profile renovate up --exit-code-from renovate renovate`);
     // The token is read by compose from .env; it must never be printed.
     assert.doesNotMatch(result.stdout + result.stderr, /github_pat_example/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+test('Server waits for DNS before Docker', async (t) => {
+  const dropIn = read(path.join(SYSTEM_DIR, 'docker.service.d/10-wait-for-dns.conf'));
+  const bootstrap = read(path.join(SERVER_DIR, 'bootstrap.sh'));
+
+  await t.test('the drop-in runs the wait before dockerd, and bootstrap installs it without a restart', () => {
+    assert.match(dropIn, /^\[Service\]$/m);
+    assert.match(dropIn, /^ExecStartPre=@SERVER_DIR@\/system\/server-wait-dns\.sh$/m);
+    assert.match(bootstrap, /^place_unit docker\.service\.d\/10-wait-for-dns\.conf && systemctl daemon-reload$/m);
+    // It only matters at boot: restarting Docker here would restart every container.
+    const step = bootstrap.slice(at(bootstrap, 'place_unit docker.service.d/'));
+    assert.doesNotMatch(step.slice(0, step.indexOf('\nstep ')), /restart docker/);
+  });
+
+  // Behaviour, against a throwaway resolv.conf.
+  const canRun = process.platform !== 'win32' && !spawnSync('bash', ['-c', 'true']).error;
+  const setup = (content) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-wait-dns-'));
+    const resolv = path.join(root, 'resolv.conf');
+    fs.writeFileSync(resolv, content);
+    // Resolves when the script exits, with its status, output and how long it took.
+    const run = (limit = 10) => new Promise((resolve) => {
+      const started = Date.now();
+      const child = spawn(path.join(SYSTEM_DIR, 'server-wait-dns.sh'), [], {
+        env: { ...process.env, RESOLV_CONF: resolv, SERVER_DNS_WAIT_SECONDS: String(limit) },
+      });
+      let output = '';
+      child.stdout.on('data', (d) => { output += d; });
+      child.stderr.on('data', (d) => { output += d; });
+      child.on('close', (status) => resolve({ status, output, seconds: (Date.now() - started) / 1000 }));
+    });
+    return { root, resolv, run };
+  };
+
+  await t.test('lets Docker start at once when the host has a nameserver', { skip: !canRun && 'needs bash' }, async () => {
+    const { root, run } = setup('domain lan\nnameserver 192.0.2.53\n');
+    const result = await run();
+    assert.equal(result.status, 0, result.output);
+    assert.ok(result.seconds < 1, `took ${result.seconds} s`);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('waits for the DHCP lease to write one', { skip: !canRun && 'needs bash' }, async () => {
+    const { root, resolv, run } = setup('# Generated by dhcpcd\n');
+    setTimeout(() => fs.appendFileSync(resolv, 'nameserver 192.0.2.53\n'), 2000);
+    const result = await run();
+    assert.equal(result.status, 0, result.output);
+    assert.ok(result.seconds >= 2 && result.seconds < 6, `took ${result.seconds} s`);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await t.test('gives up after the limit and lets Docker start anyway', { skip: !canRun && 'needs bash' }, async () => {
+    const { root, run } = setup('# Generated by dhcpcd\n');
+    const result = await run(2);
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.output, /no nameserver after 2 s/);
+    assert.ok(result.seconds >= 2 && result.seconds < 5, `took ${result.seconds} s`);
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

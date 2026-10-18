@@ -200,6 +200,10 @@ if jq -S --argjson log "$LOG_CONFIG" '. + $log' <<<"$CURRENT_CONFIG" | write_if_
   systemctl restart docker
 fi
 
+step "Docker starts once the host has a DNS server"
+# Only matters at boot, so Docker is not restarted for it.
+place_unit docker.service.d/10-wait-for-dns.conf && systemctl daemon-reload
+
 step "SSH: keys only"
 if [ -s "$USER_HOME/.ssh/authorized_keys" ]; then
   if printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\n' \
