@@ -241,8 +241,10 @@ private val labels =
                 icon = HearthIcon.Document,
                 permission = Res.string.tool_permission_note_create,
             ),
-        HubTool.REMEMBER to remembering,
-        HubTool.FORGET to forgetting,
+        HubTool.REMEMBER to
+            remembering,
+        HubTool.FORGET to
+            forgetting,
         // The hub's lookup for a Remember or Forget card: it comes with remembering.
         HubTool.MEMORY_LOOKUP to
             ToolLabel(
