@@ -87,11 +87,10 @@ class WhenAgentsActViewModel(
         )
     }
 
-    /** One card on the screen: a tool's writes, in the board's order. */
+    /** One card on the screen: its writes, each a tool and an action, in the board's order. */
     private class Card(
         val group: ToolGroup,
-        val tool: String,
-        val order: List<ToolAction>,
+        val writes: List<Pair<String, ToolAction>>,
     )
 
     private companion object {
@@ -100,21 +99,28 @@ class WhenAgentsActViewModel(
             listOf(
                 Card(
                     ToolGroup.Calendar,
-                    HubTool.CALENDAR_WRITE,
-                    listOf(ToolAction.Create, ToolAction.Update, ToolAction.Delete),
+                    listOf(ToolAction.Create, ToolAction.Update, ToolAction.Delete).map {
+                        HubTool.CALENDAR_WRITE to it
+                    },
                 ),
                 Card(
                     ToolGroup.Notes,
-                    HubTool.DOCUMENT_WRITER,
-                    listOf(ToolAction.Create, ToolAction.Append, ToolAction.Replace),
+                    listOf(ToolAction.Create, ToolAction.Append, ToolAction.Replace).map {
+                        HubTool.DOCUMENT_WRITER to it
+                    },
+                ),
+                // Two tools on one card: remembering can be made automatic, forgetting always asks.
+                Card(
+                    ToolGroup.Memories,
+                    listOf(HubTool.REMEMBER to ToolAction.Create, HubTool.FORGET to ToolAction.Delete),
                 ),
             )
 
         fun groupsOf(approvals: List<ToolApproval>): List<ToolApprovalGroup> =
             CARDS.mapNotNull { card ->
                 val ordered =
-                    card.order.mapNotNull { action ->
-                        approvals.firstOrNull { it.tool == card.tool && it.action == action }
+                    card.writes.mapNotNull { (tool, action) ->
+                        approvals.firstOrNull { it.tool == tool && it.action == action }
                     }
                 ordered.takeIf { it.isNotEmpty() }?.let { ToolApprovalGroup(card.group, it) }
             }

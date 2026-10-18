@@ -7,6 +7,7 @@ import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.RepeatChange
 import com.homelab.household.domain.model.RepeatEvery
+import com.homelab.household.domain.model.StoredMemory
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -16,6 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
+import kotlin.time.Instant
 
 /**
  * A write's arguments, as the model asked for them, to and from [ProposalDetails]. This is the one
@@ -48,10 +50,41 @@ object ProposalDetailsDataMapper {
                 )
             }
 
+            HubTool.REMEMBER -> {
+                ProposalDetails.Memory(
+                    content = arguments.text(CONTENT)?.trim()?.ifBlank { null },
+                    household = arguments.text(SCOPE) == HOUSEHOLD,
+                    stored = storedOf(arguments),
+                )
+            }
+
+            HubTool.FORGET -> {
+                val stored = storedOf(arguments)
+                ProposalDetails.Memory(
+                    content = stored?.content ?: arguments.text(MEMORY)?.trim()?.ifBlank { null },
+                    household = null,
+                    stored = stored,
+                )
+            }
+
             else -> {
                 ProposalDetails.Other
             }
         }
+    }
+
+    /** The stored memory the hub looked up for the card; left out when it sent only part of it. */
+    private fun storedOf(arguments: JsonObject): StoredMemory? {
+        val stored = arguments[STORED] as? JsonObject ?: return null
+        val content = stored.text(CONTENT)?.ifBlank { null } ?: return null
+        val saidBy = stored.text(SAID_BY)?.ifBlank { null } ?: return null
+        return StoredMemory(
+            content = content,
+            saidBy = saidBy,
+            mine = stored.boolean(MINE) == true,
+            agentName = stored.text(AGENT)?.ifBlank { null },
+            addedAt = stored.text(CREATED_AT)?.let(Instant::parseOrNull),
+        )
     }
 
     /** Details changed on a card, in the hub's names. Only what they have is sent. */
@@ -70,6 +103,11 @@ object ProposalDetailsDataMapper {
                 is ProposalDetails.Note -> {
                     details.title?.let { put(TITLE, it) }
                     details.content?.let { put(CONTENT, it) }
+                }
+
+                is ProposalDetails.Memory -> {
+                    details.content?.let { put(CONTENT, it) }
+                    details.household?.let { put(SCOPE, if (it) HOUSEHOLD else PERSONAL) }
                 }
 
                 ProposalDetails.Other -> {
@@ -205,6 +243,14 @@ object ProposalDetailsDataMapper {
             "yearly" to RepeatEvery.Year,
         )
     private const val NONE = "none"
+    private const val HOUSEHOLD = "household"
+    private const val PERSONAL = "personal"
+    private const val MEMORY = "memory"
+    private const val STORED = "stored"
+    private const val SAID_BY = "said_by"
+    private const val MINE = "mine"
+    private const val AGENT = "agent"
+    private const val CREATED_AT = "created_at"
     private val WEEKDAYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     private const val MONTHS = 12
     private const val MAX_DAY = 31

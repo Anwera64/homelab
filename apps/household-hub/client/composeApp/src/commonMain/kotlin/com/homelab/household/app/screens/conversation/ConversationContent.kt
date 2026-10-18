@@ -76,9 +76,11 @@ import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
+import com.homelab.household.presentation.memories.MemoryAge
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
 
 const val CONVERSATION_TRANSCRIPT_TAG = "ConversationTranscript"
 
@@ -118,6 +120,8 @@ fun ConversationContent(
     ) -> Unit = { id, edited -> onDecide(id, true, edited) },
     onUndoAutomatic: () -> Unit = {},
     onLookedOver: () -> Unit = {},
+    /** When a stored memory on a Remember or Forget card was noted. */
+    memoryAge: (Instant) -> MemoryAge? = { null },
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -349,6 +353,7 @@ fun ConversationContent(
                     onConnectCalendar = onConnectCalendar,
                     onAskAgain = question?.let { { onSend(it) } },
                     onApproveAutomatically = onApproveAutomatically,
+                    memoryAge = memoryAge,
                 )
             } else {
                 MessageBubble(
@@ -399,6 +404,7 @@ fun ConversationContent(
                         onDecide = onDecide,
                         onConnectCalendar = onConnectCalendar,
                         onApproveAutomatically = onApproveAutomatically,
+                        memoryAge = memoryAge,
                     ) {
                         val tool = state.activeTool
                         when {
@@ -465,6 +471,7 @@ private fun Answer(
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onConnectCalendar: () -> Unit,
     onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
+    memoryAge: (Instant) -> MemoryAge?,
     onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
@@ -484,6 +491,7 @@ private fun Answer(
                             card = run.card,
                             onDecide = onDecide,
                             onApproveAutomatically = onApproveAutomatically,
+                            memoryAge = memoryAge,
                         )
                     }
 

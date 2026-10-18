@@ -39,9 +39,11 @@ import com.homelab.household.app.resources.when_agents_act_calendar_add_auto
 import com.homelab.household.app.resources.when_agents_act_calendar_change_asks
 import com.homelab.household.app.resources.when_agents_act_calendar_change_auto
 import com.homelab.household.app.resources.when_agents_act_calendar_remove_caption
+import com.homelab.household.app.resources.when_agents_act_forget_caption
 import com.homelab.household.app.resources.when_agents_act_intro
 import com.homelab.household.app.resources.when_agents_act_looking
 import com.homelab.household.app.resources.when_agents_act_looking_note
+import com.homelab.household.app.resources.when_agents_act_memories
 import com.homelab.household.app.resources.when_agents_act_note_append_asks
 import com.homelab.household.app.resources.when_agents_act_note_append_auto
 import com.homelab.household.app.resources.when_agents_act_note_create_asks
@@ -50,6 +52,8 @@ import com.homelab.household.app.resources.when_agents_act_note_replace_caption
 import com.homelab.household.app.resources.when_agents_act_notes
 import com.homelab.household.app.resources.when_agents_act_pdf_caption
 import com.homelab.household.app.resources.when_agents_act_read_calendar_caption
+import com.homelab.household.app.resources.when_agents_act_remember_asks
+import com.homelab.household.app.resources.when_agents_act_remember_auto
 import com.homelab.household.app.resources.when_agents_act_retry
 import com.homelab.household.app.resources.when_agents_act_runs_freely
 import com.homelab.household.app.resources.when_agents_act_save_failed
@@ -270,6 +274,7 @@ private fun ToolGroup.title(): StringResource =
     when (this) {
         ToolGroup.Calendar -> Res.string.when_agents_act_calendar
         ToolGroup.Notes -> Res.string.when_agents_act_notes
+        ToolGroup.Memories -> Res.string.when_agents_act_memories
     }
 
 private fun SaveFailure.words(): StringResource =
@@ -293,6 +298,10 @@ private val CAPTIONS: Map<Pair<String, ToolAction>, Pair<StringResource, StringR
             (Res.string.when_agents_act_note_append_asks to Res.string.when_agents_act_note_append_auto),
         (HubTool.DOCUMENT_WRITER to ToolAction.Replace) to
             (Res.string.when_agents_act_note_replace_caption to Res.string.when_agents_act_note_replace_caption),
+        (HubTool.REMEMBER to ToolAction.Create) to
+            (Res.string.when_agents_act_remember_asks to Res.string.when_agents_act_remember_auto),
+        (HubTool.FORGET to ToolAction.Delete) to
+            (Res.string.when_agents_act_forget_caption to Res.string.when_agents_act_forget_caption),
     )
 
 /** What the switch means as it stands. The view model only hands over writes listed in [CAPTIONS]. */

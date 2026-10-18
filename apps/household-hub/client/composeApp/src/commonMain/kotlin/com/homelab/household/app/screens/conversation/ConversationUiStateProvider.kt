@@ -7,11 +7,13 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.RepeatEvery
+import com.homelab.household.domain.model.StoredMemory
 import com.homelab.household.domain.model.ToolAction
 import com.homelab.household.domain.model.ToolFailureReason
 import com.homelab.household.domain.model.ToolSource
@@ -102,6 +104,46 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
     /** Enough of an answer to outgrow any phone, for the states that have to scroll. */
     private val longAnswer =
         (1..40).joinToString(" ") { "Sentence $it of an answer that keeps going well past the fold." }
+
+    private val vegetarian = "Sam is vegetarian and doesn’t eat fish."
+    private val jury = "Studio Jury on Friday 17 October, 09:00."
+
+    @OptIn(ExperimentalTime::class)
+    private val march = Instant.parse("2026-03-04T10:00:00Z")
+
+    /** A Remember card for "Sam is vegan now.", over [stored], after the hub looked it up. */
+    private fun remembering(
+        asked: String,
+        said: String,
+        stored: StoredMemory,
+    ) = agent.copy(
+        messages =
+            listOf(
+                said("m-1", asked, MessageRole.USER),
+                said(
+                    "m-2",
+                    said,
+                    MessageRole.ASSISTANT,
+                    parts =
+                        listOf(
+                            AnswerPart.ToolDone(HubTool.MEMORY_LOOKUP, ToolSummary()),
+                            AnswerPart.Text(said),
+                            AnswerPart.Proposal(
+                                toolCallId = "c-1",
+                                tool = HubTool.REMEMBER,
+                                action = ToolAction.Create,
+                                details =
+                                    ProposalDetails.Memory(
+                                        content = "Sam is vegan now.",
+                                        household = true,
+                                        stored = stored,
+                                    ),
+                            ),
+                        ),
+                ),
+            ),
+        turnState = TurnState.AwaitingApproval,
+    )
 
     private val named =
         listOf(
@@ -631,6 +673,69 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                     madeAutomatic = AutomaticWrite("calendar_write", ToolAction.Create),
+                ),
+            // Canvas: MemRemember. The member's own memory, replaced once they approve.
+            "Remembering over your own memory" to
+                remembering(
+                    asked = "Remember that Sam is vegan now",
+                    said = "I had Sam down as vegetarian. I can change it.",
+                    stored = StoredMemory(
+                        vegetarian,
+                        saidBy = "Emma",
+                        mine = true,
+                        agentName = "Planner",
+                        addedAt = march,
+                    ),
+                ),
+            // Canvas: MemRememberOther. Liam said otherwise: his stays, and he is asked.
+            "Remembering beside Liam's memory" to
+                remembering(
+                    asked = "Remember that Sam is vegan now",
+                    said = "Liam told me Sam is vegetarian. I can keep yours as well and ask Liam.",
+                    stored = StoredMemory(
+                        vegetarian,
+                        saidBy = "Liam",
+                        mine = false,
+                        agentName = "Planner",
+                        addedAt = march,
+                    ),
+                ),
+            // Canvas: MemForget. Red, and yes is "Forget"; forgetting always asks.
+            "Forgetting a memory" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Forget the jury thing, it got cancelled", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "This is the one I have. Shall I forget it?",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.ToolDone(HubTool.MEMORY_LOOKUP, ToolSummary()),
+                                        AnswerPart.Text("This is the one I have. Shall I forget it?"),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = HubTool.FORGET,
+                                            action = ToolAction.Delete,
+                                            details =
+                                                ProposalDetails.Memory(
+                                                    content = jury,
+                                                    household = null,
+                                                    stored =
+                                                        StoredMemory(
+                                                            jury,
+                                                            saidBy = "Emma",
+                                                            mine = true,
+                                                            agentName = "Researcher",
+                                                            addedAt = march,
+                                                        ),
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
                 ),
             // Canvas: MemChatLine. The chat went quiet after the answer, was looked over, then went on.
             "Looked over" to

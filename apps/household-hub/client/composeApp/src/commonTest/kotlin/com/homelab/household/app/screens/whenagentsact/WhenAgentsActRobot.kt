@@ -17,10 +17,13 @@ import com.homelab.household.app.resources.Res
 import com.homelab.household.app.resources.tool_permission_calendar_add
 import com.homelab.household.app.resources.tool_permission_calendar_change
 import com.homelab.household.app.resources.tool_permission_calendar_remove
+import com.homelab.household.app.resources.tool_permission_forget
 import com.homelab.household.app.resources.tool_permission_note_append
 import com.homelab.household.app.resources.tool_permission_note_create
 import com.homelab.household.app.resources.tool_permission_note_replace
+import com.homelab.household.app.resources.tool_permission_remember
 import com.homelab.household.app.resources.when_agents_act_always_asks
+import com.homelab.household.app.resources.when_agents_act_memories
 import com.homelab.household.app.resources.when_agents_act_runs_freely
 import com.homelab.household.app.resources.when_agents_act_save_unreachable
 import com.homelab.household.app.resources.when_agents_act_title
@@ -66,20 +69,33 @@ class WhenAgentsActRobot(
         switchOf(Res.string.tool_permission_note_append).performScrollTo().assertIsOff()
     }
 
-    /** Removing and replacing can't be undone from the chat: a lock, never a switch. */
-    suspend fun seesRemovingAndReplacingAlwaysAsk() {
-        test.onNodeWithText(getString(Res.string.tool_permission_calendar_remove)).performScrollTo().assertIsDisplayed()
-        test.onNodeWithText(getString(Res.string.tool_permission_note_replace)).performScrollTo().assertIsDisplayed()
-        assertEquals(2, count(getString(Res.string.when_agents_act_always_asks)))
-        assertEquals(
-            0,
-            test.onAllNodes(switch(getString(Res.string.tool_permission_calendar_remove))).fetchSemanticsNodes().size,
-        )
-        assertEquals(
-            0,
-            test.onAllNodes(switch(getString(Res.string.tool_permission_note_replace))).fetchSemanticsNodes().size,
-        )
+    /** Removing, replacing and forgetting can't be undone from the chat: a lock, never a switch. */
+    suspend fun seesRemovingReplacingAndForgettingAlwaysAsk() {
+        val locked =
+            listOf(
+                Res.string.tool_permission_calendar_remove,
+                Res.string.tool_permission_note_replace,
+                Res.string.tool_permission_forget,
+            )
+        locked.forEach { label ->
+            test.onNodeWithText(getString(label)).performScrollTo().assertIsDisplayed()
+            assertEquals(0, test.onAllNodes(switch(getString(label))).fetchSemanticsNodes().size)
+        }
+        assertEquals(locked.size, count(getString(Res.string.when_agents_act_always_asks)))
     }
+
+    suspend fun seesYourMemories() {
+        // Each card's heading is set in capitals.
+        val heading = getString(Res.string.when_agents_act_memories).uppercase()
+        test.onNodeWithText(heading).performScrollTo().assertIsDisplayed()
+    }
+
+    suspend fun seesRememberingAsks() = switchOf(Res.string.tool_permission_remember).performScrollTo().assertIsOff()
+
+    suspend fun seesRememberingIsAutomatic() =
+        switchOf(Res.string.tool_permission_remember).performScrollTo().assertIsOn()
+
+    suspend fun switchesRemembering() = switchOf(Res.string.tool_permission_remember).performScrollTo().performClick()
 
     suspend fun switchesAddingEvents() = switchOf(Res.string.tool_permission_calendar_add).performClick()
 

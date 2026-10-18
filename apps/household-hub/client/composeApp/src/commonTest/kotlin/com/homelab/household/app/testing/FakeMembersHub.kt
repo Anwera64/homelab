@@ -49,6 +49,8 @@ class FakeMembersHub {
             ("document_writer" to "create") to false,
             ("document_writer" to "append") to false,
             ("document_writer" to "replace") to false,
+            ("remember" to "create") to false,
+            ("forget" to "delete") to false,
         )
     private var refusesSettings = false
 

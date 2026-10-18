@@ -12,4 +12,9 @@ object HubTool {
     const val READ_PAGE = "read_page"
     const val LOOKUP_SOURCES = "lookup_sources"
     const val PDF_READER = "pdf_reader"
+    const val REMEMBER = "remember"
+    const val FORGET = "forget"
+
+    /** Not a tool: the step the hub adds before a Remember or Forget card, "Looked through what’s known". */
+    const val MEMORY_LOOKUP = "memory_lookup"
 }

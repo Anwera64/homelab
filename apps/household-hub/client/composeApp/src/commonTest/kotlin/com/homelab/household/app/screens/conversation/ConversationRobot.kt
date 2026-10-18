@@ -20,6 +20,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -66,6 +67,8 @@ import com.homelab.household.app.resources.conversation_thinking
 import com.homelab.household.app.resources.conversation_thought
 import com.homelab.household.app.resources.conversation_try_again
 import com.homelab.household.app.resources.field_changed
+import com.homelab.household.app.resources.memories_tab_household_plain
+import com.homelab.household.app.resources.memories_tab_yours_plain
 import com.homelab.household.app.resources.profile_memories_to_check
 import com.homelab.household.app.resources.send_message
 import com.homelab.household.app.resources.steps_label_and
@@ -96,8 +99,13 @@ import com.homelab.household.app.resources.tool_card_ends_on_date
 import com.homelab.household.app.resources.tool_card_field_day
 import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_time
+import com.homelab.household.app.resources.tool_card_forget
 import com.homelab.household.app.resources.tool_card_hold
 import com.homelab.household.app.resources.tool_card_keep
+import com.homelab.household.app.resources.tool_card_memory_household
+import com.homelab.household.app.resources.tool_card_memory_kept_too
+import com.homelab.household.app.resources.tool_card_memory_replaces
+import com.homelab.household.app.resources.tool_card_memory_said
 import com.homelab.household.app.resources.tool_card_remove
 import com.homelab.household.app.resources.tool_card_repeat_daily
 import com.homelab.household.app.resources.tool_card_repeat_last
@@ -124,11 +132,15 @@ import com.homelab.household.app.resources.tool_fix_calendar_rejected_detail
 import com.homelab.household.app.resources.tool_fix_calendar_rejected_title
 import com.homelab.household.app.resources.tool_fix_nothing_added
 import com.homelab.household.app.resources.tool_fix_reconnect_calendar
+import com.homelab.household.app.resources.tool_forget_card
+import com.homelab.household.app.resources.tool_memory_lookup_done
 import com.homelab.household.app.resources.tool_permission_search
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.resources.tool_read_page_done_named
 import com.homelab.household.app.resources.tool_read_page_failed_named
 import com.homelab.household.app.resources.tool_reason_blocked
+import com.homelab.household.app.resources.tool_remember_automatic_ask
+import com.homelab.household.app.resources.tool_remember_card
 import com.homelab.household.app.resources.tool_search_done_query
 import com.homelab.household.app.resources.tool_search_results
 import com.homelab.household.app.resources.tool_step_automatic
@@ -136,10 +148,12 @@ import com.homelab.household.app.resources.tool_step_named
 import com.homelab.household.app.testing.StillTheme
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import com.homelab.household.presentation.memories.MemoryAge
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 
 /** Everything a conversation says and does, named as the resources it reads. */
 @OptIn(ExperimentalTestApi::class)
@@ -535,6 +549,73 @@ class ConversationRobot(
 
     suspend fun doesNotSeeEdit() {
         node(getString(Res.string.tool_card_edit)).assertDoesNotExist()
+    }
+
+    // ---- remembering and forgetting -----------------------------------------------------------
+
+    suspend fun seesTheRememberCard() = seesText(getString(Res.string.tool_remember_card))
+
+    suspend fun seesLookedThroughWhatsKnown() = seesText(getString(Res.string.tool_memory_lookup_done))
+
+    suspend fun seesItIsForTheHousehold() = seesText(getString(Res.string.tool_card_memory_household))
+
+    suspend fun seesItReplaces(
+        stored: String,
+        meta: String,
+    ) {
+        seesText(getString(Res.string.tool_card_memory_replaces).uppercase())
+        seesText(stored)
+        seesText(meta)
+    }
+
+    suspend fun doesNotSeeItReplaces() {
+        node(getString(Res.string.tool_card_memory_replaces).uppercase()).assertDoesNotExist()
+    }
+
+    suspend fun seesWhatTheySaid(
+        name: String,
+        stored: String,
+        meta: String,
+    ) {
+        seesText(getString(Res.string.tool_card_memory_said, name).uppercase())
+        seesText(stored)
+        seesText(meta)
+    }
+
+    suspend fun seesTheirsIsKeptAndTheyWillBeAsked(name: String) =
+        seesText(getString(Res.string.tool_card_memory_kept_too, name))
+
+    suspend fun seesAnOfferToRememberWithoutAsking() = seesText(getString(Res.string.tool_remember_automatic_ask))
+
+    /** The card's title says Forget too, so the button is the one that can be tapped. */
+    private suspend fun forgetButton(): SemanticsNodeInteraction {
+        val forget = hasText(getString(Res.string.tool_card_forget)) and hasClickAction()
+        waitForOne(forget)
+        return test.onNode(forget)
+    }
+
+    suspend fun seesTheForgetCard() {
+        test.onAllNodesWithText(getString(Res.string.tool_forget_card)).assertCountEquals(2)
+        forgetButton().assertIsDisplayed()
+    }
+
+    suspend fun tapsForget() {
+        forgetButton().performClick()
+    }
+
+    suspend fun boundsOfForget() = forgetButton().getUnclippedBoundsInRoot()
+
+    /** Yours or Household, in a Remember card's Edit view. */
+    suspend fun picksYours() {
+        node(getString(Res.string.memories_tab_yours_plain)).performClick()
+    }
+
+    suspend fun seesHouseholdSelected() {
+        seesSelected(getString(Res.string.memories_tab_household_plain), selected = true)
+    }
+
+    suspend fun doesNotSeeWhoseItIs() {
+        node(getString(Res.string.memories_tab_yours_plain)).assertDoesNotExist()
     }
 
     // ---- which dates of a series ---------------------------------------------------------------
@@ -936,6 +1017,7 @@ fun ComposeUiTest.conversationScreen(
     onApproveAutomatically: (String, ProposalDetails?) -> Unit = { _, _ -> },
     onUndoAutomatic: () -> Unit = {},
     onLookedOver: () -> Unit = {},
+    memoryAge: (Instant) -> MemoryAge? = { MemoryAge.Month(MARCH) },
 ) {
     setContent {
         StillTheme(darkTheme = darkTheme) {
@@ -952,9 +1034,13 @@ fun ComposeUiTest.conversationScreen(
                 onApproveAutomatically = onApproveAutomatically,
                 onUndoAutomatic = onUndoAutomatic,
                 onLookedOver = onLookedOver,
+                memoryAge = memoryAge,
                 onBack = {},
                 memberName = "Emma",
             )
         }
     }
 }
+
+/** Every stored memory in the screen's states was noted in March. */
+private const val MARCH = 3

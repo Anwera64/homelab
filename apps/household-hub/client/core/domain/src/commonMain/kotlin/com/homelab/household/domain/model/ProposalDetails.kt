@@ -1,5 +1,7 @@
 package com.homelab.household.domain.model
 
+import kotlin.time.Instant
+
 /**
  * What a write on an approval card is about, made sense of by the data layer: the event or note it
  * adds, changes or removes. The hub's argument names never get past the data mapper, so the card and
@@ -29,9 +31,33 @@ sealed interface ProposalDetails {
         val content: String?,
     ) : ProposalDetails
 
+    /**
+     * A memory to remember or forget (memory spec §2.1). [content] is the sentence to remember, or
+     * the agent's words for what to forget. [household] is whether every member's agents may use it;
+     * null only on an edit that left it as proposed. [stored] is the memory already kept that the
+     * card is about: the one it replaces or is kept beside, or the one it forgets.
+     */
+    data class Memory(
+        val content: String?,
+        val household: Boolean?,
+        val stored: StoredMemory? = null,
+    ) : ProposalDetails
+
     /** A write this phone has no card words for yet. */
     data object Other : ProposalDetails
 }
+
+/**
+ * A memory already kept, as a Remember or Forget card shows it: its sentence, who said it ([mine]
+ * when it was the member), the agent that noted it and when.
+ */
+data class StoredMemory(
+    val content: String,
+    val saidBy: String,
+    val mine: Boolean,
+    val agentName: String? = null,
+    val addedAt: Instant? = null,
+)
 
 /**
  * How an event repeats: [every] [interval] days, weeks, months or years, on [weekdays] of the week (0

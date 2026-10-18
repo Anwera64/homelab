@@ -27,6 +27,9 @@ class ToolLabelTest {
             "searxng_search",
             "read_page",
             "lookup_sources",
+            "remember",
+            "forget",
+            "memory_lookup",
         )
 
     @Test
@@ -50,7 +53,8 @@ class ToolLabelTest {
                     listOfNotNull(label.running, label.done, label.failed, label.card, label.declined, label.permission)
                         .forEach { words ->
                             val shown = getString(words)
-                            assertFalse(shown.contains(tool), "\"$shown\" names $tool")
+                            // "remember" and "forget" are words too: only a name no person would say is checked.
+                            if ('_' in tool) assertFalse(shown.contains(tool), "\"$shown\" names $tool")
                             assertFalse(shown.contains('_'), "\"$shown\" reads like an identifier")
                         }
                 }
@@ -214,5 +218,23 @@ class ToolLabelTest {
         runComposeUiTest {
             assertEquals("Search the web", getString(toolPermissionLabel("read_page")))
             assertEquals("Search the web", getString(toolPermissionLabel("lookup_sources")))
+        }
+
+    /** Canvas: MemRemember, MemForget, MemForgetDone. */
+    @Test
+    fun `GIVEN remembering and forgetting WHEN shown THEN the card the step and the lookup say so`() =
+        runComposeUiTest {
+            val remember = toolLabel("remember", ToolAction.Create)
+            val forget = toolLabel("forget", ToolAction.Delete)
+
+            assertEquals("Remember", remember.card?.let { getString(it) })
+            assertEquals("Remembered", getString(remember.done))
+            assertEquals("Not remembered", remember.declined?.let { getString(it) })
+            assertEquals("Remember without asking from now on", remember.automaticAsk?.let { getString(it) })
+            assertEquals(HearthIcon.Memory, remember.icon)
+            assertEquals("Forget", forget.card?.let { getString(it) })
+            assertEquals("Forgot a memory", getString(forget.done))
+            assertNull(forget.automaticAsk)
+            assertEquals("Looked through what’s known", getString(toolLabel("memory_lookup").done))
         }
 }
