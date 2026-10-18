@@ -139,6 +139,8 @@ from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
 from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
 from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
+from app.domain.use_cases.memories.match_memory import MatchMemoryUseCase
+from app.domain.use_cases.memories.remember_forget import ForgetUseCase, MemoryOnCardUseCase, RememberUseCase
 from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
 from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase, LookedOverUseCase
 
@@ -336,6 +338,29 @@ def get_container(session: AsyncSession):
         log_text=settings.MEMORY_LOG_TEXT,
     )
 
+    # Remember and forget (memory spec §2.1): the memory a call quotes, and what its card shows.
+    memory_match = MatchMemoryUseCase(
+        memory_block=BuildMemoryBlockUseCase(memory_repo, user_repo=user_repo, agent_repo=agent_repo),
+        embedder=_embedder,
+        vector_repo=memory_vector_repo,
+        model=settings.EMBEDDING_MODEL,
+        bar=settings.MEMORY_MATCH_BAR,
+    )
+    remember_uc = RememberUseCase(
+        memory_repo=memory_repo,
+        proposal_repo=proposal_repo,
+        match=memory_match,
+        user_repo=user_repo,
+        uow=uow,
+        embed_memories=embed_memories_uc,
+        log_text=settings.MEMORY_LOG_TEXT,
+    )
+    forget_uc = ForgetUseCase(
+        match=memory_match,
+        retire=RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
+        user_repo=user_repo,
+    )
+
     tool_lister = ListAvailableToolsUseCase()
     tool_executor = ExecuteToolUseCase(
         calendar_repo=calendar_cred_repo,
@@ -348,6 +373,8 @@ def get_container(session: AsyncSession):
         allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
         page_reader=_page_reader,
         calendar_secrets=calendar_secrets,
+        remember=remember_uc,
+        forget=forget_uc,
     )
 
     chat_turn_uc = ProcessChatTurnUseCase(
@@ -366,6 +393,9 @@ def get_container(session: AsyncSession):
         approval_repo=tool_approval_repo,
         event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
         recall=recall_uc,
+        memory_card=MemoryOnCardUseCase(
+            match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo
+        ),
     )
 
     summarize_history_uc = SummarizeHistoryUseCase(

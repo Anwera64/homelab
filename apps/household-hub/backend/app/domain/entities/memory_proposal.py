@@ -23,6 +23,11 @@ BOTH = "both"
 REPLACED = "replaced"
 ANSWERS = (KEPT, BOTH, REPLACED)
 
+# Where a proposal came from. Reflection proposes a sentence it read; `remember` has already saved
+# its sentence beside the stored memory, so the answers mean something else (memory spec §2.1).
+FROM_REFLECTION = "reflection"
+FROM_REMEMBER = "tool"
+
 
 def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -43,8 +48,10 @@ class MemoryProposal:
     source_session_id: str | None = None
     source_user_id: str | None = None
     state: str = PENDING  # pending, then kept, both, replaced or dropped
-    # The memory Keep both or Use new saved, so Undo can take it away again.
+    # The memory Keep both or Use new saved, so Undo can take it away again. From `remember`, the
+    # memory it saved, set from the start.
     new_memory_id: str | None = None
+    origin: str = FROM_REFLECTION
     created_at: datetime = field(default_factory=get_utc_now)
     answered_at: datetime | None = None
 

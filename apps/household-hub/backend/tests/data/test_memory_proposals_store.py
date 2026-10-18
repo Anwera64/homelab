@@ -159,3 +159,29 @@ async def test_GIVEN_proposals_WHEN_read_by_ids_THEN_the_known_ones_come_back(se
 
     assert {p.id for p in found} == {one.id, two.id}
     assert await repo.get_many([]) == []
+
+
+@pytest.mark.asyncio
+async def test_a_proposal_from_remember_keeps_where_it_came_from_and_its_saved_memory(session):
+    session.add(MemoryModel(id="mine", user_id="emma", scope="household", content="Boiler service in October"))
+    await session.flush()
+    proposal = _proposal()
+    proposal.origin = "tool"
+    proposal.new_memory_id = "mine"
+
+    await _repo(session).create(proposal)
+
+    (read,) = await _repo(session).list_pending_for_answerer("liam")
+    assert (read.origin, read.new_memory_id) == ("tool", "mine")
+    assert (await _repo(session).create(_proposal(content="x"))).origin == "reflection"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_memory_remember_saved_is_removed_THEN_the_change_it_raised_is_dropped(session):
+    session.add(MemoryModel(id="mine", user_id="emma", scope="household", content="Boiler service in October"))
+    await session.flush()
+    proposal = _proposal()
+    proposal.origin, proposal.new_memory_id = "tool", "mine"
+    created = await _repo(session).create(proposal)
+
+    assert await _repo(session).drop_pending_for("mine") == [created.id]

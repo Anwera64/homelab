@@ -1,6 +1,6 @@
 from typing import List, Optional, Protocol
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models.memory_proposal_model import MemoryProposalModel
@@ -56,8 +56,9 @@ class SqliteMemoryProposalDataSource(IMemoryProposalDataSource):
         return merged
 
     async def drop_pending_for(self, memory_id: str) -> List[str]:
+        # A change `remember` raised goes too when the memory it saved does: nothing is left to choose.
         pending = (
-            MemoryProposalModel.memory_id == memory_id,
+            or_(MemoryProposalModel.memory_id == memory_id, MemoryProposalModel.new_memory_id == memory_id),
             MemoryProposalModel.state == _PENDING,
         )
         ids = list((await self.session.execute(select(MemoryProposalModel.id).where(*pending))).scalars())

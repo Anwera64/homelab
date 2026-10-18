@@ -10,10 +10,12 @@ TITLE_CHARACTERS = 120
 WEB_SCHEMES = ("https://", "http://")
 
 # What each write tool can do, so the phone can say what it did: a removal never reads as "Added".
-# Both tools default to create when the model leaves the action out (list_available_tools).
+# The calendar and notes default to create when the model leaves the action out (list_available_tools).
 WRITE_ACTIONS = {
     "calendar_write": ("create", "update", "delete"),
     "document_writer": ("create", "append", "replace"),
+    "remember": ("create",),
+    "forget": ("delete",),
 }
 
 
@@ -57,7 +59,8 @@ def write_action(tool: str, arguments: Dict[str, Any]) -> Optional[str]:
     actions = WRITE_ACTIONS.get(tool)
     if actions is None:
         return None
-    action = (arguments or {}).get("action") or "create"
+    # Left out, it is the tool's first: create, or forget's only one, delete.
+    action = (arguments or {}).get("action") or actions[0]
     return action if action in actions else None
 
 
@@ -67,6 +70,13 @@ def describe_write(tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     title = (arguments or {}).get("title")
     if title and tool == "calendar_write":
         summary["title"] = _clip(str(title))
+    elif tool in ("remember", "forget"):
+        # A forget step names the memory its card showed, not the model's quote of it.
+        stored = (arguments or {}).get("stored")
+        stored = stored.get("content") if isinstance(stored, dict) else None
+        sentence = (arguments or {}).get("content" if tool == "remember" else "memory")
+        if stored or sentence:
+            summary["title"] = _clip(str(stored if tool == "forget" and stored else sentence))
     return summary
 
 

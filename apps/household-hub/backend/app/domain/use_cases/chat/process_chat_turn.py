@@ -18,10 +18,15 @@ from app.domain.use_cases.chat.chat_title import title_from_first_message
 from app.domain.use_cases.chat.current_date_line import zone_of
 from app.domain.use_cases.chat.assemble_agent_context import AssembleAgentContextUseCase
 from app.domain.use_cases.memories.recall_memories import RECALLED, RecallMemoriesUseCase
+from app.domain.use_cases.memories.remember_forget import MemoryOnCardUseCase
 from app.domain.repositories.source_index import ISourceIndexFactory
 from app.domain.entities.calendar_event import ALL
 from app.domain.use_cases.integrations import calendar_arguments
-from app.domain.use_cases.integrations.execute_tool import ExecuteToolUseCase, effective_tool_permissions
+from app.domain.use_cases.integrations.execute_tool import (
+    MEMORY_TOOLS,
+    ExecuteToolUseCase,
+    effective_tool_permissions,
+)
 from app.domain.use_cases.integrations.get_calendar_event import GetCalendarEventUseCase
 from app.domain.use_cases.integrations.list_available_tools import ListAvailableToolsUseCase
 from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS, describe_write, summarize_tool, write_action
@@ -55,6 +60,9 @@ from app.domain.exceptions import (
 
 
 logger = logging.getLogger(__name__)
+
+# The step a memory card follows: the hub looked through the stored memories for it.
+MEMORY_LOOKUP = "memory_lookup"
 
 # How much of a call's arguments the log keeps: enough to see what was asked, not a whole note.
 LOGGED_ARGUMENTS = 500
@@ -267,6 +275,7 @@ class ProcessChatTurnUseCase:
         approval_repo: Optional[IToolApprovalRepository] = None,
         event_lookup: Optional[GetCalendarEventUseCase] = None,
         recall: Optional[RecallMemoriesUseCase] = None,
+        memory_card: Optional[MemoryOnCardUseCase] = None,
     ):
         self.session_repo = session_repo
         self.agent_repo = agent_repo
@@ -290,6 +299,8 @@ class ProcessChatTurnUseCase:
         self.event_lookup = event_lookup
         # Attaches memories the fixed block left out to a new message. None: no recall.
         self.recall = recall
+        # Finds the stored memory a remember or forget card is about. None: those cards show only the call.
+        self.memory_card = memory_card
 
     async def _recall(self, session, current_user: User, recent_messages: List[ChatMessage], is_turn_secret: bool):
         """
@@ -743,6 +754,8 @@ class ProcessChatTurnUseCase:
                 is_secret_mode=is_turn_secret,
                 sources=sources,
                 timezone_name=timezone_name,
+                session_id=session_id,
+                agent_id=agent.id,
             )
         except ToolPermissionDeniedException:
             shown = " ".join(tc.name.split())[:60]
@@ -938,21 +951,20 @@ class ProcessChatTurnUseCase:
         available_tools_defs = (
             await tool_defs_res if hasattr(tool_defs_res, "__await__") else tool_defs_res
         )
-        agent_tools = []
-        if agent.tool_permissions:
-            granted = effective_tool_permissions(agent.tool_permissions)
-            for td in available_tools_defs:
-                if td.name in granted:
-                    agent_tools.append(
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": td.name,
-                                "description": td.description,
-                                "parameters": td.parameters_schema,
-                            },
-                        }
-                    )
+        # Every agent has some: remembering and forgetting come with none given (memory spec §2.1).
+        granted = effective_tool_permissions(agent.tool_permissions or [])
+        agent_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": td.name,
+                    "description": td.description,
+                    "parameters": td.parameters_schema,
+                },
+            }
+            for td in available_tools_defs
+            if td.name in granted
+        ]
 
         return _Turn(
             session=session,
@@ -1039,14 +1051,23 @@ class ProcessChatTurnUseCase:
 
             cards = 0
             for tc in asks:
-                looked_up, no_such_event = await self._event_on_card(tc, current_user.id, turn.timezone_name)
-                if no_such_event:
-                    self._refuse(turn, tc, no_such_event, current_user.id)
+                pinned: Dict[str, Any] = {}
+                if tc.name in MEMORY_TOOLS:
+                    looked_up, pinned, refusal = await self._memory_on_card(tc, current_user)
+                    if looked_up:
+                        async for event in self._looked_through(turn):
+                            yield event
+                else:
+                    looked_up, refusal = await self._event_on_card(tc, current_user.id, turn.timezone_name)
+                if refusal:
+                    self._refuse(turn, tc, refusal, current_user.id)
                     continue
                 part = proposal_part(tc)
+                if looked_up or pinned:
+                    # Only the card's copy: the model's call stays as it made it. What was only looked
+                    # up to be shown is dropped before the write runs; the memory it pins is kept.
+                    part["arguments"] = {**tc.arguments, **pinned, **looked_up}
                 if looked_up:
-                    # Only the card's copy: the model's call stays as it made it.
-                    part["arguments"] = {**tc.arguments, **looked_up}
                     part["looked_up"] = looked_up
                 turn.answer.parts.append(part)
                 yield proposal_event(part)
@@ -1057,10 +1078,10 @@ class ProcessChatTurnUseCase:
 
     def _refuse(self, turn: "_Turn", tc: LLMToolCall, error: str, user_id: str) -> None:
         """
-        Turns down a remove or a change of an event the calendar doesn't have, without a card (#65):
-        the member would be asked to approve something that cannot happen. Only the model is told,
-        so it can read the calendar and ask again. The call is never run to find out, since only a
-        card may remove something.
+        Turns down a write that cannot happen without a card (#65): a remove or a change of an event
+        the calendar doesn't have, or a forget of a memory the member may not forget. The member
+        would be asked to approve something that cannot happen. Only the model is told, so it can
+        look again or say why. The call is never run to find out, since only a card may remove something.
         """
         result = ToolExecutionResult(
             tool_name=tc.name, success=False, error=error, reason=ToolFailureReason.NOT_FOUND
@@ -1121,6 +1142,28 @@ class ProcessChatTurnUseCase:
         )
         turn.out_of_room = turn.out_of_room or no_room
         turn.llm_messages.append(LLMMessage(role="tool", tool_call_id=tc.id, name=tc.name, content=seen))
+
+    async def _memory_on_card(
+        self, tc: LLMToolCall, member: User
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+        """
+        The stored memory a remember or forget card is about, the id that pins it to the write, and,
+        for a forget with nothing the member may forget, what to tell the model instead of a card.
+        When memories can't be searched, all are empty: the card shows the call as the model made it.
+        """
+        if self.memory_card is None:
+            return {}, {}, None
+        try:
+            return await self.memory_card.execute(member, tc.name, tc.arguments or {})
+        except Exception:
+            logger.warning("Could not look up the memory for a %s card", tc.name, exc_info=True)
+            return {}, {}, None
+
+    async def _looked_through(self, turn: "_Turn"):
+        """The step before a memory card, "Looked through what's known": the hub's own look, not a tool."""
+        turn.answer.tool(MEMORY_LOOKUP, True)
+        yield {"type": "tool_executing", "tool": MEMORY_LOOKUP, "arguments": {}}
+        yield {"type": "tool_result", "data": {"tool": MEMORY_LOOKUP, "success": True, "summary": None}}
 
     async def _event_on_card(
         self, tc: LLMToolCall, user_id: str, timezone_name: Optional[str]
