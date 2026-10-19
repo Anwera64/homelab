@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LaunchSmokeTest {
     @Test
-    fun main_activity_reaches_resumed() {
+    fun GIVEN_the_app_is_installed_WHEN_the_main_screen_is_launched_and_resumed_THEN_it_stays_resumed() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.moveToState(Lifecycle.State.RESUMED)
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
@@ -22,7 +22,7 @@ class LaunchSmokeTest {
 
     /** The launcher shows HyggeHub's own icon, not the Android default. */
     @Test
-    fun the_app_uses_the_hyggehub_launcher_icon() {
+    fun GIVEN_the_installed_app_WHEN_its_application_info_is_read_THEN_the_launcher_icon_is_the_HyggeHub_one() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val app = context.packageManager.getApplicationInfo(context.packageName, 0)
 
@@ -31,7 +31,7 @@ class LaunchSmokeTest {
 
     /** Compose draws the whole screen; a platform action bar would sit on top of it. */
     @Test
-    fun main_activity_has_no_action_bar() {
+    fun GIVEN_the_main_screen_is_launched_WHEN_its_action_bar_is_looked_up_THEN_there_is_none() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity -> assertNull(activity.actionBar) }
         }

@@ -41,7 +41,7 @@ class KoinDependencyGraphTest : KoinTest {
     }
 
     @Test
-    fun verify_koin_dependency_graph_resolves_all_repositories_usecases_and_viewmodels() {
+    fun `GIVEN the SDK started WHEN every repository use case and view model is resolved THEN all of them resolve`() {
         val koinApp = HouseholdHubSdk.init()
 
         assertNotNull(koinApp)

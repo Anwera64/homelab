@@ -27,7 +27,7 @@ class AttentionAccentTest {
         )
 
     @Test
-    fun attention_accents_read_tertiary_not_secondary() {
+    fun `GIVEN the production UI sources WHEN attention accents are looked for THEN they read tertiary and never secondary`() {
         val secondary = Regex("""\bcolors\.(on)?[sS]econdary(Container)?\b""")
 
         val violations =

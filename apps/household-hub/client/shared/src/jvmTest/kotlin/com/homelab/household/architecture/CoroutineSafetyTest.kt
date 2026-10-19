@@ -17,7 +17,7 @@ class CoroutineSafetyTest {
 
     /** `runCatching` also catches `CancellationException`; `runCatchingSafe` rethrows it. */
     @Test
-    fun sources_use_run_catching_safe_instead_of_run_catching() {
+    fun `GIVEN the production sources WHEN they are scanned for runCatching THEN none uses it instead of the safe variant`() {
         val runCatchingCall = Regex("""\brunCatching\s*\{""")
 
         val violations =

@@ -36,7 +36,7 @@ class StillMotionInTestsTest {
     private val allowed = setOf("StillTheme.kt")
 
     @Test
-    fun a_ui_test_composes_the_still_theme_rather_than_the_live_one() {
+    fun `GIVEN the UI test sources WHEN their theme use is read THEN they compose the still theme and not the live one`() {
         assertTrue(testDir.exists(), "Test directory must exist at: ${testDir.absolutePath}")
 
         val liveTheme = Regex("""\bHearthTheme\s*\(""")

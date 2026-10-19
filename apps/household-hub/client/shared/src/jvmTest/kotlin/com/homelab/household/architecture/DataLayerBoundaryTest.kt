@@ -24,7 +24,7 @@ class DataLayerBoundaryTest {
     private val dataSourceDir = File(dataDir, "datasource")
 
     @Test
-    fun a_repository_never_holds_an_http_client() {
+    fun `GIVEN the repository sources WHEN their fields and constructors are read THEN none holds an HTTP client`() {
         assertTrue(repositoryDir.exists(), "Repository directory must exist at: ${repositoryDir.absolutePath}")
 
         val violations =
@@ -40,7 +40,7 @@ class DataLayerBoundaryTest {
     }
 
     @Test
-    fun only_data_sources_and_the_network_package_reach_the_hub() {
+    fun `GIVEN the data sources WHEN the code that calls the hub is looked up THEN only data sources and the network package do`() {
         // `di` builds the one HttpClient the data sources share — that is wiring, not a call.
         val allowed = setOf("datasource", "network", "di")
 
@@ -70,7 +70,7 @@ class DataLayerBoundaryTest {
      * and a DTO for "offline" would only be that sealed type with another name.
      */
     @Test
-    fun a_data_source_returns_dtos_not_domain_models() {
+    fun `GIVEN the data source sources WHEN their return types are read THEN they are DTOs and never domain models`() {
         if (!dataSourceDir.exists()) return
 
         // Two, each with its reason written in the file itself:
@@ -116,7 +116,6 @@ class DataLayerBoundaryTest {
      */
     @Test
     fun `GIVEN the production sources of every module WHEN their imports are read THEN OpenTelemetry appears only in the data layer's telemetry and di packages`() {
-        // GIVEN
         val allowed = setOf("telemetry", "di")
         val modules =
             listOf("core/domain", "core/data", "core/presentation", "shared", "composeApp", "androidApp", "iosApp")
@@ -127,7 +126,6 @@ class DataLayerBoundaryTest {
                     (src.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name.endsWith("ain") }
                 }.flatMap { it.kotlinFiles() }
 
-        // WHEN
         val violations =
             productionFiles
                 .filter { file -> file.readLines().any { it.trim().startsWith("import io.opentelemetry") } }
@@ -137,7 +135,6 @@ class DataLayerBoundaryTest {
                         path.substringAfter("/com/homelab/household/data/", "").substringBefore('/') in allowed
                 }
 
-        // THEN
         assertTrue(productionFiles.isNotEmpty(), "No production sources found under ${clientRootDir.absolutePath}")
         assertTrue(
             violations.isEmpty(),

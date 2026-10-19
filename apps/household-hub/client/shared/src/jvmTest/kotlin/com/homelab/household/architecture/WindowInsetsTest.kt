@@ -37,7 +37,7 @@ class WindowInsetsTest {
         )
 
     @Test
-    fun every_bar_pads_its_own_window_insets() {
+    fun `GIVEN the bar composables WHEN their inset handling is read THEN every bar pads its own window insets`() {
         val offenders =
             bars.filter { path ->
                 val source = File(uiDir, path)
@@ -53,7 +53,7 @@ class WindowInsetsTest {
     }
 
     @Test
-    fun a_bar_built_on_material3_does_not_pad_the_insets_twice() {
+    fun `GIVEN the bars built on Material3 WHEN their inset handling is read THEN none pads the insets twice`() {
         // TopAppBar already applies TopAppBarDefaults.windowInsets; padding again would double it.
         val topBar = File(uiDir, "app/components/HearthTopBar.kt")
         assertTrue(topBar.exists(), "HearthTopBar not found: ${topBar.absolutePath}")

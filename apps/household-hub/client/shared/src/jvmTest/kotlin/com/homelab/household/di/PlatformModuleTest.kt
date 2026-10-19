@@ -19,7 +19,7 @@ class PlatformModuleTest : KoinTest {
     }
 
     @Test
-    fun jvm_platform_module_binds_cio_engine_and_file_token_storage() {
+    fun `GIVEN the SDK started on the JVM WHEN the engine and token storage are resolved THEN they are the CIO engine and the file storage`() {
         HouseholdHubSdk.init()
 
         val engine = get<HttpClientEngine>()

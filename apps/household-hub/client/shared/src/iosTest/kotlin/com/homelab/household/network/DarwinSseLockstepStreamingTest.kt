@@ -46,7 +46,7 @@ class DarwinSseLockstepStreamingTest : KoinTest {
     }
 
     @Test
-    fun darwin_delivers_each_sse_delta_before_the_server_is_allowed_to_write_the_next() =
+    fun `GIVEN a server that holds each delta until the last was received WHEN the stream is read on Darwin THEN every delta arrives before the next is written`() =
         runBlocking {
             HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
             val repository = get<SessionRepository>()

@@ -36,7 +36,7 @@ class DesignSystemTokenTest {
      * layout decision a theme gets to change.
      */
     @Test
-    fun screens_read_the_scale_through_the_theme_not_the_default_instance() {
+    fun `GIVEN the screen and component sources WHEN they are scanned for the scale THEN it is read through the theme and not the default instance`() {
         val allowed = setOf("HearthIcon.kt")
         val defaultInstance = Regex("""\bDefault(Spacing|Sizes)\b""")
 
@@ -61,7 +61,7 @@ class DesignSystemTokenTest {
     }
 
     @Test
-    fun no_screen_or_component_writes_a_raw_dp() {
+    fun `GIVEN the screen and component sources WHEN they are scanned for dp values THEN none writes a raw dp`() {
         assertTrue(uiDir.exists(), "UI directory must exist at: ${uiDir.absolutePath}")
         assertTrue(themePackage.exists(), "Theme package must exist at: ${themePackage.absolutePath}")
 
@@ -93,7 +93,7 @@ class DesignSystemTokenTest {
      * otherwise invent has nowhere to be written.
      */
     @Test
-    fun no_screen_or_component_writes_a_raw_sp() {
+    fun `GIVEN the screen and component sources WHEN they are scanned for sp values THEN none writes a raw sp`() {
         val literal = Regex("""(?<![\w.])\d+(\.\d+)?\.sp\b""")
 
         val violations =
@@ -123,7 +123,7 @@ class DesignSystemTokenTest {
      * Without this, "waiting" drifts screen by screen exactly the way type did.
      */
     @Test
-    fun no_screen_or_component_writes_a_raw_duration() {
+    fun `GIVEN the screen and component sources WHEN they are scanned for durations THEN none writes a raw duration`() {
         val literal = Regex("""(?<![\w.])(durationMillis\s*=\s*\d+|\d+(\.\d+)?\.(milliseconds|seconds))\b""")
 
         val violations =
@@ -152,7 +152,7 @@ class DesignSystemTokenTest {
      * medium-weight body that no other screen has.
      */
     @Test
-    fun no_screen_or_component_applies_a_font_weight_by_hand() {
+    fun `GIVEN the screen and component sources WHEN they are scanned for font weights THEN none applies one by hand`() {
         val weight = Regex("""\bFontWeight\.""")
 
         val violations =
