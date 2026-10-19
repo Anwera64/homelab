@@ -1,29 +1,26 @@
 # Agent Guidelines & Workflow Rules
 
-## 1. Strict Planning Rule: Always Plan First
-- **No Direct Coding without Approval:** Never write, modify, delete files, or execute modifying commands without first creating an implementation plan and receiving explicit approval from the user.
-- **Mandatory Lifecycle:**
-  1. **Research & Inspect:** Use read-only tools to investigate codebase state, configuration files, and root causes without modifying anything.
-  2. **Create Implementation Plan:** Present the plan through the agent's plan mode, outlining the problem, architecture, file-by-file changes, open questions, and verification steps. Don't write plan files into the repository.
-  3. **Wait for Approval:** Stop and present the plan to the user for review and refinement.
-  4. **Execute Only When Approved:** Only after the user explicitly approves the plan, proceed to development, file modifications, and testing.
-- **Universal Scope:** This rule applies unconditionally to all tasks, tweaks, bug fixes, or refactors, regardless of perceived simplicity.
+## 1. Plan first
+- Investigate read-only, then present a plan through plan mode (problem, architecture, file-by-file changes, open questions, verification) and wait for explicit approval before writing, deleting, or running anything that modifies state.
+- This covers every change, including one-line fixes and follow-ups in the same session. Don't write plan files into the repository.
 
-## 2. Mandatory Test-Driven Development (TDD) Rule: Always Test First
-- **Strict Red-Green-Refactor Lifecycle:** When designing plans and writing code, always structure work into discrete TDD cycles.
-- **Red Phase (Tests First):** Write automated unit or integration tests that assert the desired behavior and verify that they fail before writing any implementation code.
-- **Green Phase (Minimal Implementation):** Write the minimal implementation code necessary to make the failing tests pass.
-- **Refactor Phase:** Clean up and optimize the implementation while ensuring 100% of the test suite remains passing.
-- **Planning Integration:** Every implementation plan must explicitly structure features into sequential TDD cycles, detailing the Red (tests & expected failures), Green (minimal code changes), and Refactor stages for each cycle.
+## 2. Test-driven development
+- Work in red-green-refactor cycles: write the test and watch it fail before any implementation code, then the minimal code to pass, then refactor with the full suite green.
+- Each plan lists its cycles in order, with the Red tests and their expected failures, the Green change, and the Refactor step.
+- Client test conventions (names, robots) are in `apps/household-hub/client/AGENTS.md`.
 
-## 3. Mandatory Clean Architecture Rule: Always Follow Clean Architecture
-- **Strict Inward Dependency Rule (`presentation -> domain <- data`):**
-  1. **`domain` is the Independent Core:** Contains pure Python Entities, Use Cases / Interactors, Repository Interfaces (Protocols), and Domain Exceptions. It must have ZERO dependencies on frameworks, databases, or outside modules (`fastapi`, `sqlalchemy`, `pydantic`, `data`, `presentation`, `bootstrap`).
-  2. **`presentation` Depends ONLY on `domain`:** Contains thin FastAPI routers, Pydantic HTTP schemas, Presentation Mappers, and exception handlers. It must have ZERO imports from `data` or persistence engines.
-  3. **`data` Depends ONLY on `domain`:** Implements repository protocols defined in `domain`, encapsulates DataSources (abstract protocols + SQLite implementations), ORM models, and Data Mappers. It must have ZERO imports from `presentation` or web frameworks.
-  4. **`bootstrap` is the DI Coordinator:** Sits at the application root (equivalent to an Android `:app` module). It is the sole layer permitted to wire DataSources $\rightarrow$ Repositories $\rightarrow$ Use Cases $\rightarrow$ FastAPI dependencies.
-- **Inter-Layer Mappers:** Always use dedicated mappers between layers (`presentation.mappers` for HTTP schemas $\leftrightarrow$ domain, and `data.mappers` for ORM models $\leftrightarrow$ domain) to prevent model changes from leaking across boundaries.
-- **Automated Boundary Enforcement:** All architecture boundary rules must be covered by automated AST-based tests and executed on every test run and Git pre-commit hook. Cross-module violations must immediately fail the build.
+## 3. Clean architecture
+Every app keeps three layers with dependencies pointing inward: `presentation -> domain <- data`.
+- **domain** is the core: entities, use cases, repository interfaces and domain exceptions. It depends on no framework, database or other layer.
+- **presentation** depends only on domain: UI or HTTP entry points, their models, and mappers to domain.
+- **data** depends only on domain: it implements the repository interfaces, with data sources, storage models and mappers to domain.
+- Models never cross a layer boundary; each boundary has its own mappers, so a model change doesn't leak.
+- Wiring happens only in DI code, and only the app's root assembles the graph.
+- Boundary tests enforce these rules on every test run and in the pre-commit hook. A new rule gets a test.
+
+Per stack:
+- **Hub backend (Python):** `app/domain`, `app/data`, `app/presentation`, and `app/bootstrap` as the DI root. domain imports none of `fastapi`, `sqlalchemy` or `pydantic`. Boundaries are tested in `tests/architecture/`.
+- **Client (Kotlin Multiplatform):** Gradle modules `:core:domain`, `:core:data` and `:core:presentation`, each with its own Koin module, assembled by the app. Boundaries are tested in `shared/src/jvmTest/.../architecture/`.
 
 ## 4. Sub-Agent Rule: Keep Token Cost Down
 - **Delegate what doesn't need the main model's judgement:** **Sonnet** for simple, well-specified tasks, **Haiku** for the most basic ones (lookups, boilerplate, doc checkboxes).
@@ -34,5 +31,5 @@
 - **On-demand model:** The local LLM is loaded and offloaded on demand by design. Don't suggest keep-alive or keeping the model resident.
 - **Hub logs live in Grafana:** Query Grafana/Loki for hub logs rather than `docker logs`.
 - **Local services:** Services on the local network (e.g. Cleanuparr) need no API key unless stated.
-- **Connectivity:** Windows Firewall on the desktop can block ports from the Pi; check this early. For phone connectivity, check the Android local-network permission.
+- **Connectivity:** Windows Firewall on the desktop allows Ollama (11434) only from the server; check it early when the hub can't reach the model. For phone connectivity, check the Android local-network permission.
 - **Client builds:** Build and test client (Kotlin) code before committing; if the environment can't build it, say so clearly in the commit and PR.
