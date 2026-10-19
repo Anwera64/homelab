@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.homelab.household.app.components.BentoCard
 import com.homelab.household.app.components.ChipVariant
@@ -78,12 +79,15 @@ import com.homelab.household.app.resources.memories_waiting_yours
 import com.homelab.household.app.resources.memories_withdraw
 import com.homelab.household.app.resources.memories_withdrawn
 import com.homelab.household.app.resources.memories_you
+import com.homelab.household.app.resources.memories_moved_theirs
+import com.homelab.household.app.resources.memories_moved_yours
 import com.homelab.household.app.resources.memories_you_asked
 import com.homelab.household.app.screens.changes.SentenceBox
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.app.theme.PreviewDayNight
 import com.homelab.household.domain.model.MemoryOrigin
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.MemoriesStatus
 import com.homelab.household.presentation.memories.MemoriesUiState
 import com.homelab.household.presentation.memories.MemoryActionFailure
@@ -354,13 +358,14 @@ private fun MemoryCard(
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
     val item = row.item
+    val sentence = memorySentence(item.content, row.eventTime)
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
             ) {
-                Text(item.content, style = type.body, color = colors.textPrimary)
+                Text(sentence, style = type.body, color = colors.textPrimary)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
@@ -399,11 +404,47 @@ private fun MemoryCard(
                         HearthChip(label = stringResource(Res.string.memories_you_asked), variant = ChipVariant.Primary)
                     }
                 }
+                row.movedFrom?.let { was -> MovedLine(was = was, speakerName = if (item.isMine) null else item.speakerName) }
             }
             if (item.canRemove) {
-                RemoveButton(content = item.content, onClick = onRemove)
+                RemoveButton(content = sentence, onClick = onRemove)
             }
         }
+    }
+}
+
+/** "Moved in your calendar · was Sat 20:00" (canvas MemListCalendar); someone else's names whose calendar it is. */
+@Composable
+private fun MovedLine(
+    was: LocalEventTime,
+    speakerName: String?,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val words = wasWords(was)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HearthIconImage(
+            icon = HearthIcon.Schedule,
+            contentDescription = null,
+            size = HearthTheme.size.iconSm,
+            tint = colors.textMuted,
+        )
+        Text(
+            text =
+                if (speakerName == null) {
+                    stringResource(Res.string.memories_moved_yours, words)
+                } else {
+                    stringResource(Res.string.memories_moved_theirs, speakerName, words)
+                },
+            style = HearthTheme.typography.caption,
+            color = colors.textMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -453,7 +494,7 @@ internal fun RemovedRow(
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs)) {
             Text(stringResource(Res.string.memories_removed), style = type.labelStrong, color = colors.textMuted)
-            Text(row.item.content, style = type.body, color = colors.textMuted)
+            Text(memorySentence(row.item.content, row.eventTime), style = type.body, color = colors.textMuted)
         }
         Box(
             modifier = Modifier

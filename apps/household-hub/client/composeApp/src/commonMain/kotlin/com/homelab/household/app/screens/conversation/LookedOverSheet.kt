@@ -58,6 +58,7 @@ import com.homelab.household.app.screens.changes.words
 import com.homelab.household.app.screens.memories.RemoveButton
 import com.homelab.household.app.screens.memories.RemovedRow
 import com.homelab.household.app.screens.memories.SHORT_MONTHS
+import com.homelab.household.app.screens.memories.memorySentence
 import com.homelab.household.app.screens.memories.words
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
@@ -243,10 +244,11 @@ private fun RememberedRow(
     modifier: Modifier = Modifier,
 ) {
     val item = row.item
+    val sentence = memorySentence(item.content, row.eventTime)
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
-                Text(item.content, style = HearthTheme.typography.body, color = HearthTheme.colors.textPrimary)
+                Text(sentence, style = HearthTheme.typography.body, color = HearthTheme.colors.textPrimary)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
@@ -282,7 +284,7 @@ private fun RememberedRow(
                 }
             }
             if (item.canRemove) {
-                RemoveButton(content = item.content, onClick = onRemove)
+                RemoveButton(content = sentence, onClick = onRemove)
             }
         }
     }

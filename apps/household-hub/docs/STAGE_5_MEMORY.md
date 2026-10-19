@@ -134,6 +134,8 @@ Gossip milestones and household memories were written together and read together
 | `event_id` | **new** | Optional. The calendar event this memory is about (§7) |
 | replaced-by and retired-at | **new** | Set when a memory is retired in favour of another, or removed by the member, so the history can be read and undone |
 | `moved_from` | **new** | Optional. For an event memory, the event's time before it last moved, for the "Moved in your calendar · was …" line (§7) |
+| `event_starts_at` | **new** | Optional. For an event memory, the event's start it was last matched to, so the periodic check can tell it moved (§7; added in PR 7) |
+| `time_from_event` | **new** | Optional. `timed` or `all_day` once the hub rebuilt the sentence from its event: the content is then the title, and each reader adds the time in its own zone (§7; added in PR 7) |
 
 A memory is never deleted by the system, only made inactive. Removing one with ✕ retires it, and Undo
 brings it back until the member leaves the page.
@@ -358,7 +360,9 @@ reached changes nothing: a Google sign-in that expired, for instance while the O
 (seven days), stops updates until the member reconnects, and retires nothing.
 
 **When it moves.** The sentence is rebuilt from the event's fields, with no model call, so it is right
-at once, and `moved_from` keeps the time it had. The member sees the new sentence with "Moved in your
+at once, and `moved_from` keeps the time it had. The hub keeps every time in UTC (Anton, 19 October), so
+the rebuilt sentence stores only the title with `event_starts_at`: the phone adds the time in its own
+zone, and a prompt in the zone the phone sent with the message. The member sees the new sentence with "Moved in your
 calendar · was Sat 20:00". A removed event's memory is retired silently.
 
 **Repeating events.** One memory for the series, expiring when the series ends, or never.

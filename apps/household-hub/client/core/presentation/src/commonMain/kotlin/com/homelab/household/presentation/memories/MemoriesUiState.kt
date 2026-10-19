@@ -54,12 +54,18 @@ enum class MemoryActionFailure {
     UndoFailed,
 }
 
-/** One memory as its row draws it. [removed] turns the row into "Removed · Undo" until the page is left. */
+/**
+ * One memory as its row draws it. [removed] turns the row into "Removed · Undo" until the page is left.
+ * [eventTime] is the time its sentence adds, once rebuilt from its event, and [movedFrom] where that
+ * event was before it moved, both on the member's phone.
+ */
 data class MemoryRow(
     val item: MemoryItem,
     val age: MemoryAge,
     val until: LocalDay?,
     val removed: Boolean = false,
+    val eventTime: LocalEventTime? = null,
+    val movedFrom: LocalEventTime? = null,
 )
 
 /** A memory's row, with its age and "until" day worked out for the member's phone. */
@@ -74,5 +80,20 @@ fun memoryRowOf(
         item = item,
         age = memoryAge(item.createdAt, now, deviceTimeZone.offsetSecondsAt(now)),
         until = item.expiresAt?.let { localDay(it, deviceTimeZone.offsetSecondsAt(it)) },
+        eventTime = eventTimeOf(item, deviceTimeZone),
+        movedFrom =
+            item.movedFrom?.let { was ->
+                localEventTime(was, deviceTimeZone.offsetSecondsAt(was), allDay = item.eventTime?.allDay == true)
+            },
     )
 }
+
+/** The time an event memory's sentence adds, on the member's phone; null for the model's own words. */
+@OptIn(ExperimentalTime::class)
+fun eventTimeOf(
+    item: MemoryItem,
+    deviceTimeZone: DeviceTimeZone,
+): LocalEventTime? =
+    item.eventTime?.let { event ->
+        localEventTime(event.startsAt, deviceTimeZone.offsetSecondsAt(event.startsAt), event.allDay)
+    }

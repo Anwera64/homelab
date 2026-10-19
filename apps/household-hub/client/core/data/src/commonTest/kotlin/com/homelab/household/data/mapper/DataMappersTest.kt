@@ -9,6 +9,7 @@ import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.Member
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole
@@ -472,5 +473,63 @@ class DataMappersTest {
         assertEquals(MemoryOrigin.Reflection, memory.origin)
         assertEquals(MemoryScope.HOUSEHOLD, memory.scope)
         assertEquals(false, memory.canRemove)
+    }
+
+    @Test
+    fun `GIVEN a memory rebuilt from its event WHEN it is mapped THEN its start and where it moved from come across`() {
+        val dto =
+            MemoryPageItemDto(
+                id = "mem-1",
+                content = "Dinner together",
+                created_at = "2026-10-13T09:00:00Z",
+                speaker_id = "emma",
+                agent_name = "Planner",
+                agent_avatar = "🗓",
+                event_starts_at = "2026-10-19T17:30:00",
+                time_from_event = "timed",
+                moved_from = "2026-10-18T18:00:00",
+            )
+
+        val memory = MemoryDataMapper.toDomain(dto)
+
+        assertEquals(EventTime(startsAt = Instant.parse("2026-10-19T17:30:00Z"), allDay = false), memory.eventTime)
+        assertEquals(Instant.parse("2026-10-18T18:00:00Z"), memory.movedFrom)
+    }
+
+    @Test
+    fun `GIVEN an all-day event memory WHEN it is mapped THEN its time is a day`() {
+        val dto =
+            MemoryPageItemDto(
+                id = "mem-1",
+                content = "Studio jury",
+                created_at = "2026-10-13T09:00:00Z",
+                speaker_id = "emma",
+                agent_name = "Planner",
+                agent_avatar = "🗓",
+                event_starts_at = "2026-10-24T00:00:00Z",
+                time_from_event = "all_day",
+            )
+
+        assertEquals(true, MemoryDataMapper.toDomain(dto).eventTime?.allDay)
+    }
+
+    @Test
+    fun `GIVEN a memory in the model's own words WHEN it is mapped THEN it has no event time`() {
+        val dto =
+            MemoryPageItemDto(
+                id = "mem-1",
+                content = "Dinner on Saturday at 20:00",
+                created_at = "2026-10-13T09:00:00Z",
+                speaker_id = "emma",
+                agent_name = "Planner",
+                agent_avatar = "🗓",
+                event_starts_at = "2026-10-19T17:30:00Z",
+                time_from_event = "sometime",
+            )
+
+        val memory = MemoryDataMapper.toDomain(dto)
+
+        assertEquals(null, memory.eventTime)
+        assertEquals(null, memory.movedFrom)
     }
 }

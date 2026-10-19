@@ -6,6 +6,8 @@ import com.homelab.household.app.resources.memories_age_last_week
 import com.homelab.household.app.resources.memories_age_month_year
 import com.homelab.household.app.resources.memories_age_today
 import com.homelab.household.app.resources.memories_age_yesterday
+import com.homelab.household.app.resources.memories_event_day
+import com.homelab.household.app.resources.memories_event_timed
 import com.homelab.household.app.resources.memories_month_apr
 import com.homelab.household.app.resources.memories_month_aug
 import com.homelab.household.app.resources.memories_month_dec
@@ -18,6 +20,13 @@ import com.homelab.household.app.resources.memories_month_may
 import com.homelab.household.app.resources.memories_month_nov
 import com.homelab.household.app.resources.memories_month_oct
 import com.homelab.household.app.resources.memories_month_sep
+import com.homelab.household.app.resources.tool_card_day_fri
+import com.homelab.household.app.resources.tool_card_day_mon
+import com.homelab.household.app.resources.tool_card_day_sat
+import com.homelab.household.app.resources.tool_card_day_sun
+import com.homelab.household.app.resources.tool_card_day_thu
+import com.homelab.household.app.resources.tool_card_day_tue
+import com.homelab.household.app.resources.tool_card_day_wed
 import com.homelab.household.app.resources.tool_card_month_apr
 import com.homelab.household.app.resources.tool_card_month_aug
 import com.homelab.household.app.resources.tool_card_month_dec
@@ -37,6 +46,8 @@ import com.homelab.household.app.resources.tool_card_weekday_sun
 import com.homelab.household.app.resources.tool_card_weekday_thu
 import com.homelab.household.app.resources.tool_card_weekday_tue
 import com.homelab.household.app.resources.tool_card_weekday_wed
+import com.homelab.household.presentation.memories.LocalEventTime
+import com.homelab.household.presentation.memories.LocalTime
 import com.homelab.household.presentation.memories.MemoryAge
 import org.jetbrains.compose.resources.stringResource
 
@@ -104,3 +115,48 @@ internal val SHORT_MONTHS =
         Res.string.tool_card_month_nov,
         Res.string.tool_card_month_dec,
     )
+
+/** "Sat" in "was Sat 20:00". */
+internal val SHORT_WEEKDAYS =
+    listOf(
+        Res.string.tool_card_day_mon,
+        Res.string.tool_card_day_tue,
+        Res.string.tool_card_day_wed,
+        Res.string.tool_card_day_thu,
+        Res.string.tool_card_day_fri,
+        Res.string.tool_card_day_sat,
+        Res.string.tool_card_day_sun,
+    )
+
+internal fun clockWords(time: LocalTime): String =
+    "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
+
+/**
+ * What a memory says on this phone (memory spec §7): its own words, or, once the hub rebuilt it
+ * from its event, the event's title with the time in this phone's zone: "Dinner together on Monday
+ * 19 October, 19:30."
+ */
+@Composable
+internal fun memorySentence(
+    content: String,
+    eventTime: LocalEventTime?,
+): String {
+    eventTime ?: return content
+    val title = content.trim().trimEnd('.')
+    val weekday = stringResource(WEEKDAYS[eventTime.isoDay - 1])
+    val month = stringResource(MONTHS[eventTime.month - 1])
+    return when (val time = eventTime.time) {
+        null -> stringResource(Res.string.memories_event_day, title, weekday, eventTime.day, month)
+        else -> stringResource(Res.string.memories_event_timed, title, weekday, eventTime.day, month, clockWords(time))
+    }
+}
+
+/** "Sat 20:00" in the moved line, or "Sat 24 Oct" for a day. */
+@Composable
+internal fun wasWords(at: LocalEventTime): String {
+    val weekday = stringResource(SHORT_WEEKDAYS[at.isoDay - 1])
+    return when (val time = at.time) {
+        null -> "$weekday ${at.day} ${stringResource(SHORT_MONTHS[at.month - 1])}"
+        else -> "$weekday ${clockWords(time)}"
+    }
+}

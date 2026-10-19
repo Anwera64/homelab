@@ -45,6 +45,7 @@ import com.homelab.household.app.resources.memories_tab_yours_plain
 import com.homelab.household.app.resources.memories_undo
 import com.homelab.household.app.resources.memories_you
 import com.homelab.household.app.screens.memories.ageWords
+import com.homelab.household.app.screens.memories.memorySentence
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.MemoryScope
@@ -108,7 +109,7 @@ private fun ChangeOpenCard(
         val who = if (stored.isMine) stringResource(Res.string.memories_you) else stored.speakerName
         SentenceBox(
             label = stringResource(Res.string.changes_stored),
-            sentence = stored.content,
+            sentence = memorySentence(stored.content, row.storedEventTime),
             meta = "$who · ${stored.agentName} · ${ageWords(row.storedAge)}",
             container = colors.secondaryContainer,
             ink = colors.onSecondaryContainer,
@@ -206,9 +207,9 @@ private fun ChangeDoneRow(
     val type = HearthTheme.typography
     val words =
         when (done.answer) {
-            ProposalAnswer.UseNew -> stringResource(Res.string.changes_done_replaced, row.card.stored.content)
+            ProposalAnswer.UseNew -> stringResource(Res.string.changes_done_replaced, memorySentence(row.card.stored.content, row.storedEventTime))
             ProposalAnswer.KeepStored -> stringResource(Res.string.changes_done_kept, row.card.content)
-            ProposalAnswer.KeepBoth -> stringResource(Res.string.changes_done_both, row.card.stored.content)
+            ProposalAnswer.KeepBoth -> stringResource(Res.string.changes_done_both, memorySentence(row.card.stored.content, row.storedEventTime))
         }
     Row(
         modifier = modifier

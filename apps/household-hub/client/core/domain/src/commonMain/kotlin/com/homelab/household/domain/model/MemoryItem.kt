@@ -16,8 +16,21 @@ enum class MemoryOrigin {
 }
 
 /**
+ * The time a memory's sentence leaves to its reader (memory spec §7). Once the hub rebuilt a memory
+ * from its calendar event, its content is only the event's title, and the phone adds [startsAt] in
+ * its own zone: "Dinner together on Monday 19 October, 19:30." An [allDay] event is a date.
+ */
+@OptIn(ExperimentalTime::class)
+data class EventTime(
+    val startsAt: Instant,
+    val allDay: Boolean,
+)
+
+/**
  * One row on the memory page: the sentence, who said it, which agent noted it, and when. [expiresAt]
  * is set for an event memory ("until 17 Oct"). [canRemove] is true only on the member's own.
+ * [eventTime] is set once the sentence was rebuilt from its event, and [movedFrom] is where that
+ * event was before it last moved ("Moved in your calendar · was Sat 20:00").
  */
 @OptIn(ExperimentalTime::class)
 data class MemoryItem(
@@ -33,6 +46,8 @@ data class MemoryItem(
     val agentName: String,
     val agentAvatar: String,
     val canRemove: Boolean,
+    val eventTime: EventTime? = null,
+    val movedFrom: Instant? = null,
 )
 
 /**

@@ -299,6 +299,9 @@ class FakeMembersHub {
         mine: Boolean = true,
         youAsked: Boolean = false,
         expiresAt: String? = null,
+        eventStartsAt: String? = null,
+        timeFromEvent: String? = null,
+        movedFrom: String? = null,
     ) {
         val createdAt = Clock.System.now().toString()
         val speaker = if (mine) "emma" else "liam"
@@ -307,8 +310,12 @@ class FakeMembersHub {
             """{"id":"$id","content":"$content","scope":"${if (household) "household" else "personal"}",
             "origin":"${if (youAsked) "tool" else "reflection"}","created_at":"$createdAt",
             "expires_at":${expiresAt?.let { "\"$it\"" } ?: "null"},"speaker_id":"$speaker","speaker_name":"$name",
-            "is_mine":$mine,"agent_name":"Coordinator","agent_avatar":"🏡","can_remove":$mine}""" to true
+            "is_mine":$mine,"agent_name":"Coordinator","agent_avatar":"🏡","can_remove":$mine,
+            "event_starts_at":${eventStartsAt.json()},"time_from_event":${timeFromEvent.json()},
+            "moved_from":${movedFrom.json()}}""" to true
     }
+
+    private fun String?.json(): String = this?.let { "\"$it\"" } ?: "null"
 
     /**
      * Emma asked an agent to remember [content] over Liam's memory [storedId], which must be remembered

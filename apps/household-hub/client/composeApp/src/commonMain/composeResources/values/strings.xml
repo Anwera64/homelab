@@ -779,6 +779,12 @@
     <string name="memories_you">You</string>
     <string name="memories_you_asked">You asked</string>
     <string name="memories_until">until %1$d %2$s</string>
+    <!-- A memory the hub rebuilt from its calendar event: its title, with the event's time in this phone's zone (memory spec §7) -->
+    <string name="memories_event_timed">%1$s on %2$s %3$d %4$s, %5$s.</string>
+    <string name="memories_event_day">%1$s on %2$s %3$d %4$s.</string>
+    <!-- Where the event was before it last moved (canvas MemListCalendar). %1$s is "Sat 20:00" -->
+    <string name="memories_moved_yours">Moved in your calendar · was %1$s</string>
+    <string name="memories_moved_theirs">Moved in %1$s’s calendar · was %2$s</string>
     <string name="memories_remove">Remove: %1$s</string>
     <string name="memories_removed">Removed</string>
     <string name="memories_undo">Undo</string>
