@@ -15,3 +15,4 @@ Given a PR number (none given: the PR of the current branch):
 6. While I test, use Grafana logs (not docker logs) to investigate anything I report.
 7. Present a plan before coding any fix. After I confirm it works, push and check CI.
 8. Put the server back: once the PR is merged, or the test is given up, `git switch master`, fast-forward it, rebuild and restart `household-hub` the same way. Don't leave the server on a PR branch overnight: the 04:00 update fast-forwards whatever branch is checked out, so master's merges would not be applied.
+   - If the PR is given up and it added an Alembic revision, first downgrade the database to master's head with the PR's code still deployed: master's hub upgrades to its own head at start and fails on a revision it doesn't know. Once the PR is merged, master has the revision and no downgrade is needed.
