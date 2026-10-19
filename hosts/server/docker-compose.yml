@@ -512,7 +512,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.167.6
+    image: renovate/renovate:44.167.7
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
