@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.entities.llm_message import LLMMessage
 from app.domain.entities.memory import AgentMemory
 from app.domain.entities.memory_proposal import (
@@ -29,6 +30,7 @@ from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import current_date_line, sent_at_stamp
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.event_links import event_expiry, touched_event_ids
 from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase, _aware, sanitize_prompt_snippet
 
 logger = logging.getLogger(__name__)
@@ -63,7 +65,8 @@ Return one JSON object only, with no markdown and nothing outside it:
       "expires_at": "ISO-8601 timestamp, or null if it stays true",
       "relevant_for": ["up to 5 short situations where this matters, e.g. \\"planning dinner\\""],
       "relation": "same" | "different" | "more_detail" | "changed" | "contradicts" | "unclear",
-      "about": "m1"
+      "about": "m1",
+      "event": "e1"
     }
   ]
 }
@@ -73,6 +76,7 @@ Guidelines:
 - "household" is for what the rest of the household should know: events, schedules, deadlines, shared plans. Everything else is "personal".
 - Write dates as absolute dates: turn "tomorrow" or "on Friday" into the date it meant when that line was sent, and give expires_at to a fact that stops mattering on a date.
 - relevant_for lists the kinds of questions or plans the fact would help with, not the fact reworded.
+- You may be shown calendar events the conversation created or changed, each with an id such as e1. A fact about one of them gives that id as "event"; leave "event" out otherwise. One fact per event is enough.
 - An empty "facts" list is a good answer when nothing is worth keeping.
 """
 
@@ -170,6 +174,7 @@ class ReflectChatUseCase:
         neighbours_max: int = 15,
         clock: Callable[[], datetime] = _utc_now,
         log_text: bool = False,
+        event_lookup: Optional[Any] = None,
     ):
         self.llm_client = llm_client
         self.session_repo = session_repo
@@ -186,6 +191,9 @@ class ReflectChatUseCase:
         self.neighbours_max = neighbours_max
         self.clock = clock
         self.log_text = log_text
+        # Reads an event the chat touched from the member's calendar (GetCalendarEventUseCase), so a
+        # fact about it can be linked to it (memory spec §7). None: nothing is linked.
+        self.event_lookup = event_lookup
 
     def _text(self, text: str) -> str:
         return f" text={text[:LOGGED_TEXT_CHARACTERS]!r}" if self.log_text else ""
@@ -209,18 +217,19 @@ class ReflectChatUseCase:
             )
             return result
 
-        visible = (await self.memory_block.execute(member_id, is_secret=False))
-        neighbours, how, scores = await self._neighbours(session, said, visible.visible)
-        labels = {f"m{index}": memory for index, memory in enumerate(neighbours, start=1)}
-
-        member = await self.user_repo.get_by_id(member_id)
-        member_name = sanitize_prompt_snippet(member.full_name, max_length=50) if member else "The member"
         zone = next(
             ((m.metadata_json or {}).get("timezone") for m in reversed(said) if (m.metadata_json or {}).get("timezone")),
             None,
         )
+        visible = (await self.memory_block.execute(member_id, is_secret=False, timezone_name=zone))
+        neighbours, how, scores = await self._neighbours(session, said, visible.visible)
+        labels = {f"m{index}": memory for index, memory in enumerate(neighbours, start=1)}
+        events = await self._touched_events(session, kept)
+
+        member = await self.user_repo.get_by_id(member_id)
+        member_name = sanitize_prompt_snippet(member.full_name, max_length=50) if member else "The member"
         first_reflection = session.reflected_through_id is None
-        prompt = self._prompt(labels, visible.lines, kept, member_name or "The member", zone, first_reflection)
+        prompt = self._prompt(labels, visible.lines, kept, member_name or "The member", zone, first_reflection, events)
 
         response = await self.llm_client.chat_completion(
             messages=[
@@ -246,6 +255,11 @@ class ReflectChatUseCase:
         }
         new_memories: List[AgentMemory] = []
         new_proposals: List[MemoryProposal] = []
+        # Events already remembered, before this run or by an earlier fact of it: one memory each.
+        linked = set()
+        for event in events.values():
+            if await self.memory_repo.list_by_event(member_id, event.id):
+                linked.add(event.id)
         facts = parsed.get("facts") if isinstance(parsed.get("facts"), list) else []
         for fact in facts:
             if not isinstance(fact, dict):
@@ -257,8 +271,12 @@ class ReflectChatUseCase:
             if relation not in RELATIONS:
                 relation = UNCLEAR
             about = labels.get(str(fact.get("about") or ""))
+            event = events.get(str(fact.get("event") or ""))
 
-            if _normalized(content) in visible_text:
+            if event is not None and event.id in linked:
+                outcome, target = "dropped_already_linked", event.id
+                result.same += 1
+            elif _normalized(content) in visible_text:
                 outcome, target = "dropped_same", None
                 result.same += 1
             elif relation == SAME and about is not None:
@@ -297,14 +315,19 @@ class ReflectChatUseCase:
                     origin="reflection",
                     relevant_for=_parse_relevant_for(fact.get("relevant_for")),
                 )
+                if event is not None:
+                    memory.event_id = event.id
+                    memory.event_starts_at = event.start_time
+                    memory.expires_at = event_expiry(event)
+                    linked.add(event.id)
                 new_memories.append(memory)
                 visible_text.add(_normalized(content))
                 outcome, target = "saved", memory.id
             logger.info(
-                "Reflection fact | member=%s session=%s relation=%s about=%s score=%s outcome=%s id=%s%s",
+                "Reflection fact | member=%s session=%s relation=%s about=%s score=%s outcome=%s id=%s event=%s%s",
                 member_id, session_id, relation, about.id if about else None,
                 f"{scores[about.id]:.3f}" if about and about.id in scores else None,
-                outcome, target, self._text(content),
+                outcome, target, event.id if event else None, self._text(content),
             )
 
         result.title = title
@@ -349,6 +372,33 @@ class ReflectChatUseCase:
         close.sort(key=lambda m: best[m.id], reverse=True)
         return close[: self.neighbours_max], "similar", best
 
+    async def _touched_events(self, session: ConversationSession, kept: List[ChatMessage]) -> Dict[str, CalendarEvent]:
+        """
+        The events the chat created or changed that the calendar still has, labelled e1, e2… for the
+        model. One the calendar can't be asked about is left out: the fact is then saved unlinked.
+        """
+        ids = touched_event_ids(kept)
+        if not ids or self.event_lookup is None:
+            return {}
+        found: List[CalendarEvent] = []
+        for event_id in ids:
+            try:
+                event = await self.event_lookup.execute(session.user_id, event_id)
+            except Exception as exc:
+                logger.warning(
+                    "Reflection events | member=%s session=%s event=%s could not be read, not linked: %s",
+                    session.user_id, session.id, event_id, exc,
+                )
+                continue
+            if event is None:
+                logger.info(
+                    "Reflection events | member=%s session=%s event=%s gone from the calendar, not offered",
+                    session.user_id, session.id, event_id,
+                )
+                continue
+            found.append(event)
+        return {f"e{index}": event for index, event in enumerate(found, start=1)}
+
     def _prompt(
         self,
         labels: Dict[str, AgentMemory],
@@ -357,11 +407,22 @@ class ReflectChatUseCase:
         member_name: str,
         zone: Optional[str],
         first_reflection: bool,
+        events: Optional[Dict[str, CalendarEvent]] = None,
     ) -> str:
         parts = [current_date_line(self.clock(), zone), "", "Stored memories closest to this conversation:"]
         parts += [f"[{label}] {lines.get(m.id) or sanitize_prompt_snippet(m.content)}" for label, m in labels.items()]
         if not labels:
             parts.append("(none)")
+        if events:
+            parts += ["", "Calendar events this conversation created or changed:"]
+            for label, event in events.items():
+                when = (
+                    sent_at_stamp(event.start_time, "UTC").rsplit(",", 1)[0]
+                    if event.is_all_day
+                    else sent_at_stamp(event.start_time, zone)
+                )
+                repeats = f" · repeats {event.repeat.frequency}" if event.repeat else ""
+                parts.append(f"[{label}] {sanitize_prompt_snippet(event.title, max_length=120)} · {when}{repeats}")
         parts += ["", f"Conversation. Only {member_name}'s lines are a source:"]
         for message in kept:
             stamp = sent_at_stamp(message.created_at, zone)

@@ -8,6 +8,7 @@ from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
+from app.domain.use_cases.memories.event_sentence import memory_text
 
 # Recall can't find these: "answer briefly" resembles no message (memory spec §5.1).
 ALWAYS_FIRST = ("preference", "health")
@@ -84,7 +85,8 @@ class BuildMemoryBlockUseCase:
         self.budget_tokens = budget_tokens
         self.clock = clock
 
-    async def execute(self, user_id: str, is_secret: bool) -> MemoryBlock:
+    async def execute(self, user_id: str, is_secret: bool, timezone_name: Optional[str] = None) -> MemoryBlock:
+        """[timezone_name] is the member's, as the phone sent it: an event memory's time is shown in it."""
         now = self.clock()
         memories = await self.memory_repo.list_user_memories(user_id=user_id, scope="personal", active_only=True)
         if not is_secret:
@@ -95,7 +97,7 @@ class BuildMemoryBlockUseCase:
         ordered = [m for m in newest_first if m.category in ALWAYS_FIRST] + [
             m for m in newest_first if m.category not in ALWAYS_FIRST
         ]
-        lines = await self._lines(ordered)
+        lines = await self._lines(ordered, timezone_name)
 
         included: List[AgentMemory] = []
         used = 0.0
@@ -107,7 +109,7 @@ class BuildMemoryBlockUseCase:
             used += cost
         return MemoryBlock(included, [], lines, used, self.budget_tokens)
 
-    async def _lines(self, memories: List[AgentMemory]) -> Dict[str, str]:
+    async def _lines(self, memories: List[AgentMemory], timezone_name: Optional[str] = None) -> Dict[str, str]:
         """
         A personal memory with when it was added; a household one with who said it and to which
         agent (memory spec §3.2). A member who has left is named in the past, so agents stop
@@ -125,7 +127,7 @@ class BuildMemoryBlockUseCase:
 
         lines: Dict[str, str] = {}
         for memory in memories:
-            content = sanitize_prompt_snippet(memory.content)
+            content = sanitize_prompt_snippet(memory_text(memory, timezone_name))
             if memory.scope != "household":
                 added = memory.created_at.strftime("%b %Y") if memory.created_at else "Recent"
                 lines[memory.id] = f"[Added {added}] {content}"

@@ -81,7 +81,9 @@ class RecallMemoriesUseCase:
     ) -> List[Dict[str, str]]:
         """`messages` is the chat's window, the member's new message last."""
         started = time.monotonic()
-        block = await self.memory_block.execute(user_id, is_secret=is_secret)
+        # The zone the phone sent with the message: an event memory's time is told in it.
+        zone = (messages[-1].metadata_json or {}).get("timezone") if messages else None
+        block = await self.memory_block.execute(user_id, is_secret=is_secret, timezone_name=zone)
 
         def done(reason: str, scores: Dict[str, float] | None = None, attached=()) -> List[Dict[str, str]]:
             in_block = {m.id for m in block.included}

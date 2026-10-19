@@ -26,6 +26,12 @@ class IMemoryDataSource(Protocol):
     async def list_current(self, now: datetime, scope: str, user_id: Optional[str] = None) -> List[MemoryModel]:
         ...
 
+    async def list_by_event(self, user_id: str, event_id: str) -> List[MemoryModel]:
+        ...
+
+    async def list_linked_current(self, now: datetime) -> List[MemoryModel]:
+        ...
+
     async def get_by_id(self, memory_id: str) -> Optional[MemoryModel]:
         ...
 
@@ -92,6 +98,25 @@ class SqliteMemoryDataSource(IMemoryDataSource):
             stmt = stmt.where(MemoryModel.user_id == user_id)
         stmt = stmt.order_by(MemoryModel.created_at.desc())
         res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def list_by_event(self, user_id: str, event_id: str) -> List[MemoryModel]:
+        # Event ids are per calendar, and each member's calendar is their own.
+        stmt = select(MemoryModel).where(
+            MemoryModel.user_id == user_id,
+            MemoryModel.event_id == event_id,
+            MemoryModel.is_active.is_(True),
+        )
+        res = await self.session.execute(stmt.order_by(MemoryModel.created_at))
+        return list(res.scalars().all())
+
+    async def list_linked_current(self, now: datetime) -> List[MemoryModel]:
+        stmt = select(MemoryModel).where(
+            MemoryModel.event_id.is_not(None),
+            MemoryModel.is_active.is_(True),
+            or_(MemoryModel.expires_at.is_(None), MemoryModel.expires_at > now),
+        )
+        res = await self.session.execute(stmt.order_by(MemoryModel.user_id, MemoryModel.created_at))
         return list(res.scalars().all())
 
     async def get_by_id(self, memory_id: str) -> Optional[MemoryModel]:

@@ -22,6 +22,8 @@ class MemoryDataMapper:
             replaced_by_id=model.replaced_by_id,
             retired_at=model.retired_at,
             moved_from=model.moved_from,
+            event_starts_at=model.event_starts_at,
+            time_from_event=model.time_from_event,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -45,6 +47,8 @@ class MemoryDataMapper:
             replaced_by_id=entity.replaced_by_id,
             retired_at=entity.retired_at,
             moved_from=entity.moved_from,
+            event_starts_at=entity.event_starts_at,
+            time_from_event=entity.time_from_event,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

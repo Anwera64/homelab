@@ -661,6 +661,7 @@ def get_container(session: AsyncSession):
                 neighbour_bar=settings.REFLECTION_NEIGHBOUR_BAR,
                 neighbours_max=settings.REFLECTION_NEIGHBOURS_MAX,
                 log_text=settings.MEMORY_LOG_TEXT,
+                event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
             ),
             embed_memories=embed_memories_uc,
             idle_minutes=settings.REFLECTION_IDLE_MINUTES,

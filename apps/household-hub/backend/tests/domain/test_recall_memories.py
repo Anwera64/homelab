@@ -347,3 +347,19 @@ async def test_GIVEN_a_regenerate_THEN_recall_is_not_run_and_the_saved_one_is_re
 
     assert recall.calls == []
     assert "Sam is vegetarian" in llm.stream_calls[0]["messages"][-1].content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_recalled_memory_rebuilt_from_its_event_THEN_its_time_is_in_the_zone_the_message_was_sent_in():
+    from app.domain.entities.memory import TIMED
+
+    moved = AgentMemory(
+        id="dinner", user_id="emma", content="Dinner together", created_at=NOW - timedelta(days=30),
+        event_starts_at=datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc), time_from_event=TIMED,
+    )
+    question = [ChatMessage(id="q", session_id="s1", role="user", content="When is dinner?",
+                            metadata_json={"timezone": "Europe/Madrid"})]
+
+    recalled = await _recall({"dinner": 0.8}, personal=[*STORE, moved]).execute("emma", "s1", question, is_secret=False)
+
+    assert recalled == [{"id": "dinner", "text": "[Added Sep 2026] Dinner together on Monday 19 October, 19:30."}]
