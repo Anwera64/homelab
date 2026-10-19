@@ -26,7 +26,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class)
 class DataMappersTest {
     @Test
-    fun user_mapper_converts_dto_to_domain() {
+    fun `GIVEN a member record from the hub WHEN it is mapped THEN the user keeps its id and name and colour and admin flag`() {
         val dto =
             UserReadDto(
                 id = "user-1",
@@ -46,7 +46,7 @@ class DataMappersTest {
     }
 
     @Test
-    fun a_member_profile_becomes_a_member() {
+    fun `GIVEN a member profile from the hub WHEN it is mapped THEN it becomes a member with the same id and name and colour`() {
         val member =
             UserDataMapper.toMember(
                 MemberProfileDto(id = "emma", full_name = "Emma", avatar_color = "#3C6E4E"),
@@ -56,7 +56,7 @@ class DataMappersTest {
     }
 
     @Test
-    fun session_mapper_converts_dto_to_domain() {
+    fun `GIVEN a secret conversation record from the hub WHEN it is mapped THEN the session keeps its ids and title and secret flag`() {
         val dto =
             SessionReadDto(
                 id = "s-1",
@@ -78,7 +78,7 @@ class DataMappersTest {
     }
 
     @Test
-    fun message_mapper_converts_dto_to_domain() {
+    fun `GIVEN an assistant message record from the hub WHEN it is mapped THEN the message keeps its ids and role and text`() {
         val dto =
             ChatMessageReadDto(
                 id = "m-1",
@@ -383,7 +383,7 @@ class DataMappersTest {
     }
 
     @Test
-    fun space_mapper_converts_dto_to_domain() {
+    fun `GIVEN a personal space record from the hub WHEN it is mapped THEN the space keeps its id and type and settings`() {
         val dto =
             SpaceReadDto(
                 id = "sp-1",
@@ -401,7 +401,7 @@ class DataMappersTest {
     }
 
     @Test
-    fun agent_mapper_converts_dto_to_domain() {
+    fun `GIVEN an agent record from the hub WHEN it is mapped THEN the agent keeps its id and slug and name and tool permissions`() {
         val dto =
             AgentReadDto(
                 id = "ag-1",

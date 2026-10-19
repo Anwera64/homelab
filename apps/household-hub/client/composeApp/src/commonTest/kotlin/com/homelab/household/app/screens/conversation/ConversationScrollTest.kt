@@ -84,7 +84,7 @@ class ConversationScrollTest {
         )
 
     @Test
-    fun a_long_answer_scrolls_the_question_off_the_top() =
+    fun `GIVEN a long answer arriving WHEN the conversation is shown THEN the question is scrolled off the top`() =
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             setContent(conversation(stateNamed("A long answer arriving")))
             waitForIdle()
@@ -97,7 +97,7 @@ class ConversationScrollTest {
         }
 
     @Test
-    fun opening_a_long_conversation_starts_at_the_newest_message() =
+    fun `GIVEN a long conversation whose transcript lands after the greeting WHEN the screen is open THEN it shows the newest message and not the oldest`() =
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             // As the screen really opens: the greeting is drawn first and the transcript lands a
             // moment later, so the list is composed by a recomposition, not by the first pass.
@@ -114,7 +114,7 @@ class ConversationScrollTest {
         }
 
     @Test
-    fun the_transcript_follows_an_answer_down() =
+    fun `GIVEN a long conversation at its newest message WHEN a newer answer lands THEN the transcript follows it down`() =
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             var state by mutableStateOf(stateNamed("A conversation opened again"))
             setContent(growing { state })
@@ -126,7 +126,7 @@ class ConversationScrollTest {
         }
 
     @Test
-    fun an_answer_arriving_does_not_yank_you_back_from_what_you_were_re_reading() =
+    fun `GIVEN a long conversation scrolled back to its start WHEN a newer answer lands THEN the oldest question stays and the answer is not scrolled to`() =
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             var state by mutableStateOf(stateNamed("A conversation opened again"))
             setContent(growing { state })
@@ -148,7 +148,7 @@ class ConversationScrollTest {
         }
 
     @Test
-    fun a_conversation_that_fits_does_not_scroll_anything_away() =
+    fun `GIVEN a conversation that fits the screen WHEN it is shown THEN the question is still shown`() =
         runComposeUiTest(effectContext = StandardTestDispatcher()) {
             setContent(conversation(stateNamed("A finished exchange")))
             waitForIdle()

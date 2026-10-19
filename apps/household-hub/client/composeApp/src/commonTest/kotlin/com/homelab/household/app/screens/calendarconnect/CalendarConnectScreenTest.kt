@@ -15,7 +15,7 @@ class CalendarConnectScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun details_the_hub_can_use_are_kept_and_the_screen_hands_back() {
+    fun `GIVEN an Apple calendar the hub accepts WHEN the member types the account and password and connects THEN the details reach the hub and the screen hands back`() {
         val hub = FakeCalendarHub()
         var connected = 0
 
@@ -36,7 +36,7 @@ class CalendarConnectScreenTest {
     }
 
     @Test
-    fun a_refused_password_lands_under_the_password_with_the_steps_to_make_one() {
+    fun `GIVEN the hub refuses the Apple password WHEN the member connects THEN the refusal shows under the password with the steps to make one`() {
         val hub = FakeCalendarHub()
         hub.rejectsThePassword()
         var connected = 0
@@ -60,7 +60,7 @@ class CalendarConnectScreenTest {
     }
 
     @Test
-    fun a_server_the_hub_cannot_reach_lands_under_the_server_not_the_password() {
+    fun `GIVEN a CalDAV server the hub cannot reach WHEN the member connects with complete details THEN the error shows under the server and not the password`() {
         val hub = FakeCalendarHub()
         hub.cannotReachTheServer()
 
@@ -86,7 +86,7 @@ class CalendarConnectScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the server field is there`() {
         val states = CalendarConnectUiStateProvider().values.toList()
 
         states.forEach { state ->

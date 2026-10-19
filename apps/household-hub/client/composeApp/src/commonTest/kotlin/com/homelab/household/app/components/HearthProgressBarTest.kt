@@ -23,19 +23,19 @@ import kotlin.test.assertNotEquals
 @OptIn(ExperimentalTestApi::class)
 class HearthProgressBarTest {
     @Test
-    fun the_track_bar_rests_where_a_test_can_see_it() =
+    fun `GIVEN a progress bar with the default track WHEN it is shown THEN it is visibly working`() =
         restingBar {
             HearthProgressBar()
         }
 
     @Test
-    fun the_full_bleed_bar_rests_where_a_test_can_see_it() =
+    fun `GIVEN a full-bleed progress bar WHEN it is shown THEN it is visibly working`() =
         restingBar {
             HearthProgressBar(width = HearthProgressBarWidth.FullBleed)
         }
 
     @Test
-    fun the_inset_bar_rests_where_a_test_can_see_it() =
+    fun `GIVEN an inset progress bar WHEN it is shown THEN it is visibly working`() =
         restingBar {
             HearthProgressBar(width = HearthProgressBarWidth.Inset)
         }
@@ -46,7 +46,7 @@ class HearthProgressBarTest {
      * widths added for the waiting patterns sit on the softer one, as the canvas draws them.
      */
     @Test
-    fun every_width_draws_its_bar_on_a_track() {
+    fun `GIVEN the day and night palettes WHEN the track colour is asked for each width THEN each width has a visible track`() {
         assertEquals(DayColors.outline, HearthProgressBarWidth.Track.trackColor(DayColors))
         assertEquals(DayColors.outlineSoft, HearthProgressBarWidth.FullBleed.trackColor(DayColors))
         assertEquals(DayColors.outlineSoft, HearthProgressBarWidth.Inset.trackColor(DayColors))

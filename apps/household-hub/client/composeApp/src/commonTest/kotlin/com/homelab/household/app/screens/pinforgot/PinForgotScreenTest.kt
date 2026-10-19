@@ -17,7 +17,7 @@ class PinForgotScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun it_names_the_housemate_who_can_vouch() {
+    fun `GIVEN a household with another member WHEN the forgotten PIN screen is shown THEN it names the housemate to ask and shows the fallback`() {
         val hub = FakeMembersHub()
 
         runScreenTest {
@@ -31,7 +31,7 @@ class PinForgotScreenTest {
     }
 
     @Test
-    fun having_a_code_already_goes_straight_on() {
+    fun `GIVEN the forgotten PIN screen WHEN have a code is tapped THEN the screen goes straight on`() {
         val hub = FakeMembersHub()
         var code = 0
 
@@ -44,7 +44,7 @@ class PinForgotScreenTest {
     }
 
     @Test
-    fun arriving_stands_blocks_where_the_housemate_goes_and_keeps_the_fallback_on_screen() {
+    fun `GIVEN a forgotten PIN screen that is still loading WHEN it is shown THEN it shows loading blocks and keeps the fallback`() {
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -64,7 +64,7 @@ class PinForgotScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = PinForgotUiStateProvider().values.toList()
 
         states.forEach { state ->

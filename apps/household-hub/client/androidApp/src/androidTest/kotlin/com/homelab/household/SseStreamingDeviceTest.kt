@@ -42,7 +42,7 @@ class SseStreamingDeviceTest {
     }
 
     @Test
-    fun deltas_arrive_one_by_one_and_survive_a_long_pause() {
+    fun GIVEN_deltas_and_a_long_pause_WHEN_the_stream_is_read_THEN_each_arrives_alone_and_the_pause_is_survived() {
         thread(isDaemon = true) {
             server.accept().use { socket ->
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))

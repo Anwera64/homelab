@@ -43,7 +43,6 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a healthy hub WHEN its health is checked THEN it reports online`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -55,10 +54,8 @@ class KtorServerStatusRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val status = dataSource(engine).checkHealth()
 
-            // THEN
             assertEquals("/api/v1/health", path)
             assertTrue(status is ServerStatus.Online)
         }
@@ -66,13 +63,10 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a hub that cannot be reached WHEN its health is checked THEN it reports offline rather than throwing`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { throw IOException("Connection refused") }
 
-            // WHEN
             val status = dataSource(engine).checkHealth()
 
-            // THEN
             assertTrue(status is ServerStatus.Offline)
             assertTrue(status.reason.isNotEmpty())
         }
@@ -80,13 +74,10 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a hub that says it is degraded WHEN its health is checked THEN it reports offline and says why`() =
         runTest {
-            // GIVEN
             val engine = hubAnswering("""{"status": "degraded", "database": "disconnected"}""")
 
-            // WHEN
             val status = dataSource(engine).checkHealth()
 
-            // THEN
             assertTrue(status is ServerStatus.Offline)
             assertTrue(status.reason.contains("degraded"))
         }
@@ -94,26 +85,20 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a captive portal answering with HTML WHEN the hub's health is checked THEN it reports offline`() =
         runTest {
-            // GIVEN
             val engine = hubAnswering("<html>Captive Portal Login</html>", contentType = "text/html")
 
-            // WHEN
             val status = dataSource(engine).checkHealth()
 
-            // THEN
             assertTrue(status is ServerStatus.Offline)
         }
 
     @Test
     fun `GIVEN a hub answering with an error status WHEN its health is checked THEN it reports offline with the code`() =
         runTest {
-            // GIVEN
             val engine = hubAnswering("""{"detail": "nope"}""", status = HttpStatusCode.ServiceUnavailable)
 
-            // WHEN
             val status = dataSource(engine).checkHealth()
 
-            // THEN
             assertTrue(status is ServerStatus.Offline)
             assertTrue(status.reason.contains("503"))
         }
@@ -123,16 +108,13 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a healthy hub WHEN its status is watched THEN it is checked again at a steady interval`() =
         runTest {
-            // GIVEN
             val engine = hubAnswering("""{"status": "ok"}""")
             val checkedAt = mutableListOf<Long>()
 
-            // WHEN
             dataSource(
                 engine,
             ).observeStatus(intervalSeconds = 10).take(3).collect { checkedAt += testScheduler.currentTime }
 
-            // THEN
             assertEquals(listOf(0L, 10_000L, 20_000L), checkedAt)
         }
 
@@ -143,16 +125,13 @@ class KtorServerStatusRemoteDataSourceTest {
     @Test
     fun `GIVEN a hub that stays down WHEN its status is watched THEN the wait before each retry grows`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { throw IOException("Connection refused") }
             val checkedAt = mutableListOf<Long>()
 
-            // WHEN
             dataSource(
                 engine,
             ).observeStatus(intervalSeconds = 10).take(3).collect { checkedAt += testScheduler.currentTime }
 
-            // THEN — 15s after the first failure, then half as long again.
             assertEquals(listOf(0L, 15_000L, 37_500L), checkedAt)
         }
 }

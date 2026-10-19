@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class InviteCodeScreenTest {
     @Test
-    fun a_good_code_opens_the_join_screen() {
+    fun `GIVEN a hub that knows the code WHEN the code is typed and continue is tapped THEN the join screen opens with the invite details and the upper-cased code`() {
         val hub = FakeJoinHub()
         hub.knowsTheCodeOf(invitedName = "Liam", inviterName = "Emma")
         val opened = mutableListOf<Pair<InvitePreview, String>>()
@@ -38,7 +38,7 @@ class InviteCodeScreenTest {
     }
 
     @Test
-    fun a_short_code_says_so_rather_than_blocking_the_button() {
+    fun `GIVEN a short code WHEN continue is tapped THEN the screen says the code is short`() {
         val hub = FakeJoinHub()
 
         runScreenTest {
@@ -53,7 +53,7 @@ class InviteCodeScreenTest {
     }
 
     @Test
-    fun a_code_the_hub_does_not_know_says_so() {
+    fun `GIVEN a hub that knows no such code WHEN the code is typed and continue is tapped THEN the screen says the code is not valid`() {
         val hub = FakeJoinHub()
         hub.knowsNoSuchCode()
 
@@ -69,7 +69,7 @@ class InviteCodeScreenTest {
     }
 
     @Test
-    fun too_much_guessing_says_how_long_to_wait() {
+    fun `GIVEN a hub that has had enough guessing WHEN a code is typed and continue is tapped THEN the screen says how long to wait`() {
         val hub = FakeJoinHub()
         hub.hasHadEnoughGuessing(seconds = 30)
 
@@ -85,7 +85,7 @@ class InviteCodeScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_says_so() {
+    fun `GIVEN an unreachable hub WHEN a code is typed and continue is tapped THEN the screen says the hub did not answer`() {
         val hub = FakeJoinHub()
         hub.isOffline()
 
@@ -101,7 +101,7 @@ class InviteCodeScreenTest {
     }
 
     @Test
-    fun back_returns_to_who_is_here() {
+    fun `GIVEN the invite code screen WHEN back is tapped THEN the screen hands back`() {
         val hub = FakeJoinHub()
         var back = 0
 
@@ -119,7 +119,7 @@ class InviteCodeScreenTest {
      * Nothing is dimmed — the button stays enabled and at full colour (design notes §2).
      */
     @Test
-    fun checking_the_code_shows_on_the_button_that_asked() =
+    fun `GIVEN a code being checked WHEN the screen is shown THEN the button says it is checking with a progress bar and continue is gone`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -147,7 +147,7 @@ class InviteCodeScreenTest {
      * to tests that assert semantics, colour and height and never once a width.
      */
     @Test
-    fun the_continue_button_still_fills_the_screen_under_its_wrapper() =
+    fun `GIVEN a typed code WHEN the screen is shown THEN the continue button fills the screen width`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -170,7 +170,7 @@ class InviteCodeScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = InviteCodeUiStateProvider().values.toList()
 
         states.forEach { state ->

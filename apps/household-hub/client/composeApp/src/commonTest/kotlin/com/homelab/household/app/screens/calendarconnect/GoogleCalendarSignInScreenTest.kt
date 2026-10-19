@@ -15,7 +15,6 @@ class GoogleCalendarSignInScreenTest {
 
     @Test
     fun `GIVEN Google shares the calendar WHEN the member signs in THEN Google's page opens and the screen hands back`() {
-        // GIVEN
         val hub = FakeCalendarHub()
         val browser = FakeExternalApps().apply { browserReturnsTo = "hyggehub://calendar/connected" }
         var connected = 0
@@ -23,10 +22,8 @@ class GoogleCalendarSignInScreenTest {
         runScreenTest {
             googleCalendarSignInScreen(hub, browser, onConnect = { connected++ })
 
-            // WHEN
             onGoogleCalendarSignIn { tapsSignIn() }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { connected == 1 }
         }
         assertEquals(listOf(FakeCalendarHub.GOOGLE_PAGE), browser.pagesOpened)
@@ -34,7 +31,6 @@ class GoogleCalendarSignInScreenTest {
 
     @Test
     fun `GIVEN the member did not share their calendar WHEN the browser comes back THEN the screen says so and offers to sign in again`() {
-        // GIVEN
         val hub = FakeCalendarHub()
         val browser = FakeExternalApps().apply { browserReturnsTo = "hyggehub://calendar/failed?reason=denied" }
         var connected = 0
@@ -43,10 +39,8 @@ class GoogleCalendarSignInScreenTest {
             googleCalendarSignInScreen(hub, browser, onConnect = { connected++ })
 
             onGoogleCalendarSignIn {
-                // WHEN
                 tapsSignIn()
 
-                // THEN
                 seesTheMemberDidNotShare()
                 seesToSignInAgain()
             }
@@ -56,17 +50,14 @@ class GoogleCalendarSignInScreenTest {
 
     @Test
     fun `GIVEN the member closes the browser WHEN it comes back empty THEN the screen is ready to sign in again with no error`() {
-        // GIVEN
         val hub = FakeCalendarHub()
         val browser = FakeExternalApps().apply { browserReturnsTo = null }
 
         runScreenTest {
             googleCalendarSignInScreen(hub, browser)
 
-            // WHEN
             onGoogleCalendarSignIn { tapsSignIn() }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { browser.pagesOpened.size == 1 }
             onGoogleCalendarSignIn {
                 seesItReadyToSignIn()
@@ -77,7 +68,6 @@ class GoogleCalendarSignInScreenTest {
 
     @Test
     fun `GIVEN the hub has no Google sign-in set up WHEN the member signs in THEN the screen says so and no browser opens`() {
-        // GIVEN
         val hub = FakeCalendarHub().apply { hasNoGoogleSignIn() }
         val browser = FakeExternalApps()
 
@@ -85,10 +75,8 @@ class GoogleCalendarSignInScreenTest {
             googleCalendarSignInScreen(hub, browser)
 
             onGoogleCalendarSignIn {
-                // WHEN
                 tapsSignIn()
 
-                // THEN
                 seesGoogleSignInIsUnavailable()
             }
         }
@@ -97,15 +85,12 @@ class GoogleCalendarSignInScreenTest {
 
     @Test
     fun `GIVEN every previewed state WHEN it is drawn THEN the steps in the browser are there`() {
-        // GIVEN
         val states = GoogleSignInUiStateProvider().values.toList()
 
         states.forEach { state ->
             runComposeUiTest {
-                // WHEN
                 setContent { StillTheme { GoogleCalendarSignInContent(state = state, onSignIn = {}, onBack = {}) } }
 
-                // THEN
                 onGoogleCalendarSignIn { seesTheStepsInTheBrowser() }
             }
         }

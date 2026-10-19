@@ -65,7 +65,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun load_dashboard_populates_state() =
+    fun `GIVEN a signed-in user and an online hub WHEN loading the dashboard THEN the user and the online status show without an error`() =
         runTest(testDispatcher) {
             viewModel.loadDashboard()
             advanceUntilIdle()
@@ -77,7 +77,7 @@ class DashboardViewModelTest {
         }
 
     @Test
-    fun logout_invokes_usecase_and_clears_user() =
+    fun `GIVEN a signed-in user WHEN logging out THEN the logout is asked for and the user is cleared`() =
         runTest(testDispatcher) {
             everySuspend { logoutUseCase() } returns Unit
 

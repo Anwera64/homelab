@@ -40,7 +40,7 @@ class PinApproveViewModelTest {
     private fun viewModel() = PinApproveViewModel(emma, approvePinReset)
 
     @Test
-    fun their_own_pin_produces_a_code_to_read_out() =
+    fun `GIVEN their own pin WHEN approving THEN a code to read out shows and counts down from 900 seconds`() =
         runTest(testDispatcher) {
             everySuspend { approvePinReset(any(), any()) } returns ResetCode(code = "P4XN7T", expiresInSeconds = 900)
             val viewModel = viewModel()
@@ -54,7 +54,7 @@ class PinApproveViewModelTest {
         }
 
     @Test
-    fun a_wrong_pin_says_how_many_tries_are_left_and_clears_the_field() =
+    fun `GIVEN a wrong pin WHEN approving THEN the status says how many tries are left and the field is cleared`() =
         runTest(testDispatcher) {
             everySuspend { approvePinReset(any(), any()) } throws WrongPinException(attemptsLeft = 3)
             val viewModel = viewModel()
@@ -68,22 +68,30 @@ class PinApproveViewModelTest {
         }
 
     @Test
-    fun too_many_wrong_pins_count_down_and_ignore_the_pad() =
+    fun `GIVEN too many wrong pins WHEN approving THEN the status counts down the lock`() =
         runTest(testDispatcher) {
             everySuspend { approvePinReset(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
             val viewModel = viewModel()
             viewModel.onPinChange("000000")
-
             viewModel.approve()
             advanceTimeBy(1)
             assertEquals(PinApproveStatus.Locked(secondsLeft = 30), viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN a locked pad WHEN typing a pin THEN the pad is ignored`() =
+        runTest(testDispatcher) {
+            everySuspend { approvePinReset(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
+            val viewModel = viewModel()
+            viewModel.onPinChange("000000")
+            viewModel.approve()
+            advanceTimeBy(1)
             viewModel.onPinChange("246801")
             assertEquals("", viewModel.uiState.value.pin)
         }
 
     @Test
-    fun an_unreachable_hub_says_so() =
+    fun `GIVEN an unreachable hub WHEN approving THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { approvePinReset(any(), any()) } throws ServerOfflineException()
             val viewModel = viewModel()

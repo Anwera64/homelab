@@ -54,7 +54,7 @@ class DarwinSseLongPauseTest : KoinTest {
     }
 
     @Test
-    fun darwin_stream_survives_a_pause_longer_than_nsurlsessions_default_request_timeout() =
+    fun `GIVEN a server that pauses longer than the default request timeout WHEN the stream is read on Darwin THEN the stream survives the pause`() =
         runBlocking {
             HouseholdHubSdk.init(HubConfig(SseFixture.BASE_URL))
             val repository = get<SessionRepository>()

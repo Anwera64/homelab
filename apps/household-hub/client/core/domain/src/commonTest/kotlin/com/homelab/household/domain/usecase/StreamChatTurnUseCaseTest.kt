@@ -20,14 +20,14 @@ class StreamChatTurnUseCaseTest {
     private val streamChatTurnUseCase = StreamChatTurnUseCaseImpl(sessionRepo)
 
     @Test
-    fun execute_with_blank_content_throws_validation_error() {
+    fun `GIVEN a blank message WHEN a chat turn is streamed THEN it is refused as invalid`() {
         assertFailsWith<ValidationException> {
             streamChatTurnUseCase("session-1", "   ", autoApproveWrites = false)
         }
     }
 
     @Test
-    fun execute_streams_events_from_repository() =
+    fun `GIVEN a repository streaming two words and a done event WHEN a chat turn is streamed THEN all three events arrive in order`() =
         runTest {
             val events =
                 listOf(

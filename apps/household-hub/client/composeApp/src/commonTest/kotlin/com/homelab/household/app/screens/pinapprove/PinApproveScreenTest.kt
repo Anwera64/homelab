@@ -15,7 +15,7 @@ class PinApproveScreenTest {
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
 
     @Test
-    fun your_own_pin_produces_the_code_to_read_out() {
+    fun `GIVEN a hub that approves resets WHEN your own PIN is typed and generate is tapped THEN the code to read out shows`() {
         val hub = FakeMembersHub()
         hub.approvesResets(code = "P4XN7T")
 
@@ -31,7 +31,7 @@ class PinApproveScreenTest {
     }
 
     @Test
-    fun a_wrong_pin_of_your_own_says_how_many_tries_are_left() {
+    fun `GIVEN a hub that refuses your PIN WHEN the PIN is typed and generate is tapped THEN the screen says how many tries are left`() {
         val hub = FakeMembersHub()
         hub.refusesThePin(attemptsLeft = 3)
 
@@ -52,7 +52,7 @@ class PinApproveScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun checking_your_pin_shows_on_the_button() =
+    fun `GIVEN your PIN being checked WHEN the screen is shown THEN the button says it is checking and generate is gone`() =
         runComposeUiTest {
             pinApproveContent(
                 PinApproveUiState(
@@ -69,7 +69,7 @@ class PinApproveScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title names the member`() {
         PinApproveUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 pinApproveContent(state)

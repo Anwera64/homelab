@@ -35,7 +35,7 @@ class PinForgotViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun the_others_are_who_you_can_ask() =
+    fun `GIVEN a household of two WHEN the screen loads THEN the other member is who you can ask and it is ready`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } returns listOf(emma, liam)
 
@@ -47,7 +47,7 @@ class PinForgotViewModelTest {
         }
 
     @Test
-    fun living_alone_leaves_only_the_hub_itself() =
+    fun `GIVEN a household of one WHEN the screen loads THEN nobody else is listed`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } returns listOf(emma)
 
@@ -58,14 +58,20 @@ class PinForgotViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so_and_can_be_asked_again() =
+    fun `GIVEN an unreachable hub WHEN the screen loads THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } throws ServerOfflineException()
-
             val viewModel = PinForgotViewModel(emma, listMembers)
             advanceUntilIdle()
             assertEquals(PinForgotStatus.Unreachable, viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN an unreachable hub that has since come back WHEN loading again THEN the status is ready`() =
+        runTest(testDispatcher) {
+            everySuspend { listMembers() } throws ServerOfflineException()
+            val viewModel = PinForgotViewModel(emma, listMembers)
+            advanceUntilIdle()
             everySuspend { listMembers() } returns listOf(emma, liam)
             viewModel.load()
             advanceUntilIdle()

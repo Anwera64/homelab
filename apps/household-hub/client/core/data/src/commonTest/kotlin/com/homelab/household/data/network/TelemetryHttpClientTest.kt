@@ -21,17 +21,14 @@ class TelemetryHttpClientTest {
     @Test
     fun `GIVEN a signed-in phone WHEN the log endpoint answers 401 THEN nobody is signed out`() =
         runTest {
-            // GIVEN
             val storage = InMemorySessionStorage().apply { saveTokens("jwt-token-123") }
             val client =
                 telemetryHttpClient(MockEngine { respond("", HttpStatusCode.Unauthorized) }) {
                     telemetryHeaders(storage)
                 }
 
-            // WHEN
             val response = client.post("https://telemetry.test/v1/logs") { setBody(ByteArray(4)) }
 
-            // THEN
             assertEquals(HttpStatusCode.Unauthorized, response.status)
             assertEquals("jwt-token-123", storage.getAccessToken())
         }
@@ -39,7 +36,6 @@ class TelemetryHttpClientTest {
     @Test
     fun `GIVEN the token changes between two posts WHEN each is sent THEN it carries the token kept at that moment`() =
         runTest {
-            // GIVEN
             val seen = mutableListOf<String?>()
             val storage = InMemorySessionStorage().apply { saveTokens("first-token") }
             val engine =
@@ -49,19 +45,16 @@ class TelemetryHttpClientTest {
                 }
             val client = telemetryHttpClient(engine) { telemetryHeaders(storage) }
 
-            // WHEN
             client.post("https://telemetry.test/v1/logs") { setBody(ByteArray(4)) }
             storage.saveTokens("second-token")
             client.post("https://telemetry.test/v1/logs") { setBody(ByteArray(4)) }
 
-            // THEN
             assertEquals(listOf<String?>("Bearer first-token", "Bearer second-token"), seen)
         }
 
     @Test
     fun `GIVEN nobody signed in WHEN a post is sent THEN it carries no Authorization header`() =
         runTest {
-            // GIVEN
             var authorization: String? = "not asked yet"
             val engine =
                 MockEngine { request ->
@@ -70,10 +63,8 @@ class TelemetryHttpClientTest {
                 }
             val client = telemetryHttpClient(engine) { telemetryHeaders(InMemorySessionStorage()) }
 
-            // WHEN
             client.post("https://telemetry.test/v1/logs") { setBody(ByteArray(4)) }
 
-            // THEN
             assertNull(authorization)
         }
 }

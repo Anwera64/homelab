@@ -43,7 +43,7 @@ class InviteCodeViewModelTest {
     private fun viewModel() = InviteCodeViewModel(lookUpInvite)
 
     @Test
-    fun what_is_typed_is_upper_cased_and_stops_at_six() =
+    fun `GIVEN an empty code field WHEN typing a longer lower-case code THEN it is upper-cased and stops at six`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
 
@@ -53,7 +53,7 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun characters_no_code_can_contain_are_ignored() =
+    fun `GIVEN an empty code field WHEN typing characters no code can contain THEN they are ignored`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
 
@@ -63,7 +63,7 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun a_short_code_is_answered_with_words_rather_than_a_dead_button() =
+    fun `GIVEN a code of only three characters WHEN continuing THEN the status says the code is incomplete`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
             viewModel.onCodeChange("k7m")
@@ -75,7 +75,7 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun a_code_the_hub_knows_opens_the_join_screen() =
+    fun `GIVEN a code the hub knows WHEN continuing THEN the join screen opens with the invite and code`() =
         runTest(testDispatcher) {
             everySuspend { lookUpInvite(any()) } returns invite
             val viewModel = viewModel()
@@ -90,7 +90,7 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun a_code_the_hub_does_not_know_says_so() =
+    fun `GIVEN a code the hub does not know WHEN continuing THEN the status says it is invalid`() =
         runTest(testDispatcher) {
             everySuspend { lookUpInvite(any()) } throws InviteInvalidException()
             val viewModel = viewModel()
@@ -103,26 +103,32 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun too_much_guessing_counts_down_and_ignores_the_keyboard() =
+    fun `GIVEN too much guessing WHEN continuing THEN the lock counts down`() =
         runTest(testDispatcher) {
             everySuspend { lookUpInvite(any()) } throws CodeGuessesLockedException(retryAfterSeconds = 30)
             val viewModel = viewModel()
             viewModel.onCodeChange("zzzzzz")
-
             viewModel.onContinue()
             advanceTimeBy(1)
-
             assertEquals(InviteCodeStatus.Locked(secondsLeft = 30), viewModel.uiState.value.status)
-
-            viewModel.onCodeChange("k7m2qp")
-            assertEquals("ZZZZZZ", viewModel.uiState.value.code)
-
             advanceTimeBy(10_000)
             assertEquals(InviteCodeStatus.Locked(secondsLeft = 20), viewModel.uiState.value.status)
         }
 
     @Test
-    fun an_unreachable_hub_says_so() =
+    fun `GIVEN a locked code field WHEN typing a new code THEN the keyboard is ignored`() =
+        runTest(testDispatcher) {
+            everySuspend { lookUpInvite(any()) } throws CodeGuessesLockedException(retryAfterSeconds = 30)
+            val viewModel = viewModel()
+            viewModel.onCodeChange("zzzzzz")
+            viewModel.onContinue()
+            advanceTimeBy(1)
+            viewModel.onCodeChange("k7m2qp")
+            assertEquals("ZZZZZZ", viewModel.uiState.value.code)
+        }
+
+    @Test
+    fun `GIVEN an unreachable hub WHEN continuing THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { lookUpInvite(any()) } throws ServerOfflineException()
             val viewModel = viewModel()
@@ -135,7 +141,7 @@ class InviteCodeViewModelTest {
         }
 
     @Test
-    fun anything_else_the_hub_does_is_a_plain_failure() =
+    fun `GIVEN the hub fails in an unexpected way WHEN continuing THEN the status is a plain failure`() =
         runTest(testDispatcher) {
             everySuspend { lookUpInvite(any()) } throws IllegalStateException("boom")
             val viewModel = viewModel()

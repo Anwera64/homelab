@@ -34,7 +34,7 @@ class TestsGoThroughRobotsTest {
         )
 
     @Test
-    fun a_test_finds_and_touches_nodes_only_through_a_robot() {
+    fun `GIVEN the screen test sources WHEN node lookups and touches are scanned THEN they happen only through a robot`() {
         assertTrue(appTestDir.exists(), "Test directory must exist at: ${appTestDir.absolutePath}")
 
         val violations =
@@ -58,7 +58,7 @@ class TestsGoThroughRobotsTest {
     }
 
     @Test
-    fun every_screen_test_has_a_robot_beside_it() {
+    fun `GIVEN the screen test sources WHEN each is checked for a robot THEN every one has a robot beside it`() {
         assertTrue(screensDir.exists(), "Screens test directory must exist at: ${screensDir.absolutePath}")
 
         val violations =

@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class HearthBottomNavTest {
     @Test
-    fun shows_four_tabs_and_the_centre_plus() =
+    fun `GIVEN the bottom navigation WHEN it is shown THEN every tab and the new chat button are visible`() =
         runComposeUiTest {
             setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 
@@ -20,7 +20,7 @@ class HearthBottomNavTest {
         }
 
     @Test
-    fun only_the_current_tab_is_selected() =
+    fun `GIVEN the bottom navigation on the chats tab WHEN it is shown THEN only the chats tab is selected`() =
         runComposeUiTest {
             setContent { StillTheme { HearthBottomNav(NavTab.Chats, onSelect = {}, onNewChat = {}) } }
 
@@ -33,7 +33,7 @@ class HearthBottomNavTest {
         }
 
     @Test
-    fun tapping_a_tab_reports_it() =
+    fun `GIVEN the bottom navigation on the household tab WHEN another tab is tapped THEN that tab is reported`() =
         runComposeUiTest {
             var chosen: NavTab? = null
             setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = { chosen = it }, onNewChat = {}) } }
@@ -44,7 +44,7 @@ class HearthBottomNavTest {
         }
 
     @Test
-    fun the_plus_starts_a_new_chat() =
+    fun `GIVEN the bottom navigation WHEN the plus is tapped THEN a new chat is started`() =
         runComposeUiTest {
             var newChats = 0
             setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = { newChats++ }) } }
@@ -55,7 +55,7 @@ class HearthBottomNavTest {
         }
 
     @Test
-    fun every_target_is_at_least_44dp() =
+    fun `GIVEN the bottom navigation WHEN it is shown THEN every tab and the new chat button are big enough to hit`() =
         runComposeUiTest {
             setContent { StillTheme { HearthBottomNav(NavTab.Household, onSelect = {}, onNewChat = {}) } }
 

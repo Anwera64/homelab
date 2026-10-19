@@ -40,7 +40,7 @@ class ProfilePickerViewModelTest {
     }
 
     @Test
-    fun it_loads_the_members_as_soon_as_it_opens() =
+    fun `GIVEN a household of two WHEN the picker opens THEN it is loading and then shows both members`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } returns listOf(emma, liam)
             val viewModel = ProfilePickerViewModel(listMembers)
@@ -52,7 +52,7 @@ class ProfilePickerViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_is_reported() =
+    fun `GIVEN an unreachable hub WHEN the picker opens THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } throws ServerOfflineException()
             val viewModel = ProfilePickerViewModel(listMembers)
@@ -62,7 +62,7 @@ class ProfilePickerViewModelTest {
         }
 
     @Test
-    fun any_other_failure_is_reported_as_failed() =
+    fun `GIVEN the hub fails in an unexpected way WHEN the picker opens THEN the status says failed`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } throws IllegalStateException("odd")
             val viewModel = ProfilePickerViewModel(listMembers)
@@ -72,7 +72,7 @@ class ProfilePickerViewModelTest {
         }
 
     @Test
-    fun trying_again_reloads() =
+    fun `GIVEN an unreachable hub that has since come back WHEN trying again THEN the picker is loading and then shows the member`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } throws ServerOfflineException()
             val viewModel = ProfilePickerViewModel(listMembers)
@@ -87,7 +87,7 @@ class ProfilePickerViewModelTest {
         }
 
     @Test
-    fun tapping_a_face_goes_to_that_members_pin() =
+    fun `GIVEN a loaded picker WHEN tapping a face THEN the screen goes to that members pin`() =
         runTest(testDispatcher) {
             everySuspend { listMembers() } returns listOf(emma, liam)
             val viewModel = ProfilePickerViewModel(listMembers)

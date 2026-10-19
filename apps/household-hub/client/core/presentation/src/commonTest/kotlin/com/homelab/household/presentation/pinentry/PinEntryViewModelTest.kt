@@ -63,7 +63,7 @@ class PinEntryViewModelTest {
     }
 
     @Test
-    fun it_opens_empty_for_the_member_that_was_tapped() {
+    fun `GIVEN a tapped member WHEN the screen opens THEN it shows that member with no dots filled and nothing wrong`() {
         val state = viewModel().uiState.value
 
         assertEquals(emma, state.member)
@@ -72,7 +72,7 @@ class PinEntryViewModelTest {
     }
 
     @Test
-    fun digits_fill_the_dots_and_delete_takes_the_last_one_back() {
+    fun `GIVEN three digits typed WHEN deleting THEN two dots stay filled`() {
         val viewModel = viewModel()
 
         viewModel.type("482")
@@ -82,7 +82,7 @@ class PinEntryViewModelTest {
     }
 
     @Test
-    fun the_sixth_digit_signs_in_and_moves_on() =
+    fun `GIVEN a correct pin WHEN typing the sixth digit THEN the member is signed in and the screen moves on`() =
         runTest(testDispatcher) {
             everySuspend { login("emma", "482913") } returns signedIn
             val viewModel = viewModel()
@@ -98,7 +98,7 @@ class PinEntryViewModelTest {
         }
 
     @Test
-    fun digits_typed_while_the_hub_is_checking_are_ignored() =
+    fun `GIVEN six digits being checked by a slow hub WHEN typing another digit THEN it is ignored`() =
         runTest(testDispatcher) {
             everySuspend { login(any(), any()) } calls {
                 delay(1_000)
@@ -115,7 +115,7 @@ class PinEntryViewModelTest {
         }
 
     @Test
-    fun a_wrong_pin_clears_the_dots_and_says_how_many_tries_are_left() =
+    fun `GIVEN a wrong pin WHEN typing the sixth digit THEN the dots clear and the status says how many tries are left`() =
         runTest(testDispatcher) {
             everySuspend { login(any(), any()) } throws WrongPinException(attemptsLeft = 2)
             val viewModel = viewModel()
@@ -128,29 +128,44 @@ class PinEntryViewModelTest {
         }
 
     @Test
-    fun a_lock_counts_down_each_second_and_ignores_the_pad_meanwhile() =
+    fun `GIVEN too many wrong pins WHEN typing the sixth digit THEN the lock counts down each second until it ends`() =
         runTest(testDispatcher) {
             everySuspend { login(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
             val viewModel = viewModel()
-
             viewModel.type("000000")
             assertEquals(PinStatus.Locked(secondsLeft = 30), state(viewModel).status)
-
-            viewModel.type("1")
-            assertEquals(0, viewModel.uiState.value.entered)
-
             advanceTimeBy(1_000)
             assertEquals(PinStatus.Locked(secondsLeft = 29), state(viewModel).status)
-
             advanceTimeBy(29_000)
             assertEquals(PinStatus.Idle, state(viewModel).status)
+        }
 
+    @Test
+    fun `GIVEN a locked pad WHEN typing a digit THEN the pad is ignored`() =
+        runTest(testDispatcher) {
+            everySuspend { login(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
+            val viewModel = viewModel()
+            viewModel.type("000000")
+            state(viewModel)
+            viewModel.type("1")
+            assertEquals(0, viewModel.uiState.value.entered)
+        }
+
+    @Test
+    fun `GIVEN a lock that has ended WHEN typing a digit THEN the pad works again`() =
+        runTest(testDispatcher) {
+            everySuspend { login(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
+            val viewModel = viewModel()
+            viewModel.type("000000")
+            state(viewModel)
+            advanceTimeBy(30_000)
+            runCurrent()
             viewModel.type("1")
             assertEquals(1, viewModel.uiState.value.entered)
         }
 
     @Test
-    fun an_unreachable_hub_is_reported_and_the_dots_cleared() =
+    fun `GIVEN an unreachable hub WHEN typing the sixth digit THEN the status says unreachable and the dots clear`() =
         runTest(testDispatcher) {
             everySuspend { login(any(), any()) } throws ServerOfflineException()
             val viewModel = viewModel()
@@ -163,7 +178,7 @@ class PinEntryViewModelTest {
         }
 
     @Test
-    fun anything_else_is_reported_as_failed() =
+    fun `GIVEN the hub fails in an unexpected way WHEN typing the sixth digit THEN the status says failed`() =
         runTest(testDispatcher) {
             everySuspend { login(any(), any()) } throws IllegalStateException("odd")
             val viewModel = viewModel()

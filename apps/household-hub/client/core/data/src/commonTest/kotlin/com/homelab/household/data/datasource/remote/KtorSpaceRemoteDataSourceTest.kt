@@ -65,7 +65,6 @@ class KtorSpaceRemoteDataSourceTest {
     @Test
     fun `GIVEN a member's own space WHEN it is asked for THEN it comes back from the personal address`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -73,10 +72,8 @@ class KtorSpaceRemoteDataSourceTest {
                     respondJson(personalSpaceJson)
                 }
 
-            // WHEN
             val space = dataSource(engine).getPersonalSpace()
 
-            // THEN
             assertEquals("/api/v1/spaces/personal", path)
             assertEquals("sp-personal-emma", space.id)
         }
@@ -84,10 +81,8 @@ class KtorSpaceRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a member's own space is asked for THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).getPersonalSpace() }
         }
 
@@ -96,7 +91,6 @@ class KtorSpaceRemoteDataSourceTest {
     @Test
     fun `GIVEN the space everybody shares WHEN it is asked for THEN it comes back from the shared address`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -104,10 +98,8 @@ class KtorSpaceRemoteDataSourceTest {
                     respondJson(householdSpaceJson)
                 }
 
-            // WHEN
             val space = dataSource(engine).getHouseholdSpace()
 
-            // THEN
             assertEquals("/api/v1/spaces/shared", path)
             assertEquals("sp-household", space.id)
         }
@@ -117,7 +109,6 @@ class KtorSpaceRemoteDataSourceTest {
     @Test
     fun `GIVEN new settings for a space WHEN they are saved THEN they are put to that space's own address`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var method: HttpMethod? = null
             var sent: String? = null
@@ -129,10 +120,8 @@ class KtorSpaceRemoteDataSourceTest {
                     respondJson(householdSpaceJson)
                 }
 
-            // WHEN
             val space = dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
 
-            // THEN
             assertEquals("/api/v1/spaces/sp-household/settings", path)
             assertEquals(HttpMethod.Put, method)
             assertSameJson("""{"settings": {"theme": "dark"}}""", sent)
@@ -142,10 +131,8 @@ class KtorSpaceRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a space's settings are saved THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> {
                 dataSource(engine).updateSpaceSettings("sp-household", mapOf("theme" to "dark"))
             }

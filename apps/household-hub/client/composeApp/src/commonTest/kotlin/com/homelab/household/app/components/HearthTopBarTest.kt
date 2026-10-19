@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class HearthTopBarTest {
     @Test
-    fun back_goes_back() =
+    fun `GIVEN a top bar with a back button WHEN back is tapped THEN back is reported once`() =
         runComposeUiTest {
             var back = 0
             setContent {
@@ -24,7 +24,7 @@ class HearthTopBarTest {
         }
 
     @Test
-    fun a_title_shows_beside_the_back_button() =
+    fun `GIVEN a top bar with a title WHEN it is shown THEN the title and the back button are visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {

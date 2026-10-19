@@ -33,7 +33,7 @@ class ConversationScreenTest {
     }
 
     @Test
-    fun a_new_chat_greets_you_instead_of_showing_an_empty_transcript() =
+    fun `GIVEN a new chat WHEN the conversation is shown THEN it greets the member with the agent's tagline and name`() =
         runComposeUiTest {
             conversationScreen(stateNamed("New chat"))
 
@@ -77,7 +77,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun a_question_that_never_arrived_is_marked_on_your_own_bubble_and_offers_to_resend() =
+    fun `GIVEN a question that never reached the hub WHEN retry is tapped THEN the bubble is marked not sent and the question is sent again`() =
         runComposeUiTest {
             val resent = mutableListOf<String>()
             conversationScreen(stateNamed("Never reached the hub"), onRetry = { resent += it })
@@ -91,7 +91,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun a_dropped_stream_keeps_the_half_answer_and_says_it_is_reconnecting() =
+    fun `GIVEN a stream that dropped WHEN the conversation is shown THEN the half answer stays and it says it is reconnecting`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Stream dropped, reconnecting"))
 
@@ -104,7 +104,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_question_is_not_blamed_when_the_stream_drops() =
+    fun `GIVEN a stream that dropped WHEN the conversation is shown THEN the question is not marked as not sent and no retry is offered`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Stream dropped, reconnecting"))
 
@@ -116,7 +116,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun past_the_active_wait_the_composer_says_you_can_leave() =
+    fun `GIVEN an answer still being written after a minute WHEN the conversation is shown THEN the composer says you can leave and no try again is offered`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Still working after a minute"))
 
@@ -129,7 +129,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun an_answer_that_failed_offers_a_fresh_one_and_says_the_question_arrived() =
+    fun `GIVEN an answer that failed WHEN try again is tapped THEN the failure says the question arrived and a fresh answer is asked for`() =
         runComposeUiTest {
             var triedAgain = false
             conversationScreen(stateNamed("The answer failed"), onTryAgain = { triedAgain = true })
@@ -144,7 +144,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_composer_does_not_send_while_an_answer_is_being_written() =
+    fun `GIVEN an answer being written and text in the composer WHEN send is tapped THEN nothing is sent`() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
             conversationScreen(
@@ -159,7 +159,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_composer_sends_when_nothing_is_in_flight() =
+    fun `GIVEN a finished exchange and text in the composer WHEN send is tapped THEN the text is sent`() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
             conversationScreen(
@@ -173,7 +173,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_keyboard_send_key_goes_through_the_same_guard_as_the_button() =
+    fun `GIVEN an answer being written and text in the composer WHEN the keyboard send key is pressed THEN nothing is sent`() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
             conversationScreen(
@@ -188,7 +188,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_keyboard_send_key_sends_when_nothing_is_in_flight() =
+    fun `GIVEN a finished exchange and text in the composer WHEN the keyboard send key is pressed THEN the text is sent`() =
         runComposeUiTest {
             val sent = mutableListOf<String>()
             conversationScreen(
@@ -261,7 +261,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun a_send_that_failed_says_so_and_keeps_what_you_typed() =
+    fun `GIVEN a send that failed with text in the composer WHEN the conversation is shown THEN the error shows and the composer keeps the text`() =
         runComposeUiTest {
             conversationScreen(
                 stateNamed("A finished exchange").copy(
@@ -283,7 +283,7 @@ class ConversationScreenTest {
      * and nothing else, which reads as nothing having happened at all.
      */
     @Test
-    fun before_the_first_word_arrives_the_screen_says_it_is_thinking() =
+    fun `GIVEN an answer before its first word WHEN the conversation is shown THEN it shows the thinking dots and says it is thinking`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Thinking, before the first word"))
 
@@ -294,7 +294,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun the_first_word_takes_the_dots_place() =
+    fun `GIVEN an answer that has started WHEN the conversation is shown THEN the words show and the thinking dots do not`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Answering"))
 
@@ -308,7 +308,7 @@ class ConversationScreenTest {
     // ---- a turn you can watch ----------------------------------------------
 
     @Test
-    fun the_newest_question_says_it_was_sent() =
+    fun `GIVEN a finished exchange WHEN the conversation is shown THEN the newest question says it was sent`() =
         runComposeUiTest {
             conversationScreen(stateNamed("A finished exchange"))
 
@@ -323,7 +323,7 @@ class ConversationScreenTest {
      * the floor for a graphic that carries meaning.
      */
     @Test
-    fun the_sent_check_can_be_seen_by_day_and_at_night() {
+    fun `GIVEN a finished exchange by day and at night WHEN the sent check is measured THEN its contrast is at least 3 to 1 in both`() {
         listOf(false, true).forEach { night ->
             runComposeUiTest {
                 conversationScreen(stateNamed("A finished exchange"), darkTheme = night)
@@ -339,7 +339,7 @@ class ConversationScreenTest {
     }
 
     @Test
-    fun a_question_that_never_landed_does_not_claim_to_have_been_sent() =
+    fun `GIVEN a question that never reached the hub WHEN the conversation is shown THEN it does not say sent`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Never reached the hub"))
 
@@ -347,7 +347,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun while_an_answer_is_being_written_the_composer_says_it_is_waiting() =
+    fun `GIVEN an answer before its first word WHEN the conversation is shown THEN the composer says it is waiting`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Thinking, before the first word"))
 
@@ -360,7 +360,7 @@ class ConversationScreenTest {
      * letters. The screen says it is thinking, and nothing more.
      */
     @Test
-    fun a_model_thinking_shows_only_the_status() =
+    fun `GIVEN a model thinking out loud WHEN the conversation is shown THEN only the thinking status shows and not its thoughts`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Thinking out loud"))
 
@@ -373,7 +373,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun a_tool_is_named_in_words_while_it_runs() =
+    fun `GIVEN a tool running WHEN the conversation is shown THEN the tool is named in words and its internal name is hidden`() =
         runComposeUiTest {
             conversationScreen(stateNamed("Using a tool"))
 
@@ -521,7 +521,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun a_tool_that_could_not_run_says_so_in_the_trail() =
+    fun `GIVEN a tool that could not run WHEN the conversation is shown THEN the trail says the calendar could not be checked`() =
         runComposeUiTest {
             conversationScreen(stateNamed("A tool that couldn't run"))
 
@@ -530,7 +530,7 @@ class ConversationScreenTest {
 
     /** A failed turn has a card of its own to show; the dots would say it was still coming. */
     @Test
-    fun an_answer_that_failed_shows_no_dots() =
+    fun `GIVEN an answer that failed WHEN the conversation is shown THEN no thinking dots show`() =
         runComposeUiTest {
             conversationScreen(stateNamed("The answer failed"))
 
@@ -538,7 +538,7 @@ class ConversationScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the agent is shown`() {
         provider.values.toList().forEach { state ->
             runComposeUiTest {
                 conversationScreen(state)

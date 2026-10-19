@@ -34,7 +34,7 @@ class TestNameCompatibilityTest {
     private val backtickedName = Regex("""\bfun\s+`([^`]+)`""")
 
     @Test
-    fun a_backticked_test_name_uses_no_character_a_target_rejects() {
+    fun `GIVEN a backticked test name WHEN it is read THEN it uses no character a target rejects`() {
         val violations =
             sourceFiles { it !in instrumentedSourceSets }.flatMap { file ->
                 file.namedTests().mapNotNull { (line, name) ->
@@ -55,7 +55,7 @@ class TestNameCompatibilityTest {
     }
 
     @Test
-    fun an_android_instrumented_test_name_has_no_spaces() {
+    fun `GIVEN an Android instrumented test WHEN its name is read THEN it has no spaces`() {
         val violations =
             sourceFiles { it in instrumentedSourceSets }.flatMap { file ->
                 file
@@ -71,7 +71,68 @@ class TestNameCompatibilityTest {
         )
     }
 
+    /** The structure lives in the name (client AGENTS.md), so every test reads GIVEN, WHEN, THEN in that order. */
+    @Test
+    fun `GIVEN a client test WHEN its name is read THEN it says GIVEN WHEN THEN`() {
+        val spaced = Regex("""^GIVEN .+ WHEN .+ THEN .+$""")
+        val underscored = Regex("""^GIVEN_.+_WHEN_.+_THEN_.+$""")
+        val violations =
+            sourceFiles { true }.flatMap { file ->
+                val instrumented = file.sourceSet() in instrumentedSourceSets
+                file
+                    .testFunctions()
+                    .filterNot { (_, name) -> (if (instrumented) underscored else spaced).matches(name) }
+                    .map { (line, name) -> "${file.name}:$line `$name`" }
+            }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Name tests `GIVEN <situation> WHEN <action> THEN <outcome>` (GIVEN_x_WHEN_y_THEN_z in " +
+                "Android instrumented tests):\n" + violations.joinToString("\n"),
+        )
+    }
+
+    /** The name carries GIVEN, WHEN and THEN, so the body doesn't repeat them as comments. */
+    @Test
+    fun `GIVEN a client test WHEN its body is read THEN it has no GIVEN WHEN THEN comments`() {
+        val sectionComment = Regex("""^\s*//\s*(GIVEN|WHEN|THEN)\b""")
+        val violations =
+            sourceFiles { true }.flatMap { file ->
+                file.readLines().mapIndexedNotNull { index, line ->
+                    if (sectionComment.containsMatchIn(line)) "${file.name}:${index + 1}" else null
+                }
+            }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Drop the // GIVEN, // WHEN and // THEN comments; the test name carries them:\n" +
+                violations.joinToString("\n"),
+        )
+    }
+
     private val instrumentedSourceSets = setOf("androidDeviceTest", "androidTest")
+
+    private val funName = Regex("""\bfun\s+(?:`([^`]+)`|(\w+))""")
+
+    /** Each `@Test` paired with the name of the next function declared after it. */
+    private fun File.testFunctions(): List<Pair<Int, String>> {
+        val lines = readLines()
+        return lines.indices
+            .filter { lines[it].trim() == "@Test" }
+            .mapNotNull { at ->
+                (at + 1 until lines.size).firstNotNullOfOrNull { index ->
+                    funName.find(lines[index])?.let { match ->
+                        (index + 1) to match.groupValues[1].ifEmpty { match.groupValues[2] }
+                    }
+                }
+            }
+    }
+
+    /** The source set a file sits in, such as `commonTest` or `androidTest`. */
+    private fun File.sourceSet(): String =
+        generateSequence(this) { it.parentFile }
+            .first { it.parentFile?.name == "src" }
+            .name
 
     private fun sourceFiles(sourceSet: (String) -> Boolean): List<File> =
         modules

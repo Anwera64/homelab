@@ -41,7 +41,7 @@ class InviteCreateViewModelTest {
     private fun viewModel() = InviteCreateViewModel(createInvite)
 
     @Test
-    fun a_name_and_a_tap_make_a_code_that_counts_down() =
+    fun `GIVEN a typed name WHEN creating an invite THEN a code shows and counts down`() =
         runTest(testDispatcher) {
             everySuspend { createInvite(any(), any()) } returns invite
             val viewModel = viewModel()
@@ -58,7 +58,7 @@ class InviteCreateViewModelTest {
         }
 
     @Test
-    fun a_blank_name_is_answered_with_words_rather_than_a_dead_button() =
+    fun `GIVEN a blank name WHEN creating an invite THEN the name field says it is missing`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
 
@@ -69,7 +69,7 @@ class InviteCreateViewModelTest {
         }
 
     @Test
-    fun inviting_a_name_the_household_already_has_lands_under_the_field() =
+    fun `GIVEN a name the household already has WHEN creating an invite THEN the name field says it is taken`() =
         runTest(testDispatcher) {
             everySuspend { createInvite(any(), any()) } throws NameTakenException()
             val viewModel = viewModel()
@@ -82,7 +82,7 @@ class InviteCreateViewModelTest {
         }
 
     @Test
-    fun an_admin_can_invite_another_admin() =
+    fun `GIVEN a typed name and the admin switch on WHEN creating an invite THEN the hub is asked for an admin invite`() =
         runTest(testDispatcher) {
             everySuspend { createInvite(any(), any()) } returns invite.copy(isAdmin = true)
             val viewModel = viewModel()
@@ -96,16 +96,24 @@ class InviteCreateViewModelTest {
         }
 
     @Test
-    fun a_code_nobody_used_runs_out_and_a_new_one_replaces_it() =
+    fun `GIVEN a code nobody used WHEN its time runs out THEN the status is expired`() =
         runTest(testDispatcher) {
             everySuspend { createInvite(any(), any()) } returns invite.copy(expiresInSeconds = 2)
             val viewModel = viewModel()
             viewModel.onNameChange("Liam")
             viewModel.create()
             advanceTimeBy(3_000)
-
             assertEquals(InviteCreateStatus.Expired, viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN an expired code WHEN asking for a new one THEN a fresh code replaces it`() =
+        runTest(testDispatcher) {
+            everySuspend { createInvite(any(), any()) } returns invite.copy(expiresInSeconds = 2)
+            val viewModel = viewModel()
+            viewModel.onNameChange("Liam")
+            viewModel.create()
+            advanceTimeBy(3_000)
             viewModel.newCode()
             advanceTimeBy(1)
 
@@ -118,7 +126,7 @@ class InviteCreateViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so() =
+    fun `GIVEN an unreachable hub WHEN creating an invite THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { createInvite(any(), any()) } throws ServerOfflineException()
             val viewModel = viewModel()

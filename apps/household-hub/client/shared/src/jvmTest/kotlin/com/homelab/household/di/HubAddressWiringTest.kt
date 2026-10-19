@@ -47,7 +47,7 @@ class HubAddressWiringTest : KoinTest {
     }
 
     @Test
-    fun every_repository_talks_to_the_configured_hub() =
+    fun `GIVEN a configured hub address WHEN every repository makes a request THEN each talks to that hub`() =
         runTest {
             startKoin {
                 modules(

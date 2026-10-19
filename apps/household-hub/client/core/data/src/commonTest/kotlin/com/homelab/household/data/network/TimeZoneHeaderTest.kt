@@ -17,7 +17,6 @@ class TimeZoneHeaderTest {
     @Test
     fun `GIVEN a device zone WHEN two different calls are made THEN both carry it as X-Timezone`() =
         runTest {
-            // GIVEN
             val capturedHeaders = mutableListOf<String?>()
             val mockEngine =
                 MockEngine { request ->
@@ -29,18 +28,15 @@ class TimeZoneHeaderTest {
                     sendDeviceTimeZone { "America/Lima" }
                 }
 
-            // WHEN
             client.get("/api/v1/spaces/shared")
             client.get("/api/v1/agents")
 
-            // THEN
             assertEquals(listOf<String?>("America/Lima", "America/Lima"), capturedHeaders)
         }
 
     @Test
     fun `GIVEN the device zone changes between calls WHEN each call is sent THEN it carries the zone current at send time`() =
         runTest {
-            // GIVEN
             val capturedHeaders = mutableListOf<String?>()
             val mockEngine =
                 MockEngine { request ->
@@ -53,12 +49,10 @@ class TimeZoneHeaderTest {
                     sendDeviceTimeZone { zone }
                 }
 
-            // WHEN
             client.get("/api/v1/spaces/shared")
             zone = "Asia/Tokyo"
             client.get("/api/v1/agents")
 
-            // THEN
             assertEquals(listOf<String?>("America/Lima", "Asia/Tokyo"), capturedHeaders)
         }
 }

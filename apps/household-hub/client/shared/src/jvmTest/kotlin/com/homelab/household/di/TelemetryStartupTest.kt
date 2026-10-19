@@ -34,13 +34,10 @@ class TelemetryStartupTest : KoinTest {
 
     @Test
     fun `GIVEN the SDK started with no telemetry config WHEN the graph is up THEN telemetry was started and is off`() {
-        // GIVEN
         val hubConfig = HubConfig(baseUrl = "https://hub.test")
 
-        // WHEN
         HouseholdHubSdk.init(hubConfig)
 
-        // THEN
         val telemetry = get<Telemetry>()
         assertTrue(telemetry.isStarted, "HouseholdHubSdk.init must start telemetry")
         assertFalse(telemetry.isEnabled)
@@ -48,7 +45,6 @@ class TelemetryStartupTest : KoinTest {
 
     @Test
     fun `GIVEN modules built with a telemetry endpoint WHEN telemetry is resolved THEN it is on`() {
-        // GIVEN
         startKoin {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test"), TelemetryConfig("https://telemetry.test", "0.1")) +
@@ -59,10 +55,8 @@ class TelemetryStartupTest : KoinTest {
             )
         }
 
-        // WHEN
         val telemetry = get<Telemetry>()
 
-        // THEN
         assertTrue(telemetry.isEnabled)
     }
 }

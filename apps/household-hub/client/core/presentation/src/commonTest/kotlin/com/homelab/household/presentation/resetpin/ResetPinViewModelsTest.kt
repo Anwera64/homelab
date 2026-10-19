@@ -41,7 +41,7 @@ class ResetPinViewModelsTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun the_code_is_upper_cased_and_carried_to_the_new_pin() =
+    fun `GIVEN a lower-case reset code WHEN continuing THEN the screen goes to the new pin with the code upper-cased`() =
         runTest(testDispatcher) {
             val viewModel = ResetCodeViewModel()
             viewModel.onCodeChange("p4xn7t")
@@ -55,7 +55,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun a_short_code_is_answered_with_words_rather_than_a_dead_button() =
+    fun `GIVEN a reset code that is too short WHEN continuing THEN the screen says the code is incomplete`() =
         runTest(testDispatcher) {
             val viewModel = ResetCodeViewModel()
             viewModel.onCodeChange("p4x")
@@ -67,7 +67,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun the_new_pin_has_to_be_typed_the_same_way_twice() =
+    fun `GIVEN two different new pins WHEN setting the pin THEN the mismatch shows under the second field`() =
         runTest(testDispatcher) {
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)
             viewModel.onPinChange("864209")
@@ -80,7 +80,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun a_pin_that_is_not_six_digits_says_so_under_the_field() =
+    fun `GIVEN a new pin that is not six digits WHEN setting the pin THEN the pin field says so`() =
         runTest(testDispatcher) {
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)
             viewModel.onPinChange("864")
@@ -93,7 +93,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun the_hub_takes_the_new_pin_and_signs_them_in() =
+    fun `GIVEN two matching new pins the hub accepts WHEN setting the pin THEN the member is signed in`() =
         runTest(testDispatcher) {
             everySuspend { redeemPinReset(any(), any()) } returns emma
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)
@@ -110,7 +110,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun a_code_that_has_gone_says_so() =
+    fun `GIVEN a reset code that has gone WHEN setting the pin THEN the status says invalid`() =
         runTest(testDispatcher) {
             everySuspend { redeemPinReset(any(), any()) } throws InviteInvalidException()
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)
@@ -124,7 +124,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun too_much_guessing_counts_down() =
+    fun `GIVEN too much guessing WHEN setting the pin THEN the status counts down the lock`() =
         runTest(testDispatcher) {
             everySuspend { redeemPinReset(any(), any()) } throws CodeGuessesLockedException(retryAfterSeconds = 30)
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)
@@ -138,7 +138,7 @@ class ResetPinViewModelsTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so() =
+    fun `GIVEN an unreachable hub WHEN setting the pin THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { redeemPinReset(any(), any()) } throws ServerOfflineException()
             val viewModel = NewPinViewModel("P4XN7T", redeemPinReset)

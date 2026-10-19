@@ -34,7 +34,7 @@ class IosPlatformModuleTest : KoinTest {
     }
 
     @Test
-    fun ios_platform_module_binds_darwin_engine_and_keychain_token_storage() {
+    fun `GIVEN the SDK started on iOS WHEN the engine and token storage are resolved THEN they are the Darwin engine and the Keychain storage`() {
         HouseholdHubSdk.init()
 
         val engine = get<HttpClientEngine>()
@@ -46,7 +46,7 @@ class IosPlatformModuleTest : KoinTest {
     }
 
     @Test
-    fun verify_koin_dependency_graph_resolves_all_repositories_usecases_and_viewmodels_on_ios() {
+    fun `GIVEN the SDK started on iOS WHEN every repository use case and view model is resolved THEN all of them resolve`() {
         val koinApp = HouseholdHubSdk.init()
 
         assertNotNull(koinApp)

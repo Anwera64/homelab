@@ -21,7 +21,7 @@ class CleanArchitectureBoundaryTest {
             .filter { it.exists() }
 
     @Test
-    fun domain_layer_has_zero_external_or_outer_layer_dependencies() {
+    fun `GIVEN the domain sources WHEN their imports are read THEN none reach a framework or an outer layer`() {
         assertTrue(domainDir.exists(), "Domain directory must exist at: ${domainDir.absolutePath}")
 
         val violations =
@@ -45,7 +45,7 @@ class CleanArchitectureBoundaryTest {
     }
 
     @Test
-    fun presentation_layer_depends_only_on_domain_and_never_on_data() {
+    fun `GIVEN the presentation sources WHEN their imports are read THEN they depend on domain and never on data`() {
         assertTrue(presentationDir.exists(), "Presentation directory must exist at: ${presentationDir.absolutePath}")
 
         val violations = importViolations(presentationDir, listOf("com.homelab.household.data"))
@@ -57,7 +57,7 @@ class CleanArchitectureBoundaryTest {
     }
 
     @Test
-    fun data_layer_depends_only_on_domain_and_never_on_presentation() {
+    fun `GIVEN the data sources WHEN their imports are read THEN they depend on domain and never on presentation`() {
         assertTrue(dataDir.exists(), "Data directory must exist at: ${dataDir.absolutePath}")
 
         val violations = importViolations(dataDir, listOf("com.homelab.household.presentation"))
@@ -76,7 +76,7 @@ class CleanArchitectureBoundaryTest {
      * but do not try to prove it by adding such an import, because the build fails first.
      */
     @Test
-    fun common_main_has_no_platform_imports() {
+    fun `GIVEN the common main sources WHEN their imports are read THEN none is a platform import`() {
         val violations =
             commonMainDirs.flatMap {
                 importViolations(
@@ -100,7 +100,7 @@ class CleanArchitectureBoundaryTest {
     }
 
     @Test
-    fun ui_layer_imports_only_presentation_and_domain() {
+    fun `GIVEN the UI sources WHEN their imports are read THEN they come only from presentation and domain`() {
         assertTrue(uiDir.exists(), "UI directory must exist at: ${uiDir.absolutePath}")
 
         val violations =
@@ -127,7 +127,7 @@ class CleanArchitectureBoundaryTest {
      * compile-time mocking library on iOS.
      */
     @Test
-    fun use_case_implementations_are_named_only_by_the_di_module() {
+    fun `GIVEN the production sources WHEN use case implementations are looked up THEN only the DI module names them`() {
         val outsideDomainDirs = commonMainDirs.filterNot { it == domainDir }
         assertTrue(outsideDomainDirs.isNotEmpty(), "No commonMain directories found outside :core:domain")
 
@@ -149,7 +149,7 @@ class CleanArchitectureBoundaryTest {
      * able to reach past `:core:presentation`.
      */
     @Test
-    fun module_dependencies_point_inward() {
+    fun `GIVEN the module build files WHEN their dependencies are read THEN they all point inward`() {
         val allowedProjectDependencies =
             mapOf(
                 "core/domain" to emptySet(),

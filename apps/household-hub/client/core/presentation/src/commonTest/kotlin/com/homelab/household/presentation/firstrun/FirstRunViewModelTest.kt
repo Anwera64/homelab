@@ -54,7 +54,7 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun it_starts_with_the_first_swatch_chosen() {
+    fun `GIVEN a new first run screen WHEN it opens THEN the first swatch is chosen and the name and pin are empty`() {
         val state = FirstRunViewModel(onboard).uiState.value
 
         assertEquals(AvatarPalette.swatches.first(), state.colour)
@@ -63,7 +63,7 @@ class FirstRunViewModelTest {
     }
 
     @Test
-    fun the_pin_field_keeps_only_the_first_six_digits() {
+    fun `GIVEN a first run screen WHEN typing a pin with a letter and too many digits THEN only the first six digits are kept`() {
         val viewModel = FirstRunViewModel(onboard)
 
         viewModel.onPinChange("12a3456789")
@@ -72,7 +72,7 @@ class FirstRunViewModelTest {
     }
 
     @Test
-    fun creating_with_nothing_filled_in_says_so_under_each_field_and_sends_nothing() =
+    fun `GIVEN nothing filled in WHEN creating THEN each field says so and nothing is sent to the hub`() =
         runTest(testDispatcher) {
             val viewModel = FirstRunViewModel(onboard)
 
@@ -85,7 +85,7 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun a_name_over_128_characters_is_too_long() =
+    fun `GIVEN a name over 128 characters WHEN creating THEN the name field says it is too long`() =
         runTest(testDispatcher) {
             val viewModel = filledIn().apply { onNameChange("x".repeat(129)) }
 
@@ -95,19 +95,23 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun typing_in_a_field_clears_its_error() {
+    fun `GIVEN a name error WHEN typing in the name field THEN the name error clears`() {
         val viewModel = FirstRunViewModel(onboard)
         viewModel.create()
-
         viewModel.onNameChange("E")
-        viewModel.onPinChange("4")
-
         assertNull(viewModel.uiState.value.nameError)
+    }
+
+    @Test
+    fun `GIVEN a pin error WHEN typing in the pin field THEN the pin error clears`() {
+        val viewModel = FirstRunViewModel(onboard)
+        viewModel.create()
+        viewModel.onPinChange("4")
         assertNull(viewModel.uiState.value.pinError)
     }
 
     @Test
-    fun creating_sends_the_name_pin_and_colour_and_goes_home() =
+    fun `GIVEN a filled-in form and a chosen colour WHEN creating THEN the hub gets the name and pin and colour and the screen goes home`() =
         runTest(testDispatcher) {
             everySuspend { onboard("Emma", "482913", "#C05638") } returns emma
             val viewModel = filledIn().apply { onColourSelect("#C05638") }
@@ -122,7 +126,7 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_is_reported_and_nothing_typed_is_cleared() =
+    fun `GIVEN an unreachable hub WHEN creating THEN the failure is unreachable and nothing typed is cleared`() =
         runTest(testDispatcher) {
             everySuspend { onboard(any(), any(), any()) } throws ServerOfflineException()
             val viewModel = filledIn()
@@ -138,7 +142,7 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun a_hub_someone_else_already_set_up_says_so() =
+    fun `GIVEN a hub someone else already set up WHEN creating THEN the failure says it is already set up`() =
         runTest(testDispatcher) {
             everySuspend { onboard(any(), any(), any()) } throws HubAlreadySetUpException()
             val viewModel = filledIn()
@@ -150,7 +154,7 @@ class FirstRunViewModelTest {
         }
 
     @Test
-    fun anything_else_is_an_unknown_failure() =
+    fun `GIVEN the hub fails in an unexpected way WHEN creating THEN the failure is unknown`() =
         runTest(testDispatcher) {
             everySuspend { onboard(any(), any(), any()) } throws IllegalStateException("odd")
             val viewModel = filledIn()

@@ -14,7 +14,7 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class SlowLineTest {
     @Test
-    fun a_hub_taking_longer_than_usual_says_so_quietly() =
+    fun `GIVEN a slow line in the slow phase WHEN it is shown THEN it says the hub is slow`() =
         runComposeUiTest {
             setContent { StillTheme { SlowLine(WaitPhase.Slow) } }
 
@@ -26,7 +26,7 @@ class SlowLineTest {
      * that appeared at 250ms would make every call look like a problem.
      */
     @Test
-    fun a_wait_going_normally_has_nothing_to_say() =
+    fun `GIVEN slow lines in the hidden and showing phases WHEN they are shown THEN neither says the hub is slow`() =
         runComposeUiTest {
             setContent {
                 StillTheme {

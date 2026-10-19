@@ -29,7 +29,7 @@ class KtorLoggingConfigurationTest : KoinTest {
     }
 
     @Test
-    fun logs_all_when_isDebug_is_true() {
+    fun `GIVEN a debug build WHEN the HTTP client is resolved THEN it logs everything`() {
         startKoin {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = true)) +
@@ -46,7 +46,7 @@ class KtorLoggingConfigurationTest : KoinTest {
     }
 
     @Test
-    fun logs_info_when_isDebug_is_false() {
+    fun `GIVEN a release build WHEN the HTTP client is resolved THEN it logs info only`() {
         startKoin {
             modules(
                 sdkModules(HubConfig(baseUrl = "https://hub.test", isDebug = false)) +

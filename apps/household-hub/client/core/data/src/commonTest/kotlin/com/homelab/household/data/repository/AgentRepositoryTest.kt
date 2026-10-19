@@ -63,25 +63,20 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN the hub lists one agent WHEN its personalities are asked for THEN it is mapped to an agent personality`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             everySuspend { remote.listAgents() } returns listOf(llamaDto)
 
-            // WHEN
             val agents = repository(remote).listAgents()
 
-            // THEN
             assertEquals(listOf(llama), agents)
         }
 
     @Test
     fun `GIVEN the hub cannot be reached WHEN the household's agents are asked for THEN the failure reaches the caller`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             everySuspend { remote.listAgents() } throws ServerOfflineException()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { repository(remote).listAgents() }
         }
 
@@ -90,14 +85,11 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN one agent's id WHEN it is asked for by itself THEN it is mapped to an agent personality`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             everySuspend { remote.getAgent("a-1") } returns llamaDto
 
-            // WHEN
             val agent = repository(remote).getAgent("a-1")
 
-            // THEN
             assertEquals(llama, agent)
         }
 
@@ -106,7 +98,6 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN a new agent's personality WHEN it is created THEN it is sent as a create request and the stored agent comes back mapped`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             val expectedCreate =
                 AgentCreateDto(
@@ -121,10 +112,8 @@ class AgentRepositoryTest {
                 )
             everySuspend { remote.createAgent(expectedCreate) } returns llamaDto
 
-            // WHEN
             val agent = repository(remote).createAgent(llama)
 
-            // THEN
             assertEquals(llama, agent)
             verifySuspend(VerifyMode.exactly(1)) { remote.createAgent(expectedCreate) }
         }
@@ -134,7 +123,6 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN changes to an agent's personality WHEN it is updated THEN they are sent to that agent's own id and the result comes back mapped`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             val expectedUpdate =
                 AgentUpdateDto(
@@ -149,10 +137,8 @@ class AgentRepositoryTest {
                 )
             everySuspend { remote.updateAgent("a-1", expectedUpdate) } returns llamaDto
 
-            // WHEN
             val agent = repository(remote).updateAgent(llama)
 
-            // THEN
             assertEquals(llama, agent)
             verifySuspend(VerifyMode.exactly(1)) { remote.updateAgent("a-1", expectedUpdate) }
         }
@@ -162,14 +148,11 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN an agent an admin no longer wants WHEN it is deleted THEN the data source is asked to remove it`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             everySuspend { remote.deleteAgent("a-1") } returns Unit
 
-            // WHEN
             repository(remote).deleteAgent("a-1")
 
-            // THEN
             verifySuspend(VerifyMode.exactly(1)) { remote.deleteAgent("a-1") }
         }
 
@@ -178,14 +161,11 @@ class AgentRepositoryTest {
     @Test
     fun `GIVEN a deleted agent WHEN it is restored THEN it is mapped to an agent personality`() =
         runTest {
-            // GIVEN
             val remote = mock<AgentRemoteDataSource>()
             everySuspend { remote.restoreAgent("a-1") } returns llamaDto
 
-            // WHEN
             val agent = repository(remote).restoreAgent("a-1")
 
-            // THEN
             assertEquals(llama, agent)
         }
 }

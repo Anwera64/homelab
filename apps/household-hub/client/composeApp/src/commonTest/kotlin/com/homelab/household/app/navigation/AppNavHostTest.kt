@@ -25,7 +25,7 @@ class AppNavHostTest {
     private val session = StubSession()
 
     @Test
-    fun a_phone_the_hub_signs_out_starts_over_at_who_is_here() =
+    fun `GIVEN a phone on home WHEN the hub signs it out THEN it starts over at who is here`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -40,7 +40,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_session_is_renewed_once_when_the_app_opens() =
+    fun `GIVEN a phone on home WHEN the app opens THEN the session is renewed once`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -52,7 +52,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun it_starts_on_launch() =
+    fun `GIVEN a fresh back stack WHEN the app opens THEN it shows launch`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -62,7 +62,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun launch_sends_the_user_to_sign_in() =
+    fun `GIVEN the launch screen WHEN go to sign in is tapped THEN sign in replaces launch on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -76,7 +76,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun launch_sends_the_user_to_first_run() =
+    fun `GIVEN the launch screen WHEN go to first run is tapped THEN first run replaces launch on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -89,7 +89,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun first_run_goes_home_once_the_household_exists() =
+    fun `GIVEN the first run screen WHEN the household is created THEN home replaces first run on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -104,7 +104,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun first_run_on_a_hub_already_set_up_goes_to_sign_in() =
+    fun `GIVEN the first run screen on a hub already set up WHEN sign in instead is tapped THEN sign in replaces first run on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -118,7 +118,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun tapping_a_face_opens_that_members_pin_over_the_picker() =
+    fun `GIVEN the profile picker WHEN a member's face is tapped THEN that member's PIN opens over the picker`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -137,17 +137,14 @@ class AppNavHostTest {
     fun `GIVEN a conversation WHEN a screen is opened over it and closed THEN it still has the same ViewModel`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 val screens = StubScreens()
                 backStack[0] = Destination.Conversation()
                 appNavHost(screens, backStack, session)
 
-                // WHEN
                 tapsReconnectCalendar()
                 seesTheCalendarPicker()
                 tapsBack()
 
-                // THEN
                 seesANewConversation()
                 val kept = screens.viewModels.single()
                 assertFalse(kept.cleared)
@@ -158,18 +155,15 @@ class AppNavHostTest {
     fun `GIVEN a conversation that opened the connect flow WHEN a calendar connects THEN the conversation hears it once`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 val screens = StubScreens()
                 backStack[0] = Destination.Conversation("s-1")
                 appNavHost(screens, backStack, session)
 
-                // WHEN
                 tapsReconnectCalendar()
                 tapsPickApple()
                 tapsCalendarConnected()
                 waitForIdle()
 
-                // THEN
                 seesTheConversation("s-1")
                 assertEquals(1, screens.calendarsConnected)
             }
@@ -179,17 +173,14 @@ class AppNavHostTest {
     fun `GIVEN a conversation that opened the connect flow WHEN it is left with Back THEN the conversation hears nothing`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 val screens = StubScreens()
                 backStack[0] = Destination.Conversation("s-1")
                 appNavHost(screens, backStack, session)
 
-                // WHEN
                 tapsReconnectCalendar()
                 tapsBack()
                 waitForIdle()
 
-                // THEN
                 assertEquals(0, screens.calendarsConnected)
             }
         }
@@ -198,7 +189,6 @@ class AppNavHostTest {
     fun `GIVEN a PIN pad closed with Back WHEN it is opened again THEN it has a new ViewModel`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 val screens = StubScreens()
                 backStack[0] = Destination.SignIn
                 appNavHost(screens, backStack, session)
@@ -206,11 +196,9 @@ class AppNavHostTest {
                 tapsBack()
                 waitForIdle()
 
-                // WHEN
                 tapsPickEmma()
                 waitForIdle()
 
-                // THEN
                 assertEquals(2, screens.viewModels.size)
                 assertTrue(screens.viewModels.first().cleared)
                 assertFalse(screens.viewModels.last().cleared)
@@ -218,7 +206,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun back_from_the_pin_returns_to_the_picker() =
+    fun `GIVEN a member's PIN over the picker WHEN back is tapped THEN the picker is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -233,7 +221,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_right_pin_goes_home_and_leaves_sign_in_behind() =
+    fun `GIVEN a member's PIN over the picker WHEN the right PIN is entered THEN home is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -248,7 +236,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun someone_with_an_invite_types_the_code_and_joins() =
+    fun `GIVEN the profile picker WHEN an invite code is accepted and the join is done THEN home is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -266,7 +254,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_code_that_has_gone_sends_them_back_to_typing_one() =
+    fun `GIVEN an accepted invite code WHEN the code turns out to have expired THEN the invite code screen is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -282,7 +270,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_forgotten_pin_goes_through_a_reset_code_to_a_new_one() =
+    fun `GIVEN a member's PIN over the picker WHEN the PIN is forgotten and a reset code is typed and a new PIN is set THEN home is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 appNavHost(StubScreens(), backStack, session)
@@ -303,7 +291,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_profile_opens_from_home_and_leads_to_members() =
+    fun `GIVEN home WHEN the profile and then members are opened THEN members is shown over the profile over home`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -318,7 +306,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_profile_leads_to_the_memory_page_and_back() =
+    fun `GIVEN the profile WHEN the memory page is opened and back is tapped THEN the profile is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -336,7 +324,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_chat_leads_to_all_memories_and_back() =
+    fun `GIVEN a conversation WHEN all memories are opened and back is tapped THEN the conversation is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Conversation("s-1")
@@ -353,7 +341,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_memory_page_leads_to_changes_to_check_and_back() =
+    fun `GIVEN the memory page WHEN changes to check are opened and back is tapped THEN the memory page is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Memories
@@ -371,7 +359,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_profile_leads_to_when_agents_act_and_back() =
+    fun `GIVEN the profile WHEN when agents act is opened and back is tapped THEN the profile is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -389,7 +377,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun members_leads_to_inviting_approving_and_removing() =
+    fun `GIVEN the members screen WHEN inviting then approving a reset then removing a member are opened and done THEN members is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Members
@@ -413,7 +401,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun leaving_the_household_ends_at_who_is_here() =
+    fun `GIVEN the profile WHEN leaving the household is done THEN sign in is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -428,7 +416,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun signing_out_ends_at_who_is_here() =
+    fun `GIVEN the profile WHEN the member signs out THEN sign in is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -442,7 +430,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_changed_pin_returns_to_the_profile() =
+    fun `GIVEN the profile WHEN the PIN is changed THEN the profile is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -457,7 +445,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_connected_calendar_returns_to_the_profile_past_the_picker() =
+    fun `GIVEN the profile WHEN an Apple calendar is picked and connected THEN the profile is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -477,17 +465,14 @@ class AppNavHostTest {
     fun `GIVEN the picker WHEN Google is picked and signed in THEN the profile is back past the picker`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 backStack[0] = Destination.Profile
                 appNavHost(StubScreens(), backStack, session)
                 tapsGoToCalendar()
 
-                // WHEN
                 tapsPickGoogle()
                 seesTheGoogleSignIn()
                 tapsCalendarConnected()
 
-                // THEN
                 seesProfile()
                 assertEquals(listOf(Destination.Profile), backStack.toList())
             }
@@ -497,14 +482,11 @@ class AppNavHostTest {
     fun `GIVEN a Google calendar that needs signing in again WHEN the profile asks for it THEN the sign-in opens straight away`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 backStack[0] = Destination.Profile
                 appNavHost(StubScreens(), backStack, session)
 
-                // WHEN
                 tapsSignInToGoogleAgain()
 
-                // THEN
                 seesTheGoogleSignIn()
                 assertEquals(listOf(Destination.Profile, Destination.GoogleCalendarSignIn), backStack.toList())
             }
@@ -514,24 +496,21 @@ class AppNavHostTest {
     fun `GIVEN a failed calendar step WHEN Reconnect calendar is tapped and a calendar connected THEN the conversation is back`() =
         runComposeUiTest {
             onAppNavHost {
-                // GIVEN
                 backStack[0] = Destination.Conversation("s-1")
                 appNavHost(StubScreens(), backStack, session)
 
-                // WHEN
                 tapsReconnectCalendar()
                 seesTheCalendarPicker()
                 tapsPickApple()
                 tapsCalendarConnected()
 
-                // THEN
                 seesTheConversation("s-1")
                 assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
             }
         }
 
     @Test
-    fun back_from_a_calendar_s_details_returns_to_the_picker() =
+    fun `GIVEN an Apple calendar's details opened from the picker WHEN back is tapped THEN the picker is shown again`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Profile
@@ -549,7 +528,7 @@ class AppNavHostTest {
     // ---- the four tabs and the raised + ------------------------------------
 
     @Test
-    fun each_tab_reaches_its_own_screen() =
+    fun `GIVEN home WHEN each tab is tapped in turn THEN each shows its own screen`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -570,7 +549,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun a_tab_replaces_the_stack_rather_than_piling_onto_it() =
+    fun `GIVEN home WHEN two tabs are tapped in turn THEN only the last tab's screen is on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -585,7 +564,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun the_raised_plus_opens_a_conversation_that_has_no_session_yet() =
+    fun `GIVEN home WHEN the raised plus is tapped THEN a new conversation opens over home`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Home
@@ -599,7 +578,7 @@ class AppNavHostTest {
         }
 
     @Test
-    fun opening_a_chat_stacks_it_on_the_list_so_back_returns_there() =
+    fun `GIVEN the chats list WHEN a chat is opened and back is tapped THEN the chats list is the only screen left on the stack`() =
         runComposeUiTest {
             onAppNavHost {
                 backStack[0] = Destination.Chats

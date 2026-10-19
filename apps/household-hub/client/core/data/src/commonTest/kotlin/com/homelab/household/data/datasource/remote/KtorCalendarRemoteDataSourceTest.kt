@@ -193,7 +193,6 @@ class KtorCalendarRemoteDataSourceTest {
     @Test
     fun `GIVEN a Google calendar that needs signing in again WHEN it is asked for THEN the hub's flag comes through`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -206,30 +205,24 @@ class KtorCalendarRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val calendar = dataSource(engine).getMyCalendar()
 
-            // THEN
             assertEquals(true, calendar?.needsReconnect)
         }
 
     @Test
     fun `GIVEN a hub from before Google sign-in WHEN the calendar is asked for THEN it needs nothing`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { respondJson(calendarJson) }
 
-            // WHEN
             val calendar = dataSource(engine).getMyCalendar()
 
-            // THEN
             assertEquals(false, calendar?.needsReconnect)
         }
 
     @Test
     fun `GIVEN the hub can start a Google sign-in WHEN one is started THEN it is posted and Google's page comes back`() =
         runTest {
-            // GIVEN
             var method: HttpMethod? = null
             var path: String? = null
             val engine =
@@ -239,10 +232,8 @@ class KtorCalendarRemoteDataSourceTest {
                     respondJson("""{"authorization_url":"https://accounts.google.com/o/oauth2/v2/auth?state=s"}""")
                 }
 
-            // WHEN
             val page = dataSource(engine).startGoogleSignIn()
 
-            // THEN
             assertEquals(HttpMethod.Post, method)
             assertEquals("/api/v1/integrations/calendars/google/start", path)
             assertEquals("https://accounts.google.com/o/oauth2/v2/auth?state=s", page)
@@ -251,7 +242,6 @@ class KtorCalendarRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub has no Google sign-in set up WHEN one is started THEN it says so rather than offline`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -260,23 +250,18 @@ class KtorCalendarRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val failure = assertFailsWith<GoogleSignInUnavailableException> { dataSource(engine).startGoogleSignIn() }
 
-            // THEN
             assertEquals("This hub isn't set up for Google sign-in", failure.message)
         }
 
     @Test
     fun `GIVEN a proxy answering 503 for a hub that is down WHEN a sign-in is started THEN the hub is offline`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { respond("Service Unavailable", HttpStatusCode.ServiceUnavailable) }
 
-            // WHEN
             val failure = assertFailsWith<ServerOfflineException> { dataSource(engine).startGoogleSignIn() }
 
-            // THEN
             assertTrue(failure.message.orEmpty().contains("503"), "was ${failure.message}")
         }
 }

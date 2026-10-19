@@ -46,7 +46,7 @@ class AppStartTest {
         }
 
     @Test
-    fun a_phone_still_signed_in_opens_on_home_without_waiting_for_the_hub() {
+    fun `GIVEN a phone still signed in WHEN the app opens THEN it shows home without waiting for the hub`() {
         val tokens = InMemorySessionStorage().apply { saveTokens("token-from-last-time") }
 
         runScreenTest {
@@ -57,7 +57,7 @@ class AppStartTest {
     }
 
     @Test
-    fun a_phone_still_signed_in_renews_its_token_once() {
+    fun `GIVEN a phone still signed in WHEN the app opens THEN its token is renewed once`() {
         val tokens = InMemorySessionStorage().apply { saveTokens("token-from-last-time") }
 
         runScreenTest {
@@ -70,7 +70,7 @@ class AppStartTest {
     }
 
     @Test
-    fun a_phone_whose_token_the_hub_no_longer_accepts_goes_to_who_is_here() {
+    fun `GIVEN a phone whose token the hub refuses WHEN the app opens THEN it shows sign in and forgets the token`() {
         val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
         val refusing = MockEngine { respond("""{"detail":"Invalid or expired token."}""", HttpStatusCode.Unauthorized) }
 
@@ -84,7 +84,7 @@ class AppStartTest {
     }
 
     @Test
-    fun a_phone_with_nobody_signed_in_opens_on_launch() {
+    fun `GIVEN a phone with nobody signed in WHEN the app opens THEN it shows launch`() {
         runScreenTest {
             setContent {
                 TestApp(

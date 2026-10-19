@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SplashThemeTest {
     @Test
-    fun main_activity_opens_with_the_splash_theme() {
+    fun GIVEN_the_installed_app_WHEN_the_main_screen_theme_is_read_THEN_it_is_the_splash_theme() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val activity =
             context.packageManager.getActivityInfo(
@@ -29,7 +29,7 @@ class SplashThemeTest {
     }
 
     @Test
-    fun once_resumed_the_window_is_back_on_the_app_theme() {
+    fun GIVEN_a_resumed_main_screen_WHEN_its_background_is_resolved_THEN_it_is_the_app_theme_canvas() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.moveToState(Lifecycle.State.RESUMED)
             scenario.onActivity { activity ->

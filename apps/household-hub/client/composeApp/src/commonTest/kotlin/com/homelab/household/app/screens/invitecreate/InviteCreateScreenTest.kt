@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class InviteCreateScreenTest {
     @Test
-    fun a_name_and_a_tap_produce_a_code_to_read_out() {
+    fun `GIVEN a hub that makes invites WHEN a name is typed and new code is tapped THEN the code shows and the name reached the hub`() {
         val hub = FakeMembersHub()
         hub.makesInvites(code = "K7M2QP")
 
@@ -32,7 +32,7 @@ class InviteCreateScreenTest {
     }
 
     @Test
-    fun a_blank_name_says_so_under_the_field() {
+    fun `GIVEN a blank name WHEN new code is tapped THEN the name field says it is missing`() {
         val hub = FakeMembersHub()
 
         runScreenTest {
@@ -46,7 +46,7 @@ class InviteCreateScreenTest {
     }
 
     @Test
-    fun a_name_the_household_already_has_says_so() {
+    fun `GIVEN a hub that says the name is taken WHEN the name is typed and new code is tapped THEN the screen says the name is taken`() {
         val hub = FakeMembersHub()
         hub.saysTheNameIsTaken()
 
@@ -67,7 +67,7 @@ class InviteCreateScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun making_the_first_code_shows_on_the_button() =
+    fun `GIVEN the first code being made WHEN the screen is shown THEN the button says it is making the first code and new code is gone`() =
         runComposeUiTest {
             inviteCreateContent(InviteCreateUiState(name = "Liam", status = InviteCreateStatus.Creating))
 
@@ -82,7 +82,7 @@ class InviteCreateScreenTest {
      * itself differently — this is a *new* code, and the one on screen is about to stop working.
      */
     @Test
-    fun making_a_second_code_announces_that_it_is_a_new_one() =
+    fun `GIVEN a code on screen and a new one being made WHEN the screen is shown THEN the button says it is making a new code and the old code is gone`() =
         runComposeUiTest {
             val invite = Invite(code = "K7M2QP", invitedName = "Liam", isAdmin = false, expiresInSeconds = 892)
 
@@ -107,7 +107,7 @@ class InviteCreateScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = InviteCreateUiStateProvider().values.toList()
 
         states.forEach { state ->

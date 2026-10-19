@@ -87,7 +87,7 @@ class WhenAgentsActScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val provider = WhenAgentsActUiStateProvider()
         provider.values.forEach { state ->
             runComposeUiTest {

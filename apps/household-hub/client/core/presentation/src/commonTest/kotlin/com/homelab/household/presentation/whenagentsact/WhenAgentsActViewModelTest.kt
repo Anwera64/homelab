@@ -62,7 +62,7 @@ class WhenAgentsActViewModelTest {
     ) = groups.flatMap { it.approvals }.first { it.tool == tool && it.action == action }
 
     @Test
-    fun the_calendar_comes_first_then_notes_each_in_the_order_the_board_draws_them() =
+    fun `GIVEN the hub lists calendar and notes approvals WHEN the screen loads THEN the calendar comes first then notes each in the order the board draws them`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
 
@@ -86,7 +86,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun a_tool_this_phone_does_not_know_is_left_out() =
+    fun `GIVEN the hub lists a tool this phone does not know WHEN the screen loads THEN that tool is left out`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
 
@@ -100,14 +100,20 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun a_hub_that_cannot_be_reached_says_so_and_try_again_asks_once_more() =
+    fun `GIVEN a hub that cannot be reached WHEN the screen loads THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } throws ServerOfflineException("offline")
-
             val viewModel = viewModel()
             advanceUntilIdle()
             assertEquals(WhenAgentsActStatus.Unreachable, viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN a hub that was unreachable and has since come back WHEN trying again THEN the board is ready with both groups`() =
+        runTest(testDispatcher) {
+            everySuspend { getToolApprovals() } throws ServerOfflineException("offline")
+            val viewModel = viewModel()
+            advanceUntilIdle()
             everySuspend { getToolApprovals() } returns hubList
             viewModel.load()
             advanceUntilIdle()
@@ -117,7 +123,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun a_hub_that_answers_with_an_error_is_a_failure_not_offline() =
+    fun `GIVEN a hub that answers with an error WHEN the screen loads THEN the status is failed rather than unreachable`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } throws IllegalStateException("500")
 
@@ -128,7 +134,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun switching_a_write_on_flips_it_at_once_and_keeps_what_the_hub_answers() =
+    fun `GIVEN a write that is off WHEN switching it on THEN it flips at once and keeps what the hub answers`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
             val hubAnswer = CompletableDeferred<List<ToolApproval>>()
@@ -166,7 +172,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun a_switch_the_hub_would_not_save_goes_back_and_says_why() =
+    fun `GIVEN a hub that cannot be reached WHEN switching a write off THEN the switch goes back and the failure is said beside it`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
             everySuspend { setToolApproval(any(), any(), any()) } throws ServerOfflineException("offline")
@@ -183,17 +189,26 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun a_refused_save_is_a_failure_and_the_next_switch_clears_the_line() =
+    fun `GIVEN a hub that refuses the save WHEN switching a write on THEN the save failure is failed`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
             everySuspend { setToolApproval(any(), any(), any()) } throws IllegalStateException("400")
             val viewModel = viewModel()
             advanceUntilIdle()
-
             viewModel.onToggle(HubTool.CALENDAR_WRITE, ToolAction.Update, automatic = true)
             advanceUntilIdle()
             assertEquals(SaveFailure.Failed, viewModel.uiState.value.saveFailure)
+        }
 
+    @Test
+    fun `GIVEN a refused save WHEN switching again THEN the failure line clears`() =
+        runTest(testDispatcher) {
+            everySuspend { getToolApprovals() } returns hubList
+            everySuspend { setToolApproval(any(), any(), any()) } throws IllegalStateException("400")
+            val viewModel = viewModel()
+            advanceUntilIdle()
+            viewModel.onToggle(HubTool.CALENDAR_WRITE, ToolAction.Update, automatic = true)
+            advanceUntilIdle()
             everySuspend { setToolApproval(any(), any(), any()) } returns hubList
             viewModel.onToggle(HubTool.CALENDAR_WRITE, ToolAction.Update, automatic = true)
             runCurrent()
@@ -202,7 +217,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun removing_and_replacing_can_never_be_switched_on() =
+    fun `GIVEN a write that always asks WHEN switching it on THEN nothing is saved and it stays off`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns hubList
             val viewModel = viewModel()
@@ -221,7 +236,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun remembering_and_forgetting_come_last_as_your_memories() =
+    fun `GIVEN the hub lists memory approvals WHEN the screen loads THEN remembering and forgetting come last as your memories`() =
         runTest(testDispatcher) {
             val memories =
                 listOf(
@@ -239,7 +254,7 @@ class WhenAgentsActViewModelTest {
         }
 
     @Test
-    fun forgetting_always_asks_so_its_switch_cannot_be_turned_on() =
+    fun `GIVEN forgetting that always asks WHEN switching it on THEN nothing is saved`() =
         runTest(testDispatcher) {
             everySuspend { getToolApprovals() } returns
                 listOf(ToolApproval(HubTool.FORGET, ToolAction.Delete, automatic = false, alwaysAsks = true))

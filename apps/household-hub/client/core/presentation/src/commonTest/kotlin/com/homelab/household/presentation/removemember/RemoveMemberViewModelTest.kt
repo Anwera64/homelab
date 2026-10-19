@@ -39,7 +39,7 @@ class RemoveMemberViewModelTest {
     private fun viewModel() = RemoveMemberViewModel(liam, removeMember)
 
     @Test
-    fun their_name_typed_out_removes_them() =
+    fun `GIVEN their name typed out with stray spaces and another case WHEN removing THEN the member is removed`() =
         runTest(testDispatcher) {
             everySuspend { removeMember(any()) } returns Unit
             val viewModel = viewModel()
@@ -55,7 +55,7 @@ class RemoveMemberViewModelTest {
         }
 
     @Test
-    fun another_name_is_answered_with_words_rather_than_a_dead_button() =
+    fun `GIVEN a name that does not match WHEN removing THEN the screen says the name does not match`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
             viewModel.onNameChange("Li")
@@ -67,7 +67,7 @@ class RemoveMemberViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_nobody_was_removed() =
+    fun `GIVEN an unreachable hub WHEN removing THEN the status says nobody was removed`() =
         runTest(testDispatcher) {
             everySuspend { removeMember(any()) } throws ServerOfflineException()
             val viewModel = viewModel()

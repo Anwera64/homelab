@@ -94,7 +94,7 @@ class ProfileViewModelTest {
         )
 
     @Test
-    fun the_only_admin_is_told_they_cannot_leave() =
+    fun `GIVEN the only admin in the household WHEN the profile loads THEN the member shows and the sole admin flag is set`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -108,7 +108,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun an_admin_with_another_admin_beside_them_can_leave() =
+    fun `GIVEN an admin with another admin in the household WHEN the profile loads THEN the sole admin flag is not set`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
@@ -120,7 +120,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun a_member_who_is_not_an_admin_can_always_leave() =
+    fun `GIVEN a member who is not an admin WHEN the profile loads THEN the sole admin flag is not set`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns liam
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -136,7 +136,7 @@ class ProfileViewModelTest {
      * household is what drew an empty circle where a name and a colour belong.
      */
     @Test
-    fun the_member_is_shown_even_when_the_household_cannot_be_listed() =
+    fun `GIVEN a household that cannot be listed WHEN the profile loads THEN the member is still shown and the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } throws ServerOfflineException()
@@ -150,7 +150,7 @@ class ProfileViewModelTest {
 
     /** Nobody can be promoted offline either, so the question is left alone rather than guessed. */
     @Test
-    fun a_household_that_cannot_be_listed_leaves_the_sole_admin_question_unanswered() =
+    fun `GIVEN a household that cannot be listed WHEN the profile loads THEN the sole admin question is left unanswered`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } throws ServerOfflineException()
@@ -162,14 +162,20 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so_and_can_be_asked_again() =
+    fun `GIVEN an unreachable hub WHEN the profile loads THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } throws ServerOfflineException()
-
             val viewModel = viewModel()
             advanceUntilIdle()
             assertEquals(ProfileStatus.Unreachable, viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN an unreachable hub that has since come back WHEN loading again THEN the status is ready`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } throws ServerOfflineException()
+            val viewModel = viewModel()
+            advanceUntilIdle()
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
             viewModel.load()
@@ -179,7 +185,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun signing_out_forgets_the_token_and_says_so() =
+    fun `GIVEN a loaded profile WHEN signing out THEN the token is forgotten and the screen says signed out`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -197,7 +203,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun a_connected_calendar_shows_its_account_and_how_long_since_it_was_checked() =
+    fun `GIVEN a connected calendar WHEN the calendar loads THEN the row shows its account and how long since it was checked`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -214,7 +220,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun no_calendar_offers_to_connect_one() =
+    fun `GIVEN no calendar WHEN the calendar loads THEN the row offers to connect one`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -229,7 +235,7 @@ class ProfileViewModelTest {
 
     /** Coming back from connecting one is what asks again, so the new calendar shows at once. */
     @Test
-    fun asking_again_picks_up_a_calendar_connected_since() =
+    fun `GIVEN a calendar connected since the last check WHEN the calendar loads again THEN the row shows the new calendar`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -249,7 +255,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun a_calendar_the_hub_could_not_say_makes_no_claim() =
+    fun `GIVEN a hub that cannot say about the calendar WHEN the calendar loads THEN the row makes no claim`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -265,15 +271,12 @@ class ProfileViewModelTest {
     @Test
     fun `GIVEN a connected calendar WHEN it is disconnected THEN the hub removes it and the row offers to connect one`() =
         runTest(testDispatcher) {
-            // GIVEN
             val viewModel = connectedToIcloud()
             everySuspend { removeCalendar() } returns Unit
 
-            // WHEN
             viewModel.onDisconnectCalendar()
             advanceUntilIdle()
 
-            // THEN
             verifySuspend(VerifyMode.exactly(1)) { removeCalendar() }
             assertEquals(CalendarRow.None, viewModel.uiState.value.calendar)
             assertEquals(CalendarDisconnect.Idle, viewModel.uiState.value.calendarDisconnect)
@@ -282,15 +285,12 @@ class ProfileViewModelTest {
     @Test
     fun `GIVEN the hub can't be reached WHEN the calendar is disconnected THEN it stays connected and says so`() =
         runTest(testDispatcher) {
-            // GIVEN
             val viewModel = connectedToIcloud()
             everySuspend { removeCalendar() } throws ServerOfflineException()
 
-            // WHEN
             viewModel.onDisconnectCalendar()
             advanceUntilIdle()
 
-            // THEN
             assertEquals(
                 CalendarRow.Connected(provider = CalendarProvider.APPLE, account = "emma@icloud.com", minutesAgo = 4),
                 viewModel.uiState.value.calendar,
@@ -301,16 +301,13 @@ class ProfileViewModelTest {
     @Test
     fun `GIVEN the hub is still answering WHEN the calendar is being disconnected THEN it shows it's busy`() =
         runTest(testDispatcher) {
-            // GIVEN
             val viewModel = connectedToIcloud()
             val hubAnswers = CompletableDeferred<Unit>()
             everySuspend { removeCalendar() } calls { hubAnswers.await() }
 
-            // WHEN
             viewModel.onDisconnectCalendar()
             runCurrent()
 
-            // THEN
             assertEquals(CalendarDisconnect.Disconnecting, viewModel.uiState.value.calendarDisconnect)
             hubAnswers.complete(Unit)
         }
@@ -318,18 +315,15 @@ class ProfileViewModelTest {
     @Test
     fun `GIVEN Google stopped accepting the sign-in WHEN the calendar is loaded THEN the row asks to sign in again`() =
         runTest(testDispatcher) {
-            // GIVEN
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
             everySuspend { getCalendar() } returns
                 icloud.copy(provider = CalendarProvider.GOOGLE, account = "emma@gmail.com", needsReconnect = true)
             val viewModel = viewModel()
 
-            // WHEN
             viewModel.loadCalendar()
             advanceUntilIdle()
 
-            // THEN
             assertEquals(
                 CalendarRow.Connected(
                     provider = CalendarProvider.GOOGLE,
@@ -358,7 +352,7 @@ class ProfileViewModelTest {
             ToolApproval(HubTool.DOCUMENT_WRITER, ToolAction.Create, automatic = ToolAction.Append in automatic)
 
     @Test
-    fun the_agents_row_counts_the_writes_that_run_without_asking() =
+    fun `GIVEN two writes that run without asking WHEN the agents row loads THEN it counts two`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
@@ -373,7 +367,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun coming_back_to_the_profile_counts_again() =
+    fun `GIVEN no writes that run without asking WHEN the agents row loads THEN it counts none`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
@@ -382,7 +376,17 @@ class ProfileViewModelTest {
             viewModel.loadAutomaticWrites()
             advanceUntilIdle()
             assertEquals(0, viewModel.uiState.value.automaticWrites)
+        }
 
+    @Test
+    fun `GIVEN a count of none and a write switched on since WHEN coming back to the profile THEN it counts again`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } returns emma
+            everySuspend { listHouseholdMembers() } returns listOf(emma, noor)
+            everySuspend { getToolApprovals() } returns writes()
+            val viewModel = viewModel()
+            viewModel.loadAutomaticWrites()
+            advanceUntilIdle()
             everySuspend { getToolApprovals() } returns writes(ToolAction.Create)
             viewModel.loadAutomaticWrites()
             advanceUntilIdle()
@@ -391,7 +395,7 @@ class ProfileViewModelTest {
         }
 
     @Test
-    fun a_count_the_hub_could_not_give_makes_no_claim() =
+    fun `GIVEN a hub that cannot give the count WHEN the agents row loads THEN it makes no claim`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, noor)

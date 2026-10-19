@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class ObserveEventsTest {
     @Test
-    fun an_event_reaches_the_collector() =
+    fun `GIVEN a screen observing events WHEN an event is sent THEN the collector receives it`() =
         runScreenTest {
             val events = Channel<String>(Channel.BUFFERED)
             val seen = mutableListOf<String>()
@@ -29,7 +29,7 @@ class ObserveEventsTest {
         }
 
     @Test
-    fun a_recomposition_does_not_replay_an_event() =
+    fun `GIVEN a screen that already received an event WHEN another event is sent THEN each event is received once`() =
         runScreenTest {
             val events = Channel<String>(Channel.BUFFERED)
             val seen = mutableListOf<String>()

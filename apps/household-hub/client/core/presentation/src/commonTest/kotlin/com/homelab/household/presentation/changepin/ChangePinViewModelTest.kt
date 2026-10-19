@@ -45,7 +45,7 @@ class ChangePinViewModelTest {
     }
 
     @Test
-    fun the_hub_takes_the_change_and_the_screen_says_so() =
+    fun `GIVEN a filled-in form the hub accepts WHEN changing the pin THEN the screen says it changed`() =
         runTest(testDispatcher) {
             everySuspend { changePin(any(), any()) } returns Unit
             val viewModel = ChangePinViewModel(changePin)
@@ -61,7 +61,7 @@ class ChangePinViewModelTest {
         }
 
     @Test
-    fun two_different_new_pins_land_under_the_second_field() =
+    fun `GIVEN two different new pins WHEN changing the pin THEN the mismatch lands under the second field`() =
         runTest(testDispatcher) {
             val viewModel = ChangePinViewModel(changePin)
             viewModel.onCurrentChange("135790")
@@ -75,7 +75,7 @@ class ChangePinViewModelTest {
         }
 
     @Test
-    fun a_new_pin_that_is_not_six_digits_says_so_under_the_field() =
+    fun `GIVEN a new pin that is not six digits WHEN changing the pin THEN the new pin field says so`() =
         runTest(testDispatcher) {
             val viewModel = ChangePinViewModel(changePin)
             viewModel.onCurrentChange("135790")
@@ -89,7 +89,7 @@ class ChangePinViewModelTest {
         }
 
     @Test
-    fun a_wrong_current_pin_lands_under_that_field_with_the_tries_left() =
+    fun `GIVEN a wrong current pin WHEN changing the pin THEN the error lands under that field with the tries left and the field is cleared`() =
         runTest(testDispatcher) {
             everySuspend { changePin(any(), any()) } throws WrongPinException(attemptsLeft = 4)
             val viewModel = ChangePinViewModel(changePin)
@@ -103,7 +103,7 @@ class ChangePinViewModelTest {
         }
 
     @Test
-    fun too_many_wrong_pins_count_down() =
+    fun `GIVEN too many wrong pins WHEN changing the pin THEN the status counts down the lock`() =
         runTest(testDispatcher) {
             everySuspend { changePin(any(), any()) } throws PinLockedException(retryAfterSeconds = 30)
             val viewModel = ChangePinViewModel(changePin)
@@ -116,7 +116,7 @@ class ChangePinViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_nothing_was_changed() =
+    fun `GIVEN an unreachable hub WHEN changing the pin THEN the status says nothing was changed`() =
         runTest(testDispatcher) {
             everySuspend { changePin(any(), any()) } throws ServerOfflineException()
             val viewModel = ChangePinViewModel(changePin)

@@ -66,7 +66,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a household with two conversations WHEN they are listed THEN both come back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -79,10 +78,8 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val sessions = dataSource(engine).listSessions()
 
-            // THEN
             assertEquals("/api/v1/sessions", path)
             assertEquals(listOf("s-1", "s-2"), sessions.map { it.id })
             assertEquals(listOf(false, true), sessions.map { it.is_secret })
@@ -91,7 +88,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a conversation with messages WHEN it is fetched THEN the conversation and its messages come back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -108,10 +104,8 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val detail = dataSource(engine).fetchSession("s-100")
 
-            // THEN
             assertEquals("/api/v1/sessions/s-100", path)
             assertEquals("Kitchen Planning", detail.title)
             assertEquals(listOf("m-1", "m-2"), detail.messages.map { it.id })
@@ -120,10 +114,8 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN conversations are listed THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).listSessions() }
         }
 
@@ -132,7 +124,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN an agent to talk to WHEN a conversation is started THEN the agent title and secrecy are posted`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -144,10 +135,8 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val session = dataSource(engine).createSession(agentId = "a-1", title = "Groceries", isSecret = true)
 
-            // THEN
             assertEquals("/api/v1/sessions", path)
             assertSameJson("""{"agent_id": "a-1", "title": "Groceries", "is_secret": true}""", sent)
             assertEquals("s-3", session.id)
@@ -156,7 +145,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN an open conversation WHEN it is archived THEN the hub is asked to archive it`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -164,17 +152,14 @@ class KtorSessionRemoteDataSourceTest {
                     respondJson("""{"id": "s-100", "user_id": "u-1", "title": "Dinner", "is_archived": true}""")
                 }
 
-            // WHEN
             dataSource(engine).archiveSession("s-100")
 
-            // THEN
             assertEquals("/api/v1/sessions/s-100/archive", path)
         }
 
     @Test
     fun `GIVEN an open conversation WHEN it is made secret THEN the new secrecy is patched and comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -184,10 +169,8 @@ class KtorSessionRemoteDataSourceTest {
                     respondJson("""{"id": "s-100", "user_id": "u-1", "title": "Secret Chat", "is_secret": true}""")
                 }
 
-            // WHEN
             val session = dataSource(engine).toggleSecretMode("s-100", isSecret = true)
 
-            // THEN
             assertEquals("/api/v1/sessions/s-100/secret", path)
             assertSameJson("""{"is_secret": true}""", sent)
             assertTrue(session.is_secret)
@@ -196,7 +179,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a conversation nobody wants kept WHEN it is deleted THEN the hub is asked to delete it`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -204,10 +186,8 @@ class KtorSessionRemoteDataSourceTest {
                     respondJson("""{"message": "deleted"}""")
                 }
 
-            // WHEN
             dataSource(engine).deleteSession("s-100")
 
-            // THEN
             assertEquals("/api/v1/sessions/s-100", path)
         }
 
@@ -216,7 +196,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a card waiting WHEN it is answered THEN the decision is posted and the rest of the turn streams back`() =
         runTest {
-            // GIVEN
             val sse =
                 """
                 data: {"type": "accepted"}
@@ -235,7 +214,6 @@ class KtorSessionRemoteDataSourceTest {
                     respondSse(sse)
                 }
 
-            // WHEN
             val events =
                 dataSource(engine)
                     .openDecisionStream(
@@ -249,7 +227,6 @@ class KtorSessionRemoteDataSourceTest {
                             },
                     ).toList()
 
-            // THEN
             assertEquals("/api/v1/sessions/s-1/tools/tc-1/decision", path)
             assertSameJson(
                 """{"approved": true, "modified_arguments": {"start_time": "2026-10-03T21:00:00", "is_all_day": false}}""",
@@ -262,7 +239,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a card waiting WHEN another message is sent THEN it is held rather than taken for a busy hub`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -271,7 +247,6 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<ApprovalPendingException> {
                 dataSource(engine).openChatStream("s-1", "Also lunch?", autoApproveWrites = false).toList()
             }
@@ -280,7 +255,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a busy hub whose refusal only mentions a card WHEN a message is sent THEN it reads the code and not the words`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -289,7 +263,6 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<SessionConflictException> {
                 dataSource(engine).openChatStream("s-1", "Also lunch?", autoApproveWrites = false).toList()
             }
@@ -300,7 +273,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a hub streaming a reply WHEN a turn is sent THEN each event arrives in order`() =
         runTest {
-            // GIVEN
             val sse =
                 """
                 data: {"type": "delta", "content": "Working on it..."}
@@ -319,10 +291,8 @@ class KtorSessionRemoteDataSourceTest {
                     respondSse(sse)
                 }
 
-            // WHEN
             val events = dataSource(engine).openChatStream("s-1", "Hello", autoApproveWrites = true).toList()
 
-            // THEN � auto_approve_writes is sent as true rather than false on purpose: it defaults to
             // false in the DTO, and kotlinx.serialization omits a field equal to its default, so a
             // false here would assert nothing about whether the flag reaches the hub at all.
             assertEquals("/api/v1/sessions/s-1/chat/stream", path)
@@ -340,7 +310,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub already working on this conversation WHEN another turn is sent THEN it is refused as a conflict`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -349,7 +318,6 @@ class KtorSessionRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<SessionConflictException> {
                 dataSource(engine).openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
             }
@@ -358,10 +326,8 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a turn is sent THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> {
                 dataSource(engine).openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
             }
@@ -370,10 +336,8 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub answering a turn with an unexpected status WHEN it is sent THEN it is reported as a bad answer from upstream`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { respondJson("""{"detail": "teapot"}""", HttpStatusCode.InternalServerError) }
 
-            // WHEN / THEN
             val thrown =
                 assertFailsWith<UpstreamGatewayException> {
                     dataSource(engine).openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
@@ -398,7 +362,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a turn that streamed two events WHEN it is resumed THEN the hub is asked for what came after the last one`() =
         runTest {
-            // GIVEN
             val resumeSse =
                 """
                 id: t:3
@@ -422,10 +385,8 @@ class KtorSessionRemoteDataSourceTest {
             val dataSource = dataSource(engine)
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
 
-            // WHEN
             val events = dataSource.resumeTurnStream("s-1").toList()
 
-            // THEN
             assertEquals("/api/v1/sessions/s-1/chat/stream", getPath)
             assertEquals("t:2", getLastEventId)
             assertEquals(" world", (events[0] as ChatStreamEvent.Delta).content)
@@ -434,7 +395,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a resumed stream WHEN it is resumed again THEN it continues from the last resumed event`() =
         runTest {
-            // GIVEN
             val resumeSse =
                 """
                 id: t:3
@@ -457,17 +417,14 @@ class KtorSessionRemoteDataSourceTest {
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
             dataSource.resumeTurnStream("s-1").toList()
 
-            // WHEN
             dataSource.resumeTurnStream("s-1").toList()
 
-            // THEN
             assertEquals(listOf<String?>("t:2", "t:3"), getLastEventIds)
         }
 
     @Test
     fun `GIVEN a conversation opened mid-turn WHEN it is resumed THEN the hub is asked for its turn from the start`() =
         runTest {
-            // GIVEN — nothing streamed on this phone yet: the screen was reopened, or the app restarted.
             var path: String? = null
             var asked: String? = "unset"
             val engine =
@@ -477,10 +434,8 @@ class KtorSessionRemoteDataSourceTest {
                     respondSse(twoEventTurnSse)
                 }
 
-            // WHEN
             val events = dataSource(engine).resumeTurnStream("s-1").toList()
 
-            // THEN
             assertEquals("/api/v1/sessions/s-1/chat/stream", path)
             assertNull(asked)
             assertEquals(2, events.size)
@@ -489,10 +444,8 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a conversation with no turn held WHEN it is resumed with nothing remembered THEN it is gone`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { respondJson("""{"detail": "gone"}""", HttpStatusCode.Gone) }
 
-            // WHEN / THEN
             assertFailsWith<TurnGoneException> {
                 dataSource(engine).resumeTurnStream("s-1").toList()
             }
@@ -501,7 +454,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub has let the turn go WHEN it is resumed THEN it is gone`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine { request ->
                     if (request.method == HttpMethod.Post) {
@@ -513,7 +465,6 @@ class KtorSessionRemoteDataSourceTest {
             val dataSource = dataSource(engine)
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
 
-            // WHEN / THEN
             assertFailsWith<TurnGoneException> {
                 dataSource.resumeTurnStream("s-1").toList()
             }
@@ -522,7 +473,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a turn is resumed THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine { request ->
                     if (request.method == HttpMethod.Post) {
@@ -534,7 +484,6 @@ class KtorSessionRemoteDataSourceTest {
             val dataSource = dataSource(engine)
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> {
                 dataSource.resumeTurnStream("s-1").toList()
             }
@@ -543,7 +492,6 @@ class KtorSessionRemoteDataSourceTest {
     @Test
     fun `GIVEN a new turn in the conversation WHEN it is resumed before any event arrives THEN it does not resume the previous turn`() =
         runTest {
-            // GIVEN
             val noIdSse =
                 """
                 data: [DONE]
@@ -565,10 +513,8 @@ class KtorSessionRemoteDataSourceTest {
             dataSource.openChatStream("s-1", "Hello", autoApproveWrites = false).toList()
             dataSource.openChatStream("s-1", "Hello again", autoApproveWrites = false).toList()
 
-            // WHEN
             dataSource.resumeTurnStream("s-1").toList()
 
-            // THEN — the new turn is asked for from its start, never after the old turn's last event.
             assertNull(asked)
         }
 }

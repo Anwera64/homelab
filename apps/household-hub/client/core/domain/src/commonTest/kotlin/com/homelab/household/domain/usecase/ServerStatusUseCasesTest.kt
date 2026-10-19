@@ -21,7 +21,7 @@ class ServerStatusUseCasesTest {
     private val checkHealthUseCase = CheckServerHealthUseCaseImpl(statusRepo)
 
     @Test
-    fun observe_status_emits_flow_of_server_statuses() =
+    fun `GIVEN a repository reporting connecting then online then offline WHEN the status is observed THEN the three statuses arrive in order`() =
         runTest {
             val statuses =
                 listOf(
@@ -41,7 +41,7 @@ class ServerStatusUseCasesTest {
         }
 
     @Test
-    fun check_health_returns_latest_status() =
+    fun `GIVEN an online hub WHEN its health is checked THEN the online status comes back with its latency`() =
         runTest {
             everySuspend { statusRepo.checkHealth() } returns ServerStatus.Online(latencyMs = 8)
 

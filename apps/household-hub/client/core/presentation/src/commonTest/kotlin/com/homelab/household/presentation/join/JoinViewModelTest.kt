@@ -56,7 +56,7 @@ class JoinViewModelTest {
     private fun viewModel() = JoinViewModel(invite, "K7M2QP", joinHousehold, listMembers)
 
     @Test
-    fun the_form_starts_with_the_name_from_the_invite() =
+    fun `GIVEN an invite for Liam WHEN the form opens THEN it has his name and the first colour`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
             advanceUntilIdle()
@@ -66,22 +66,29 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun a_colour_somebody_here_wears_is_marked_and_not_chosen() =
+    fun `GIVEN a colour somebody here wears WHEN the form opens THEN it is marked taken and not chosen`() =
         runTest(testDispatcher) {
             val taken = AvatarPalette.swatches.first()
             everySuspend { listMembers() } returns listOf(Member(id = "emma", name = "Emma", avatarColor = taken))
             val viewModel = viewModel()
             advanceUntilIdle()
-
             assertEquals(setOf(taken), viewModel.uiState.value.takenColours)
             assertEquals(AvatarPalette.swatches[1], viewModel.uiState.value.colour)
+        }
 
+    @Test
+    fun `GIVEN a colour somebody here wears WHEN selecting it THEN the chosen colour stays the same`() =
+        runTest(testDispatcher) {
+            val taken = AvatarPalette.swatches.first()
+            everySuspend { listMembers() } returns listOf(Member(id = "emma", name = "Emma", avatarColor = taken))
+            val viewModel = viewModel()
+            advanceUntilIdle()
             viewModel.onColourSelect(taken)
             assertEquals(AvatarPalette.swatches[1], viewModel.uiState.value.colour)
         }
 
     @Test
-    fun joining_sends_the_name_pin_and_colour_and_says_so() =
+    fun `GIVEN a filled-in form WHEN joining THEN the hub gets the code and name and pin and colour and the screen says joined`() =
         runTest(testDispatcher) {
             everySuspend { joinHousehold(any(), any(), any(), any()) } returns liam
             val viewModel = viewModel()
@@ -100,7 +107,7 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun a_name_that_was_wiped_out_says_so_under_the_field() =
+    fun `GIVEN a name wiped out to blanks WHEN joining THEN the name field says it is missing`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
             advanceUntilIdle()
@@ -114,7 +121,7 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun a_pin_that_is_not_six_digits_says_so_under_the_field() =
+    fun `GIVEN a pin that is not six digits WHEN joining THEN the pin field says so`() =
         runTest(testDispatcher) {
             val viewModel = viewModel()
             advanceUntilIdle()
@@ -127,7 +134,7 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun a_name_taken_while_they_typed_lands_under_the_name() =
+    fun `GIVEN a name someone took while they typed WHEN joining THEN the name field says it is taken and the status is idle`() =
         runTest(testDispatcher) {
             everySuspend { joinHousehold(any(), any(), any(), any()) } throws NameTakenException()
             val viewModel = viewModel()
@@ -142,7 +149,7 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun a_code_that_has_gone_says_so() =
+    fun `GIVEN an invite code that has gone WHEN joining THEN the status says expired`() =
         runTest(testDispatcher) {
             everySuspend { joinHousehold(any(), any(), any(), any()) } throws InviteInvalidException()
             val viewModel = viewModel()
@@ -156,7 +163,7 @@ class JoinViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so() =
+    fun `GIVEN an unreachable hub WHEN joining THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { joinHousehold(any(), any(), any(), any()) } throws ServerOfflineException()
             val viewModel = viewModel()

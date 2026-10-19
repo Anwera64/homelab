@@ -40,7 +40,7 @@ class SessionUseCasesTest {
         )
 
     @Test
-    fun create_session_with_valid_agent_returns_session() =
+    fun `GIVEN a valid agent WHEN a session is created THEN the new session comes back and the repository is asked once`() =
         runTest {
             everySuspend { sessionRepo.createSession("agent-1", "Research Session", false) } returns dummySession
 
@@ -52,7 +52,7 @@ class SessionUseCasesTest {
         }
 
     @Test
-    fun create_session_with_blank_agent_id_throws_validation_error() =
+    fun `GIVEN a blank agent id WHEN a session is created THEN it is refused as invalid`() =
         runTest {
             assertFailsWith<ValidationException> {
                 createSessionUseCase("", "Research Session", false)
@@ -60,7 +60,7 @@ class SessionUseCasesTest {
         }
 
     @Test
-    fun get_session_returns_session_and_messages() =
+    fun `GIVEN a session with one message WHEN it is fetched THEN the session and its message come back`() =
         runTest {
             val messages =
                 listOf(
@@ -83,7 +83,7 @@ class SessionUseCasesTest {
         }
 
     @Test
-    fun archive_session_delegates_to_repo() =
+    fun `GIVEN an existing session WHEN it is archived THEN the repository archives it once`() =
         runTest {
             everySuspend { sessionRepo.archiveSession("session-1") } returns Unit
 
@@ -93,7 +93,7 @@ class SessionUseCasesTest {
         }
 
     @Test
-    fun toggle_secret_mode_delegates_to_repo() =
+    fun `GIVEN a session that is not secret WHEN secret mode is switched on THEN the session comes back secret`() =
         runTest {
             everySuspend { sessionRepo.toggleSecretMode("session-1", true) } returns dummySession.copy(isSecret = true)
 

@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class ToolRecordLineTest {
     @Test
-    fun shows_what_the_tool_did() =
+    fun `GIVEN a tool record line WHEN it is shown THEN the record text is visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -23,7 +23,7 @@ class ToolRecordLineTest {
         }
 
     @Test
-    fun is_not_clickable_without_on_click() =
+    fun `GIVEN a tool record line without a click handler WHEN it is shown THEN it cannot be opened`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -35,7 +35,7 @@ class ToolRecordLineTest {
         }
 
     @Test
-    fun opens_when_on_click_is_provided() =
+    fun `GIVEN a tool record line with a click handler WHEN it is tapped THEN it opens once`() =
         runComposeUiTest {
             var opened = 0
             setContent {

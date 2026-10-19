@@ -16,7 +16,7 @@ class RemoveMemberScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun typing_their_name_removes_them() {
+    fun `GIVEN a hub that removes members WHEN the member's name is typed and remove is tapped THEN the member is removed`() {
         val hub = FakeMembersHub()
         hub.doesIt()
         var removed = 0
@@ -34,7 +34,7 @@ class RemoveMemberScreenTest {
     }
 
     @Test
-    fun another_name_says_so_under_the_field() {
+    fun `GIVEN a different name typed WHEN remove is tapped THEN the field says the name does not match`() {
         val hub = FakeMembersHub()
 
         runScreenTest {
@@ -54,7 +54,7 @@ class RemoveMemberScreenTest {
      * about.
      */
     @Test
-    fun removing_them_shows_on_the_button_and_names_them() =
+    fun `GIVEN a removal in progress WHEN the screen is shown THEN the button says it is removing the member by name and remove is gone`() =
         runComposeUiTest {
             removeMemberContent(
                 RemoveMemberUiState(
@@ -71,7 +71,7 @@ class RemoveMemberScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title names the member`() {
         RemoveMemberUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 removeMemberContent(state)

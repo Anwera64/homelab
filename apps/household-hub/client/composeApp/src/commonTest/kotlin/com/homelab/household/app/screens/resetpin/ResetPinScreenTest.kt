@@ -17,7 +17,7 @@ class ResetPinScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun the_code_is_carried_to_the_new_pin_screen() {
+    fun `GIVEN the reset code screen WHEN a code is typed and continue is tapped THEN the upper-cased code is carried on`() {
         val hub = FakeJoinHub()
         val codes = mutableListOf<String>()
 
@@ -36,7 +36,7 @@ class ResetPinScreenTest {
     }
 
     @Test
-    fun the_new_pin_signs_the_member_in() {
+    fun `GIVEN a hub that lets the member in WHEN the new PIN is typed twice and set is tapped THEN the member is signed in and the token is kept`() {
         val hub = FakeJoinHub()
         hub.letsThemJoinAs(memberId = "emma", fullName = "Emma")
         val tokens = InMemorySessionStorage()
@@ -58,7 +58,7 @@ class ResetPinScreenTest {
     }
 
     @Test
-    fun a_code_that_has_gone_says_so() {
+    fun `GIVEN a hub that says the code has gone WHEN the new PIN is typed twice and set is tapped THEN the screen says the code has gone`() {
         val hub = FakeJoinHub()
         hub.saysTheCodeHasGone()
 
@@ -76,7 +76,7 @@ class ResetPinScreenTest {
     }
 
     @Test
-    fun two_different_pins_say_so_under_the_second_field() {
+    fun `GIVEN two different new PINs WHEN set is tapped THEN the second field says the PINs differ`() {
         val hub = FakeJoinHub()
 
         runScreenTest {
@@ -97,7 +97,7 @@ class ResetPinScreenTest {
      * Nothing is dimmed, and the button says which PIN is being set.
      */
     @Test
-    fun setting_the_new_pin_shows_on_the_button() =
+    fun `GIVEN a new PIN being set WHEN the screen is shown THEN the button says it is setting`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -114,7 +114,7 @@ class ResetPinScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state of both screens WHEN each is drawn THEN each shows its own title`() {
         ResetCodeUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 setContent {

@@ -25,7 +25,6 @@ class RequestPathWordsTest {
 
     @Test
     fun `GIVEN every hub path a data source names WHEN it is templated THEN its fixed words are all kept`() {
-        // GIVEN
         val paths =
             remoteDir
                 .walkTopDown()
@@ -33,14 +32,12 @@ class RequestPathWordsTest {
                 .flatMap { file -> hubPath.findAll(file.readText()).map { it.groupValues[1].substringBefore('?') } }
                 .toSet()
 
-        // WHEN
         val unknownWords =
             paths
                 .flatMap { path -> path.split('/').filter { it.isNotEmpty() && '$' !in it } }
                 .toSet()
                 .filter { word -> templateRequestPath("/$word") != "/$word" }
 
-        // THEN
         assertTrue(paths.size > 20, "Expected to find the hub's paths under ${remoteDir.absolutePath}, found $paths")
         assertTrue(
             unknownWords.isEmpty(),
