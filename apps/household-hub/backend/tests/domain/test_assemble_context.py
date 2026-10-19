@@ -399,3 +399,59 @@ async def test_a_minute_later_the_prompt_only_grows_so_ollama_can_keep_its_cache
     )
 
     assert [(m.role, m.content) for m in second[: len(first)]] == [(m.role, m.content) for m in first]
+
+
+# --- Your own sentences still waiting on someone else (memory spec §2.1) ------------------------
+
+
+def _waiting_world():
+    from app.domain.entities.memory_proposal import MemoryProposal
+    from tests.domain.reflection_fakes import FakeProposals, FakeUsers
+
+    anton, jazmin = User(id="anton", full_name="Anton"), User(id="jazmin", full_name="Jazmin")
+    proposals = FakeProposals([
+        MemoryProposal(memory_id="boiler", content="The boiler is serviced in November now.",
+                       answerer_id="jazmin", source_user_id="anton", origin="tool"),
+        MemoryProposal(memory_id="boiler", content="Reflection read this one.",
+                       answerer_id="jazmin", source_user_id="anton"),
+    ])
+    use_case = AssembleAgentContextUseCase(
+        memory_repo=FakeMemoryRepository(),
+        user_repo=FakeUsers([anton, jazmin]),
+        proposal_repo=proposals,
+    )
+    return use_case, anton, jazmin
+
+
+async def _system(use_case, user, **kwargs):
+    agent = AgentPersonality(id="a1", slug="assistant", name="Assistant", system_prompt="Help.")
+    messages = await use_case.execute(user=user, agent=agent, recent_messages=[ChatMessage(role="user", content="Hi")], **kwargs)
+    return messages[0].content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_antons_sentence_waits_on_jazmin_THEN_his_prompt_lists_it_as_not_true_yet():
+    use_case, anton, _ = _waiting_world()
+
+    system = await _system(use_case, anton)
+
+    assert "[Waiting For Someone To Confirm - Not True Yet]:" in system
+    assert "- The boiler is serviced in November now. (waiting on Jazmin;" in system
+    assert "do not rely on this or repeat it as fact" in system and "use forget" in system
+    # Only what he asked to remember: reflection's changes aren't his sentences.
+    assert "Reflection read this one." not in system
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_antons_sentence_waits_THEN_jazmins_prompt_and_a_secret_turn_have_no_such_section():
+    use_case, anton, jazmin = _waiting_world()
+
+    assert "Not True Yet" not in await _system(use_case, jazmin)
+    assert "Not True Yet" not in await _system(use_case, anton, is_secret_session=True)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_nothing_waits_THEN_there_is_no_heading():
+    use_case = AssembleAgentContextUseCase(memory_repo=FakeMemoryRepository())
+
+    assert "Not True Yet" not in await _system(use_case, User(id="anton", full_name="Anton"))

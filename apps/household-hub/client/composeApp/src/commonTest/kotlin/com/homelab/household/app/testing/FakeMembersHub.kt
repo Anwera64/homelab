@@ -49,6 +49,8 @@ class FakeMembersHub {
             ("document_writer" to "create") to false,
             ("document_writer" to "append") to false,
             ("document_writer" to "replace") to false,
+            ("remember" to "create") to false,
+            ("forget" to "delete") to false,
         )
     private var refusesSettings = false
 
@@ -58,7 +60,15 @@ class FakeMembersHub {
 
     /** Changes to check, as the hub keeps them: id to the card's JSON, who answers, and the answer so far. */
     private val changes = linkedMapOf<String, Triple<String, Boolean, String?>>()
+
+    /** Emma's sentences waiting on Liam: id to (sentence, the stored memory's id, still waiting). */
+    private val waiting = linkedMapOf<String, Triple<String, String, Boolean>>()
+
+    /** Whether Emma's sentence [changeId] still waits on Liam, as the hub has it. */
+    fun isWaiting(changeId: String): Boolean = waiting[changeId]?.third == true
+
     private var refusesAnswers = false
+    private var tookBackBy: String? = null
 
     /** The answer the hub has for change [changeId] ("use_new", …), or null while it is open. */
     fun answerTo(changeId: String): String? = changes[changeId]?.third
@@ -116,6 +126,12 @@ class FakeMembersHub {
 
                 path.startsWith("/api/v1/memories/proposals/") && path.endsWith("/answer") -> {
                     if (refusesAnswers) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    tookBackBy?.let { name ->
+                        return@MockEngine json(
+                            """{"detail":"$name took this back.","code":"change_withdrawn"}""",
+                            HttpStatusCode.Conflict,
+                        )
+                    }
                     val id = path.removePrefix("/api/v1/memories/proposals/").removeSuffix("/answer")
                     val answer = Regex("\"answer\":\"([a-z_]+)\"").find(sent.last())!!.groupValues[1]
                     changes[id] = changes.getValue(id).copy(third = answer)
@@ -126,6 +142,18 @@ class FakeMembersHub {
                     val id = path.removePrefix("/api/v1/memories/proposals/").removeSuffix("/undo")
                     changes[id] = changes.getValue(id).copy(third = null)
                     json("""{"id":"$id","memory_id":"s-$id","content":"x","state":"pending"}""")
+                }
+
+                path.startsWith("/api/v1/memories/proposals/") && request.method == HttpMethod.Delete -> {
+                    val id = path.removePrefix("/api/v1/memories/proposals/")
+                    waiting[id] = waiting.getValue(id).copy(third = false)
+                    json("""{"id":"$id","memory_id":"x","content":"x","state":"withdrawn"}""")
+                }
+
+                path.startsWith("/api/v1/memories/proposals/") && path.endsWith("/restore") -> {
+                    val id = path.removePrefix("/api/v1/memories/proposals/").removeSuffix("/restore")
+                    waiting[id] = waiting.getValue(id).copy(third = true)
+                    json("""{"id":"$id","memory_id":"x","content":"x","state":"pending"}""")
                 }
 
                 path == "/api/v1/memories/page" -> {
@@ -282,6 +310,19 @@ class FakeMembersHub {
             "is_mine":$mine,"agent_name":"Coordinator","agent_avatar":"🏡","can_remove":$mine}""" to true
     }
 
+    /**
+     * Emma asked an agent to remember [content] over Liam's memory [storedId], which must be remembered
+     * already: it waits on him, so the page shows it beside his memory rather than in the list.
+     */
+    @OptIn(ExperimentalTime::class)
+    fun waitsOnLiam(
+        id: String,
+        content: String,
+        storedId: String,
+    ) {
+        waiting[id] = Triple(content, storedId, true)
+    }
+
     /** The page lists, but ✕ never reaches the hub. */
     fun refusesMemoryRemoval() {
         refusesRemoval = true
@@ -290,10 +331,26 @@ class FakeMembersHub {
     private fun memoryPageJson(): String {
         val active = memories.values.filter { it.second }.map { it.first }
         val yours = active.filter { it.contains("\"scope\":\"personal\"") }
-        val household = active.filter { it.contains("\"scope\":\"household\"") }
+        val pairs = waiting.filterValues { it.third }
+        val inCards = pairs.values.map { it.second }.toSet()
+        val household =
+            memories
+                .filter { (id, memory) ->
+                    memory.second && id !in inCards &&
+                        memory.first.contains("\"scope\":\"household\"")
+                }
+                .values
+                .map { it.first }
         val toCheck = changes.values.count { it.second && it.third == null }
+        val cards =
+            pairs.map { (id, change) ->
+                """{"id":"$id","content":"${change.first}","agent_name":"Planner",
+                "created_at":"${Clock.System.now()}","expires_at":null,"answerer_name":"Liam",
+                "stored":${memories.getValue(change.second).first}}"""
+            }
         return """{"yours":${yours.joinToString(prefix = "[", postfix = "]")},
-            "household":${household.joinToString(prefix = "[", postfix = "]")},"to_check":$toCheck}"""
+            "household":${household.joinToString(prefix = "[", postfix = "]")},"to_check":$toCheck,
+            "waiting":${cards.joinToString(prefix = "[", postfix = "]")}}"""
     }
 
     /**
@@ -326,6 +383,11 @@ class FakeMembersHub {
                 mine,
                 null,
             )
+    }
+
+    /** [name] took their sentence back while it waited: an answer to it is refused, naming them. */
+    fun changeIsTakenBackBy(name: String) {
+        tookBackBy = name
     }
 
     /** Changes list, but no answer reaches the hub. */

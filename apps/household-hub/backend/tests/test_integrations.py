@@ -30,7 +30,7 @@ async def test_list_tools_endpoint(client: httpx.AsyncClient):
     names = [t["name"] for t in data]
     assert sorted(names) == sorted([
         "calendar_read", "calendar_write", "searxng_search", "read_page", "lookup_sources",
-        "pdf_reader", "document_writer",
+        "pdf_reader", "document_writer", "remember", "forget",
     ])
 
 

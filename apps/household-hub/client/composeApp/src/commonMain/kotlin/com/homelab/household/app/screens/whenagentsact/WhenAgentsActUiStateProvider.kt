@@ -30,6 +30,13 @@ class WhenAgentsActUiStateProvider : PreviewParameterProvider<WhenAgentsActUiSta
                     ToolApproval(HubTool.DOCUMENT_WRITER, ToolAction.Replace, automatic = false, alwaysAsks = true),
                 ),
             ),
+            ToolApprovalGroup(
+                ToolGroup.Memories,
+                listOf(
+                    ToolApproval(HubTool.REMEMBER, ToolAction.Create, automatic = false),
+                    ToolApproval(HubTool.FORGET, ToolAction.Delete, automatic = false, alwaysAsks = true),
+                ),
+            ),
         )
 
     private val named =

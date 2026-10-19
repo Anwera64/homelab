@@ -28,6 +28,7 @@ enum class SaveFailure {
 enum class ToolGroup {
     Calendar,
     Notes,
+    Memories,
 }
 
 data class ToolApprovalGroup(

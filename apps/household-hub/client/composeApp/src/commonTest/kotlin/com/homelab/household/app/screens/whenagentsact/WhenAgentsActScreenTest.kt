@@ -27,7 +27,9 @@ class WhenAgentsActScreenTest {
                 seesAddingEventsIsAutomatic()
                 seesChangingEventsAsks()
                 seesNotesAsk()
-                seesRemovingAndReplacingAlwaysAsk()
+                seesYourMemories()
+                seesRememberingAsks()
+                seesRemovingReplacingAndForgettingAlwaysAsk()
             }
         }
     }
@@ -47,6 +49,23 @@ class WhenAgentsActScreenTest {
             waitUntil(timeoutMillis = wait) { hub.isAutomatic("calendar_write", "create") }
             onWhenAgentsAct { seesAddingEventsIsAutomatic() }
             assertTrue(hub.requests.any { it.contains("\"tool\":\"calendar_write\"") && it.contains("\"auto\":true") })
+        }
+    }
+
+    @Test
+    fun `GIVEN remembering asks WHEN its switch is turned on THEN the hub has it automatic`() {
+        val hub = FakeMembersHub()
+
+        runScreenTest {
+            whenAgentsActScreen(hub)
+
+            onWhenAgentsAct {
+                seesTheSettings()
+                switchesRemembering()
+            }
+
+            waitUntil(timeoutMillis = wait) { hub.isAutomatic("remember", "create") }
+            onWhenAgentsAct { seesRememberingIsAutomatic() }
         }
     }
 

@@ -2,10 +2,10 @@ package com.homelab.household.domain.model
 
 /**
  * A detail of a write the member can change before approving it (canvas: ToolEdit): an event's
- * [What], [Day] and [Time], how it [Repeat]s and when that [Ends], or a note's title ([What]) and
- * [Words].
+ * [What], [Day] and [Time], how it [Repeat]s and when that [Ends], a note's title ([What]) and
+ * [Words], or a memory's sentence ([What]) and whether the household [Shared] it.
  */
-enum class EditField { What, Day, Time, Words, Repeat, Ends }
+enum class EditField { What, Day, Time, Words, Repeat, Ends, Shared }
 
 /** A calendar day picked on a card. [month] is 1 for January. */
 data class EventDate(
@@ -61,6 +61,8 @@ data class EditValues(
     val ends: RepeatEnd = RepeatEnd.Never,
     val lastDate: EventDate? = null,
     val times: Int? = null,
+    /** A memory's Yours / Household switch: null for anything that isn't a memory. */
+    val household: Boolean? = null,
 ) {
     /** Repeat set to [every]; picking Weekly with no day ticked ticks the start's own weekday. */
     fun pickRepeat(every: RepeatEvery?): EditValues {
@@ -190,6 +192,11 @@ fun editableFields(
             if (card.action == ToolAction.Append) listOf(EditField.Words) else listOf(EditField.What, EditField.Words)
         }
 
+        // Kept beside another member's memory, it is the household's whatever the switch says.
+        is ProposalDetails.Memory -> {
+            if (details.stored?.mine == false) listOf(EditField.What) else listOf(EditField.What, EditField.Shared)
+        }
+
         ProposalDetails.Other -> {
             emptyList()
         }
@@ -217,6 +224,7 @@ fun proposedValues(card: AnswerPart.Proposal): EditValues {
             },
         lastDate = until?.let { EventDate(it.year, it.month, it.day) },
         times = count,
+        household = (card.details as? ProposalDetails.Memory)?.household,
     )
 }
 
@@ -241,6 +249,7 @@ fun editProposal(
             if (values.time != proposed.time) add(EditField.Time)
             if (repeatOf(values) != repeatOf(proposed)) add(EditField.Repeat)
             if (endOf(values) != endOf(proposed)) add(EditField.Ends)
+            if (values.household != proposed.household) add(EditField.Shared)
         }.intersect(fields.toSet())
     val invalid =
         buildSet {
@@ -295,6 +304,16 @@ fun editProposal(
                 ProposalDetails.Note(title = title, content = values.words.takeIf { EditField.Words in changed })
             }
 
+            is ProposalDetails.Memory -> {
+                ProposalDetails.Memory(
+                    content = title,
+                    household = values.household.takeIf {
+                        EditField.Shared in
+                            changed
+                    },
+                )
+            }
+
             ProposalDetails.Other -> {
                 null
             }
@@ -317,6 +336,10 @@ fun ProposalDetails.withEdit(edit: ProposalDetails): ProposalDetails =
 
         this is ProposalDetails.Note && edit is ProposalDetails.Note -> {
             copy(title = edit.title ?: title, content = edit.content ?: content)
+        }
+
+        this is ProposalDetails.Memory && edit is ProposalDetails.Memory -> {
+            copy(content = edit.content ?: content, household = edit.household ?: household)
         }
 
         else -> {
@@ -381,6 +404,7 @@ private fun titleOf(details: ProposalDetails): String? =
     when (details) {
         is ProposalDetails.CalendarEvent -> details.title
         is ProposalDetails.Note -> details.title
+        is ProposalDetails.Memory -> details.content
         ProposalDetails.Other -> null
     }
 

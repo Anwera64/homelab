@@ -32,10 +32,11 @@ LIAM = User(id="liam", full_name="Liam")
 class World:
     """Liam said the boiler memory; Emma's chat with the Coordinator read a change to it."""
 
-    def __init__(self, answerer="liam", state="pending"):
+    def __init__(self, answerer="liam", state="pending", from_remember=False):
         self.stored = memory("boiler", "The boiler service is booked yearly in October.", user_id="liam", scope="household")
         self.stored.category = "milestone"
         self.memories = FakeMemories([self.stored])
+        self.memories_to_add = []
         self.proposal = MemoryProposal(
             id="prop",
             memory_id="boiler",
@@ -47,6 +48,10 @@ class World:
             state=state,
             created_at=NOW,
         )
+        if from_remember:
+            # Emma said "remember that the boiler moved": it waits for Liam, and nothing is saved yet.
+            self.proposal.origin = "tool"
+            self.proposal.expires_at = NOW.replace(year=NOW.year + 1)
         self.proposals = FakeProposals([self.proposal])
         self.sessions = FakeSessions(ConversationSession(id="chat", user_id="emma", agent_id="coordinator"), [])
         self.uow = FakeUnitOfWork()
@@ -183,3 +188,46 @@ async def test_GIVEN_a_change_not_answered_WHEN_undone_THEN_it_is_refused(state)
 
     with pytest.raises(ProposalStateException):
         await world.undo.execute("prop", LIAM)
+
+
+# --- A change raised by `remember` (memory spec §2.1): saved only once Liam answers --------------
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_remembered_change_WHEN_keep_stored_THEN_nothing_of_emmas_is_saved():
+    world = World(from_remember=True)
+
+    answered = await world.answer.execute("prop", KEEP_STORED, LIAM)
+
+    assert answered.state == "kept" and answered.new_memory_id is None
+    assert world.stored.is_active
+    assert [m.id for m in world.memories.memories] == ["boiler"] and world.embed.embedded == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("answer", [KEEP_BOTH, USE_NEW])
+async def test_GIVEN_a_remembered_change_WHEN_kept_or_used_THEN_emmas_sentence_is_saved_as_she_asked(answer):
+    world = World(from_remember=True)
+
+    await world.answer.execute("prop", answer, LIAM)
+
+    new = world.new_memory
+    assert new is not None and new.is_active and world.embed.embedded == [new]
+    assert (new.user_id, new.scope, new.content) == ("emma", "household", "The boiler service moved to November this year.")
+    # Asked for in a chat, so it reads as "You asked" on Emma's page, with the end date she gave.
+    assert (new.origin, new.agent_id, new.source_session_id) == ("tool", "coordinator", "chat")
+    assert new.expires_at == world.proposal.expires_at
+    assert world.stored.is_active is (answer == KEEP_BOTH)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("answer", [KEEP_STORED, KEEP_BOTH, USE_NEW])
+async def test_GIVEN_a_remembered_change_answered_WHEN_undone_THEN_it_waits_again_as_before(answer):
+    world = World(from_remember=True)
+    await world.answer.execute("prop", answer, LIAM)
+
+    undone = await world.undo.execute("prop", LIAM)
+
+    assert undone.state == "pending" and undone.answered_at is None and undone.new_memory_id is None
+    assert [m.id for m in world.memories.memories] == ["boiler"]
+    assert world.stored.is_active and world.stored.replaced_by_id is None and world.stored.retired_at is None

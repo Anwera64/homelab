@@ -168,4 +168,57 @@ class MemoriesScreenTest {
             }
         }
     }
+
+    // ---- remember over Liam's memory: held until he picks (slice 5 PR 6) --------------------------
+
+    private val november = "The boiler service moved to November this year."
+
+    private fun waitingOnLiam() = household().apply { waitsOnLiam("p-boiler", november, storedId = "h2") }
+
+    @Test
+    fun `GIVEN a sentence waiting on Liam WHEN Household is opened THEN it shows beside his memory once and says agents keep his`() {
+        runScreenTest {
+            memoriesScreen(waitingOnLiam())
+
+            onMemories {
+                opensHousehold(count = 3)
+                seesItWaitsOn("Liam", stored = "The boiler service is booked yearly in October.", mine = november)
+            }
+        }
+    }
+
+    @Test
+    fun `GIVEN a sentence waiting on Liam WHEN X is tapped THEN it is withdrawn at once and Undo puts it back`() {
+        val hub = waitingOnLiam()
+        runScreenTest {
+            memoriesScreen(hub)
+
+            onMemories {
+                opensHousehold(count = 3)
+                withdraws(november)
+                seesItWithdrawn()
+            }
+            waitUntil(timeoutMillis = wait) { !hub.isWaiting("p-boiler") }
+
+            onMemories { undoes() }
+            waitUntil(timeoutMillis = wait) { hub.isWaiting("p-boiler") }
+        }
+    }
+
+    @Test
+    fun `GIVEN Liam asked an agent to remember something WHEN Emma sees it THEN it doesn't say You asked`() {
+        val hub =
+            FakeMembersHub().apply {
+                remembers("h9", "Liam takes the bins out on Tuesdays.", household = true, mine = false, youAsked = true)
+            }
+        runScreenTest {
+            memoriesScreen(hub)
+
+            onMemories {
+                opensHousehold(count = 1)
+                seesMemory("Liam takes the bins out on Tuesdays.")
+                doesNotSeeYouAsked()
+            }
+        }
+    }
 }

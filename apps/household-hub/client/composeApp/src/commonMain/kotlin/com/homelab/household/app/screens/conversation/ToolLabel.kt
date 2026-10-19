@@ -27,12 +27,20 @@ import com.homelab.household.app.resources.tool_calendar_remove_running
 import com.homelab.household.app.resources.tool_calendar_write_done
 import com.homelab.household.app.resources.tool_calendar_write_failed
 import com.homelab.household.app.resources.tool_calendar_write_running
+import com.homelab.household.app.resources.tool_forget_card
+import com.homelab.household.app.resources.tool_forget_declined
+import com.homelab.household.app.resources.tool_forget_done
+import com.homelab.household.app.resources.tool_forget_failed
+import com.homelab.household.app.resources.tool_forget_running
 import com.homelab.household.app.resources.tool_generic_done
 import com.homelab.household.app.resources.tool_generic_failed
 import com.homelab.household.app.resources.tool_generic_running
 import com.homelab.household.app.resources.tool_lookup_done
 import com.homelab.household.app.resources.tool_lookup_failed
 import com.homelab.household.app.resources.tool_lookup_running
+import com.homelab.household.app.resources.tool_memory_lookup_done
+import com.homelab.household.app.resources.tool_memory_lookup_failed
+import com.homelab.household.app.resources.tool_memory_lookup_running
 import com.homelab.household.app.resources.tool_note_append_automatic_ask
 import com.homelab.household.app.resources.tool_note_append_card
 import com.homelab.household.app.resources.tool_note_append_declined
@@ -62,15 +70,24 @@ import com.homelab.household.app.resources.tool_permission_calendar_add
 import com.homelab.household.app.resources.tool_permission_calendar_change
 import com.homelab.household.app.resources.tool_permission_calendar_read
 import com.homelab.household.app.resources.tool_permission_calendar_remove
+import com.homelab.household.app.resources.tool_permission_forget
 import com.homelab.household.app.resources.tool_permission_generic
 import com.homelab.household.app.resources.tool_permission_note_append
 import com.homelab.household.app.resources.tool_permission_note_create
 import com.homelab.household.app.resources.tool_permission_note_replace
 import com.homelab.household.app.resources.tool_permission_pdf
+import com.homelab.household.app.resources.tool_permission_remember
 import com.homelab.household.app.resources.tool_permission_search
 import com.homelab.household.app.resources.tool_read_page_done
 import com.homelab.household.app.resources.tool_read_page_failed
 import com.homelab.household.app.resources.tool_read_page_running
+import com.homelab.household.app.resources.tool_remember_automatic_ask
+import com.homelab.household.app.resources.tool_remember_card
+import com.homelab.household.app.resources.tool_remember_declined
+import com.homelab.household.app.resources.tool_remember_done
+import com.homelab.household.app.resources.tool_remember_failed
+import com.homelab.household.app.resources.tool_remember_now_automatic
+import com.homelab.household.app.resources.tool_remember_running
 import com.homelab.household.app.resources.tool_search_done
 import com.homelab.household.app.resources.tool_search_failed
 import com.homelab.household.app.resources.tool_search_running
@@ -138,6 +155,32 @@ private val generic =
         permission = Res.string.tool_permission_generic,
     )
 
+/** Remembering only ever adds; it is named apart from its action too, for a step saved without one. */
+private val remembering =
+    ToolLabel(
+        running = Res.string.tool_remember_running,
+        done = Res.string.tool_remember_done,
+        failed = Res.string.tool_remember_failed,
+        icon = HearthIcon.Memory,
+        permission = Res.string.tool_permission_remember,
+        card = Res.string.tool_remember_card,
+        declined = Res.string.tool_remember_declined,
+        automaticAsk = Res.string.tool_remember_automatic_ask,
+        nowAutomatic = Res.string.tool_remember_now_automatic,
+    )
+
+/** Forgetting always asks, as removing does. */
+private val forgetting =
+    ToolLabel(
+        running = Res.string.tool_forget_running,
+        done = Res.string.tool_forget_done,
+        failed = Res.string.tool_forget_failed,
+        icon = HearthIcon.Memory,
+        permission = Res.string.tool_permission_forget,
+        card = Res.string.tool_forget_card,
+        declined = Res.string.tool_forget_declined,
+    )
+
 private val labels =
     mapOf(
         HubTool.CALENDAR_READ to
@@ -197,6 +240,19 @@ private val labels =
                 failed = Res.string.tool_note_failed,
                 icon = HearthIcon.Document,
                 permission = Res.string.tool_permission_note_create,
+            ),
+        HubTool.REMEMBER to
+            remembering,
+        HubTool.FORGET to
+            forgetting,
+        // The hub's lookup for a Remember or Forget card: it comes with remembering.
+        HubTool.MEMORY_LOOKUP to
+            ToolLabel(
+                running = Res.string.tool_memory_lookup_running,
+                done = Res.string.tool_memory_lookup_done,
+                failed = Res.string.tool_memory_lookup_failed,
+                icon = HearthIcon.Memory,
+                permission = Res.string.tool_permission_remember,
             ),
     )
 
@@ -271,4 +327,6 @@ private val actionLabels =
                 card = Res.string.tool_note_replace_card,
                 declined = Res.string.tool_note_replace_declined,
             ),
+        (HubTool.REMEMBER to ToolAction.Create) to remembering,
+        (HubTool.FORGET to ToolAction.Delete) to forgetting,
     )

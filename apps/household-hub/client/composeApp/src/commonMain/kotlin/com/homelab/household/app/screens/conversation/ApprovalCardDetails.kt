@@ -4,6 +4,7 @@ import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ToolAction
 
@@ -43,11 +44,17 @@ enum class CardAsk {
 
     /** Keep it / Replace, in the destructive style: the note's words are gone once replaced. */
     Replace,
+
+    /** Keep it / Forget, in the destructive style: a forgotten memory has no Undo. */
+    Forget,
 }
 
-fun cardAsk(action: ToolAction?): CardAsk =
+fun cardAsk(
+    action: ToolAction?,
+    tool: String? = null,
+): CardAsk =
     when (action) {
-        ToolAction.Delete -> CardAsk.Remove
+        ToolAction.Delete -> if (tool == HubTool.FORGET) CardAsk.Forget else CardAsk.Remove
         ToolAction.Replace -> CardAsk.Replace
         else -> CardAsk.Approve
     }
@@ -65,6 +72,10 @@ fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
 
         is ProposalDetails.Note -> {
             ApprovalCardDetails(title = details.title, preview = details.content?.let(::previewOf))
+        }
+
+        is ProposalDetails.Memory -> {
+            ApprovalCardDetails(title = details.content)
         }
 
         ProposalDetails.Other -> {

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from app.domain.entities.tool_definition import ToolExecutionResult
+from app.domain.entities.user import User
 from app.domain.exceptions import (
     ToolNotFoundException,
     ToolPermissionDeniedException,
@@ -8,6 +9,8 @@ from app.domain.exceptions import (
     DomainException,
     PageReadException,
     ToolFailureReason,
+    EntityNotFoundException,
+    ZeroLeakViolationException,
 )
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
@@ -28,10 +31,15 @@ from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalend
 from app.domain.use_cases.integrations.execute_search import GENERAL, ExecuteSearchUseCase
 from app.domain.use_cases.integrations.manage_documents import SaveDocumentUseCase
 from app.domain.use_cases.integrations.turn_sources import TurnSources
+from app.domain.use_cases.memories.remember_forget import ForgetUseCase, RememberUseCase
 
 
 # Reading pages and looking up what was read are part of searching: an agent that may search may do both.
 RESEARCH_TOOLS = ["read_page", "lookup_sources"]
+# Every agent may remember and forget what the member asks it to (memory spec §2.1): no permission to give.
+MEMORY_TOOLS = ["remember", "forget"]
+# Writes refused in a secret turn: nothing said there may leave it.
+SECRET_LOCKED_TOOLS = {"calendar_write", "document_writer", *MEMORY_TOOLS}
 
 # What a search result shows in the prompt. With a turn index the rest is in the index, so the
 # receipt only has to say what each result is; without one the snippet is all the model gets.
@@ -47,6 +55,7 @@ def effective_tool_permissions(permissions: List[str]) -> List[str]:
     granted = list(permissions)
     if "searxng_search" in granted:
         granted += [tool for tool in RESEARCH_TOOLS if tool not in granted]
+    granted += [tool for tool in MEMORY_TOOLS if tool not in granted]
     return granted
 
 
@@ -63,6 +72,8 @@ class ExecuteToolUseCase:
         allow_calendar_delete: bool = True,
         page_reader: Optional[IPageReader] = None,
         calendar_secrets: Optional[CalendarSecretResolver] = None,
+        remember: Optional[RememberUseCase] = None,
+        forget: Optional[ForgetUseCase] = None,
     ):
         self.calendar_repo = calendar_repo
         self.calendar_connector = calendar_connector
@@ -73,6 +84,8 @@ class ExecuteToolUseCase:
         self.uow = uow
         self.allow_calendar_delete = allow_calendar_delete
         self.page_reader = page_reader
+        self.remember = remember
+        self.forget = forget
 
         # Initialize sub-use-cases
         # Without a Google client, password calendars still work; a Google one is refused once its token runs out.
@@ -95,6 +108,8 @@ class ExecuteToolUseCase:
         is_secret_mode: bool = False,
         sources: Optional[TurnSources] = None,
         timezone_name: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> ToolExecutionResult:
         # The member's zone, as the phone named it. Calendar times are clock time in it.
         zone = calendar_arguments.zone_of(timezone_name)
@@ -105,7 +120,7 @@ class ExecuteToolUseCase:
             )
 
         # 2. Enforce Secret Mode lock on external write operations
-        if is_secret_mode and tool_name in {"calendar_write", "document_writer"}:
+        if is_secret_mode and tool_name in SECRET_LOCKED_TOOLS:
             return ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
@@ -348,6 +363,9 @@ class ExecuteToolUseCase:
                     },
                 )
 
+            elif tool_name in MEMORY_TOOLS:
+                return await self._memory(tool_name, arguments, user_id, session_id, agent_id)
+
             elif tool_name == "pdf_reader":
                 return ToolExecutionResult(
                     tool_name=tool_name,
@@ -373,6 +391,71 @@ class ExecuteToolUseCase:
                 success=False,
                 error=str(e),
             )
+
+
+    async def _memory(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        user_id: str,
+        session_id: Optional[str],
+        agent_id: Optional[str],
+    ) -> ToolExecutionResult:
+        """`remember` and `forget`, on the memory a card pinned by id when it showed one."""
+        member = User(id=user_id)
+        memory_id = arguments.get("memory_id") or None
+        if tool_name == "remember":
+            if self.remember is None:
+                return ToolExecutionResult(tool_name=tool_name, success=False, error="Memories can't be saved here.")
+            done = await self.remember.execute(
+                member,
+                str(arguments.get("content") or ""),
+                scope=arguments.get("scope"),
+                category=arguments.get("category"),
+                replaces=arguments.get("replaces"),
+                memory_id=memory_id,
+                expires_at=arguments.get("expires_at"),
+                session_id=session_id,
+                agent_id=agent_id,
+            )
+            if done.held is not None:
+                # Over another member's memory nothing is saved yet: the model must not say it is.
+                name = done.speaker_name
+                return ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=True,
+                    data={
+                        "action": "remembered",
+                        "memory": done.held.content,
+                        "held": f"Saved for {name} to check. Agents won't use it until {name} says which is right.",
+                    },
+                )
+            data: Dict[str, Any] = {"action": "remembered", "memory": done.memory.content}
+            if done.replaced is not None:
+                data["replaced"] = done.replaced.content
+            return ToolExecutionResult(tool_name=tool_name, success=True, data=data)
+
+        if self.forget is None:
+            return ToolExecutionResult(tool_name=tool_name, success=False, error="Memories can't be forgotten here.")
+        try:
+            forgotten = await self.forget.execute(
+                member,
+                str(arguments.get("memory") or ""),
+                memory_id=memory_id,
+                proposal_id=arguments.get("proposal_id") or None,
+            )
+        except EntityNotFoundException as e:
+            return ToolExecutionResult(
+                tool_name=tool_name, success=False, error=e.message, reason=ToolFailureReason.NOT_FOUND
+            )
+        except ZeroLeakViolationException as e:
+            # Another member's memory: the model is told whose, so it can say who can remove it.
+            return ToolExecutionResult(
+                tool_name=tool_name, success=False, error=e.message, reason=ToolFailureReason.FORBIDDEN
+            )
+        return ToolExecutionResult(
+            tool_name=tool_name, success=True, data={"action": "forgot", "memory": forgotten.content}
+        )
 
 
 def _told(when: datetime, zone) -> str:

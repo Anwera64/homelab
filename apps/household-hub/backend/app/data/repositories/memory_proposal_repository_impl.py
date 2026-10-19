@@ -26,8 +26,8 @@ class MemoryProposalRepositoryImpl(IMemoryProposalRepository):
         updated = await self.data_source.update(self.mapper.to_model(proposal))
         return self.mapper.to_domain(updated)
 
-    async def drop_pending_for(self, memory_id: str) -> List[str]:
-        return await self.data_source.drop_pending_for(memory_id)
+    async def drop_pending_for(self, memory_id: str, origin: Optional[str] = None) -> List[str]:
+        return await self.data_source.drop_pending_for(memory_id, origin)
 
     async def list_pending_for_answerer(self, user_id: str) -> List[MemoryProposal]:
         return [self.mapper.to_domain(m) for m in await self.data_source.list_pending_for_answerer(user_id)]

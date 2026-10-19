@@ -249,4 +249,63 @@ class ListAvailableToolsUseCase:
                     "required": ["title", "content"],
                 },
             ),
+            ToolDefinition(
+                name="remember",
+                description=(
+                    "Remember something the member asked you to keep, such as \"remember that...\". The member "
+                    "approves it first. Use only for what the member said, never for something only you said."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "One concise statement, naming people rather than saying he or she",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": ["personal", "household"],
+                            "description": (
+                                "'household' for what the rest of the household should know: events, schedules, "
+                                "shared plans. Everything else is 'personal' (default)"
+                            ),
+                            "default": "personal",
+                        },
+                        "category": {
+                            "type": "string",
+                            "enum": ["preference", "fact", "milestone", "health", "project"],
+                            "default": "fact",
+                        },
+                        "replaces": {
+                            "type": "string",
+                            "description": (
+                                "When this changes or corrects a memory you were shown, that memory's sentence, "
+                                "copied as you see it. Leave it out for something new."
+                            ),
+                        },
+                        "expires_at": {
+                            "type": "string",
+                            "description": "ISO-8601 timestamp when it stops mattering, or leave it out if it stays true",
+                        },
+                    },
+                    "required": ["content"],
+                },
+            ),
+            ToolDefinition(
+                name="forget",
+                description=(
+                    "Forget one memory the member asks you to forget. The member is always asked first. Only "
+                    "memories the member said themselves can be forgotten."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "memory": {
+                            "type": "string",
+                            "description": "The memory's sentence, copied as you were shown it",
+                        },
+                    },
+                    "required": ["memory"],
+                },
+            ),
         ]

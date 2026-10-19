@@ -1282,4 +1282,121 @@ class ConversationScreenTest {
                 doesNotSeeRepeatNone()
             }
         }
+
+    // ---- remember and forget (slice 5, PR 6) ----------------------------------------------------
+
+    private val vegetarian = "Sam is vegetarian and doesn’t eat fish."
+
+    /** Canvas: MemRemember. Your own memory is replaced, and the card says which one with its age. */
+    @Test
+    fun `GIVEN a remember over your own memory WHEN drawn THEN it shows what it replaces and offers to stop asking`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Triple<String, Boolean, ProposalDetails?>>()
+            conversationScreen(
+                stateNamed("Remembering over your own memory"),
+                onDecide = { id, ok, edit -> decided += Triple(id, ok, edit) },
+            )
+
+            onConversation {
+                seesLookedThroughWhatsKnown()
+                seesTheRememberCard()
+                seesWords("Sam is vegan now.")
+                seesItIsForTheHousehold()
+                seesItReplaces(vegetarian, meta = "You · Planner · March")
+                seesAnOfferToRememberWithoutAsking()
+                tapsApprove()
+            }
+
+            assertEquals(listOf(Triple<String, Boolean, ProposalDetails?>("c-1", true, null)), decided)
+        }
+
+    /** Canvas: MemRememberOther. Liam's stays: the card says so, and that he will be asked. */
+    @Test
+    fun `GIVEN a remember beside Liams memory WHEN drawn THEN it names him and says his is kept and he is asked`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Remembering beside Liam's memory"))
+
+            onConversation {
+                seesWhatTheySaid("Liam", vegetarian, meta = "Planner · March")
+                seesTheirsIsKeptAndTheyWillBeAsked("Liam")
+                doesNotSeeItReplaces()
+            }
+        }
+
+    @Test
+    fun `GIVEN a remember being edited WHEN Yours is picked THEN Approve with changes sends only whose it is`() =
+        runComposeUiTest {
+            val decided = mutableListOf<ProposalDetails?>()
+            conversationScreen(
+                stateNamed("Remembering over your own memory"),
+                onDecide = { _, _, edit -> decided += edit },
+            )
+
+            onConversation {
+                tapsEdit(scrolling = true)
+
+                seesTheTitleField("Sam is vegan now.")
+                seesHouseholdSelected()
+                picksYours()
+                tapsApproveWithChanges(scrolling = true)
+            }
+
+            assertEquals(listOf<ProposalDetails?>(ProposalDetails.Memory(content = null, household = false)), decided)
+        }
+
+    /** Kept beside Liam's, it is the household's whatever the switch says, so there is no switch. */
+    @Test
+    fun `GIVEN a remember beside Liams memory being edited WHEN drawn THEN only the sentence opens`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Remembering beside Liam's memory"))
+
+            onConversation {
+                tapsEdit(scrolling = true)
+
+                seesTheTitleField("Sam is vegan now.")
+                doesNotSeeWhoseItIs()
+            }
+        }
+
+    /** Canvas: MemForget. Red, Keep it on the left, Forget on the right; it always asks and has no Edit. */
+    @Test
+    fun `GIVEN a forget WHEN drawn THEN it shows the memory with whose and when and asks Keep it or Forget`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            conversationScreen(stateNamed("Forgetting a memory"), onDecide = { id, ok, _ -> decided += id to ok })
+
+            onConversation {
+                seesTheForgetCard()
+                seesWords("Studio Jury on Friday 17 October, 09:00.")
+                seesWords("Yours · Researcher · March")
+                doesNotSeeEdit()
+                doesNotSeeAnOfferToMakeRemovingAutomatic()
+                assertTrue(boundsOfKeep().right <= boundsOfForget().left, "Forget is on the right")
+
+                tapsForget()
+                tapsKeep()
+            }
+
+            assertEquals(listOf("c-1" to true, "c-1" to false), decided)
+        }
+
+    /** Canvas: MemForgetHeld. Not stored yet: the card says whose answer it waits on, and Forget takes it back. */
+    @Test
+    fun `GIVEN a forget of a sentence still waiting on Liam WHEN drawn THEN it says it waits on him and asks Keep it or Forget`() =
+        runComposeUiTest {
+            val decided = mutableListOf<Pair<String, Boolean>>()
+            conversationScreen(
+                stateNamed("Forgetting a sentence still waiting on Liam"),
+                onDecide = { id, ok, _ -> decided += id to ok },
+            )
+
+            onConversation {
+                seesTheForgetCard()
+                seesWords("The boiler service moved to November this year.")
+                seesItWaitsOn("Liam", meta = "Yours · Planner · March")
+                tapsForget()
+            }
+
+            assertEquals(listOf("c-1" to true), decided)
+        }
 }

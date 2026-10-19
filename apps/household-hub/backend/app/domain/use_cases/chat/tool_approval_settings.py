@@ -8,9 +8,11 @@ from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.chat.tool_summary import WRITE_ACTIONS
 
 
-# Actions no setting can make automatic: a removed event or a replaced note can't be undone from
-# the chat, so these always show a card.
-ALWAYS_ASKS: FrozenSet[Tuple[str, str]] = frozenset({("calendar_write", "delete"), ("document_writer", "replace")})
+# Actions no setting can make automatic: a removed event, a replaced note or a forgotten memory can't
+# be undone from the chat, so these always show a card.
+ALWAYS_ASKS: FrozenSet[Tuple[str, str]] = frozenset(
+    {("calendar_write", "delete"), ("document_writer", "replace"), ("forget", "delete")}
+)
 
 
 def can_run_without_asking(tool: str, action: Optional[str], auto: FrozenSet[Tuple[str, str]]) -> bool:

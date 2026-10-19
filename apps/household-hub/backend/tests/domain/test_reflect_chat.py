@@ -368,3 +368,48 @@ async def test_GIVEN_memory_text_on_WHEN_reflected_THEN_text_is_logged_cut_to_50
     fact_line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("Reflection fact"))
     assert "text='" + "x" * 500 + "'" in fact_line
     assert "x" * 501 not in fact_line
+
+
+# --- A `remember` waiting on the same memory (memory spec §2.1) ---------------------------------
+
+
+def _waiting_remember(source_user="emma"):
+    from app.domain.entities.memory_proposal import MemoryProposal
+
+    return MemoryProposal(
+        id="asked", memory_id="boiler", content="Boiler service moved to October", answerer_id="liam",
+        source_user_id=source_user, origin="tool",
+    )
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_emma_already_asked_to_remember_it_WHEN_her_chat_is_reflected_THEN_her_ask_stands_and_no_second_change_is_raised(caplog):
+    stored = memory("boiler", "Boiler service in November", user_id="liam", scope="household")
+    world = World(
+        {"facts": [_fact("Boiler service moved to October", relation="changed", about="m1")]},
+        memories=[stored],
+        scores={"boiler": 0.8},
+    )
+    asked = await world.proposals.create(_waiting_remember())
+
+    with caplog.at_level(logging.INFO):
+        await world.run()
+
+    assert world.proposals.created == [asked] and asked.state == "pending"
+    assert "outcome=skipped_already_asked" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_someone_elses_remember_waits_WHEN_a_newer_reflection_change_is_raised_THEN_the_remember_is_never_dropped():
+    stored = memory("boiler", "Boiler service in November", user_id="liam", scope="household")
+    world = World(
+        {"facts": [_fact("Boiler service moved to October", relation="changed", about="m1")]},
+        memories=[stored],
+        scores={"boiler": 0.8},
+    )
+    asked = await world.proposals.create(_waiting_remember(source_user="robin"))
+
+    await world.run()
+
+    assert asked.state == "pending"
+    assert len(world.proposals.created) == 2

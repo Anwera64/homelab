@@ -219,4 +219,36 @@ class WhenAgentsActViewModelTest {
                     .automatic,
             )
         }
+
+    @Test
+    fun remembering_and_forgetting_come_last_as_your_memories() =
+        runTest(testDispatcher) {
+            val memories =
+                listOf(
+                    ToolApproval(HubTool.FORGET, ToolAction.Delete, automatic = false, alwaysAsks = true),
+                    ToolApproval(HubTool.REMEMBER, ToolAction.Create, automatic = true),
+                )
+            everySuspend { getToolApprovals() } returns memories + hubList
+
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf(ToolGroup.Calendar, ToolGroup.Notes, ToolGroup.Memories), state.groups.map { it.group })
+            assertEquals(memories.reversed(), state.groups.last().approvals)
+        }
+
+    @Test
+    fun forgetting_always_asks_so_its_switch_cannot_be_turned_on() =
+        runTest(testDispatcher) {
+            everySuspend { getToolApprovals() } returns
+                listOf(ToolApproval(HubTool.FORGET, ToolAction.Delete, automatic = false, alwaysAsks = true))
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            viewModel.onToggle(HubTool.FORGET, ToolAction.Delete, automatic = true)
+            advanceUntilIdle()
+
+            verifySuspend(VerifyMode.not) { setToolApproval(any(), any(), any()) }
+        }
 }

@@ -133,7 +133,7 @@ class FakeToolExecutor:
         self.executed_calls = []
 
     async def execute(
-        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None
+        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None, **_
     ):
         self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources, "zone": timezone_name})
         return ToolExecutionResult(tool_name=tool_name, success=True, data={"result": "ok"})
@@ -1149,7 +1149,7 @@ class PassagesToolExecutor(FakeToolExecutor):
     """Looks up three passages of 900 characters each: about 950 tokens by the hub's estimate."""
 
     async def execute(
-        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None
+        self, tool_name, arguments, user_id, agent_tool_permissions, is_secret_mode=False, sources=None, timezone_name=None, **_
     ):
         self.executed_calls.append({"tool": tool_name, "args": arguments, "sources": sources, "zone": timezone_name})
         return ToolExecutionResult(

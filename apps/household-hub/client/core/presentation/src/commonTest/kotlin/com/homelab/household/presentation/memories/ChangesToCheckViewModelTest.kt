@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.memories
 
+import com.homelab.household.domain.exception.ChangeWithdrawnException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.model.ChangeCard
 import com.homelab.household.domain.model.ChangesToCheck
@@ -242,4 +243,20 @@ class ChangesToCheckViewModelTest {
             readAt = Instant.parse("2026-10-16T10:42:00Z"),
         )
     }
+
+    @Test
+    fun `GIVEN Emma took her sentence back WHEN Liam answers it THEN the card says so and no longer counts`() =
+        runTest(testDispatcher) {
+            everySuspend { getChanges() } returns changes
+            everySuspend { answerChange("p-sam", ProposalAnswer.UseNew) } throws
+                ChangeWithdrawnException("Emma took this back.")
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            viewModel.onAnswer("p-sam", ProposalAnswer.UseNew)
+            advanceUntilIdle()
+
+            assertEquals(ChangeStatus.Withdrawn("Emma took this back."), viewModel.uiState.value.row("p-sam").status)
+            assertEquals(1, viewModel.uiState.value.openCount)
+        }
 }

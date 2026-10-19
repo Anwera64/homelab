@@ -35,7 +35,10 @@ from app.presentation.api.deps import (
     get_list_proposals_use_case,
     get_answer_proposal_use_case,
     get_undo_proposal_answer_use_case,
+    get_withdraw_change_use_case,
+    get_restore_change_use_case,
 )
+from app.domain.use_cases.memories.withdraw_change import RestoreChangeUseCase, WithdrawChangeUseCase
 
 router = APIRouter(prefix="/memories", tags=["Agent Memories & Relationships"])
 
@@ -107,6 +110,26 @@ async def undo_proposal_answer(
     current_user: User = Depends(get_current_user),
 ):
     """Undo after answering: the change is open again and everything is as before."""
+    return MemoryPresentationMapper.to_proposal(await use_case.execute(proposal_id, current_user))
+
+
+@router.delete("/proposals/{proposal_id}", response_model=ProposalRead)
+async def withdraw_change(
+    proposal_id: str,
+    use_case: WithdrawChangeUseCase = Depends(get_withdraw_change_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """✕ on a waiting card: take back a sentence you asked to remember, before it was answered."""
+    return MemoryPresentationMapper.to_proposal(await use_case.execute(proposal_id, current_user))
+
+
+@router.post("/proposals/{proposal_id}/restore", response_model=ProposalRead)
+async def restore_change(
+    proposal_id: str,
+    use_case: RestoreChangeUseCase = Depends(get_restore_change_use_case),
+    current_user: User = Depends(get_current_user),
+):
+    """Undo after ✕ on a waiting card: it waits again, if the memory it waits on is still there."""
     return MemoryPresentationMapper.to_proposal(await use_case.execute(proposal_id, current_user))
 
 

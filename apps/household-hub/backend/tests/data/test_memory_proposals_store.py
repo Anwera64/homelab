@@ -159,3 +159,29 @@ async def test_GIVEN_proposals_WHEN_read_by_ids_THEN_the_known_ones_come_back(se
 
     assert {p.id for p in found} == {one.id, two.id}
     assert await repo.get_many([]) == []
+
+
+@pytest.mark.asyncio
+async def test_a_proposal_from_remember_keeps_where_it_came_from_and_its_end_date(session):
+    proposal = _proposal()
+    proposal.origin = "tool"
+    proposal.expires_at = datetime(2026, 12, 1, tzinfo=timezone.utc)
+
+    await _repo(session).create(proposal)
+
+    (read,) = await _repo(session).list_pending_for_answerer("liam")
+    assert read.origin == "tool" and read.new_memory_id is None
+    assert read.expires_at.replace(tzinfo=timezone.utc) == datetime(2026, 12, 1, tzinfo=timezone.utc)
+    assert (await _repo(session).create(_proposal(content="x"))).origin == "reflection"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_remember_and_a_reflection_change_WHEN_only_reflections_are_dropped_THEN_the_remember_stays(session):
+    repo = _repo(session)
+    reflected = await repo.create(_proposal())
+    asked = _proposal(content="Boiler service in November")
+    asked.origin = "tool"
+    asked = await repo.create(asked)
+
+    assert await repo.drop_pending_for("boiler", origin="reflection") == [reflected.id]
+    assert [p.id for p in await repo.list_pending_for_answerer("liam")] == [asked.id]

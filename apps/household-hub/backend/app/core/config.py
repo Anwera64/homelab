@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     MEMORY_RECALL_CUTOFF: float = 0.60
     MEMORY_RECALL_MAX: int = 3
     MEMORY_RECALL_WAIT_SECONDS: float = 1.0
+    # How close a stored memory must be to the sentence a remember or forget call quotes (§2.1).
+    MEMORY_MATCH_BAR: float = 0.60
     # Memory text in log lines, cut to 500 characters; off unless tuning (§9).
     MEMORY_LOG_TEXT: bool = False
     

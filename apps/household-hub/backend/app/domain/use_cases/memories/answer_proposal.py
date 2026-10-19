@@ -3,13 +3,28 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from app.domain.entities.memory import AgentMemory
-from app.domain.entities.memory_proposal import ANSWERS, BOTH, KEPT, PENDING, REPLACED, MemoryProposal
+from app.domain.entities.memory_proposal import (
+    ANSWERS,
+    BOTH,
+    FROM_REMEMBER,
+    KEPT,
+    PENDING,
+    REPLACED,
+    WITHDRAWN,
+    MemoryProposal,
+)
 from app.domain.entities.user import User
-from app.domain.exceptions import EntityNotFoundException, ProposalStateException, ZeroLeakViolationException
+from app.domain.exceptions import (
+    ChangeWithdrawnException,
+    EntityNotFoundException,
+    ProposalStateException,
+    ZeroLeakViolationException,
+)
 from app.domain.repositories.memory_proposal_repository import IMemoryProposalRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
+from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
 
 logger = logging.getLogger(__name__)
@@ -42,11 +57,32 @@ async def _own_proposal(
     return proposal
 
 
+async def memory_from_proposal(
+    proposal: MemoryProposal, stored: AgentMemory, session_repo: ISessionRepository
+) -> AgentMemory:
+    """The memory a change saves (Keep both, Use new, or a `remember` no one is left to answer): the new
+    sentence, said by whoever said it in the chat, with the stored memory's scope and category."""
+    chat = await session_repo.get_by_id(proposal.source_session_id) if proposal.source_session_id else None
+    return AgentMemory(
+        user_id=proposal.source_user_id or proposal.answerer_id,
+        agent_id=chat.agent_id if chat else None,
+        scope=stored.scope,
+        category=stored.category,
+        content=proposal.content,
+        source_session_id=proposal.source_session_id,
+        expires_at=proposal.expires_at,
+        # Asked for with `remember`, so its page row says "You asked" to whoever asked.
+        origin="tool" if proposal.origin == FROM_REMEMBER else "reflection",
+    )
+
+
 class AnswerProposalUseCase:
     """Keep stored, Keep both or Use new on a change to check (memory spec §6.1).
 
     Keep both and Use new save the new sentence as a memory said by whoever said it in the chat, with
-    the stored memory's scope. Use new retires the stored memory in its favour.
+    the stored memory's scope. Use new retires the stored memory in its favour. A change `remember`
+    raised is answered the same way: its sentence was only held until now. One its asker took back is
+    refused by name.
     """
 
     def __init__(
@@ -58,6 +94,7 @@ class AnswerProposalUseCase:
         embed_memories: EmbedMemoriesUseCase,
         clock: Callable[[], datetime] = _utc_now,
         log_text: bool = False,
+        user_repo: Optional[IUserRepository] = None,
     ):
         self.proposal_repo = proposal_repo
         self.memory_repo = memory_repo
@@ -66,11 +103,14 @@ class AnswerProposalUseCase:
         self.embed_memories = embed_memories
         self.clock = clock
         self.log_text = log_text
+        self.user_repo = user_repo
 
     async def execute(self, proposal_id: str, answer: str, member: User) -> MemoryProposal:
         if answer not in _STATE_FOR:
             raise ValueError(f"Unknown answer: {answer}")
         proposal = await _own_proposal(self.proposal_repo, proposal_id, member, "answer")
+        if proposal.state == WITHDRAWN:
+            raise ChangeWithdrawnException(f"{await self._asker_name(proposal)} took this back.")
         if proposal.state != PENDING:
             raise ProposalStateException("This change was already answered.")
         stored = await self.memory_repo.get_by_id(proposal.memory_id)
@@ -81,7 +121,7 @@ class AnswerProposalUseCase:
         new: Optional[AgentMemory] = None
         async with self.uow:
             if answer != KEEP_STORED:
-                new = await self.memory_repo.create(await self._new_memory(proposal, stored))
+                new = await self.memory_repo.create(await memory_from_proposal(proposal, stored, self.session_repo))
                 proposal.new_memory_id = new.id
             if answer == USE_NEW:
                 stored.is_active = False
@@ -103,17 +143,9 @@ class AnswerProposalUseCase:
             await self.embed_memories.execute([new])
         return proposal
 
-    async def _new_memory(self, proposal: MemoryProposal, stored: AgentMemory) -> AgentMemory:
-        chat = await self.session_repo.get_by_id(proposal.source_session_id) if proposal.source_session_id else None
-        return AgentMemory(
-            user_id=proposal.source_user_id or proposal.answerer_id,
-            agent_id=chat.agent_id if chat else None,
-            scope=stored.scope,
-            category=stored.category,
-            content=proposal.content,
-            source_session_id=proposal.source_session_id,
-            origin="reflection",
-        )
+    async def _asker_name(self, proposal: MemoryProposal) -> str:
+        asker = await self.user_repo.get_by_id(proposal.source_user_id) if self.user_repo and proposal.source_user_id else None
+        return (asker.full_name if asker else "") or "Whoever asked"
 
 
 class UndoProposalAnswerUseCase:

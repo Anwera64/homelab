@@ -30,4 +30,8 @@ class MemoryRepositoryImpl(
 
     override suspend fun getLookedOver(sessionId: String): LookedOver =
         MemoryDataMapper.toDomain(remote.getLookedOver(sessionId))
+
+    override suspend fun withdrawChange(changeId: String) = remote.withdrawChange(changeId)
+
+    override suspend fun restoreChange(changeId: String) = remote.restoreChange(changeId)
 }

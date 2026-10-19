@@ -80,6 +80,7 @@ fun ConversationScreen(
         onApproveAutomatically = viewModel::approveAutomatically,
         onUndoAutomatic = viewModel::undoAutomatic,
         onLookedOver = { lookingOver = true },
+        memoryAge = viewModel::memoryAge,
         modifier = modifier,
     )
 }

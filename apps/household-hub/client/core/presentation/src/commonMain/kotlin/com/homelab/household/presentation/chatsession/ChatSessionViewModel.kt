@@ -31,7 +31,9 @@ import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
 import com.homelab.household.presentation.memories.LocalTime
+import com.homelab.household.presentation.memories.MemoryAge
 import com.homelab.household.presentation.memories.localTime
+import com.homelab.household.presentation.memories.memoryAge
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,8 +43,10 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -67,6 +71,8 @@ class ChatSessionViewModel(
     private val deviceTimeZone: DeviceTimeZone,
     /** Times each stretch of thinking for the answer's "Thought for N s". Injected so a test can move it. */
     private val timeSource: TimeSource = TimeSource.Monotonic,
+    /** Ages the stored memory a Remember or Forget card shows: "March", "last week". */
+    private val clock: Clock = Clock.System,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatSessionUiState())
     val uiState: StateFlow<ChatSessionUiState> = _uiState.asStateFlow()
@@ -228,6 +234,13 @@ class ChatSessionViewModel(
                 }
             }
         }
+    }
+
+    /** When a stored memory on a card was noted, in the phone's own days, as the memory page says it. */
+    @OptIn(ExperimentalTime::class)
+    fun memoryAge(at: Instant): MemoryAge {
+        val now = clock.now()
+        return memoryAge(at, now, deviceTimeZone.offsetSecondsAt(now))
     }
 
     @OptIn(ExperimentalTime::class)

@@ -110,9 +110,12 @@ class FakeProposals:
             if p.source_user_id == user_id and p.answerer_id != user_id and p.state == "pending"
         ]
 
-    async def drop_pending_for(self, memory_id):
+    async def drop_pending_for(self, memory_id, origin=None):
         self.dropped_for.append(memory_id)
-        dropped = [p.id for p in self.created if p.memory_id == memory_id and p.state == "pending"]
+        dropped = [
+            p.id for p in self.created
+            if p.memory_id == memory_id and p.state == "pending" and (origin is None or p.origin == origin)
+        ]
         for p in self.created:
             if p.id in dropped:
                 p.state = "dropped"

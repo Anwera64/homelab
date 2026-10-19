@@ -99,7 +99,12 @@ class AlreadyDecidedException(InvalidOperationException):
 
 class ProposalStateException(InvalidOperationException):
     """Raised when a change to check is answered twice, or an answer is undone that was never given."""
-    pass
+    code = "proposal_state"
+
+
+class ChangeWithdrawnException(ProposalStateException):
+    """Raised for answering a `remember` its asker took back while it waited."""
+    code = "change_withdrawn"
 
 
 class AlwaysAsksException(InvalidOperationException):

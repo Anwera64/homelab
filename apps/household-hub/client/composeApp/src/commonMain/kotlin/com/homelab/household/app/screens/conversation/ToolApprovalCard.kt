@@ -45,6 +45,9 @@ import com.homelab.household.app.components.ToolRecordLine
 import com.homelab.household.app.icons.HearthIcon
 import com.homelab.household.app.icons.HearthIconImage
 import com.homelab.household.app.resources.Res
+import com.homelab.household.app.resources.memories_tab_household_plain
+import com.homelab.household.app.resources.memories_tab_yours_plain
+import com.homelab.household.app.resources.memories_you
 import com.homelab.household.app.resources.tool_card_approve
 import com.homelab.household.app.resources.tool_card_approve_with_changes
 import com.homelab.household.app.resources.tool_card_approved
@@ -75,12 +78,21 @@ import com.homelab.household.app.resources.tool_card_field_days
 import com.homelab.household.app.resources.tool_card_field_empty
 import com.homelab.household.app.resources.tool_card_field_ends
 import com.homelab.household.app.resources.tool_card_field_last_date
+import com.homelab.household.app.resources.tool_card_field_memory
 import com.homelab.household.app.resources.tool_card_field_note
 import com.homelab.household.app.resources.tool_card_field_repeat
 import com.homelab.household.app.resources.tool_card_field_time
 import com.homelab.household.app.resources.tool_card_field_title
 import com.homelab.household.app.resources.tool_card_field_what
+import com.homelab.household.app.resources.tool_card_field_whose
+import com.homelab.household.app.resources.tool_card_forget
 import com.homelab.household.app.resources.tool_card_keep
+import com.homelab.household.app.resources.tool_card_memory_household
+import com.homelab.household.app.resources.tool_card_memory_kept_too
+import com.homelab.household.app.resources.tool_card_memory_replaces
+import com.homelab.household.app.resources.tool_card_memory_said
+import com.homelab.household.app.resources.tool_card_memory_waiting_on
+import com.homelab.household.app.resources.tool_card_memory_yours
 import com.homelab.household.app.resources.tool_card_month_apr
 import com.homelab.household.app.resources.tool_card_month_aug
 import com.homelab.household.app.resources.tool_card_month_dec
@@ -133,6 +145,7 @@ import com.homelab.household.app.resources.tool_card_weekday_tue
 import com.homelab.household.app.resources.tool_card_weekday_wed
 import com.homelab.household.app.resources.tool_card_when
 import com.homelab.household.app.resources.tool_card_when_all_day
+import com.homelab.household.app.screens.memories.ageWords
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
@@ -146,15 +159,18 @@ import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.RepeatEnd
 import com.homelab.household.domain.model.RepeatEvery
+import com.homelab.household.domain.model.StoredMemory
 import com.homelab.household.domain.model.TimeOfDay
 import com.homelab.household.domain.model.editProposal
 import com.homelab.household.domain.model.editableFields
 import com.homelab.household.domain.model.offersNoRepeat
 import com.homelab.household.domain.model.proposedValues
 import com.homelab.household.domain.model.repeatSummary
+import com.homelab.household.presentation.memories.MemoryAge
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
 
 /**
  * A write the agent wants to make, put to the member before it happens (canvas: ToolApproveRemove).
@@ -184,6 +200,8 @@ fun ToolApprovalCard(
         toolCallId: String,
         edited: ProposalDetails?,
     ) -> Unit = { id, edited -> onDecide(id, true, edited) },
+    /** When a stored memory on a Remember or Forget card was noted; null leaves its age out. */
+    memoryAge: (Instant) -> MemoryAge? = { null },
 ) {
     val label = toolLabel(card.tool, card.action)
     val details = approvalCardDetails(card)
@@ -208,7 +226,7 @@ fun ToolApprovalCard(
         }
 
         ProposalStatus.Pending -> {
-            PendingCard(card, label, name, details, onDecide, onApproveAutomatically, modifier)
+            PendingCard(card, label, name, details, onDecide, onApproveAutomatically, memoryAge, modifier)
         }
     }
 }
@@ -221,10 +239,11 @@ private fun PendingCard(
     details: ApprovalCardDetails,
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
+    memoryAge: (Instant) -> MemoryAge?,
     modifier: Modifier = Modifier,
 ) {
     val colors = HearthTheme.colors
-    val ask = cardAsk(card.action)
+    val ask = cardAsk(card.action, card.tool)
     var automatic by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
     val tint = if (ask == CardAsk.Approve) colors.textPrimary else colors.error
     var editing by rememberSaveable(card.toolCallId) { mutableStateOf(false) }
@@ -259,17 +278,22 @@ private fun PendingCard(
                 whichDates = whichDates,
             )
         } else {
-            // Under the title's words rather than its icon, as the canvas lines them up.
-            Column(
-                modifier = Modifier.padding(start = HearthTheme.size.iconSm + HearthTheme.spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
-            ) {
-                Text(text = name, style = HearthTheme.typography.bodyStrong, color = colors.textPrimary)
-                val caption = details.whenAt?.let { whenText(it) } ?: details.preview
-                if (caption != null) {
-                    Text(text = caption, style = HearthTheme.typography.caption, color = colors.textMuted)
+            val memory = card.details as? ProposalDetails.Memory
+            if (memory != null) {
+                MemoryDetails(memory = memory, name = name, forget = ask == CardAsk.Forget, memoryAge = memoryAge)
+            } else {
+                // Under the title's words rather than its icon, as the canvas lines them up.
+                Column(
+                    modifier = Modifier.padding(start = HearthTheme.size.iconSm + HearthTheme.spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+                ) {
+                    Text(text = name, style = HearthTheme.typography.bodyStrong, color = colors.textPrimary)
+                    val caption = details.whenAt?.let { whenText(it) } ?: details.preview
+                    if (caption != null) {
+                        Text(text = caption, style = HearthTheme.typography.caption, color = colors.textMuted)
+                    }
+                    details.repeat?.let { RepeatLine(it) }
                 }
-                details.repeat?.let { RepeatLine(it) }
             }
             whichDates()
             val edited = decidedEdit(card, edit = null, chosen = scope)
@@ -316,14 +340,12 @@ private fun PendingCard(
                         )
                     }
 
-                    CardAsk.Remove, CardAsk.Replace -> {
+                    CardAsk.Remove, CardAsk.Replace, CardAsk.Forget -> {
                         val yes =
-                            if (ask ==
-                                CardAsk.Remove
-                            ) {
-                                Res.string.tool_card_remove
-                            } else {
-                                Res.string.tool_card_replace
+                            when (ask) {
+                                CardAsk.Replace -> Res.string.tool_card_replace
+                                CardAsk.Forget -> Res.string.tool_card_forget
+                                else -> Res.string.tool_card_remove
                             }
                         DestructiveButton(
                             text = stringResource(yes),
@@ -335,6 +357,97 @@ private fun PendingCard(
             }
         }
     }
+}
+
+/**
+ * A Remember or Forget card's details (canvas: MemRemember, MemRememberOther, MemForget): the
+ * sentence and whose it is, then the stored memory a remember replaces or is kept beside, with who
+ * said it, which agent noted it and when. A forget's own memory says the same under its sentence.
+ */
+@Composable
+private fun MemoryDetails(
+    memory: ProposalDetails.Memory,
+    name: String,
+    forget: Boolean,
+    memoryAge: (Instant) -> MemoryAge?,
+    modifier: Modifier = Modifier,
+) {
+    val colors = HearthTheme.colors
+    val type = HearthTheme.typography
+    val stored = memory.stored
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.md)) {
+        Column(
+            modifier = Modifier.padding(start = HearthTheme.size.iconSm + HearthTheme.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+        ) {
+            Text(text = name, style = type.bodyStrong, color = colors.textPrimary)
+            val caption =
+                when {
+                    forget -> {
+                        stored?.let {
+                            val meta =
+                                storedMeta(it, memoryAge, yours = stringResource(Res.string.memories_tab_yours_plain))
+                            // Not stored yet (canvas: MemForgetHeld): whose answer it still waits on.
+                            val waiting = it.waitingOn?.let { name ->
+                                stringResource(Res.string.tool_card_memory_waiting_on, name)
+                            }
+                            listOfNotNull(meta, waiting).joinToString(SEPARATOR).ifEmpty { null }
+                        }
+                    }
+
+                    memory.household == true -> {
+                        stringResource(Res.string.tool_card_memory_household)
+                    }
+
+                    else -> {
+                        stringResource(Res.string.tool_card_memory_yours)
+                    }
+                }
+            if (caption != null) Text(text = caption, style = type.caption, color = colors.textMuted)
+        }
+        if (stored != null && !forget) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(HearthShapes.item)
+                    .background(colors.surfaceAlt)
+                    .border(HearthTheme.size.hairline, colors.outlineSoft, HearthShapes.item)
+                    .padding(HearthTheme.spacing.md),
+                verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
+            ) {
+                val overline =
+                    if (stored.mine) {
+                        stringResource(Res.string.tool_card_memory_replaces)
+                    } else {
+                        stringResource(Res.string.tool_card_memory_said, stored.saidBy)
+                    }
+                Text(text = overline.uppercase(), style = type.overline, color = colors.textMuted)
+                Text(text = stored.content, style = type.body, color = colors.textMuted)
+                val you = stringResource(Res.string.memories_you)
+                storedMeta(stored, memoryAge, yours = you.takeIf { stored.mine })?.let { meta ->
+                    Text(text = meta, style = type.monoSm, color = colors.textMuted)
+                }
+            }
+            if (!stored.mine) {
+                Text(
+                    text = stringResource(Res.string.tool_card_memory_kept_too, stored.saidBy),
+                    style = type.caption,
+                    color = colors.textMuted,
+                )
+            }
+        }
+    }
+}
+
+/** "You · Planner · March": whose it is when [yours] is given, the agent that noted it, and when. */
+@Composable
+private fun storedMeta(
+    stored: StoredMemory,
+    memoryAge: (Instant) -> MemoryAge?,
+    yours: String?,
+): String? {
+    val age = stored.addedAt?.let(memoryAge)?.let { ageWords(it) }
+    return listOfNotNull(yours, stored.agentName, age).takeIf { it.isNotEmpty() }?.joinToString(SEPARATOR)
 }
 
 @Composable
@@ -384,6 +497,7 @@ private fun EditingCard(
     var endsPick by rememberSaveable(card.toolCallId) { mutableStateOf<String?>(null) }
     var lastEpochDay by rememberSaveable(card.toolCallId) { mutableStateOf<Long?>(null) }
     var times by rememberSaveable(card.toolCallId) { mutableStateOf<Int?>(null) }
+    var household by rememberSaveable(card.toolCallId) { mutableStateOf<Boolean?>(null) }
     val values =
         EditValues(
             title = title ?: proposed.title,
@@ -400,6 +514,7 @@ private fun EditingCard(
             ends = endsPick?.let(RepeatEnd::valueOf) ?: proposed.ends,
             lastDate = lastEpochDay?.let(EventDate::fromEpochDay) ?: proposed.lastDate,
             times = times ?: proposed.times,
+            household = household ?: proposed.household,
         )
     // A pick can carry others with it (Weekly ticks the start's day), so every part is kept.
     val keep: (EditValues) -> Unit = { next ->
@@ -419,9 +534,28 @@ private fun EditingCard(
                 onValueChange = { title = it },
                 label = stringResource(fieldLabel(card, EditField.What)),
                 error = if (EditField.What in invalid) stringResource(Res.string.tool_card_field_empty) else null,
+                // A memory is a sentence, and can run past one line.
+                singleLine = card.details !is ProposalDetails.Memory,
                 textStyle = HearthTheme.typography.body,
                 changed = EditField.What in edit.changed,
             )
+        }
+        val shared = values.household
+        if (EditField.Shared in fields && shared != null) {
+            val whose = stringResource(fieldLabel(card, EditField.Shared))
+            Column(verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.sm)) {
+                HearthFieldLabel(label = whose, changed = EditField.Shared in edit.changed)
+                HearthSegmented(
+                    options =
+                        listOf(
+                            false to stringResource(Res.string.memories_tab_yours_plain),
+                            true to stringResource(Res.string.memories_tab_household_plain),
+                        ),
+                    chosen = shared,
+                    onChoose = { household = it },
+                    label = whose,
+                )
+            }
         }
         if (EditField.Words in fields) {
             HearthTextField(
@@ -751,8 +885,15 @@ private fun fieldLabel(
 ): StringResource =
     when (field) {
         EditField.What -> {
-            val note = card.details is ProposalDetails.Note
-            if (note) Res.string.tool_card_field_title else Res.string.tool_card_field_what
+            when (card.details) {
+                is ProposalDetails.Note -> Res.string.tool_card_field_title
+                is ProposalDetails.Memory -> Res.string.tool_card_field_memory
+                else -> Res.string.tool_card_field_what
+            }
+        }
+
+        EditField.Shared -> {
+            Res.string.tool_card_field_whose
         }
 
         EditField.Day -> {

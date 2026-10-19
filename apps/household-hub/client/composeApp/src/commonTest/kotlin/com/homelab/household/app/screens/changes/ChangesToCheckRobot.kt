@@ -81,6 +81,9 @@ class ChangesToCheckRobot(
 
     suspend fun undoes() = tapsText(getString(Res.string.memories_undo))
 
+    /** The card after a late answer: the hub's own words, naming who took the sentence back. */
+    fun seesItWasTakenBack(words: String) = seesInList(words)
+
     suspend fun seesTheAnswerFailed() = seesInList(getString(Res.string.changes_failed))
 
     suspend fun seesItWaitsFor(name: String) {

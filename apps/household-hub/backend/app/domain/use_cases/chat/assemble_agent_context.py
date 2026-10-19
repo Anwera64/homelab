@@ -6,6 +6,8 @@ from app.domain.entities.user import User
 from app.domain.entities.agent import AgentPersonality
 from app.domain.entities.session import ChatMessage
 from app.domain.entities.llm_message import LLMMessage
+from app.domain.entities.memory_proposal import FROM_REMEMBER
+from app.domain.repositories.memory_proposal_repository import IMemoryProposalRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase, MemoryBlock
 from app.domain.use_cases.memories.recall_memories import RECALLED
@@ -13,8 +15,12 @@ from app.domain.repositories.agent_repository import IAgentRepository
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import sent_at_stamp, today_line
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
+from app.domain.use_cases.memories.remember_forget import speaker_name
 
 logger = logging.getLogger(__name__)
+
+# How many of the member's waiting sentences the prompt lists at most, newest first.
+WAITING_LINES = 10
 
 
 def _utc_now() -> datetime:
@@ -39,8 +45,12 @@ class AssembleAgentContextUseCase:
         history_tokens: int = 6000,
         clock: Callable[[], datetime] = _utc_now,
         memory_block_tokens: int = 1000,
+        proposal_repo: Optional[IMemoryProposalRepository] = None,
     ):
         self.memory_repo = memory_repo
+        # The member's own sentences waiting on someone else's answer: listed, marked not true, so
+        # the agent can forget one when asked without ever using it as a fact (memory spec §2.1).
+        self.proposal_repo = proposal_repo
         self.user_repo = user_repo
         self.agent_repo = agent_repo
         # How much of the window the conversation's own messages may take, word for word.
@@ -94,6 +104,8 @@ class AssembleAgentContextUseCase:
         recency_lines = []
 
         recency_lines.extend(self._memory_lines(block))
+        if not is_secret:
+            recency_lines.extend(await self._waiting_lines(user))
 
         # Sandwich reminder for secret mode
         if is_secret:
@@ -141,6 +153,22 @@ class AssembleAgentContextUseCase:
         if household:
             lines.append("[Household Shared Knowledge - Do Not Re-Extract]:")
             lines.extend(f"- {block.lines[m.id]}" for m in household)
+        return lines
+
+    async def _waiting_lines(self, user: User) -> List[str]:
+        """What [user] asked to remember over someone else's memory, still waiting on them. None, no heading."""
+        if self.proposal_repo is None:
+            return []
+        asked = [p for p in await self.proposal_repo.list_pending_from_user(user.id) if p.origin == FROM_REMEMBER]
+        if not asked:
+            return []
+        lines = ["[Waiting For Someone To Confirm - Not True Yet]:"]
+        for proposal in sorted(asked, key=lambda p: p.created_at, reverse=True)[:WAITING_LINES]:
+            name = await speaker_name(self.user_repo, proposal.answerer_id) if self.user_repo else "another member"
+            lines.append(
+                f"- {proposal.content} (waiting on {name}; do not rely on this or repeat it as fact. "
+                "If they ask to forget it, use forget.)"
+            )
         return lines
 
     def _newest_that_fit(self, messages: List[ChatMessage]) -> List[ChatMessage]:

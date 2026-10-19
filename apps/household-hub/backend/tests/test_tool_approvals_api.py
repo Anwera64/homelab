@@ -31,6 +31,8 @@ async def test_GIVEN_a_new_member_WHEN_listed_THEN_every_write_asks(client: http
         {"tool": "document_writer", "action": "create", "auto": False, "always_asks": False},
         {"tool": "document_writer", "action": "append", "auto": False, "always_asks": False},
         {"tool": "document_writer", "action": "replace", "auto": False, "always_asks": True},
+        {"tool": "remember", "action": "create", "auto": False, "always_asks": False},
+        {"tool": "forget", "action": "delete", "auto": False, "always_asks": True},
     ]
 
 

@@ -139,7 +139,10 @@ from app.domain.use_cases.memories.update_memory import UpdateMemoryUseCase
 from app.domain.use_cases.memories.list_memory_page import ListMemoryPageUseCase
 from app.domain.use_cases.memories.restore_memory import RestoreMemoryUseCase
 from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
+from app.domain.use_cases.memories.match_memory import MatchMemoryUseCase
+from app.domain.use_cases.memories.remember_forget import ForgetUseCase, MemoryOnCardUseCase, RememberUseCase
 from app.domain.use_cases.memories.answer_proposal import AnswerProposalUseCase, UndoProposalAnswerUseCase
+from app.domain.use_cases.memories.withdraw_change import RestoreChangeUseCase, WithdrawChangeUseCase
 from app.domain.use_cases.memories.changes_to_check import ListProposalsUseCase, LookedOverUseCase
 
 # Integration Use Cases
@@ -297,6 +300,20 @@ def get_container(session: AsyncSession):
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
     sign_in_device_uc = SignInDeviceUseCase(device_session_repo, _jwt_token_service, uow)
+    # Memory vectors and recall (memory spec §4, §5.2).
+    memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
+    proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
+    context_assembler = AssembleAgentContextUseCase(
+        memory_repo=memory_repo,
+        user_repo=user_repo,
+        agent_repo=agent_repo,
+        history_tokens=settings.HISTORY_TOKENS,
+        memory_block_tokens=settings.MEMORY_BLOCK_TOKENS,
+        proposal_repo=proposal_repo,
+    )
+    embed_memories_uc = EmbedMemoriesUseCase(
+        _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
+    )
     deactivate_member_uc = DeactivateMemberUseCase(
         user_repo,
         space_repo,
@@ -307,21 +324,8 @@ def get_container(session: AsyncSession):
         calendar_cred_repo,
         device_session_repo,
         uow,
-    )
-
-    context_assembler = AssembleAgentContextUseCase(
-        memory_repo=memory_repo,
-        user_repo=user_repo,
-        agent_repo=agent_repo,
-        history_tokens=settings.HISTORY_TOKENS,
-        memory_block_tokens=settings.MEMORY_BLOCK_TOKENS,
-    )
-
-    # Memory vectors and recall (memory spec §4, §5.2).
-    memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
-    proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
-    embed_memories_uc = EmbedMemoriesUseCase(
-        _embedder, memory_vector_repo, memory_repo, uow, model=settings.EMBEDDING_MODEL
+        proposal_repo=proposal_repo,
+        embed_memories=embed_memories_uc,
     )
     recall_uc = RecallMemoriesUseCase(
         embedder=_embedder,
@@ -336,6 +340,33 @@ def get_container(session: AsyncSession):
         log_text=settings.MEMORY_LOG_TEXT,
     )
 
+    # Remember and forget (memory spec §2.1): the memory a call quotes, and what its card shows.
+    memory_match = MatchMemoryUseCase(
+        memory_block=BuildMemoryBlockUseCase(memory_repo, user_repo=user_repo, agent_repo=agent_repo),
+        embedder=_embedder,
+        vector_repo=memory_vector_repo,
+        model=settings.EMBEDDING_MODEL,
+        bar=settings.MEMORY_MATCH_BAR,
+    )
+    remember_uc = RememberUseCase(
+        memory_repo=memory_repo,
+        proposal_repo=proposal_repo,
+        match=memory_match,
+        user_repo=user_repo,
+        uow=uow,
+        embed_memories=embed_memories_uc,
+        log_text=settings.MEMORY_LOG_TEXT,
+    )
+    forget_uc = ForgetUseCase(
+        match=memory_match,
+        retire=RetireMemoryUseCase(
+            memory_repo, uow, proposal_repo=proposal_repo, session_repo=session_repo, embed_memories=embed_memories_uc
+        ),
+        user_repo=user_repo,
+        proposal_repo=proposal_repo,
+        withdraw=WithdrawChangeUseCase(proposal_repo, memory_repo, uow),
+    )
+
     tool_lister = ListAvailableToolsUseCase()
     tool_executor = ExecuteToolUseCase(
         calendar_repo=calendar_cred_repo,
@@ -348,6 +379,8 @@ def get_container(session: AsyncSession):
         allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
         page_reader=_page_reader,
         calendar_secrets=calendar_secrets,
+        remember=remember_uc,
+        forget=forget_uc,
     )
 
     chat_turn_uc = ProcessChatTurnUseCase(
@@ -366,6 +399,9 @@ def get_container(session: AsyncSession):
         approval_repo=tool_approval_repo,
         event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
         recall=recall_uc,
+        memory_card=MemoryOnCardUseCase(
+            match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo, session_repo=session_repo
+        ),
     )
 
     summarize_history_uc = SummarizeHistoryUseCase(
@@ -536,17 +572,22 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_update_memory_use_case: UpdateMemoryUseCase(memory_repo, uow, embed_memories=embed_memories_uc),
         pres_deps.get_list_memory_page_use_case: ListMemoryPageUseCase(
-            memory_repo, user_repo, agent_repo, proposal_repo=proposal_repo
+            memory_repo, user_repo, agent_repo, proposal_repo=proposal_repo, session_repo=session_repo
         ),
-        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(memory_repo, uow, proposal_repo=proposal_repo),
+        pres_deps.get_retire_memory_use_case: RetireMemoryUseCase(
+            memory_repo, uow, proposal_repo=proposal_repo, session_repo=session_repo, embed_memories=embed_memories_uc
+        ),
         pres_deps.get_restore_memory_use_case: RestoreMemoryUseCase(memory_repo, uow),
         pres_deps.get_list_proposals_use_case: ListProposalsUseCase(
             proposal_repo, memory_repo, session_repo, user_repo, agent_repo
         ),
         pres_deps.get_answer_proposal_use_case: AnswerProposalUseCase(
-            proposal_repo, memory_repo, session_repo, uow, embed_memories_uc, log_text=settings.MEMORY_LOG_TEXT
+            proposal_repo, memory_repo, session_repo, uow, embed_memories_uc, log_text=settings.MEMORY_LOG_TEXT,
+            user_repo=user_repo,
         ),
         pres_deps.get_undo_proposal_answer_use_case: UndoProposalAnswerUseCase(proposal_repo, memory_repo, uow),
+        pres_deps.get_withdraw_change_use_case: WithdrawChangeUseCase(proposal_repo, memory_repo, uow),
+        pres_deps.get_restore_change_use_case: RestoreChangeUseCase(proposal_repo, memory_repo, uow),
         pres_deps.get_looked_over_use_case: LookedOverUseCase(
             proposal_repo, memory_repo, session_repo, user_repo, agent_repo
         ),
@@ -698,6 +739,8 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_list_proposals_use_case,
         pres_deps.get_answer_proposal_use_case,
         pres_deps.get_undo_proposal_answer_use_case,
+        pres_deps.get_withdraw_change_use_case,
+        pres_deps.get_restore_change_use_case,
         pres_deps.get_looked_over_use_case,
         pres_deps.get_configure_calendar_use_case,
         pres_deps.get_user_calendar_use_case,

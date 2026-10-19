@@ -140,7 +140,7 @@ async def test_GIVEN_adding_turned_automatic_on_the_card_WHEN_the_paused_turn_ca
 
 
 @pytest.mark.asyncio
-async def test_GIVEN_no_settings_WHEN_listed_THEN_every_action_asks_and_removing_and_replacing_always_ask():
+async def test_GIVEN_no_settings_WHEN_listed_THEN_every_action_asks_and_removing_replacing_and_forgetting_always_ask():
     listed = await ListToolApprovalsUseCase(FakeToolApprovalRepository()).execute(USER)
 
     assert [(a.tool, a.action, a.auto, a.always_asks) for a in listed] == [
@@ -150,6 +150,8 @@ async def test_GIVEN_no_settings_WHEN_listed_THEN_every_action_asks_and_removing
         ("document_writer", "create", False, False),
         ("document_writer", "append", False, False),
         ("document_writer", "replace", False, True),
+        ("remember", "create", False, False),
+        ("forget", "delete", False, True),
     ]
 
 

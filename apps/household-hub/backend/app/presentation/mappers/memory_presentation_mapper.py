@@ -18,6 +18,7 @@ from app.presentation.schemas.memory_schemas import (
     MemoryPageRead,
     MemoryRead,
     ProposalRead,
+    WaitingChangeRead,
 )
 
 
@@ -62,6 +63,18 @@ class MemoryPresentationMapper:
             yours=[MemoryPresentationMapper.to_page_item(i) for i in page.yours],
             household=[MemoryPresentationMapper.to_page_item(i) for i in page.household],
             to_check=page.to_check,
+            waiting=[
+                WaitingChangeRead(
+                    id=w.proposal_id,
+                    content=w.content,
+                    agent_name=w.agent_name,
+                    created_at=w.created_at,
+                    expires_at=w.expires_at,
+                    answerer_name=w.answerer_name,
+                    stored=MemoryPresentationMapper.to_page_item(w.stored),
+                )
+                for w in page.waiting
+            ],
         )
 
     @staticmethod

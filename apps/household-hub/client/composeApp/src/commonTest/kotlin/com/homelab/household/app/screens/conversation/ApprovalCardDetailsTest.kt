@@ -110,4 +110,24 @@ class ApprovalCardDetailsTest {
         assertEquals(CardAsk.Remove, cardAsk(ToolAction.Delete))
         assertEquals(CardAsk.Replace, cardAsk(ToolAction.Replace))
     }
+
+    @Test
+    fun `GIVEN a forget WHEN asked THEN it asks Keep it or Forget in the destructive style`() {
+        assertEquals(CardAsk.Forget, cardAsk(ToolAction.Delete, tool = "forget"))
+        assertEquals(CardAsk.Approve, cardAsk(ToolAction.Create, tool = "remember"))
+    }
+
+    @Test
+    fun `GIVEN a memory card WHEN read THEN its title is the sentence`() {
+        val details =
+            approvalCardDetails(
+                card(
+                    ToolAction.Create,
+                    ProposalDetails.Memory("Sam is vegan now.", household = true),
+                    tool = "remember",
+                ),
+            )
+
+        assertEquals(ApprovalCardDetails(title = "Sam is vegan now."), details)
+    }
 }

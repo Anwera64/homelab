@@ -16,8 +16,9 @@ class IMemoryProposalRepository(Protocol):
     async def update(self, proposal: MemoryProposal) -> MemoryProposal:
         ...
 
-    async def drop_pending_for(self, memory_id: str) -> List[str]:
-        """Drops the memory's pending proposals, leaving answered ones; returns the ids dropped."""
+    async def drop_pending_for(self, memory_id: str, origin: Optional[str] = None) -> List[str]:
+        """Drops the memory's pending proposals, only those of [origin] when given, leaving answered
+        ones; returns the ids dropped."""
         ...
 
     async def list_pending_for_answerer(self, user_id: str) -> List[MemoryProposal]:

@@ -35,6 +35,7 @@ import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.presentation.memories.LocalTime
+import com.homelab.household.presentation.memories.MemoryAge
 import com.homelab.household.presentation.whenagentsact.WhenAgentsActViewModel
 import dev.mokkery.MockMode
 import dev.mokkery.answering.calls
@@ -66,7 +67,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
@@ -110,24 +113,27 @@ class ChatSessionViewModelTest {
             )
     }
 
-    /** The same wiring, with a clock the test moves by hand. */
-    private fun viewModelWith(timeSource: TimeSource) =
-        ChatSessionViewModel(
-            streamChatTurnUseCase = streamChatTurnUseCase,
-            getSessionUseCase = getSessionUseCase,
-            listAgentsUseCase = listAgentsUseCase,
-            createSessionUseCase = createSessionUseCase,
-            regenerateAnswerUseCase = regenerateAnswerUseCase,
-            resumeTurnUseCase = resumeTurnUseCase,
-            decideToolProposalUseCase = decideToolProposalUseCase,
-            toggleSecretModeUseCase = toggleSecretModeUseCase,
-            getAgentUseCase = getAgentUseCase,
-            getCurrentUserUseCase = getCurrentUserUseCase,
-            listHouseholdMembersUseCase = listHouseholdMembersUseCase,
-            setToolApprovalUseCase = setToolApprovalUseCase,
-            deviceTimeZone = { ONE_HOUR },
-            timeSource = timeSource,
-        )
+    /** The same wiring, with clocks the test sets by hand. */
+    private fun viewModelWith(
+        timeSource: TimeSource = TimeSource.Monotonic,
+        clock: Clock = Clock.System,
+    ) = ChatSessionViewModel(
+        streamChatTurnUseCase = streamChatTurnUseCase,
+        getSessionUseCase = getSessionUseCase,
+        listAgentsUseCase = listAgentsUseCase,
+        createSessionUseCase = createSessionUseCase,
+        regenerateAnswerUseCase = regenerateAnswerUseCase,
+        resumeTurnUseCase = resumeTurnUseCase,
+        decideToolProposalUseCase = decideToolProposalUseCase,
+        toggleSecretModeUseCase = toggleSecretModeUseCase,
+        getAgentUseCase = getAgentUseCase,
+        getCurrentUserUseCase = getCurrentUserUseCase,
+        listHouseholdMembersUseCase = listHouseholdMembersUseCase,
+        setToolApprovalUseCase = setToolApprovalUseCase,
+        deviceTimeZone = { ONE_HOUR },
+        timeSource = timeSource,
+        clock = clock,
+    )
 
     @AfterTest
     fun tearDown() {
@@ -1844,6 +1850,19 @@ class ChatSessionViewModelTest {
             verifySuspend { setToolApprovalUseCase("calendar_write", ToolAction.Update, true) }
             verify { decideToolProposalUseCase("s-1", "c4", true, gymMoveOnwards) }
         }
+
+    @Test
+    fun `GIVEN a stored memory on a card WHEN its age is asked THEN it is counted in the phones own days`() {
+        val fixed =
+            object : Clock {
+                override fun now() = Instant.parse("2026-10-18T09:00:00Z")
+            }
+        val viewModel = viewModelWith(clock = fixed)
+
+        assertEquals(MemoryAge.Month(3), viewModel.memoryAge(Instant.parse("2026-03-04T10:00:00Z")))
+        // 23:30Z on the 17th is already the 18th an hour ahead of UTC.
+        assertEquals(MemoryAge.Today, viewModel.memoryAge(Instant.parse("2026-10-17T23:30:00Z")))
+    }
 
     private companion object {
         /** The phone is an hour ahead of UTC, so 10:52Z reads 11:52. */

@@ -206,8 +206,10 @@ async def test_GIVEN_an_agent_without_search_WHEN_it_reads_a_page_THEN_it_is_ref
 
 
 def test_GIVEN_search_permission_WHEN_expanded_THEN_reading_and_looking_up_come_with_it():
-    assert effective_tool_permissions(["searxng_search"]) == ["searxng_search", "read_page", "lookup_sources"]
-    assert effective_tool_permissions(["calendar_read"]) == ["calendar_read"]
+    assert effective_tool_permissions(["searxng_search"]) == [
+        "searxng_search", "read_page", "lookup_sources", "remember", "forget",
+    ]
+    assert effective_tool_permissions(["calendar_read"]) == ["calendar_read", "remember", "forget"]
 
 
 def test_GIVEN_the_tool_list_WHEN_listed_THEN_it_describes_reading_and_looking_up():
