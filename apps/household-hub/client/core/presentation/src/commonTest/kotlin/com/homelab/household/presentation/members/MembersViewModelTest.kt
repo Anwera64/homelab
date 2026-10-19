@@ -39,7 +39,7 @@ class MembersViewModelTest {
     private fun viewModel() = MembersViewModel(listHouseholdMembers, getCurrentUser)
 
     @Test
-    fun you_come_first_and_are_marked_as_yourself() =
+    fun `GIVEN a household where you are not the admin WHEN the list loads THEN you come first and are marked as yourself`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns liam
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -55,7 +55,7 @@ class MembersViewModelTest {
         }
 
     @Test
-    fun the_admin_is_told_they_are_one() =
+    fun `GIVEN you are the admin WHEN the list loads THEN the screen knows you are an admin and is ready`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
@@ -68,14 +68,20 @@ class MembersViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so_and_can_be_asked_again() =
+    fun `GIVEN an unreachable hub WHEN the list loads THEN the status says unreachable`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } throws ServerOfflineException()
-
             val viewModel = viewModel()
             advanceUntilIdle()
             assertEquals(MembersStatus.Unreachable, viewModel.uiState.value.status)
+        }
 
+    @Test
+    fun `GIVEN an unreachable hub that has since come back WHEN loading again THEN the status is ready`() =
+        runTest(testDispatcher) {
+            everySuspend { getCurrentUser() } throws ServerOfflineException()
+            val viewModel = viewModel()
+            advanceUntilIdle()
             everySuspend { getCurrentUser() } returns emma
             everySuspend { listHouseholdMembers() } returns listOf(emma, liam)
             viewModel.load()
@@ -85,7 +91,7 @@ class MembersViewModelTest {
         }
 
     @Test
-    fun anything_else_the_hub_does_is_a_plain_failure() =
+    fun `GIVEN the hub fails in an unexpected way WHEN the list loads THEN the status is a plain failure`() =
         runTest(testDispatcher) {
             everySuspend { getCurrentUser() } throws IllegalStateException("boom")
 

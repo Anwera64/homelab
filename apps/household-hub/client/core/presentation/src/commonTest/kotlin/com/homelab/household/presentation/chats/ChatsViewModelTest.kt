@@ -60,7 +60,7 @@ class ChatsViewModelTest {
     )
 
     @Test
-    fun the_list_loads_and_reports_what_it_found() =
+    fun `GIVEN a household with two chats WHEN loading THEN the list shows both and reports it is neither loading nor empty`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns
                 listOf(session("s-1", "Saturday dinner"), session("s-2", "Groceries for the week"))
@@ -75,7 +75,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun a_household_that_has_never_chatted_is_empty_rather_than_unsearched() =
+    fun `GIVEN a household that has never chatted WHEN loading THEN the state is empty rather than unsearched`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns emptyList()
 
@@ -88,7 +88,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun typing_filters_the_list_by_title() =
+    fun `GIVEN several chats WHEN searching for a word in a title THEN only the chats with that word in the title show`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns
                 listOf(
@@ -110,7 +110,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun typing_also_finds_a_chat_by_its_agents_name() =
+    fun `GIVEN chats with different agents WHEN searching for part of an agents name THEN that agents chat shows`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns
                 listOf(
@@ -130,7 +130,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun a_secret_chat_is_never_a_search_result() =
+    fun `GIVEN a secret chat that matches WHEN searching THEN the secret chat is not in the results`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns
                 listOf(
@@ -151,7 +151,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun a_query_that_matches_nothing_is_not_the_same_as_having_no_chats() =
+    fun `GIVEN a chat WHEN searching for something that matches nothing THEN it reports no matches rather than an empty household`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns listOf(session("s-1", "Saturday dinner"))
             viewModel.load()
@@ -165,7 +165,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun cancelling_the_search_brings_the_whole_list_back() =
+    fun `GIVEN an active search WHEN cancelling the search THEN the whole list and an empty query return`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns
                 listOf(session("s-1", "Saturday dinner"), session("s-2", "Groceries for the week"))
@@ -180,7 +180,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun a_chat_whose_agent_is_gone_still_lists_and_still_searches_by_title() =
+    fun `GIVEN a chat whose agent is gone WHEN searching by its title THEN the chat still shows`() =
         runTest(testDispatcher) {
             // Purging an agent clears the link (slice 7 draws the row properly; this must not crash).
             everySuspend { listSessions() } returns listOf(session("s-1", "Is the 5080 worth it?", agentName = null))
@@ -197,7 +197,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_so_rather_than_looking_like_an_empty_household() =
+    fun `GIVEN an unreachable hub WHEN loading THEN the error message shows and the list is not reported as empty`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } throws ServerOfflineException("Can't reach your hub")
 
@@ -210,7 +210,7 @@ class ChatsViewModelTest {
         }
 
     @Test
-    fun loading_again_replaces_the_rows_rather_than_adding_to_them() =
+    fun `GIVEN a loaded list WHEN loading again THEN the rows are replaced rather than added to`() =
         runTest(testDispatcher) {
             everySuspend { listSessions() } returns listOf(session("s-1", "Saturday dinner"))
             viewModel.load()

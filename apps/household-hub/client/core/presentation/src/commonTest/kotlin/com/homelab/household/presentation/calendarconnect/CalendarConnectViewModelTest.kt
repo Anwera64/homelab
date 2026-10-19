@@ -53,7 +53,7 @@ class CalendarConnectViewModelTest {
         }
 
     @Test
-    fun details_the_hub_can_use_are_connected_and_the_screen_says_so() =
+    fun `GIVEN details the hub can use WHEN connecting THEN the calendar is connected and the screen says so`() =
         runTest(testDispatcher) {
             everySuspend { connectCalendar(any(), any(), any(), any(), any()) } returns icloud
             val viewModel = filledIn()
@@ -70,7 +70,7 @@ class CalendarConnectViewModelTest {
         }
 
     @Test
-    fun a_refused_password_says_rejected_and_keeps_what_was_typed() =
+    fun `GIVEN the calendar refuses the password WHEN connecting THEN the status says rejected and the typed password is kept`() =
         runTest(testDispatcher) {
             everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws CalendarRejectedException()
             val viewModel = filledIn()
@@ -83,7 +83,7 @@ class CalendarConnectViewModelTest {
         }
 
     @Test
-    fun a_server_the_hub_cannot_reach_says_so_rather_than_blaming_the_password() =
+    fun `GIVEN a calendar server the hub cannot reach WHEN connecting THEN the status says so rather than blaming the password`() =
         runTest(testDispatcher) {
             everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws CalendarUnreachableException()
             val viewModel = filledIn()
@@ -95,7 +95,7 @@ class CalendarConnectViewModelTest {
         }
 
     @Test
-    fun a_hub_that_does_not_answer_is_its_own_failure() =
+    fun `GIVEN a hub that does not answer WHEN connecting THEN the status is its own hub unreachable failure`() =
         runTest(testDispatcher) {
             everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws ServerOfflineException()
             val viewModel = filledIn()
@@ -107,7 +107,7 @@ class CalendarConnectViewModelTest {
         }
 
     @Test
-    fun tapping_connect_early_says_what_is_missing_and_asks_nothing() =
+    fun `GIVEN nothing filled in WHEN tapping connect THEN each missing field is flagged and the hub is not asked`() =
         runTest(testDispatcher) {
             val viewModel = CalendarConnectViewModel(CalendarProvider.OTHER, connectCalendar)
 

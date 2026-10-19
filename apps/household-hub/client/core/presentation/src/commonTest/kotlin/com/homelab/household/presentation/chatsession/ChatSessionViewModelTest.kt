@@ -141,7 +141,7 @@ class ChatSessionViewModelTest {
     }
 
     @Test
-    fun load_session_populates_state_with_session_and_messages() =
+    fun `GIVEN a session with two messages WHEN it is loaded THEN the session and both messages show without an error`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1", title = "Chat")
             val messages =
@@ -236,7 +236,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun send_message_streams_deltas_and_completes() =
+    fun `GIVEN a loaded chat WHEN a message is sent and the answer streams in THEN the streaming message clears and the question and the answer are listed`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
@@ -585,7 +585,7 @@ class ChatSessionViewModelTest {
     }
 
     @Test
-    fun `GIVEN the card's box and the When agents act switch WHEN either changes THEN both show the same setting`() =
+    fun `GIVEN the card's box ticked WHEN the card is approved THEN the When agents act switch for adding events shows on`() =
         runTest(testDispatcher) {
             val hub = HubSettings()
             everySuspend { setToolApprovalUseCase(any(), any(), any()) } calls
@@ -607,6 +607,28 @@ class ChatSessionViewModelTest {
                     .first { it.action == ToolAction.Create }
             }
             assertTrue(addEvents().automatic)
+        }
+
+    @Test
+    fun `GIVEN adding events made automatic from the card WHEN the When agents act switch is turned off THEN both show the same setting`() =
+        runTest(testDispatcher) {
+            val hub = HubSettings()
+            everySuspend { setToolApprovalUseCase(any(), any(), any()) } calls
+                { (tool: String, action: ToolAction, auto: Boolean) ->
+                    hub.set(tool, action, auto)
+                }
+            openPaused(dinner)
+            approvedTurn("c1")
+            viewModel.approveAutomatically("c1")
+            advanceUntilIdle()
+            val settings = WhenAgentsActViewModel({ hub.approvals }, setToolApprovalUseCase)
+            advanceUntilIdle()
+            val addEvents = {
+                settings.uiState.value.groups
+                    .first()
+                    .approvals
+                    .first { it.action == ToolAction.Create }
+            }
 
             settings.onToggle(HubTool.CALENDAR_WRITE, ToolAction.Create, automatic = false)
             advanceUntilIdle()
@@ -703,7 +725,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun server_offline_sets_error_message_in_state() =
+    fun `GIVEN an offline hub WHEN a session is loaded THEN the error message shows and loading stops`() =
         runTest(testDispatcher) {
             everySuspend { getSessionUseCase("s-offline") } throws ServerOfflineException("Server offline")
 
@@ -716,7 +738,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun send_message_generates_unique_ids_and_sets_status_to_sent_on_done() =
+    fun `GIVEN a first message already answered WHEN a second message is sent THEN each question has its own id and is marked sent`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
@@ -759,7 +781,7 @@ class ChatSessionViewModelTest {
      * matters here.
      */
     @Test
-    fun a_burst_of_sends_gives_every_message_its_own_id() =
+    fun `GIVEN a loaded chat WHEN fifty messages are sent one after another THEN every message has its own id`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
@@ -796,7 +818,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun send_message_on_offline_failure_updates_user_message_status_to_failed_offline() =
+    fun `GIVEN an offline hub WHEN a message is sent THEN the question is marked failed offline and the error message shows`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
@@ -819,7 +841,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun send_message_on_general_failure_updates_user_message_status_to_failed_error() =
+    fun `GIVEN a hub that fails unexpectedly WHEN a message is sent THEN the question is marked failed with an error and the error message shows`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, emptyList())
@@ -852,7 +874,7 @@ class ChatSessionViewModelTest {
     }
 
     @Test
-    fun a_failure_before_the_first_word_blames_the_question_and_frees_the_composer() =
+    fun `GIVEN a hub that fails before the first word WHEN a message is sent THEN the question is blamed and the composer is freed`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -868,7 +890,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_stream_that_drops_mid_answer_keeps_the_words_and_blames_the_answer() =
+    fun `GIVEN a stream that drops mid answer WHEN a message is sent THEN the words so far are kept and the answer is blamed`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -893,7 +915,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun past_the_active_wait_the_turn_is_still_working_rather_than_failed() =
+    fun `GIVEN a stream that dropped and waited past the active wait WHEN a message is sent THEN the turn is still working rather than failed`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -914,7 +936,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_turn_the_hub_is_no_longer_running_is_failed_and_offers_another_go() =
+    fun `GIVEN a turn the hub is no longer running WHEN a message is sent THEN the turn is failed and the composer is free`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -937,7 +959,6 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN an answer left still working while the phone was locked WHEN the app comes back THEN it carries on from the last word`() =
         runTest(testDispatcher) {
-            // GIVEN
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
                 flowOf(
@@ -951,11 +972,9 @@ class ChatSessionViewModelTest {
             viewModel.sendMessage("Say hello")
             advanceUntilIdle()
 
-            // WHEN
             viewModel.onForeground()
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals("Hello", state.streamingMessage)
             assertEquals(TurnState.Streaming, state.turnState)
@@ -964,7 +983,6 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN an answer resumed after the phone was locked WHEN it finishes THEN it lands as the answer`() =
         runTest(testDispatcher) {
-            // GIVEN
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
                 flowOf(
@@ -980,11 +998,9 @@ class ChatSessionViewModelTest {
             viewModel.sendMessage("Say hello")
             advanceUntilIdle()
 
-            // WHEN
             viewModel.onForeground()
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals("Hello", state.messages.last { it.role == MessageRole.ASSISTANT }.content)
             assertEquals(MessageStatus.SENT, state.messages.first { it.role == MessageRole.USER }.status)
@@ -995,7 +1011,6 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a turn still reconnecting in the background WHEN the app comes back THEN it asks right away instead of waiting out the backoff`() =
         runTest(testDispatcher) {
-            // GIVEN — the old wait never ends on its own, as a backoff delay would not for a while.
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
                 flow {
@@ -1007,25 +1022,20 @@ class ChatSessionViewModelTest {
             viewModel.sendMessage("Say hello")
             advanceUntilIdle()
 
-            // WHEN
             viewModel.onForeground()
             advanceUntilIdle()
 
-            // THEN
             assertEquals("Hello", viewModel.uiState.value.streamingMessage)
         }
 
     @Test
     fun `GIVEN nothing being answered WHEN the app comes back THEN nothing is asked of the hub`() =
         runTest(testDispatcher) {
-            // GIVEN
             loadedSession()
 
-            // WHEN
             viewModel.onForeground()
             advanceUntilIdle()
 
-            // THEN
             verify(VerifyMode.exactly(0)) { resumeTurnUseCase(any(), any()) }
         }
 
@@ -1052,17 +1062,14 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a question still being answered WHEN the conversation is opened THEN the answer streams in`() =
         runTest(testDispatcher) {
-            // GIVEN
             val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = true)
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
             every { resumeTurnUseCase("s-1", any()) } returns
                 flowOf(ChatStreamEvent.Reconnecting, ChatStreamEvent.Delta("Monday"))
 
-            // WHEN
             viewModel.loadSession("s-1")
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals("Monday", state.streamingMessage)
             assertEquals(TurnState.Streaming, state.turnState)
@@ -1072,7 +1079,6 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a question still being answered WHEN the conversation is opened and the answer finishes THEN it lands`() =
         runTest(testDispatcher) {
-            // GIVEN
             val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = true)
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
             every { resumeTurnUseCase("s-1", any()) } returns
@@ -1081,11 +1087,9 @@ class ChatSessionViewModelTest {
                     ChatStreamEvent.Done(messageId = "m2", assistantContent = "Monday", agentName = "Assistant"),
                 )
 
-            // WHEN
             viewModel.loadSession("s-1")
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals("Monday", state.messages.last().content)
             assertNull(state.streamingMessage)
@@ -1095,15 +1099,12 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a question whose answer never came WHEN the conversation is opened THEN it offers to try again`() =
         runTest(testDispatcher) {
-            // GIVEN
             val session = ConversationSession(id = "s-1", userId = "u-1", turnRunning = false)
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question()))
 
-            // WHEN
             viewModel.loadSession("s-1")
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals(TurnState.Failed, state.turnState)
             assertTrue(state.canSend)
@@ -1113,15 +1114,12 @@ class ChatSessionViewModelTest {
     @Test
     fun `GIVEN a conversation that ends in an answer WHEN it is opened THEN nothing is waited for`() =
         runTest(testDispatcher) {
-            // GIVEN
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns Pair(session, listOf(question(), answer()))
 
-            // WHEN
             viewModel.loadSession("s-1")
             advanceUntilIdle()
 
-            // THEN
             val state = viewModel.uiState.value
             assertEquals(TurnState.Idle, state.turnState)
             assertNull(state.streamingMessage)
@@ -1131,7 +1129,7 @@ class ChatSessionViewModelTest {
     // ---- what the agent says that is not the answer ------------------------
 
     @Test
-    fun the_question_is_marked_sent_the_moment_the_hub_has_it() =
+    fun `GIVEN a hub that has taken the question WHEN a message is sent THEN the question is marked sent at once`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.Accepted)
@@ -1149,7 +1147,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun reasoning_marks_the_model_as_thinking() =
+    fun `GIVEN a model that has only reasoned so far WHEN a message is sent THEN the model is marked as thinking and not silent`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -1164,7 +1162,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_tool_is_shown_while_it_runs() =
+    fun `GIVEN a tool that is running WHEN a message is sent THEN the tool is shown while it runs`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -1438,7 +1436,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_new_turn_starts_with_nothing_left_over_from_the_last() =
+    fun `GIVEN a failed first turn WHEN a second message is sent THEN nothing is left over from the last turn`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", "First", false, any()) } returns
@@ -1469,7 +1467,7 @@ class ChatSessionViewModelTest {
      * nothing and says nothing. Two messages typed, neither sent, and an empty bubble on screen.
      */
     @Test
-    fun a_turn_that_ends_without_a_word_frees_the_composer_rather_than_holding_it() =
+    fun `GIVEN a turn that ends without a word WHEN a message is sent THEN the turn is failed and the composer is free`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.TurnFailed)
@@ -1483,7 +1481,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_second_message_is_taken_once_a_failed_turn_has_ended() =
+    fun `GIVEN a failed turn that has ended WHEN a second message is sent THEN both questions are in the chat`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns flowOf(ChatStreamEvent.TurnFailed)
@@ -1501,7 +1499,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun the_recovery_is_told_which_answer_is_already_on_screen() =
+    fun `GIVEN an answer already on screen WHEN a message is sent THEN the recovery is told which answer is on screen`() =
         runTest(testDispatcher) {
             val session = ConversationSession(id = "s-1", userId = "u-1")
             everySuspend { getSessionUseCase("s-1") } returns
@@ -1525,7 +1523,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun trying_again_asks_for_a_fresh_answer_without_asking_the_question_again() =
+    fun `GIVEN a failed turn WHEN trying again THEN a fresh answer arrives without a second copy of the question`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -1555,7 +1553,7 @@ class ChatSessionViewModelTest {
     // ---- what happens to what you typed ------------------------------------
 
     @Test
-    fun a_message_that_was_taken_leaves_the_composer() =
+    fun `GIVEN a typed message WHEN it is sent THEN it leaves the composer`() =
         runTest(testDispatcher) {
             loadedSession()
             every { streamChatTurnUseCase("s-1", any(), false, any()) } returns
@@ -1569,7 +1567,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun a_message_that_could_not_be_sent_stays_in_the_composer() =
+    fun `GIVEN a new chat where the hub refuses to create one WHEN a typed message is sent THEN the text stays in the composer and an error shows`() =
         runTest(testDispatcher) {
             // A brand new chat, and the hub refuses to create one. Nothing typed is ever cleared
             // (design notes §2): losing the message is worse than the failure that caused it.
@@ -1587,7 +1585,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun trying_again_does_nothing_when_the_turn_did_not_fail() =
+    fun `GIVEN a turn that did not fail WHEN trying again THEN nothing is asked of the hub`() =
         runTest(testDispatcher) {
             loadedSession()
 
@@ -1852,7 +1850,7 @@ class ChatSessionViewModelTest {
         }
 
     @Test
-    fun `GIVEN a stored memory on a card WHEN its age is asked THEN it is counted in the phones own days`() {
+    fun `GIVEN a memory stored months ago WHEN its age is asked THEN it is counted in months`() {
         val fixed =
             object : Clock {
                 override fun now() = Instant.parse("2026-10-18T09:00:00Z")
@@ -1860,6 +1858,16 @@ class ChatSessionViewModelTest {
         val viewModel = viewModelWith(clock = fixed)
 
         assertEquals(MemoryAge.Month(3), viewModel.memoryAge(Instant.parse("2026-03-04T10:00:00Z")))
+    }
+
+    @Test
+    fun `GIVEN a memory stored late on the 17th in UTC WHEN its age is asked THEN it is today in the phones own days`() {
+        val fixed =
+            object : Clock {
+                override fun now() = Instant.parse("2026-10-18T09:00:00Z")
+            }
+        val viewModel = viewModelWith(clock = fixed)
+
         // 23:30Z on the 17th is already the 18th an hour ahead of UTC.
         assertEquals(MemoryAge.Today, viewModel.memoryAge(Instant.parse("2026-10-17T23:30:00Z")))
     }

@@ -37,7 +37,7 @@ class LeaveHouseholdViewModelTest {
     private fun viewModel() = LeaveHouseholdViewModel(leaveHousehold)
 
     @Test
-    fun the_right_pin_leaves_the_household() =
+    fun `GIVEN the right pin WHEN leaving THEN the household is left`() =
         runTest(testDispatcher) {
             everySuspend { leaveHousehold(any()) } returns Unit
             val viewModel = viewModel()
@@ -52,7 +52,7 @@ class LeaveHouseholdViewModelTest {
         }
 
     @Test
-    fun a_wrong_pin_says_how_many_tries_are_left() =
+    fun `GIVEN a wrong pin WHEN leaving THEN the status says how many tries are left`() =
         runTest(testDispatcher) {
             everySuspend { leaveHousehold(any()) } throws WrongPinException(attemptsLeft = 4)
             val viewModel = viewModel()
@@ -65,7 +65,7 @@ class LeaveHouseholdViewModelTest {
         }
 
     @Test
-    fun the_only_admin_is_refused_by_the_hub_and_told_why() =
+    fun `GIVEN the only admin WHEN leaving THEN the hub refuses and the status says why`() =
         runTest(testDispatcher) {
             everySuspend { leaveHousehold(any()) } throws SoleAdminException()
             val viewModel = viewModel()
@@ -78,7 +78,7 @@ class LeaveHouseholdViewModelTest {
         }
 
     @Test
-    fun an_unreachable_hub_says_nothing_was_changed() =
+    fun `GIVEN an unreachable hub WHEN leaving THEN the status says nothing was changed`() =
         runTest(testDispatcher) {
             everySuspend { leaveHousehold(any()) } throws ServerOfflineException()
             val viewModel = viewModel()

@@ -70,7 +70,7 @@ class LaunchViewModelTest {
     private fun LaunchViewModel.stop() = viewModelScope.cancel()
 
     @Test
-    fun it_names_the_hub_it_is_reaching_before_any_answer() =
+    fun `GIVEN a hub that has not answered yet WHEN the screen opens THEN it names the hub address and is checking`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 1)
 
@@ -81,7 +81,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun a_hub_with_members_leads_to_sign_in_straight_from_checking() =
+    fun `GIVEN a hub with members WHEN the check finishes THEN the screen goes to sign in while the status still reads checking`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = true, memberCount = 2)
             val viewModel = viewModel()
@@ -96,7 +96,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun an_empty_hub_leads_to_first_run_straight_from_checking() =
+    fun `GIVEN an empty hub WHEN the check finishes THEN the screen goes to first run while the status still reads checking`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } returns AuthStatus(isInitialized = false, memberCount = 0)
             val viewModel = viewModel()
@@ -111,7 +111,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun an_offline_hub_has_no_route_and_counts_down_to_asking_again() =
+    fun `GIVEN an offline hub WHEN the check fails THEN it has no route and counts down to asking again`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
             val viewModel = viewModel()
@@ -132,7 +132,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun when_the_countdown_runs_out_it_asks_the_hub_again() =
+    fun `GIVEN an offline hub that has since come back WHEN the countdown runs out THEN the hub is asked again and the screen goes to sign in`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
             val viewModel = viewModel()
@@ -151,7 +151,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun trying_again_by_hand_stops_the_countdown() =
+    fun `GIVEN an offline hub counting down WHEN trying again by hand THEN the status is checking and the countdown stops`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
             val viewModel = viewModel()
@@ -169,7 +169,7 @@ class LaunchViewModelTest {
      * UI can map — never a sentence the hub or the network happened to produce.
      */
     @Test
-    fun a_hub_that_answers_with_an_error_reports_the_status_it_sent() =
+    fun `GIVEN a hub that answers with an error status WHEN the check fails THEN the failure carries that status and the screen counts down`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 500)
 
@@ -177,7 +177,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun a_hub_that_is_not_there_reports_a_bad_address() =
+    fun `GIVEN a hub address that is not found WHEN the check fails THEN the failure is a bad address and the screen counts down`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws NotFoundException()
 
@@ -185,7 +185,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun a_hub_that_answers_with_something_other_than_json_reports_what_it_sent() =
+    fun `GIVEN a hub that answers with something other than json WHEN the check fails THEN the failure carries what it sent and the screen counts down`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws UnexpectedContentTypeException("text/html")
 
@@ -193,7 +193,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun anything_else_is_an_unknown_failure() =
+    fun `GIVEN the check fails in an unexpected way WHEN the check finishes THEN the failure is unknown and the screen counts down`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws IllegalStateException("something odd")
 
@@ -202,7 +202,7 @@ class LaunchViewModelTest {
 
     /** Not only a hub with no route: one that answered badly may be starting up, so it's asked again too. */
     @Test
-    fun a_hub_that_answered_badly_is_asked_again_by_itself() =
+    fun `GIVEN a hub that answered badly and has since come back WHEN the countdown runs out THEN the hub is asked again and the screen goes to first run`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws UpstreamGatewayException(statusCode = 503)
             val viewModel = viewModel()
@@ -220,7 +220,7 @@ class LaunchViewModelTest {
         }
 
     @Test
-    fun retrying_asks_the_hub_again() =
+    fun `GIVEN an offline hub that has since come back WHEN retrying THEN the screen goes to sign in`() =
         runTest(testDispatcher) {
             everySuspend { checkAuthStatusUseCase() } throws ServerOfflineException()
             val viewModel = viewModel()
