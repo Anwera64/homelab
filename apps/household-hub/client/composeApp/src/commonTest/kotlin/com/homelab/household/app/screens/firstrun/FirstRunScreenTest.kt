@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class FirstRunScreenTest {
     @Test
-    fun creating_with_nothing_filled_in_says_what_is_missing_under_each_field() {
+    fun `GIVEN an empty first run form WHEN create is tapped THEN each missing field says so and nothing is sent`() {
         val hub = FakeFirstRunHub()
         hub.createsTheHousehold()
 
@@ -35,7 +35,7 @@ class FirstRunScreenTest {
     }
 
     @Test
-    fun creating_the_household_sends_the_name_pin_and_colour_and_goes_home() {
+    fun `GIVEN a hub that creates the household WHEN the name and PIN and colour are filled in and create is tapped THEN they are sent to the hub and the screen hands back`() {
         val hub = FakeFirstRunHub()
         hub.createsTheHousehold()
         var created = 0
@@ -59,7 +59,7 @@ class FirstRunScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_says_so_and_keeps_what_was_typed() {
+    fun `GIVEN an unreachable hub WHEN the form is filled in and create is tapped THEN it says the hub did not answer and keeps the name`() {
         val hub = FakeFirstRunHub()
         hub.isOffline()
         var created = 0
@@ -80,7 +80,7 @@ class FirstRunScreenTest {
     }
 
     @Test
-    fun a_hub_someone_else_already_set_up_offers_sign_in_instead() {
+    fun `GIVEN a hub already set up WHEN the form is filled in and create is tapped THEN it says so and offers sign in instead`() {
         val hub = FakeFirstRunHub()
         hub.isAlreadySetUp()
         var signIn = 0
@@ -107,7 +107,7 @@ class FirstRunScreenTest {
      * any field, is the only dismissal path iOS offers — so it must clear focus.
      */
     @Test
-    fun tapping_the_form_background_clears_focus() {
+    fun `GIVEN the first run form with the name focused WHEN the form background is tapped THEN the name loses focus`() {
         val hub = FakeFirstRunHub()
         hub.createsTheHousehold()
 
@@ -125,7 +125,7 @@ class FirstRunScreenTest {
 
     /** Every previewed state draws: the form's own copy is on screen whatever state it's in. */
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = FirstRunUiStateProvider().values.toList()
         assertEquals(5, states.size)
 

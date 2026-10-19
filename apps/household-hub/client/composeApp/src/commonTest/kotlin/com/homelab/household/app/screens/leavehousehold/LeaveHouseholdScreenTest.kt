@@ -12,7 +12,7 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class LeaveHouseholdScreenTest {
     @Test
-    fun your_pin_leaves_the_household() {
+    fun `GIVEN a hub that accepts the PIN WHEN the PIN is typed and leave is tapped THEN the screen reports that the member left`() {
         val hub = FakeMembersHub()
         hub.doesIt()
         var left = 0
@@ -29,7 +29,7 @@ class LeaveHouseholdScreenTest {
     }
 
     @Test
-    fun a_wrong_pin_says_how_many_tries_are_left() {
+    fun `GIVEN a hub that refuses the PIN WHEN the PIN is typed and leave is tapped THEN the screen says how many tries are left`() {
         val hub = FakeMembersHub()
         hub.refusesThePin(attemptsLeft = 4)
 
@@ -45,7 +45,7 @@ class LeaveHouseholdScreenTest {
     }
 
     @Test
-    fun the_only_admin_is_told_the_household_cannot_lose_them() {
+    fun `GIVEN a hub that refuses the only admin WHEN the PIN is typed and leave is tapped THEN the screen says the only admin cannot leave`() {
         val hub = FakeMembersHub()
         hub.refusesTheOnlyAdmin()
 
@@ -66,7 +66,7 @@ class LeaveHouseholdScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun deleting_the_account_shows_on_the_button() =
+    fun `GIVEN a leave in progress WHEN the screen is shown THEN the button says it is deleting and leave is gone`() =
         runComposeUiTest {
             leaveHouseholdContent(LeaveHouseholdUiState(pin = "135790", status = LeaveHouseholdStatus.Leaving))
 
@@ -77,7 +77,7 @@ class LeaveHouseholdScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         LeaveHouseholdUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 leaveHouseholdContent(state)

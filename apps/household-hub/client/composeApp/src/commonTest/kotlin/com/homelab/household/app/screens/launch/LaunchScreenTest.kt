@@ -28,7 +28,7 @@ import kotlin.test.assertEquals
 class LaunchScreenTest {
     /** No "your hub is ready" on the way: the splash is all there is until the user moves on. */
     @Test
-    fun a_hub_with_members_sends_the_user_to_sign_in_from_the_splash() {
+    fun `GIVEN a hub with members WHEN the launch screen opens THEN it sends the user to sign in and not to first run`() {
         val hub = FakeLaunchHub()
         hub.respondsWith(initialized = true, members = 2)
         var signIn = 0
@@ -46,7 +46,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun a_hub_with_nobody_on_it_sends_the_user_to_first_run_from_the_splash() {
+    fun `GIVEN a hub with nobody on it WHEN the launch screen opens THEN it sends the user to first run and not to sign in`() {
         val hub = FakeLaunchHub()
         hub.respondsWith(initialized = false, members = 0)
         var signIn = 0
@@ -64,7 +64,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun open_tailscale_hands_the_user_over_to_tailscale() {
+    fun `GIVEN an offline hub WHEN open Tailscale is tapped THEN Tailscale is opened once`() {
         val hub = FakeLaunchHub()
         hub.isOffline()
         val apps = FakeExternalApps()
@@ -82,7 +82,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_keeps_the_user_here_with_something_to_retry() {
+    fun `GIVEN an unreachable hub WHEN the launch screen opens THEN it says the hub is unavailable and the user goes nowhere`() {
         val hub = FakeLaunchHub()
         hub.isOffline()
         var moved = 0
@@ -98,7 +98,7 @@ class LaunchScreenTest {
 
     /** A real 500 from the hub, said in the app's own words rather than the hub's — and retried. */
     @Test
-    fun a_failing_hub_says_what_it_answered() {
+    fun `GIVEN a hub failing with a server error WHEN the launch screen opens THEN it says the hub answered 500 and the user goes nowhere`() {
         val hub = FakeLaunchHub()
         hub.fails(HttpStatusCode.InternalServerError)
         var moved = 0
@@ -113,7 +113,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun something_answering_with_a_web_page_says_so() {
+    fun `GIVEN something answering with a web page WHEN the launch screen opens THEN it says the answer was not JSON and the user goes nowhere`() {
         val hub = FakeLaunchHub()
         hub.answersWithHtml()
         var moved = 0
@@ -128,7 +128,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun it_names_the_hub_it_is_reaching_while_it_waits() {
+    fun `GIVEN a hub that never answers WHEN the launch screen opens THEN it says it is reaching the hub and names its address`() {
         val hub = FakeLaunchHub()
         hub.neverAnswers()
 
@@ -143,7 +143,7 @@ class LaunchScreenTest {
     }
 
     @Test
-    fun trying_again_asks_the_hub_a_second_time() {
+    fun `GIVEN an offline hub that comes back WHEN try again is tapped THEN the hub is asked again and the user is sent to sign in`() {
         val hub = FakeLaunchHub()
         hub.isOffline()
         var signIn = 0
@@ -168,7 +168,7 @@ class LaunchScreenTest {
      * without a previewed state, or without a hub behaviour that produces it, fails here.
      */
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN launch is reached through the hub THEN each state draws with the hub address`() {
         val states = LaunchUiStateProvider().values.toList()
         assertEquals(6, states.size)
 
@@ -194,7 +194,7 @@ class LaunchScreenTest {
 
     /** A short phone or a large font: the offline screen scrolls rather than clipping its buttons. */
     @Test
-    fun the_offline_screen_scrolls_when_it_does_not_fit() =
+    fun `GIVEN the offline screen in a short window WHEN it is shown THEN it scrolls to the offline hint`() =
         runComposeUiTest {
             val offline = LaunchUiStateProvider().values.first { it.status is HubStatus.Unavailable }
             setContent {

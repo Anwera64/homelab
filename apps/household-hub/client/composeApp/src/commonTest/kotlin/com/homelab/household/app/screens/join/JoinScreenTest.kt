@@ -19,7 +19,7 @@ class JoinScreenTest {
     private val invite = InvitePreview(invitedName = "Liam", inviterName = "Emma", inviterAvatarColor = "#3C6E4E")
 
     @Test
-    fun the_joiner_keeps_the_name_they_were_invited_as_and_picks_a_pin() {
+    fun `GIVEN an invitation from Emma to Liam WHEN a PIN is typed and join is tapped THEN the invited name and the PIN are sent and the screen hands back`() {
         val hub = FakeJoinHub()
         hub.letsThemJoinAs(memberId = "liam", fullName = "Liam")
         var joined = 0
@@ -42,7 +42,7 @@ class JoinScreenTest {
     }
 
     @Test
-    fun a_pin_that_is_not_six_digits_says_so_under_the_field() {
+    fun `GIVEN a PIN of three digits WHEN join is tapped THEN the screen says the PIN is not six digits and nothing is sent`() {
         val hub = FakeJoinHub()
 
         runScreenTest {
@@ -59,7 +59,7 @@ class JoinScreenTest {
     }
 
     @Test
-    fun a_name_someone_took_meanwhile_says_so_under_the_name() {
+    fun `GIVEN a hub that says the name is taken WHEN a PIN is typed and join is tapped THEN the screen says the name is taken`() {
         val hub = FakeJoinHub()
         hub.saysThatNameIsTaken()
 
@@ -75,7 +75,7 @@ class JoinScreenTest {
     }
 
     @Test
-    fun a_code_that_expired_while_they_typed_says_so() {
+    fun `GIVEN a hub that says the code has gone WHEN a PIN is typed and join is tapped THEN the screen says the code expired`() {
         val hub = FakeJoinHub()
         hub.saysTheCodeHasGone()
 
@@ -96,7 +96,7 @@ class JoinScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun joining_the_household_shows_on_the_button() =
+    fun `GIVEN a join in progress WHEN the screen is shown THEN the button says it is joining with a progress bar and join is gone`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -129,7 +129,7 @@ class JoinScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = JoinUiStateProvider().values.toList()
 
         states.forEach { state ->

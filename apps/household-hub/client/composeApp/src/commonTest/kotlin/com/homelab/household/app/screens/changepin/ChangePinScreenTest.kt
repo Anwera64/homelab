@@ -17,7 +17,7 @@ class ChangePinScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun the_new_pin_is_taken_and_this_phone_keeps_its_place() {
+    fun `GIVEN the hub takes the change WHEN the member enters the current PIN and the new PIN twice and taps change THEN the screen hands back and this phone keeps a fresh token`() {
         val hub = FakeMembersHub()
         hub.takesTheChange()
         val tokens = InMemorySessionStorage().apply { saveTokens("old-token") }
@@ -40,7 +40,7 @@ class ChangePinScreenTest {
     }
 
     @Test
-    fun a_wrong_current_pin_lands_under_that_field() {
+    fun `GIVEN the hub refuses the current PIN WHEN the member taps change THEN the refusal shows under the current PIN with the attempts left`() {
         val hub = FakeMembersHub()
         hub.refusesThePin(attemptsLeft = 4)
 
@@ -59,7 +59,7 @@ class ChangePinScreenTest {
     }
 
     @Test
-    fun two_different_new_pins_say_so_under_the_second_field() {
+    fun `GIVEN two different new PINs WHEN the member taps change THEN the second field says they differ`() {
         val hub = FakeMembersHub()
 
         runScreenTest {
@@ -82,7 +82,7 @@ class ChangePinScreenTest {
      * is happening rather than "Working" (design notes §2, §6.21).
      */
     @Test
-    fun saving_the_new_pin_shows_on_the_button() =
+    fun `GIVEN a PIN being saved WHEN the screen is shown THEN the button shows it is saving`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -107,7 +107,7 @@ class ChangePinScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = ChangePinUiStateProvider().values.toList()
 
         states.forEach { state ->

@@ -27,19 +27,19 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class ButtonsTest {
     @Test
-    fun primary_button_always_reaches_on_click() =
+    fun `GIVEN a primary button WHEN it is tapped THEN the tap reaches the click handler`() =
         assertAlwaysClickable { onClick ->
             PrimaryButton(text = "Create", onClick = onClick)
         }
 
     @Test
-    fun secondary_button_always_reaches_on_click() =
+    fun `GIVEN a secondary button WHEN it is tapped THEN the tap reaches the click handler`() =
         assertAlwaysClickable { onClick ->
             SecondaryButton(text = "Create", onClick = onClick)
         }
 
     @Test
-    fun destructive_button_always_reaches_on_click() =
+    fun `GIVEN a destructive button WHEN it is tapped THEN the tap reaches the click handler`() =
         assertAlwaysClickable { onClick ->
             DestructiveButton(text = "Create", onClick = onClick)
         }
@@ -49,19 +49,19 @@ class ButtonsTest {
      * the button's own guard; every ViewModel guards re-entry too, and both are cheap.
      */
     @Test
-    fun a_busy_primary_button_swallows_the_tap() =
+    fun `GIVEN a busy primary button WHEN it is tapped THEN the tap is swallowed`() =
         assertBusySwallowsTheTap { busy, onClick ->
             PrimaryButton(text = "Creating…", onClick = onClick, busy = busy)
         }
 
     @Test
-    fun a_busy_secondary_button_swallows_the_tap() =
+    fun `GIVEN a busy secondary button WHEN it is tapped THEN the tap is swallowed`() =
         assertBusySwallowsTheTap { busy, onClick ->
             SecondaryButton(text = "Creating…", onClick = onClick, busy = busy)
         }
 
     @Test
-    fun a_busy_destructive_button_swallows_the_tap() =
+    fun `GIVEN a busy destructive button WHEN it is tapped THEN the tap is swallowed`() =
         assertBusySwallowsTheTap { busy, onClick ->
             DestructiveButton(text = "Creating…", onClick = onClick, busy = busy)
         }
@@ -72,7 +72,7 @@ class ButtonsTest {
      * bottom edge is the only thing that changes.
      */
     @Test
-    fun a_busy_button_is_not_dimmed_but_says_it_is_working() =
+    fun `GIVEN a busy primary button WHEN it is shown THEN it stays enabled and says it is working with a progress bar`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -92,7 +92,7 @@ class ButtonsTest {
      * reader hearing "Working" three screens running has learned nothing.
      */
     @Test
-    fun a_button_announces_the_wait_its_caller_names() =
+    fun `GIVEN a busy button whose caller names the wait WHEN it is shown THEN it announces that wait`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -110,7 +110,7 @@ class ButtonsTest {
 
     /** And no bar when it isn't working — the affordance only exists during the wait. */
     @Test
-    fun a_button_at_rest_carries_no_bar() =
+    fun `GIVEN a button that is not busy WHEN it is shown THEN it carries no progress bar`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -128,7 +128,7 @@ class ButtonsTest {
      * made the secondary bar `textMuted` — a grey bar on a grey button, all but invisible.
      */
     @Test
-    fun each_kind_of_button_draws_its_bar_on_its_own_surface() {
+    fun `GIVEN the day palette WHEN each kind of busy bar is built THEN its bar and track come from that button's own surface`() {
         with(BusyBar.filled(DayColors)) {
             assertEquals(DayColors.onPrimary, bar, "a filled button's bar")
             assertEquals(DayColors.onPrimary.copy(alpha = 0.24f), track, "a filled button's track")
@@ -145,7 +145,7 @@ class ButtonsTest {
 
     /** Both palettes, since a bar taken from the wrong role only shows up in one of them. */
     @Test
-    fun the_bar_follows_the_palette_it_is_drawn_in() {
+    fun `GIVEN the night palette WHEN each kind of busy bar is built THEN its bar follows the night palette`() {
         assertEquals(NightColors.onPrimary, BusyBar.filled(NightColors).bar)
         assertEquals(NightColors.primary, BusyBar.outlined(NightColors).bar)
         assertEquals(NightColors.error, BusyBar.destructive(NightColors).bar)
@@ -158,26 +158,26 @@ class ButtonsTest {
      * *box* around a button still hugging its label — and the shadow hugged it too.
      */
     @Test
-    fun a_primary_button_told_to_fill_its_width_does() =
+    fun `GIVEN a primary button told to fill its width WHEN it is shown THEN it is as wide as its container`() =
         assertFillsTheWidthItIsGiven { modifier ->
             PrimaryButton(text = "Create", onClick = {}, modifier = modifier)
         }
 
     @Test
-    fun a_secondary_button_told_to_fill_its_width_does() =
+    fun `GIVEN a secondary button told to fill its width WHEN it is shown THEN it is as wide as its container`() =
         assertFillsTheWidthItIsGiven { modifier ->
             SecondaryButton(text = "Create", onClick = {}, modifier = modifier)
         }
 
     @Test
-    fun a_destructive_button_told_to_fill_its_width_does() =
+    fun `GIVEN a destructive button told to fill its width WHEN it is shown THEN it is as wide as its container`() =
         assertFillsTheWidthItIsGiven { modifier ->
             DestructiveButton(text = "Create", onClick = {}, modifier = modifier)
         }
 
     /** The bar is laid over the button, so it must not change what the button measures. */
     @Test
-    fun a_working_button_fills_its_width_the_same_way() =
+    fun `GIVEN a busy button told to fill its width WHEN it is shown THEN it is as wide as its container`() =
         assertFillsTheWidthItIsGiven { modifier ->
             PrimaryButton(text = "Create", onClick = {}, busy = true, modifier = modifier)
         }
@@ -188,19 +188,19 @@ class ButtonsTest {
      * component would have stretched them across the screen.
      */
     @Test
-    fun a_primary_button_left_to_itself_wraps_its_label() =
+    fun `GIVEN a primary button told nothing about width WHEN it is shown THEN it is narrower than its container`() =
         assertWrapsItsLabel {
             PrimaryButton(text = "Create", onClick = {})
         }
 
     @Test
-    fun a_secondary_button_left_to_itself_wraps_its_label() =
+    fun `GIVEN a secondary button told nothing about width WHEN it is shown THEN it is narrower than its container`() =
         assertWrapsItsLabel {
             SecondaryButton(text = "Create", onClick = {})
         }
 
     @Test
-    fun a_destructive_button_left_to_itself_wraps_its_label() =
+    fun `GIVEN a destructive button told nothing about width WHEN it is shown THEN it is narrower than its container`() =
         assertWrapsItsLabel {
             DestructiveButton(text = "Create", onClick = {})
         }

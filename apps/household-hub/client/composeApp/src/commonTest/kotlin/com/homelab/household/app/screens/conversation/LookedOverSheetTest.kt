@@ -61,7 +61,7 @@ class LookedOverSheetTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN it settles without failing`() {
         LookedOverUiStateProvider().values.forEach { state ->
             runComposeUiTest {
                 lookedOverSheetContent(state)

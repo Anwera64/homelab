@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class HearthChipTest {
     @Test
-    fun shows_its_label() =
+    fun `GIVEN a chip with a label WHEN it is shown THEN the label is visible`() =
         runComposeUiTest {
             setContent { StillTheme { HearthChip(label = "Read only") } }
 
@@ -19,7 +19,7 @@ class HearthChipTest {
         }
 
     @Test
-    fun secret_chip_is_a_ghost_tuned_per_palette() {
+    fun `GIVEN the day and night palettes WHEN the secret chip colours are built THEN each is a ghost tuned to its palette`() {
         listOf(DayColors, NightColors).forEach { palette ->
             val colors = chipColors(ChipVariant.Secret, palette)
             assertEquals(palette.secret.copy(alpha = palette.ghostTint), colors.container)
@@ -29,7 +29,7 @@ class HearthChipTest {
     }
 
     @Test
-    fun variants_use_their_container_pairs() {
+    fun `GIVEN the day palette WHEN chip colours are built for each variant THEN each uses its own container and content pair`() {
         with(chipColors(ChipVariant.Primary, DayColors)) {
             assertEquals(DayColors.primaryContainer, container)
             assertEquals(DayColors.onPrimaryContainer, content)

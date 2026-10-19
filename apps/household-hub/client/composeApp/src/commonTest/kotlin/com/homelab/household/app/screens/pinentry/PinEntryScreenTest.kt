@@ -18,7 +18,7 @@ class PinEntryScreenTest {
     private val emma = Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E")
 
     @Test
-    fun the_right_pin_signs_the_member_in() {
+    fun `GIVEN a hub that accepts Emma's PIN WHEN the PIN is typed THEN Emma is signed in and the hub got her id and PIN`() {
         val hub = FakeSignInHub()
         hub.acceptsThePinOf(emma)
         var signedIn = 0
@@ -39,7 +39,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun delete_takes_the_last_digit_back() {
+    fun `GIVEN three digits typed WHEN delete is tapped THEN two digits remain entered and nothing is sent`() {
         val hub = FakeSignInHub()
 
         runScreenTest {
@@ -56,7 +56,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun two_tries_from_a_wait_says_so() {
+    fun `GIVEN a hub that refuses the PIN with two tries left WHEN a PIN is typed THEN the pad says two tries are left and clears the digits`() {
         val hub = FakeSignInHub()
         hub.refusesThePin(attemptsLeft = 2)
         var signedIn = 0
@@ -75,7 +75,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun a_locked_member_is_told_to_wait() {
+    fun `GIVEN a hub that locks the member WHEN a PIN is typed THEN the pad says it is locked`() {
         val hub = FakeSignInHub()
         hub.locksFor(seconds = 30)
 
@@ -90,7 +90,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_says_so() {
+    fun `GIVEN an unreachable hub WHEN a PIN is typed THEN the pad says the hub did not answer`() {
         val hub = FakeSignInHub()
         hub.isOffline()
 
@@ -105,7 +105,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun back_goes_back_to_the_picker() {
+    fun `GIVEN the PIN pad WHEN back is tapped THEN the screen goes back`() {
         val hub = FakeSignInHub()
         var back = 0
 
@@ -124,7 +124,7 @@ class PinEntryScreenTest {
      * at all.
      */
     @Test
-    fun checking_says_the_pin_is_with_the_hub() =
+    fun `GIVEN a PIN being checked WHEN the pad is shown THEN it says the PIN is with the hub`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -142,7 +142,7 @@ class PinEntryScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the pad names the member`() {
         val states = PinEntryUiStateProvider().values.toList()
         assertEquals(7, states.size)
 
@@ -160,7 +160,7 @@ class PinEntryScreenTest {
     }
 
     @Test
-    fun forgotten_it_leads_to_getting_a_new_pin() {
+    fun `GIVEN the PIN pad WHEN forgotten is tapped THEN the screen reports the PIN as forgotten`() {
         val hub = FakeSignInHub()
         var forgotten = 0
 

@@ -20,7 +20,7 @@ class ChatsScreenTest {
     }
 
     @Test
-    fun a_row_shows_its_title_its_preview_and_the_agents_face() =
+    fun `GIVEN the chats list WHEN it is shown THEN each row shows its title and preview and the agent's face`() =
         runComposeUiTest {
             chatsScreen(stateNamed("The list"))
 
@@ -35,7 +35,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun tapping_a_row_opens_that_conversation() =
+    fun `GIVEN the chats list WHEN a row is tapped THEN that conversation opens`() =
         runComposeUiTest {
             val opened = mutableListOf<String>()
             chatsScreen(stateNamed("The list"), onOpen = { opened += it })
@@ -46,7 +46,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun typing_in_the_search_field_reaches_the_view_model() =
+    fun `GIVEN the chats list WHEN text is typed in the search field THEN the text reaches the view model`() =
         runComposeUiTest {
             val typed = mutableListOf<String>()
             chatsScreen(stateNamed("The list"), onSearch = { typed += it })
@@ -57,7 +57,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun cancel_appears_only_while_searching_and_clears_the_query() =
+    fun `GIVEN a search in progress WHEN cancel is tapped THEN the search is cancelled`() =
         runComposeUiTest {
             var cancelled = false
             chatsScreen(stateNamed("Searching"), onCancelSearch = { cancelled = true })
@@ -68,7 +68,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun a_query_that_matches_nothing_names_the_query_and_says_what_search_cannot_do() =
+    fun `GIVEN a query that matches nothing WHEN the list is shown THEN it names the query and says what search cannot do`() =
         runComposeUiTest {
             chatsScreen(stateNamed("Nothing matched"))
 
@@ -80,7 +80,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun a_household_that_has_never_chatted_gets_the_one_empty_state_with_a_button() =
+    fun `GIVEN a household that has never chatted WHEN the list is shown and start a chat is tapped THEN the empty state shows and a new chat starts`() =
         runComposeUiTest {
             var started = false
             chatsScreen(stateNamed("Never chatted"), onNewChat = { started = true })
@@ -94,7 +94,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun the_empty_screen_has_no_search_because_there_is_nothing_to_search() =
+    fun `GIVEN a household that has never chatted WHEN the list is shown THEN there is no search field`() =
         runComposeUiTest {
             chatsScreen(stateNamed("Never chatted"))
 
@@ -102,7 +102,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun an_unreachable_hub_offers_another_go_rather_than_claiming_there_are_no_chats() =
+    fun `GIVEN an unreachable hub WHEN the list is shown and try again is tapped THEN it says the hub is unreachable and retries`() =
         runComposeUiTest {
             var retried = false
             chatsScreen(stateNamed("Hub unreachable"), onRetry = { retried = true })
@@ -117,7 +117,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun a_conversation_whose_agent_is_gone_still_draws_its_row() =
+    fun `GIVEN a conversation whose agent is gone WHEN the list is shown THEN its row is still drawn`() =
         runComposeUiTest {
             chatsScreen(stateNamed("An agent that is gone"))
 
@@ -128,7 +128,7 @@ class ChatsScreenTest {
         }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         provider.values.toList().forEach { state ->
             runComposeUiTest {
                 chatsScreen(state)

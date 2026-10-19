@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class EmptyStateTest {
     @Test
-    fun shows_icon_title_and_line() =
+    fun `GIVEN an empty state with an icon a title and a line WHEN it is shown THEN all three are visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -31,7 +31,7 @@ class EmptyStateTest {
         }
 
     @Test
-    fun the_action_appears_only_when_given() =
+    fun `GIVEN an empty state with an action WHEN the action is tapped THEN the action's handler runs once`() =
         runComposeUiTest {
             var started = 0
             setContent {
@@ -50,7 +50,7 @@ class EmptyStateTest {
         }
 
     @Test
-    fun without_an_action_there_is_no_button() =
+    fun `GIVEN an empty state without an action WHEN it is shown THEN no action button appears`() =
         runComposeUiTest {
             setContent {
                 StillTheme {

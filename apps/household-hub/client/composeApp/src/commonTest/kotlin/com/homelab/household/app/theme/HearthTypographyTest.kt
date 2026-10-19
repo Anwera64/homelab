@@ -33,14 +33,14 @@ class HearthTypographyTest {
     private val type = hearthTypography(fonts)
 
     @Test
-    fun display_roles_match_the_type_proof() {
+    fun `GIVEN the type scale WHEN the display roles are read THEN they match the type proof`() {
         type.hero.assertIs(fonts.outfit, 28.sp, FontWeight.SemiBold, 32.sp, (-0.015).em)
         type.title.assertIs(fonts.outfit, 21.sp, FontWeight.SemiBold, 25.sp, (-0.012).em)
         type.heading.assertIs(fonts.outfit, 17.sp, FontWeight.SemiBold, 22.sp, (-0.01).em)
     }
 
     @Test
-    fun text_roles_match_the_type_proof() {
+    fun `GIVEN the type scale WHEN the text roles are read THEN they match the type proof`() {
         type.bodyLarge.assertIs(fonts.inter, 15.sp, FontWeight.Normal, 23.sp)
         type.body.assertIs(fonts.inter, 14.sp, FontWeight.Normal, 21.sp)
         type.bodyStrong.assertIs(fonts.inter, 14.sp, FontWeight.SemiBold, 19.sp)
@@ -52,7 +52,7 @@ class HearthTypographyTest {
     }
 
     @Test
-    fun mono_roles_match_the_type_proof() {
+    fun `GIVEN the type scale WHEN the mono roles are read THEN they match the type proof`() {
         type.monoSm.assertIs(fonts.jetBrainsMono, 10.sp, FontWeight.Medium, 14.sp)
         type.mono.assertIs(fonts.jetBrainsMono, 12.sp, FontWeight.Medium, 17.sp)
         type.monoLg.assertIs(fonts.jetBrainsMono, 15.sp, FontWeight.Medium, 21.sp, 0.06.em)
@@ -65,7 +65,7 @@ class HearthTypographyTest {
      * centres it.
      */
     @Test
-    fun glyph_roles_climb_one_step_per_circle() {
+    fun `GIVEN the type scale WHEN the glyph roles are read THEN each steps up one size per circle with the outfit family`() {
         val steps =
             listOf(
                 type.glyphXs to 10,
@@ -86,7 +86,7 @@ class HearthTypographyTest {
 
     /** Material's own components read the same roles, so a Card or a Dialog cannot drift. */
     @Test
-    fun material_reads_the_same_roles() {
+    fun `GIVEN the type scale WHEN its Material mapping is read THEN Material uses the same roles`() {
         val m = type.material
         assertEquals(type.hero, m.displaySmall, "displaySmall")
         assertEquals(type.title, m.headlineMedium, "headlineMedium")
@@ -101,7 +101,7 @@ class HearthTypographyTest {
 
     /** Display slots stay Outfit and text slots stay Inter, whichever way Material reaches them. */
     @Test
-    fun material_display_slots_are_outfit_and_text_slots_are_inter() {
+    fun `GIVEN the type scale WHEN its Material slots are read THEN display slots use Outfit and text slots use Inter`() {
         val m = type.material
         listOf(
             "displayLarge" to m.displayLarge,
@@ -129,12 +129,12 @@ class HearthTypographyTest {
     }
 
     @Test
-    fun bento_cards_have_24dp_corners() {
+    fun `GIVEN the shape set WHEN the bento shape is read THEN it has 24dp corners`() {
         assertEquals(RoundedCornerShape(24.dp), HearthShapes.bento)
     }
 
     @Test
-    fun the_theme_hands_out_the_type_scale() =
+    fun `GIVEN the theme WHEN the typography is read inside it THEN Hearth and Material both get the 14sp body size`() =
         runComposeUiTest {
             var seen: HearthTypography? = null
             var material: TextStyle? = null
@@ -153,7 +153,7 @@ class HearthTypographyTest {
 
     /** Type doesn't change with the palette: the same role reads the same in either. */
     @Test
-    fun the_type_scale_is_the_same_in_both_palettes() =
+    fun `GIVEN the light and dark themes WHEN the typography is read inside each THEN the body and hero roles are the same`() =
         runComposeUiTest {
             var day: HearthTypography? = null
             var night: HearthTypography? = null
@@ -173,7 +173,7 @@ class HearthTypographyTest {
      * class, an accessibility pass — can be provided once and every screen under it follows.
      */
     @Test
-    fun a_provided_type_scale_reaches_the_screens_under_it() =
+    fun `GIVEN a roomier type scale provided under the theme WHEN the body role is read below it THEN the roomier size is seen`() =
         runComposeUiTest {
             var seen: TextStyle? = null
 

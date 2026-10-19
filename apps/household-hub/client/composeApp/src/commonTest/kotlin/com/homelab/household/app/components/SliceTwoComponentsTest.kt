@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class SliceTwoComponentsTest {
     @Test
-    fun a_pin_field_takes_six_digits_and_nothing_else() =
+    fun `GIVEN an empty PIN field WHEN digits and letters are typed THEN only the digits are kept`() =
         runComposeUiTest {
             var pin = ""
             setContent {
@@ -25,7 +25,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_pin_field_never_grows_past_six_digits() =
+    fun `GIVEN a PIN field with six digits WHEN another digit is typed THEN it still has six digits`() =
         runComposeUiTest {
             var pin = "482913"
             setContent {
@@ -40,7 +40,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun code_boxes_upper_case_what_is_typed_and_stop_at_six() =
+    fun `GIVEN empty code boxes WHEN a long lower-case code is typed THEN six upper-case characters are kept`() =
         runComposeUiTest {
             var code = ""
             setContent {
@@ -55,7 +55,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun code_boxes_draw_a_box_per_character_typed() =
+    fun `GIVEN code boxes holding three characters WHEN they are shown THEN each character appears`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -71,7 +71,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_code_card_shows_the_code_and_how_long_it_lasts() =
+    fun `GIVEN a code card with a code and an expiry WHEN it is shown THEN both are visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -86,7 +86,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun consequence_cards_list_what_goes_and_what_stays() =
+    fun `GIVEN consequence cards with erased and kept items WHEN they are shown THEN both lists are visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -108,7 +108,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_switch_reports_the_value_it_would_become() =
+    fun `GIVEN a switch that is off WHEN it is tapped THEN it reports on`() =
         runComposeUiTest {
             var admin = false
             setContent {
@@ -127,7 +127,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_settings_row_opens_what_it_names() =
+    fun `GIVEN a settings row WHEN it is tapped THEN it opens once`() =
         runComposeUiTest {
             var opened = 0
             setContent {
@@ -142,7 +142,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_row_that_cannot_be_opened_says_why_and_does_nothing() =
+    fun `GIVEN a disabled settings row with a caption WHEN it is tapped THEN the caption shows and nothing opens`() =
         runComposeUiTest {
             var opened = 0
             setContent {
@@ -165,7 +165,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_taken_colour_cannot_be_chosen() =
+    fun `GIVEN colour swatches with one taken WHEN the taken swatch is tapped THEN the choice does not change`() =
         runComposeUiTest {
             var chosen = "#3C6E4E"
             setContent {
@@ -186,7 +186,7 @@ class SliceTwoComponentsTest {
         }
 
     @Test
-    fun a_free_colour_can_be_chosen() =
+    fun `GIVEN colour swatches with none taken WHEN another swatch is tapped THEN that colour is chosen`() =
         runComposeUiTest {
             var chosen = "#3C6E4E"
             setContent {

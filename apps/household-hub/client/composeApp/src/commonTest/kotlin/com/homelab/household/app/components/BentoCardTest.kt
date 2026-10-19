@@ -9,7 +9,7 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class BentoCardTest {
     @Test
-    fun shows_its_label_and_content() =
+    fun `GIVEN a card with a label and content WHEN it is shown THEN the label is upper-cased and the content is visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -24,7 +24,7 @@ class BentoCardTest {
         }
 
     @Test
-    fun label_is_optional() =
+    fun `GIVEN a card without a label WHEN it is shown THEN the content is still visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {

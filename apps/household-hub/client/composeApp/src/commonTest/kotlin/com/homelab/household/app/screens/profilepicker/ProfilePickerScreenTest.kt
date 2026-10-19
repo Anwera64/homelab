@@ -16,7 +16,7 @@ class ProfilePickerScreenTest {
     private val liam = Member(id = "liam", name = "Liam", avatarColor = "#C05638")
 
     @Test
-    fun it_shows_everyone_who_lives_on_the_hub() {
+    fun `GIVEN a hub that lists Emma and Liam WHEN the picker is shown THEN both are there`() {
         val hub = FakeSignInHub()
         hub.lists(emma, liam)
 
@@ -28,7 +28,7 @@ class ProfilePickerScreenTest {
     }
 
     @Test
-    fun tapping_a_face_opens_that_members_pin() {
+    fun `GIVEN a hub that lists Emma and Liam WHEN Liam's face is tapped THEN Liam is picked`() {
         val hub = FakeSignInHub()
         hub.lists(emma, liam)
         val picked = mutableListOf<Member>()
@@ -47,7 +47,7 @@ class ProfilePickerScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_says_so_and_asks_again_on_try_again() {
+    fun `GIVEN an unreachable hub that then lists Emma WHEN try again is tapped THEN the household shows`() {
         val hub = FakeSignInHub()
         hub.isOffline()
 
@@ -65,7 +65,7 @@ class ProfilePickerScreenTest {
     }
 
     @Test
-    fun someone_who_is_not_on_the_picker_can_say_they_have_an_invite() {
+    fun `GIVEN the picker WHEN invite code is tapped THEN the screen opens the invite code entry`() {
         val hub = FakeSignInHub()
         hub.lists(emma)
         var invite = 0
@@ -79,7 +79,7 @@ class ProfilePickerScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = ProfilePickerUiStateProvider().values.toList()
         assertEquals(4, states.size)
 

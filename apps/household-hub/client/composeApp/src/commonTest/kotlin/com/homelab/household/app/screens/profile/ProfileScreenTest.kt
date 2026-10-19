@@ -18,7 +18,7 @@ class ProfileScreenTest {
     private val calendarAccount = "emma@icloud.com"
 
     @Test
-    fun arriving_stands_blocks_where_the_name_goes_and_draws_the_rest_at_once() {
+    fun `GIVEN a profile that is still loading WHEN it is shown THEN blocks stand where the name goes and the static rows show without any claim about leaving`() {
         runComposeUiTest {
             profileContent(ProfileUiState(member = null, status = ProfileStatus.Loading))
 
@@ -34,7 +34,7 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun the_only_admin_is_told_they_cannot_leave() {
+    fun `GIVEN a member who is the only admin WHEN the profile is shown THEN it says the only admin cannot leave and shows their name`() {
         val hub = FakeMembersHub()
 
         runScreenTest {
@@ -48,7 +48,7 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun members_is_a_tap_away() {
+    fun `GIVEN the profile WHEN members is tapped THEN the screen opens members`() {
         val hub = FakeMembersHub()
         var members = 0
 
@@ -61,7 +61,7 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun signing_out_forgets_the_token_and_leaves() {
+    fun `GIVEN a signed in member WHEN sign out is tapped THEN the token is forgotten and the screen reports the sign out`() {
         val hub = FakeMembersHub()
         val tokens = InMemorySessionStorage().apply { saveTokens("signed-in-token") }
         var signedOut = 0
@@ -77,7 +77,7 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN sign out is there`() {
         val states = ProfileUiStateProvider().values.toList()
         assertEquals(6, states.size)
 
@@ -92,7 +92,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN a connected calendar WHEN its options are opened THEN it can be changed or disconnected`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
@@ -101,10 +100,8 @@ class ProfileScreenTest {
             onProfile {
                 seesCalendar(calendarAccount)
 
-                // WHEN
                 opensTheCalendarOptions()
 
-                // THEN
                 seesItCanBeChangedOrDisconnected()
             }
         }
@@ -112,7 +109,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN the calendar options WHEN Change calendar is chosen THEN the picker opens`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
         var picker = 0
 
@@ -122,18 +118,15 @@ class ProfileScreenTest {
             onProfile {
                 opensTheOptionsOfCalendar(calendarAccount)
 
-                // WHEN
                 tapsChangeCalendar()
             }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { picker == 1 }
         }
     }
 
     @Test
     fun `GIVEN the calendar options WHEN Disconnect calendar is chosen THEN it asks first`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
@@ -142,10 +135,8 @@ class ProfileScreenTest {
             onProfile {
                 opensTheOptionsOfCalendar(calendarAccount)
 
-                // WHEN
                 tapsDisconnectCalendar()
 
-                // THEN
                 seesItAsksToDisconnectAppleCalendar()
             }
             assertEquals(0, hub.calendarsRemoved)
@@ -154,7 +145,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN it asks to disconnect WHEN the disconnect is confirmed THEN the hub forgets it and Profile offers to connect one`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
@@ -164,10 +154,8 @@ class ProfileScreenTest {
                 opensTheOptionsOfCalendar(calendarAccount)
                 tapsDisconnectCalendar()
 
-                // WHEN
                 tapsConfirmTheDisconnect()
 
-                // THEN
                 seesToConnectACalendar()
             }
             assertEquals(1, hub.calendarsRemoved)
@@ -176,7 +164,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN it asks to disconnect WHEN Keep it connected is chosen THEN nothing is disconnected`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
@@ -186,10 +173,8 @@ class ProfileScreenTest {
                 opensTheOptionsOfCalendar(calendarAccount)
                 tapsDisconnectCalendar()
 
-                // WHEN
                 tapsKeepItConnected()
 
-                // THEN
                 seesTheDisconnectQuestionGone()
                 seesCalendar(calendarAccount)
             }
@@ -199,7 +184,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN the hub stops answering WHEN the disconnect is confirmed THEN it says so and the calendar stays`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasACalendar() }
 
         runScreenTest {
@@ -212,10 +196,8 @@ class ProfileScreenTest {
                 seesItAsksToDisconnectAppleCalendar()
                 hub.isOffline()
 
-                // WHEN
                 tapsConfirmTheDisconnect()
 
-                // THEN
                 seesTheHubCouldNotBeReached()
             }
             assertEquals(0, hub.calendarsRemoved)
@@ -224,7 +206,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN Google stopped accepting the sign-in WHEN the profile is shown THEN the calendar asks to sign in again`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { hasAGoogleCalendarNeedingSignInAgain() }
         var signInAgain = 0
 
@@ -234,11 +215,9 @@ class ProfileScreenTest {
             onProfile {
                 seesTheCalendarNeedsSigningInAgain()
 
-                // WHEN
                 tapsSignInAgain()
             }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { signInAgain == 1 }
             onProfile { seesCalendar("emma@gmail.com") }
         }
@@ -246,7 +225,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN memories on the hub WHEN the profile is shown THEN the Memories row counts them and opens the memory page`() {
-        // GIVEN
         val hub =
             FakeMembersHub().apply {
                 remembers("p1", "Likes tea")
@@ -262,11 +240,9 @@ class ProfileScreenTest {
                 seesTheMemoryHeading()
                 seesMemoryCounts(yours = 2, household = 1)
 
-                // WHEN
                 tapsMemories()
             }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { opened == 1 }
         }
     }
@@ -288,7 +264,6 @@ class ProfileScreenTest {
 
     @Test
     fun `GIVEN agents add events without asking WHEN the profile is shown THEN the agents row counts it and opens When agents act`() {
-        // GIVEN
         val hub = FakeMembersHub().apply { addsEventsAutomatically() }
         var opened = 0
 
@@ -299,11 +274,9 @@ class ProfileScreenTest {
                 seesAgentsAddingWithoutAsking(count = 1)
                 seesTheAgentsHeading()
 
-                // WHEN
                 tapsWhenAgentsAct()
             }
 
-            // THEN
             waitUntil(timeoutMillis = wait) { opened == 1 }
         }
     }
@@ -320,7 +293,7 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun no_calendar_offers_to_connect_one() {
+    fun `GIVEN a member with no calendar WHEN connect a calendar is tapped THEN the screen opens the calendar picker`() {
         val hub = FakeMembersHub()
         var calendar = 0
 

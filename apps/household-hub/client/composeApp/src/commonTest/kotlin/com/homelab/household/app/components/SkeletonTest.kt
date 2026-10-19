@@ -27,7 +27,7 @@ import kotlin.time.Duration
 @OptIn(ExperimentalTestApi::class)
 class SkeletonTest {
     @Test
-    fun the_group_announces_the_wait() =
+    fun `GIVEN a skeleton group WHEN it is shown THEN the group announces the wait`() =
         runComposeUiTest {
             setContent {
                 Still {
@@ -47,7 +47,7 @@ class SkeletonTest {
      * instead of waiting for the answer, three times over.
      */
     @Test
-    fun the_blocks_inside_it_are_not_in_the_semantics_tree() =
+    fun `GIVEN a skeleton group with several blocks WHEN it is shown THEN the blocks say nothing themselves`() =
         runComposeUiTest {
             setContent {
                 Still {
@@ -68,7 +68,7 @@ class SkeletonTest {
      * earlier version defaulted to, which at 14dp high reads as a lozenge rather than a line.
      */
     @Test
-    fun a_skeleton_line_takes_the_skeleton_corner() {
+    fun `GIVEN the shape set WHEN the skeleton corner is read THEN it is the gentle 4dp corner and not the pill`() {
         assertEquals(HearthShapes.skeleton, RoundedCornerShape(4.dp))
         assertNotEquals(HearthShapes.pill, HearthShapes.skeleton)
     }
@@ -78,7 +78,7 @@ class SkeletonTest {
      * thing arriving rather than six lights blinking together.
      */
     @Test
-    fun the_breath_can_be_staggered_across_a_row_of_blocks() {
+    fun `GIVEN the default and still motion WHEN the breathe stagger is read THEN it is a beat shorter than the breath and absent when still`() {
         assertTrue(DefaultMotion.breatheStagger > Duration.ZERO, "a stagger of zero is no stagger")
         assertTrue(
             DefaultMotion.breatheStagger < DefaultMotion.breathe,

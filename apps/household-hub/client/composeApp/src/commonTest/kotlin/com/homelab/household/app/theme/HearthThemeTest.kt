@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalTestApi::class)
 class HearthThemeTest {
     @Test
-    fun day_palette_matches_the_palette_proof() {
+    fun `GIVEN the day palette WHEN its tokens are read THEN they match the palette proof`() {
         with(DayColors) {
             assertColor(0xF5F2EB, canvas, "canvas")
             assertColor(0xFFFFFF, surface, "surface")
@@ -55,7 +55,7 @@ class HearthThemeTest {
     }
 
     @Test
-    fun night_palette_matches_the_palette_proof() {
+    fun `GIVEN the night palette WHEN its tokens are read THEN they match the palette proof`() {
         with(NightColors) {
             assertColor(0x100F0E, canvas, "canvas")
             assertColor(0x191715, surface, "surface")
@@ -91,7 +91,7 @@ class HearthThemeTest {
     }
 
     @Test
-    fun dark_theme_provides_night_tokens_to_hearth_and_material() =
+    fun `GIVEN the dark theme WHEN the tokens are read inside it THEN Hearth and Material both get the night tokens`() =
         runComposeUiTest {
             var hearth: HearthColors? = null
             var materialPrimary: Color? = null
@@ -118,7 +118,7 @@ class HearthThemeTest {
         }
 
     @Test
-    fun light_theme_provides_day_tokens_to_hearth_and_material() =
+    fun `GIVEN the light theme WHEN the tokens are read inside it THEN Hearth and Material both get the day tokens`() =
         runComposeUiTest {
             var hearth: HearthColors? = null
             var materialPrimary: Color? = null
@@ -142,7 +142,7 @@ class HearthThemeTest {
         }
 
     @Test
-    fun the_theme_hands_out_the_scale_beside_the_palette() =
+    fun `GIVEN the theme WHEN the spacing and sizes are read inside it THEN they are the default scale`() =
         runComposeUiTest {
             var spacing: HearthSpacing? = null
             var size: HearthSizes? = null
@@ -161,7 +161,7 @@ class HearthThemeTest {
 
     /** Space doesn't change with the palette: a screen reads the same step in either theme. */
     @Test
-    fun the_scale_is_the_same_in_both_palettes() =
+    fun `GIVEN the light and dark themes WHEN the spacing is read inside each THEN it is the same`() =
         runComposeUiTest {
             var day: HearthSpacing? = null
             var night: HearthSpacing? = null
@@ -180,7 +180,7 @@ class HearthThemeTest {
      * later size class — can be provided once, and every screen follows without being touched.
      */
     @Test
-    fun a_provided_scale_reaches_the_screens_under_it() =
+    fun `GIVEN a roomier spacing scale provided under the theme WHEN a step is read below it THEN the roomier step is seen`() =
         runComposeUiTest {
             val roomier = DefaultSpacing.copy(xl = 32.dp)
             var seen: Dp? = null
@@ -198,7 +198,7 @@ class HearthThemeTest {
         }
 
     @Test
-    fun the_theme_hands_out_the_motion_scale_too() =
+    fun `GIVEN the theme WHEN the motion is read inside it THEN it is the default motion and it animates`() =
         runComposeUiTest {
             var motion: HearthMotion? = null
 
@@ -217,7 +217,7 @@ class HearthThemeTest {
      * endless one — without which the composition never goes idle and the test hangs.
      */
     @Test
-    fun a_subtree_given_the_still_scale_stops_animating() =
+    fun `GIVEN a subtree given the still motion WHEN the motion is read inside it THEN it does not animate`() =
         runComposeUiTest {
             var seen: HearthMotion? = null
 
@@ -235,7 +235,7 @@ class HearthThemeTest {
 
     /** Nothing is time-gated when motion is off, so a screen test never waits on the hold. */
     @Test
-    fun the_still_scale_collapses_the_beats_but_keeps_the_slow_threshold() {
+    fun `GIVEN the still motion WHEN its beats are read THEN the hold and minimum are zero and the slow threshold is eight seconds`() {
         assertEquals(Duration.ZERO, StillMotion.hold)
         assertEquals(Duration.ZERO, StillMotion.minimumVisible)
         assertEquals(8.seconds, StillMotion.slow, "the slow line must never appear by accident")
@@ -246,7 +246,7 @@ class HearthThemeTest {
      * app's own scale carries its timing, and the still scale keeps drawing only the badge.
      */
     @Test
-    fun the_nudge_rings_time_a_single_pass_out_of_the_agent_swap_badge() {
+    fun `GIVEN the default and still motion WHEN the nudge timings are read THEN the rings time a single pass and still motion has none`() {
         assertEquals(1200.milliseconds, DefaultMotion.nudge)
         assertEquals(600.milliseconds, DefaultMotion.nudgeStagger)
         assertFalse(StillMotion.animate, "StillMotion draws the badge only, never the rings")

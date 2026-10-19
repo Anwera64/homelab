@@ -26,7 +26,7 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class HearthScaffoldTest {
     @Test
-    fun header_and_bottom_bar_stay_while_the_content_scrolls() =
+    fun `GIVEN a scaffold with a header a bottom bar and long content WHEN the content is scrolled THEN the header and bottom bar stay on screen`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -55,7 +55,7 @@ class HearthScaffoldTest {
         }
 
     @Test
-    fun a_lazy_list_scrolls_inside() =
+    fun `GIVEN a scaffold holding a lazy list WHEN the list is scrolled to its end THEN the last row and the header are visible`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -76,7 +76,7 @@ class HearthScaffoldTest {
         }
 
     @Test
-    fun the_content_starts_under_the_header_and_ends_above_the_bottom_bar() =
+    fun `GIVEN a scaffold with a header and a bottom bar WHEN it is shown THEN the content sits between the two bars`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -111,7 +111,7 @@ class HearthScaffoldTest {
         }
 
     @Test
-    fun without_bars_the_window_insets_and_the_gutter_reach_the_content() =
+    fun `GIVEN a scaffold without bars but with a status bar inset WHEN it is shown THEN the inset and the gutter reach the content`() =
         runComposeUiTest {
             setContent {
                 StillTheme {

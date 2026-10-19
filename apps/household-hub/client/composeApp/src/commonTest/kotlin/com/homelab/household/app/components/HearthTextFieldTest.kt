@@ -12,7 +12,7 @@ import kotlin.test.Test
 @OptIn(ExperimentalTestApi::class)
 class HearthTextFieldTest {
     @Test
-    fun error_sits_below_the_field_and_marks_it_as_an_error() =
+    fun `GIVEN a text field with an error WHEN it is shown THEN the error sits below the field and the field is marked as an error`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -24,7 +24,7 @@ class HearthTextFieldTest {
         }
 
     @Test
-    fun without_an_error_the_field_is_not_marked() =
+    fun `GIVEN a text field without an error WHEN it is shown THEN the field is not marked as an error`() =
         runComposeUiTest {
             setContent {
                 StillTheme {
@@ -36,7 +36,7 @@ class HearthTextFieldTest {
         }
 
     @Test
-    fun typed_text_survives_an_error_appearing() =
+    fun `GIVEN a text field with typed text WHEN an error appears THEN the typed text stays and the error shows`() =
         runComposeUiTest {
             var text by mutableStateOf("")
             var error by mutableStateOf<String?>(null)

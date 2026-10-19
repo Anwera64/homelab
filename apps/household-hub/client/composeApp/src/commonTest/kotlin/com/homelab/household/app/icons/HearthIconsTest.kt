@@ -81,14 +81,14 @@ class HearthIconsTest {
         )
 
     @Test
-    fun the_set_is_exactly_the_icon_sheet() {
+    fun `GIVEN the icon sheet WHEN the icon set is read THEN it holds exactly the sheet's icons`() {
         assertEquals(sheetTokens, HearthIcon.entries.map { it.token }.toSet())
         assertEquals(sheetTokens.size, HearthIcon.entries.size)
         assertTrue(HearthIcon.entries.none { it.token == "voice" }, "voice was removed")
     }
 
     @Test
-    fun every_icon_sits_on_the_24_unit_grid() {
+    fun `GIVEN every icon WHEN its vector is built THEN it sits on the 24 unit grid`() {
         HearthIcon.entries.forEach { icon ->
             val vector = icon.vector()
             assertEquals(24.dp, vector.defaultWidth, icon.token)
@@ -99,7 +99,7 @@ class HearthIconsTest {
     }
 
     @Test
-    fun strokes_are_1_5_with_round_caps_and_joins_and_1_85_when_active() {
+    fun `GIVEN every icon WHEN its resting and active vectors are built THEN strokes are one and a half wide at rest and one point eight five when active with round caps and joins`() {
         HearthIcon.entries.forEach { icon ->
             listOf(false to 1.5f, true to 1.85f).forEach { (active, width) ->
                 val paths = icon.vector(active).paths()
@@ -115,7 +115,7 @@ class HearthIconsTest {
     }
 
     @Test
-    fun solid_shapes_are_filled_not_stroked() {
+    fun `GIVEN every icon WHEN its vector is built THEN its solid shapes are filled and not stroked`() {
         HearthIcon.entries.forEach { icon ->
             val solids = icon.vector().paths().filter { it.fill != null }
             assertEquals(solidShapeCounts[icon.token] ?: 0, solids.size, "${icon.token} solid shapes")
@@ -124,7 +124,7 @@ class HearthIconsTest {
     }
 
     @Test
-    fun every_path_has_drawing_commands() {
+    fun `GIVEN every icon WHEN its vector is built THEN every path has drawing commands`() {
         HearthIcon.entries.forEach { icon ->
             icon.vector().paths().forEach { path ->
                 assertTrue(path.pathData.isNotEmpty(), "${icon.token} has an empty path")
@@ -133,7 +133,7 @@ class HearthIconsTest {
     }
 
     @Test
-    fun vectors_are_built_once_per_variant() {
+    fun `GIVEN an icon WHEN its vector is asked for twice THEN the same vector comes back for each variant`() {
         assertSame(HearthIcon.Household.vector(), HearthIcon.Household.vector())
         assertSame(HearthIcon.Household.vector(active = true), HearthIcon.Household.vector(active = true))
     }

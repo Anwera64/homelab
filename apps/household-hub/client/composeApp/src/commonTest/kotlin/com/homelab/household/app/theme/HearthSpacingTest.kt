@@ -27,7 +27,7 @@ class HearthSpacingTest {
         )
 
     @Test
-    fun spacing_steps_only_climb() {
+    fun `GIVEN the spacing scale WHEN its steps are compared THEN each step is bigger than the one before and the ends are 0dp and 40dp`() {
         spacingSteps.zipWithNext { (smallerName, smaller), (largerName, larger) ->
             assertTrue(larger > smaller, "$largerName ($larger) must be a bigger step than $smallerName ($smaller)")
         }
@@ -36,7 +36,7 @@ class HearthSpacingTest {
     }
 
     @Test
-    fun spacing_steps_sit_on_the_four_dp_grid_apart_from_the_hairline_half_step() {
+    fun `GIVEN the spacing scale WHEN its steps are checked THEN all but the hairline half-step sit on the 4dp grid`() {
         assertEquals(2.dp, DefaultSpacing.xxs, "xxs is the one half-step, for hairline insets")
         spacingSteps.filterNot { (name, _) -> name == "xxs" }.forEach { (name, step) ->
             assertOnGrid(step, 4, "spacing $name")
@@ -44,7 +44,7 @@ class HearthSpacingTest {
     }
 
     @Test
-    fun icon_sizes_climb_in_four_dp_steps() {
+    fun `GIVEN the icon sizes WHEN they are checked THEN each sits on the 4dp grid and is bigger than the one before`() {
         val icons =
             listOf(
                 "iconSm" to DefaultSizes.iconSm,
@@ -61,7 +61,7 @@ class HearthSpacingTest {
     }
 
     @Test
-    fun anything_bigger_than_an_icon_sits_on_the_eight_dp_grid() {
+    fun `GIVEN the sizes bigger than an icon WHEN they are checked THEN each sits on the 8dp grid`() {
         listOf(
             "touchTarget" to DefaultSizes.touchTarget,
             "control" to DefaultSizes.control,
@@ -75,12 +75,12 @@ class HearthSpacingTest {
     }
 
     @Test
-    fun the_pin_dot_sits_on_the_four_dp_grid() {
+    fun `GIVEN the PIN dot size WHEN it is checked THEN it sits on the 4dp grid`() {
         assertOnGrid(DefaultSizes.pinDot, 4, "size pinDot")
     }
 
     @Test
-    fun a_tappable_thing_is_never_smaller_than_the_accessibility_floor() {
+    fun `GIVEN the touch target and control sizes WHEN they are compared with the floor THEN the touch target is at least 48dp and the control clears it`() {
         assertTrue(
             DefaultSizes.touchTarget >= 48.dp,
             "touchTarget is ${DefaultSizes.touchTarget}, under the 48dp floor",
@@ -92,14 +92,14 @@ class HearthSpacingTest {
     }
 
     @Test
-    fun strokes_and_elevation_are_not_layout_so_they_are_off_the_grid() {
+    fun `GIVEN the stroke and elevation sizes WHEN they are read THEN they are the off-grid hairline emphasis and a raised blur`() {
         assertEquals(1.dp, DefaultSizes.hairline)
         assertEquals(2.dp, DefaultSizes.emphasis)
         assertTrue(DefaultSizes.raised > 0.dp, "raised is a shadow blur, and a shadow needs one")
     }
 
     @Test
-    fun icon_tiles_reuse_the_bento_radius_instead_of_inventing_one() {
+    fun `GIVEN the shape set WHEN the tile shape is read THEN it is the bento shape`() {
         assertEquals(HearthShapes.bento, HearthShapes.tile)
     }
 

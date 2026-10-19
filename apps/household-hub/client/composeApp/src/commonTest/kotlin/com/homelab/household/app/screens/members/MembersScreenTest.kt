@@ -16,7 +16,7 @@ class MembersScreenTest {
     private val wait = 5_000L
 
     @Test
-    fun the_admin_sees_everyone_and_can_invite_reset_and_remove() {
+    fun `GIVEN an admin on the members list WHEN reset PIN and then remove are tapped THEN everyone and invite are shown and both actions reach the callbacks`() {
         val hub = FakeMembersHub()
         val reset = mutableListOf<Member>()
         val removed = mutableListOf<Member>()
@@ -41,7 +41,7 @@ class MembersScreenTest {
     }
 
     @Test
-    fun a_member_can_vouch_but_not_invite_or_remove() {
+    fun `GIVEN a member who is not an admin WHEN the members list is shown THEN reset PIN shows but invite and remove do not`() {
         val hub = FakeMembersHub()
         hub.signedInAsAMember()
 
@@ -57,7 +57,7 @@ class MembersScreenTest {
     }
 
     @Test
-    fun an_unreachable_hub_says_so() {
+    fun `GIVEN an unreachable hub WHEN the members list is shown THEN it says the hub is unreachable`() {
         val hub = FakeMembersHub()
         hub.isOffline()
 
@@ -69,7 +69,7 @@ class MembersScreenTest {
     }
 
     @Test
-    fun arriving_empty_draws_the_chrome_and_stands_blocks_where_the_members_will_be() {
+    fun `GIVEN a members list that is still loading WHEN it is shown THEN the title and placeholder blocks show and invite does not`() {
         runComposeUiTest {
             membersContent(MembersUiState(status = MembersStatus.Loading))
 
@@ -84,7 +84,7 @@ class MembersScreenTest {
     }
 
     @Test
-    fun coming_back_keeps_the_rows_readable_and_puts_a_bar_under_the_header() {
+    fun `GIVEN a members list with rows that is loading again WHEN it is shown THEN the rows stay readable with a bar under the header and no blocks`() {
         runComposeUiTest {
             membersContent(
                 MembersUiState(
@@ -104,7 +104,7 @@ class MembersScreenTest {
     }
 
     @Test
-    fun every_previewed_state_draws() {
+    fun `GIVEN every previewed state WHEN it is drawn THEN the title is there`() {
         val states = MembersUiStateProvider().values.toList()
 
         states.forEach { state ->
