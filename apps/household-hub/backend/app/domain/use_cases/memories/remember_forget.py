@@ -323,6 +323,12 @@ class MemoryOnCardUseCase:
                 "created_at": stored.created_at.isoformat() if stored.created_at else None,
             }
         }
+        if stored.time_from_event and stored.event_starts_at:
+            # Rebuilt from its event: the content is the title, and the phone adds the time (memory spec §7).
+            start = stored.event_starts_at
+            start = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+            shown["stored"]["event_starts_at"] = start.isoformat()
+            shown["stored"]["time_from_event"] = stored.time_from_event
         logger.info(
             "Memory card | member=%s tool=%s matched=%s score=%s mine=%s", member.id, tool, stored.id, score, item.is_mine
         )
