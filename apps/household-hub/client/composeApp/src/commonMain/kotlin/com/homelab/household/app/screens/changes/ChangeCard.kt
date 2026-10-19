@@ -207,9 +207,17 @@ private fun ChangeDoneRow(
     val type = HearthTheme.typography
     val words =
         when (done.answer) {
-            ProposalAnswer.UseNew -> stringResource(Res.string.changes_done_replaced, memorySentence(row.card.stored.content, row.storedEventTime))
+            ProposalAnswer.UseNew -> stringResource(
+                Res.string.changes_done_replaced,
+                memorySentence(row.card.stored.content, row.storedEventTime),
+            )
+
             ProposalAnswer.KeepStored -> stringResource(Res.string.changes_done_kept, row.card.content)
-            ProposalAnswer.KeepBoth -> stringResource(Res.string.changes_done_both, memorySentence(row.card.stored.content, row.storedEventTime))
+
+            ProposalAnswer.KeepBoth -> stringResource(
+                Res.string.changes_done_both,
+                memorySentence(row.card.stored.content, row.storedEventTime),
+            )
         }
     Row(
         modifier = modifier

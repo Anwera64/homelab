@@ -63,15 +63,24 @@ class MemoryEventTimeTest {
     fun `GIVEN an all-day event memory WHEN its row is made THEN it is the same date in every zone and has no time`() {
         val event = EventTime(Instant.parse("2026-10-24T00:00:00Z"), allDay = true)
 
-        assertEquals(LocalEventTime(isoDay = 6, day = 24, month = 10, time = null), memoryRowOf(item(event), mexicoCity, clock).eventTime)
-        assertEquals(LocalEventTime(isoDay = 6, day = 24, month = 10, time = null), memoryRowOf(item(event), madrid, clock).eventTime)
+        assertEquals(
+            LocalEventTime(isoDay = 6, day = 24, month = 10, time = null),
+            memoryRowOf(item(event), mexicoCity, clock).eventTime,
+        )
+        assertEquals(
+            LocalEventTime(isoDay = 6, day = 24, month = 10, time = null),
+            memoryRowOf(item(event), madrid, clock).eventTime,
+        )
     }
 
     @Test
     fun `GIVEN an event that moved WHEN its row is made THEN where it was is in the phone's time`() {
         val row =
             memoryRowOf(
-                item(EventTime(Instant.parse("2026-10-19T17:30:00Z"), allDay = false), Instant.parse("2026-10-18T18:00:00Z")),
+                item(
+                    EventTime(Instant.parse("2026-10-19T17:30:00Z"), allDay = false),
+                    Instant.parse("2026-10-18T18:00:00Z"),
+                ),
                 madrid,
                 clock,
             )

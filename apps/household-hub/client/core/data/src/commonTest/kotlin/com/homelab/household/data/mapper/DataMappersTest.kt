@@ -8,8 +8,8 @@ import com.homelab.household.data.dto.SessionReadDto
 import com.homelab.household.data.dto.SpaceReadDto
 import com.homelab.household.data.dto.UserReadDto
 import com.homelab.household.domain.model.AnswerPart
-import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.EventTime
+import com.homelab.household.domain.model.Member
 import com.homelab.household.domain.model.MemoryOrigin
 import com.homelab.household.domain.model.MemoryScope
 import com.homelab.household.domain.model.MessageRole

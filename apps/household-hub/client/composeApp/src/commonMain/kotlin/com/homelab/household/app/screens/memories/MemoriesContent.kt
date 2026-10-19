@@ -56,6 +56,8 @@ import com.homelab.household.app.resources.memories_failed_line
 import com.homelab.household.app.resources.memories_failed_title
 import com.homelab.household.app.resources.memories_household_note
 import com.homelab.household.app.resources.memories_intro
+import com.homelab.household.app.resources.memories_moved_theirs
+import com.homelab.household.app.resources.memories_moved_yours
 import com.homelab.household.app.resources.memories_offline_line
 import com.homelab.household.app.resources.memories_offline_title
 import com.homelab.household.app.resources.memories_remove
@@ -79,8 +81,6 @@ import com.homelab.household.app.resources.memories_waiting_yours
 import com.homelab.household.app.resources.memories_withdraw
 import com.homelab.household.app.resources.memories_withdrawn
 import com.homelab.household.app.resources.memories_you
-import com.homelab.household.app.resources.memories_moved_theirs
-import com.homelab.household.app.resources.memories_moved_yours
 import com.homelab.household.app.resources.memories_you_asked
 import com.homelab.household.app.screens.changes.SentenceBox
 import com.homelab.household.app.theme.HearthShapes
@@ -404,7 +404,9 @@ private fun MemoryCard(
                         HearthChip(label = stringResource(Res.string.memories_you_asked), variant = ChipVariant.Primary)
                     }
                 }
-                row.movedFrom?.let { was -> MovedLine(was = was, speakerName = if (item.isMine) null else item.speakerName) }
+                row.movedFrom?.let { was ->
+                    MovedLine(was = was, speakerName = if (item.isMine) null else item.speakerName)
+                }
             }
             if (item.canRemove) {
                 RemoveButton(content = sentence, onClick = onRemove)
