@@ -171,6 +171,57 @@ async def test_updating_an_event_memory_saves_its_new_sentence_time_expiry_and_m
     assert _utc(loaded.expires_at) == start + timedelta(hours=2)
 
 
+MADRID_SUMMER = timezone(timedelta(hours=2))
+MADRID_WINTER = timezone(timedelta(hours=1))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_event_times_in_the_calendars_own_zone_WHEN_a_memory_is_saved_THEN_they_come_back_as_the_same_moment_in_UTC(
+    session: AsyncSession,
+):
+    repo = _repo(session)
+    start = datetime(2026, 10, 24, 20, 0, tzinfo=MADRID_SUMMER)
+    created = await repo.create(
+        AgentMemory(
+            user_id="emma",
+            content="Dinner together",
+            event_id="ev1",
+            event_starts_at=start,
+            expires_at=start + timedelta(hours=2),
+            moved_from=datetime(2026, 10, 23, 20, 0, tzinfo=MADRID_SUMMER),
+        )
+    )
+
+    loaded = await repo.get_by_id(created.id)
+
+    assert loaded.event_starts_at == datetime(2026, 10, 24, 18, 0, tzinfo=timezone.utc)
+    assert loaded.event_starts_at.tzinfo == timezone.utc
+    assert loaded.expires_at == datetime(2026, 10, 24, 20, 0, tzinfo=timezone.utc)
+    assert loaded.moved_from == datetime(2026, 10, 23, 18, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_event_memory_WHEN_it_follows_a_move_in_the_calendars_own_zone_THEN_the_new_times_are_saved_in_UTC(
+    session: AsyncSession,
+):
+    repo = _repo(session)
+    memory = await repo.create(AgentMemory(user_id="emma", content="Dinner together", event_id="ev1"))
+    start = datetime(2026, 10, 25, 19, 30, tzinfo=MADRID_WINTER)
+    memory.event_starts_at = start
+    memory.expires_at = start + timedelta(hours=2)
+    memory.moved_from = datetime(2026, 10, 24, 20, 0, tzinfo=MADRID_SUMMER)
+    memory.retired_at = datetime(2026, 10, 20, 9, 0, tzinfo=MADRID_SUMMER)
+
+    await repo.update(memory)
+
+    loaded = await repo.get_by_id(memory.id)
+    assert loaded.event_starts_at == datetime(2026, 10, 25, 18, 30, tzinfo=timezone.utc)
+    assert loaded.event_starts_at.tzinfo == timezone.utc
+    assert loaded.expires_at == datetime(2026, 10, 25, 20, 30, tzinfo=timezone.utc)
+    assert loaded.moved_from == datetime(2026, 10, 24, 18, 0, tzinfo=timezone.utc)
+    assert loaded.retired_at == datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
+
+
 @pytest.mark.asyncio
 async def test_memories_linked_to_an_event_are_found_by_member_and_event(session: AsyncSession):
     """GIVEN linked memories WHEN asked for one member's event THEN only that member's active ones come back."""

@@ -12,8 +12,9 @@ from app.domain.entities.calendar_event import CalendarEvent
 from tests.test_memories import setup_environment
 
 CONNECTOR = "app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector"
-SAT = datetime(2026, 10, 18, 18, 0, tzinfo=timezone.utc)
-SUN = datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc)
+# Far ahead, so the memory never expires before the test reads the page.
+SAT = datetime(2099, 10, 17, 18, 0, tzinfo=timezone.utc)
+SUN = datetime(2099, 10, 18, 17, 30, tzinfo=timezone.utc)
 
 
 def _event(start):
@@ -65,6 +66,30 @@ async def test_GIVEN_a_linked_memory_WHEN_the_phone_moves_its_event_THEN_the_pag
     assert datetime.fromisoformat(row["event_starts_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == SUN
     assert datetime.fromisoformat(row["moved_from"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == SAT
     assert page["to_check"] == 0
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_calendar_that_answers_in_madrid_time_WHEN_the_event_is_moved_and_then_followed_again_THEN_the_page_shows_UTC_and_it_moved_once(
+    client: httpx.AsyncClient, db_session
+):
+    _, token, agent_id, session_id = await setup_environment(client)
+    memory_id, headers = await _linked_memory(client, db_session, token, agent_id, session_id)
+    madrid_sun = SUN.astimezone(timezone(timedelta(hours=1)))
+
+    for _ in range(2):
+        with patch(f"{CONNECTOR}.update_event", new=AsyncMock(return_value=_event(madrid_sun))), \
+                patch(f"{CONNECTOR}.get_event", new=AsyncMock(return_value=_event(madrid_sun))):
+            moved = await client.put(
+                "/api/v1/integrations/calendars/events/ev1", headers=headers,
+                json={"start_time": madrid_sun.isoformat(), "end_time": (madrid_sun + timedelta(hours=2)).isoformat()},
+            )
+        assert moved.status_code == 200
+
+    page = (await client.get("/api/v1/memories/page", headers=headers)).json()
+    [row] = [m for m in page["household"] if m["id"] == memory_id]
+    assert datetime.fromisoformat(row["event_starts_at"].replace("Z", "+00:00")) == SUN
+    assert datetime.fromisoformat(row["event_starts_at"].replace("Z", "+00:00")).utcoffset() == timedelta(0)
+    assert datetime.fromisoformat(row["moved_from"].replace("Z", "+00:00")) == SAT
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,7 @@ from typing import List, Optional
 from app.domain.entities.memory import AgentMemory
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.data.datasources.memory_data_source import IMemoryDataSource
-from app.data.mappers.memory_data_mapper import MemoryDataMapper
+from app.data.mappers.memory_data_mapper import MemoryDataMapper, as_stored
 
 
 class MemoryRepositoryImpl(IMemoryRepository):
@@ -64,11 +64,11 @@ class MemoryRepositoryImpl(IMemoryRepository):
             model.content = memory.content
             model.confidence = memory.confidence
             model.is_active = memory.is_active
-            model.retired_at = memory.retired_at
+            model.retired_at = as_stored(memory.retired_at)
             # An event memory follows its event (memory spec §7).
-            model.expires_at = memory.expires_at
-            model.moved_from = memory.moved_from
-            model.event_starts_at = memory.event_starts_at
+            model.expires_at = as_stored(memory.expires_at)
+            model.moved_from = as_stored(memory.moved_from)
+            model.event_starts_at = as_stored(memory.event_starts_at)
             model.time_from_event = memory.time_from_event
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
