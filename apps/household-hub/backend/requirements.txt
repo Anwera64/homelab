@@ -139,7 +139,7 @@ regex==2026.9.29
     # via dateparser
 six==1.17.0
     # via python-dateutil
-sqlalchemy==2.1.4
+sqlalchemy==2.1.5
     # via
     #   -r requirements.in
     #   alembic

@@ -247,7 +247,7 @@ six==1.17.0
     # via
     #   -c requirements.txt
     #   python-dateutil
-sqlalchemy==2.1.4
+sqlalchemy==2.1.5
     # via
     #   -c requirements.txt
     #   -r requirements.in
