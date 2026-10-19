@@ -45,7 +45,7 @@ class AuthUseCasesTest {
         )
 
     @Test
-    fun signing_in_passes_the_member_and_pin_to_the_hub() =
+    fun `GIVEN a member and a PIN WHEN signing in THEN the hub is asked with them and the member comes back`() =
         runTest {
             everySuspend { authRepo.login("emma", "482913") } returns emma
 
@@ -55,7 +55,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun a_wrong_pin_reaches_the_caller_as_it_came_from_the_hub() =
+    fun `GIVEN the hub rejecting the PIN WHEN signing in THEN the wrong PIN reaches the caller`() =
         runTest {
             everySuspend { authRepo.login("emma", "000000") } throws WrongPinException(attemptsLeft = 3)
 
@@ -63,7 +63,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun a_pin_that_is_not_six_digits_never_reaches_the_hub() =
+    fun `GIVEN PINs that are not six digits WHEN signing in THEN each is refused and the hub is never asked`() =
         runTest {
             listOf("", "12345", "1234567", "12a456").forEach { pin ->
                 assertFailsWith<ValidationException> { loginUseCase("emma", pin) }
@@ -72,7 +72,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun first_run_sends_the_trimmed_name_the_pin_and_the_colour() =
+    fun `GIVEN a name with stray spaces WHEN the first member is set up THEN the hub gets the trimmed name with the PIN and colour`() =
         runTest {
             everySuspend { authRepo.onboard("Emma", "482913", "#C05638") } returns emma
 
@@ -82,7 +82,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun first_run_needs_a_name_and_a_six_digit_pin() =
+    fun `GIVEN a blank name or a too long name or a short PIN WHEN the first member is set up THEN each is refused and the hub is never asked`() =
         runTest {
             assertFailsWith<ValidationException> { onboardUseCase("   ", "482913", "#3C6E4E") }
             assertFailsWith<ValidationException> { onboardUseCase("x".repeat(129), "482913", "#3C6E4E") }
@@ -92,7 +92,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun listing_members_asks_the_hub() =
+    fun `GIVEN a hub with one member WHEN members are listed THEN that member comes back`() =
         runTest {
             val members = listOf(Member(id = "emma", name = "Emma", avatarColor = "#3C6E4E"))
             everySuspend { authRepo.listMembers() } returns members
@@ -101,7 +101,7 @@ class AuthUseCasesTest {
         }
 
     @Test
-    fun check_auth_status_returns_initialization_state() =
+    fun `GIVEN an initialized hub with two members WHEN the auth status is checked THEN it reports initialized with two members`() =
         runTest {
             val status = AuthStatus(isInitialized = true, memberCount = 2)
             everySuspend { authRepo.checkStatus() } returns status
@@ -114,18 +114,21 @@ class AuthUseCasesTest {
 
     /** Asked before anything is drawn, so it can't wait on the hub. */
     @Test
-    fun a_stored_session_is_answered_without_the_hub() {
+    fun `GIVEN a token kept on this phone WHEN a stored session is asked about THEN it says yes without the hub`() {
         every { authRepo.hasStoredSession() } returns true
 
         assertEquals(true, hasStoredSessionUseCase())
+    }
 
+    @Test
+    fun `GIVEN no token kept on this phone WHEN a stored session is asked about THEN it says no without the hub`() {
         every { authRepo.hasStoredSession() } returns false
 
         assertEquals(false, hasStoredSessionUseCase())
     }
 
     @Test
-    fun logout_invokes_repo_logout() =
+    fun `GIVEN a signed-in member WHEN logging out THEN the repository logs out once`() =
         runTest {
             everySuspend { authRepo.logout() } returns Unit
 

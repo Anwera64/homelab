@@ -68,7 +68,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN a household with one agent WHEN its agents are asked for THEN their full personality comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -76,10 +75,8 @@ class KtorAgentRemoteDataSourceTest {
                     respondJson("[$llamaJson]")
                 }
 
-            // WHEN
             val agents = dataSource(engine).listAgents()
 
-            // THEN
             assertEquals("/api/v1/agents", path)
             assertEquals(1, agents.size)
             assertEquals("a-1", agents.first().id)
@@ -89,10 +86,8 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN the household's agents are asked for THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).listAgents() }
         }
 
@@ -101,7 +96,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN one agent's id WHEN it is asked for by itself THEN its personality comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -109,10 +103,8 @@ class KtorAgentRemoteDataSourceTest {
                     respondJson(llamaJson)
                 }
 
-            // WHEN
             val agent = dataSource(engine).getAgent("a-1")
 
-            // THEN
             assertEquals("/api/v1/agents/a-1", path)
             assertEquals("Llama", agent.name)
         }
@@ -122,7 +114,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN a new agent's personality WHEN it is created THEN it is posted and the stored agent comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -143,10 +134,8 @@ class KtorAgentRemoteDataSourceTest {
                     tool_permissions = listOf("search"),
                 )
 
-            // WHEN
             val agent = dataSource(engine).createAgent(create)
 
-            // THEN
             assertEquals("/api/v1/agents", path)
             assertSameJson(
                 """{"slug": "llama", "name": "Llama", "description": "General helper", "avatar": "🦙",
@@ -161,11 +150,9 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN an agent is created THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
             val create = AgentCreateDto(slug = "llama", name = "Llama", system_prompt = "You are helpful.")
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).createAgent(create) }
         }
 
@@ -174,7 +161,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN changes to an agent's personality WHEN it is updated THEN they are sent to that agent's own address`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var method: HttpMethod? = null
             var sent: String? = null
@@ -187,10 +173,8 @@ class KtorAgentRemoteDataSourceTest {
                 }
             val update = AgentUpdateDto(name = "Llama", temperature = 0.5f, is_active = true)
 
-            // WHEN
             val agent = dataSource(engine).updateAgent("a-1", update)
 
-            // THEN
             assertEquals("/api/v1/agents/a-1", path)
             assertEquals(HttpMethod.Put, method)
             assertSameJson("""{"name": "Llama", "temperature": 0.5, "is_active": true}""", sent)
@@ -202,7 +186,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN an agent an admin no longer wants WHEN it is deleted THEN its own address is asked to remove it`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var method: HttpMethod? = null
             val engine =
@@ -212,10 +195,8 @@ class KtorAgentRemoteDataSourceTest {
                     respondJson("""{"message": "Agent deleted"}""")
                 }
 
-            // WHEN
             dataSource(engine).deleteAgent("a-1")
 
-            // THEN
             assertEquals("/api/v1/agents/a-1", path)
             assertEquals(HttpMethod.Delete, method)
         }
@@ -225,7 +206,6 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN a deleted agent WHEN it is restored THEN its own restore address is posted to and it comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -233,10 +213,8 @@ class KtorAgentRemoteDataSourceTest {
                     respondJson(llamaJson)
                 }
 
-            // WHEN
             val agent = dataSource(engine).restoreAgent("a-1")
 
-            // THEN
             assertEquals("/api/v1/agents/a-1/restore", path)
             assertEquals("a-1", agent.id)
         }
@@ -244,10 +222,8 @@ class KtorAgentRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a deleted agent is restored THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).restoreAgent("a-1") }
         }
 }

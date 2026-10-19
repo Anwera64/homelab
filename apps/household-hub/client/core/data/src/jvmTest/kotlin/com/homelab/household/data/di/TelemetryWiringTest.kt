@@ -128,20 +128,16 @@ class TelemetryWiringTest {
 
     @Test
     fun `GIVEN no telemetry endpoint WHEN the graph builds telemetry THEN it is off and nothing is sent`() {
-        // GIVEN
         val koin = graph(TelemetryConfig.Disabled)
 
-        // WHEN
         val telemetry = koin.get<Telemetry>()
 
-        // THEN
         assertFalse(telemetry.isEnabled)
         assertTrue(seen.isEmpty())
     }
 
     @Test
     fun `GIVEN a signed-in phone and an endpoint that answers 401 WHEN a line is logged THEN it is posted with the token and nobody is signed out`() {
-        // GIVEN
         val storage = InMemorySessionStorage().apply { saveTokens("jwt-token-123") }
         val koin = graph(TelemetryConfig("https://telemetry.test/", appVersion = "0.1"), storage)
         val signedOut = CopyOnWriteArrayList<Unit>()
@@ -153,10 +149,8 @@ class TelemetryWiringTest {
             .launchIn(watching)
         val log = koin.startedLogger("Auth")
 
-        // WHEN
         log.i { "Signed in" }
 
-        // THEN
         await("the export") { seen.isNotEmpty() }
         Thread.sleep(500) // long enough for the 401 to be read and acted on, were anything to act on it
         val post = seen.single()
@@ -176,21 +170,17 @@ class TelemetryWiringTest {
 
     @Test
     fun `GIVEN nobody signed in WHEN a line is logged THEN it is posted without an Authorization header`() {
-        // GIVEN
         val koin = graph(TelemetryConfig("https://telemetry.test"))
         val log = koin.startedLogger("App")
 
-        // WHEN
         log.w { "Something worth a warning" }
 
-        // THEN
         await("the export") { seen.isNotEmpty() }
         assertNull(seen.first().authorization)
     }
 
     @Test
     fun `GIVEN the app's own client WHEN a hub call fails THEN it is logged as a failed request and the log endpoint's refusal is not`() {
-        // GIVEN
         val lines = CopyOnWriteArrayList<Triple<Severity, String, String>>()
         val recorder =
             object : LogWriter() {
@@ -209,14 +199,12 @@ class TelemetryWiringTest {
         try {
             koin.get<Telemetry>().start()
 
-            // WHEN
             runBlocking {
                 koin.get<HttpClient>().get(
                     "https://hub.test/api/v1/sessions/3f2a9c1e-7b64-4d0a-9e51-0c8d2b6f4a17?q=x",
                 )
             }
 
-            // THEN
             val failure = "Request failed: GET /api/v1/sessions/{id} -> 503"
             await("both lines to be exported") { exported().let { "App started" in it && failure in it } }
             Thread.sleep(500) // room for a refused export to be logged, were it going to be

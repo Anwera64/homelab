@@ -23,7 +23,7 @@ class SignedInSessionUseCasesTest {
     private val authRepo = mock<AuthRepository>()
 
     @Test
-    fun a_sign_out_from_the_hub_reaches_whoever_is_watching() =
+    fun `GIVEN the hub signing this phone out WHEN the sign-out is observed THEN the watcher is told once`() =
         runTest {
             every { authRepo.observeSignedOut() } returns flowOf(Unit)
 
@@ -31,7 +31,7 @@ class SignedInSessionUseCasesTest {
         }
 
     @Test
-    fun renewing_asks_the_hub_for_a_fresh_token() =
+    fun `GIVEN a hub ready to renew WHEN the session is renewed THEN the hub is asked for a fresh token once`() =
         runTest {
             everySuspend { authRepo.refreshToken() } returns "fresh-token"
 
@@ -41,7 +41,7 @@ class SignedInSessionUseCasesTest {
         }
 
     @Test
-    fun renewing_with_the_hub_unreachable_quietly_keeps_the_token_it_has() =
+    fun `GIVEN a hub that is unreachable WHEN the session is renewed THEN nothing is thrown and the token is kept`() =
         runTest {
             everySuspend { authRepo.refreshToken() } throws ServerOfflineException()
 
@@ -49,7 +49,7 @@ class SignedInSessionUseCasesTest {
         }
 
     @Test
-    fun renewing_a_token_the_hub_refused_leaves_the_sign_out_to_the_signal() =
+    fun `GIVEN a hub that no longer accepts the token WHEN the session is renewed THEN nothing is thrown because the sign-out signal handles it`() =
         runTest {
             everySuspend { authRepo.refreshToken() } throws UnauthorizedException("Token no longer accepted")
 

@@ -30,52 +30,40 @@ class SecretLockUseCasesTest {
     @Test
     fun `GIVEN three secret conversations WHEN everything secret is locked THEN it reports three`() =
         runTest {
-            // GIVEN
             everySuspend { sessionRepo.lockAllSecretSessions() } returns 3
 
-            // WHEN
             val lockedCount = lockSecretSessionsUseCase()
 
-            // THEN
             assertEquals(3, lockedCount)
         }
 
     @Test
     fun `GIVEN a locked conversation WHEN it is unlocked with a PIN THEN it opens`() =
         runTest {
-            // GIVEN
             everySuspend { sessionRepo.unlockSecretSession("session-1", "1234") } returns true
 
-            // WHEN
             val success = unlockSecretSessionUseCase("session-1", "1234")
 
-            // THEN
             assertTrue(success)
         }
 
     @Test
     fun `GIVEN a conversation that was not locked WHEN it is unlocked THEN it says there was nothing to open`() =
         runTest {
-            // GIVEN
             everySuspend { sessionRepo.unlockSecretSession("session-1", "1234") } returns false
 
-            // WHEN
             val success = unlockSecretSessionUseCase("session-1", "1234")
 
-            // THEN
             assertFalse(success)
         }
 
     @Test
     fun `GIVEN no PIN typed at all WHEN a conversation is unlocked THEN it is refused before the data layer is asked`() =
         runTest {
-            // GIVEN
             val blank = "   "
 
-            // WHEN
             assertFailsWith<ValidationException> { unlockSecretSessionUseCase("session-1", blank) }
 
-            // THEN
             verifySuspend(VerifyMode.exactly(0)) { sessionRepo.unlockSecretSession("session-1", "1234") }
         }
 }

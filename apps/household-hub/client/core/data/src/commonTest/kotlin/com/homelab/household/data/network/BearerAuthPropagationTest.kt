@@ -28,7 +28,6 @@ class BearerAuthPropagationTest {
     @Test
     fun `GIVEN a phone with a kept token WHEN two different calls reach the hub THEN both carry it as a bearer header`() =
         runTest {
-            // GIVEN
             val capturedHeaders = mutableListOf<String?>()
             val storage = InMemorySessionStorage()
             storage.saveTokens(accessToken = "bearer-secret-token-abc")
@@ -64,11 +63,9 @@ class BearerAuthPropagationTest {
             val spaceDataSource = KtorSpaceRemoteDataSource(client, baseUrl = DEFAULT_BASE_URL)
             val agentDataSource = KtorAgentRemoteDataSource(client, baseUrl = DEFAULT_BASE_URL)
 
-            // WHEN
             spaceDataSource.getHouseholdSpace()
             agentDataSource.listAgents()
 
-            // THEN
             assertEquals(2, capturedHeaders.size)
             assertEquals("Bearer bearer-secret-token-abc", capturedHeaders[0])
             assertEquals("Bearer bearer-secret-token-abc", capturedHeaders[1])
@@ -77,7 +74,6 @@ class BearerAuthPropagationTest {
     @Test
     fun `GIVEN a call made as one member WHEN another member's token is kept THEN the next call carries the new token`() =
         runTest {
-            // GIVEN
             val capturedHeaders = mutableListOf<String?>()
             val storage = InMemorySessionStorage()
             val client = clientWith(sharedSpaceHub(capturedHeaders), storage)
@@ -85,18 +81,15 @@ class BearerAuthPropagationTest {
             storage.saveTokens(accessToken = "first-member-token")
             spaces.getHouseholdSpace()
 
-            // WHEN
             storage.saveTokens(accessToken = "second-member-token")
             spaces.getHouseholdSpace()
 
-            // THEN
             assertEquals(listOf<String?>("Bearer first-member-token", "Bearer second-member-token"), capturedHeaders)
         }
 
     @Test
     fun `GIVEN the kept session is cleared WHEN a call is made THEN it carries no bearer header`() =
         runTest {
-            // GIVEN
             val capturedHeaders = mutableListOf<String?>()
             val storage = InMemorySessionStorage()
             val client = clientWith(sharedSpaceHub(capturedHeaders), storage)
@@ -104,11 +97,9 @@ class BearerAuthPropagationTest {
             storage.saveTokens(accessToken = "signed-out-member-token")
             spaces.getHouseholdSpace()
 
-            // WHEN
             storage.clear()
             spaces.getHouseholdSpace()
 
-            // THEN
             assertEquals(listOf<String?>("Bearer signed-out-member-token", null), capturedHeaders)
         }
 

@@ -28,46 +28,37 @@ class InMemorySessionStorageTest {
 
     @Test
     fun `GIVEN a saved member WHEN the storage is read THEN it is them`() {
-        // GIVEN
         val storage = storage().apply { saveTokens("access-123") }
 
-        // WHEN
         storage.saveUser(emma)
 
-        // THEN
         assertEquals(emma, storage.getUser())
     }
 
     @Test
     fun `GIVEN a saved member WHEN only a token is saved THEN the member is left alone`() {
-        // GIVEN
         val storage =
             storage().apply {
                 saveTokens("access-123")
                 saveUser(emma)
             }
 
-        // WHEN
         storage.saveTokens("access-789")
 
-        // THEN
         assertEquals("access-789", storage.getAccessToken())
         assertEquals(emma, storage.getUser())
     }
 
     @Test
     fun `GIVEN a saved member WHEN the storage is cleared THEN the member and the token are both gone`() {
-        // GIVEN
         val storage =
             storage().apply {
                 saveTokens("access-123", "refresh-456")
                 saveUser(emma)
             }
 
-        // WHEN
         storage.clear()
 
-        // THEN
         assertNull(storage.getAccessToken())
         assertNull(storage.getRefreshToken())
         assertNull(storage.getUser())
@@ -75,17 +66,14 @@ class InMemorySessionStorageTest {
 
     @Test
     fun `GIVEN a saved member WHEN nobody is saved over them THEN they are forgotten`() {
-        // GIVEN
         val storage =
             storage().apply {
                 saveTokens("access-123")
                 saveUser(emma)
             }
 
-        // WHEN
         storage.saveUser(null)
 
-        // THEN
         assertNull(storage.getUser())
         assertEquals("access-123", storage.getAccessToken())
     }

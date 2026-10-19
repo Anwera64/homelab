@@ -9,14 +9,14 @@ import kotlin.test.assertIs
 
 class RunCatchingSafeTest {
     @Test
-    fun wraps_a_returned_value_as_success() {
+    fun `GIVEN a block returning a value WHEN it is run safely THEN the value comes back as a success`() {
         val result = runCatchingSafe { 42 }
 
         assertEquals(42, result.getOrNull())
     }
 
     @Test
-    fun wraps_an_ordinary_exception_as_failure() {
+    fun `GIVEN a block throwing an ordinary exception WHEN it is run safely THEN the exception comes back as a failure`() {
         val result = runCatchingSafe { throw IllegalStateException("boom") }
 
         assertIs<IllegalStateException>(result.exceptionOrNull())
@@ -24,7 +24,7 @@ class RunCatchingSafeTest {
 
     /** Swallowing cancellation would let a cancelled coroutine carry on as if it had failed. */
     @Test
-    fun rethrows_cancellation_instead_of_wrapping_it() =
+    fun `GIVEN a block that is cancelled WHEN it is run safely THEN the cancellation is rethrown rather than wrapped`() =
         runTest {
             assertFailsWith<CancellationException> {
                 runCatchingSafe { throw CancellationException("cancelled") }

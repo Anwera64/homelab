@@ -66,7 +66,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN a household with one member WHEN its members are asked for THEN their full profile comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -74,10 +73,8 @@ class KtorMembersRemoteDataSourceTest {
                     respondJson("[$emmaJson]")
                 }
 
-            // WHEN
             val members = dataSource(engine).listHouseholdMembers()
 
-            // THEN
             assertEquals("/api/v1/users", path)
             assertEquals(1, members.size)
             assertEquals("emma", members.first().id)
@@ -87,10 +84,8 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN household members are asked for THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).listHouseholdMembers() }
         }
 
@@ -99,7 +94,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN an admin inviting someone WHEN the invite is created THEN the name and admin flag are posted and a code comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -112,10 +106,8 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val invite = dataSource(engine).createInvite("Liam", isAdmin = false)
 
-            // THEN
             assertEquals("/api/v1/invites", path)
             assertSameJson("""{"invited_name": "Liam", "is_admin": false}""", sent)
             assertEquals("482913", invite.code)
@@ -125,7 +117,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN a name someone in the household already has WHEN an invite is created THEN it says the name is taken`() =
         runTest {
-            // GIVEN — the picker tells members apart by name alone, so the hub refuses a repeat.
             val engine =
                 MockEngine {
                     respondJson(
@@ -134,17 +125,14 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<NameTakenException> { dataSource(engine).createInvite("Emma", isAdmin = false) }
         }
 
     @Test
     fun `GIVEN the hub cannot be reached WHEN an invite is created THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).createInvite("Liam", isAdmin = false) }
         }
 
@@ -153,7 +141,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN an admin approving a forgotten PIN WHEN they confirm with their own THEN their pin is posted and a reset code comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -163,10 +150,8 @@ class KtorMembersRemoteDataSourceTest {
                     respondJson("""{"code": "738291", "expires_in_seconds": 900}""", HttpStatusCode.Created)
                 }
 
-            // WHEN
             val reset = dataSource(engine).approvePinReset("liam", "111111")
 
-            // THEN
             assertEquals("/api/v1/users/liam/pin-resets", path)
             assertSameJson("""{"pin": "111111"}""", sent)
             assertEquals("738291", reset.code)
@@ -176,7 +161,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN an admin whose own PIN is wrong WHEN they approve a reset THEN it says how many attempts are left`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -185,17 +169,14 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val thrown = assertFailsWith<WrongPinException> { dataSource(engine).approvePinReset("liam", "000000") }
 
-            // THEN
             assertEquals(2, thrown.attemptsLeft)
         }
 
     @Test
     fun `GIVEN an admin locked out of PIN checks WHEN they approve a reset THEN it says how long to wait`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -204,20 +185,16 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val thrown = assertFailsWith<PinLockedException> { dataSource(engine).approvePinReset("liam", "000000") }
 
-            // THEN
             assertEquals(30, thrown.retryAfterSeconds)
         }
 
     @Test
     fun `GIVEN a refusal that does not say how many attempts are left WHEN a reset is approved THEN it is a plain forbidden`() =
         runTest {
-            // GIVEN
             val engine = MockEngine { respondJson("""{"detail": "Not allowed"}""", HttpStatusCode.Forbidden) }
 
-            // WHEN / THEN
             assertFailsWith<ForbiddenException> { dataSource(engine).approvePinReset("liam", "111111") }
         }
 
@@ -226,7 +203,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN a member changing their PIN WHEN both pins are sent THEN a fresh token comes back`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -236,10 +212,8 @@ class KtorMembersRemoteDataSourceTest {
                     respondJson("""{"access_token": "new-token", "token_type": "bearer", "user": $emmaJson}""")
                 }
 
-            // WHEN
             val token = dataSource(engine).changePin("111111", "222222")
 
-            // THEN
             assertEquals("/api/v1/users/me/pin", path)
             assertSameJson("""{"current_pin": "111111", "new_pin": "222222"}""", sent)
             assertEquals("new-token", token.access_token)
@@ -248,7 +222,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN the wrong current PIN WHEN a member changes it THEN it says how many attempts are left`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -257,10 +230,8 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val thrown = assertFailsWith<WrongPinException> { dataSource(engine).changePin("000000", "222222") }
 
-            // THEN
             assertEquals(1, thrown.attemptsLeft)
         }
 
@@ -269,7 +240,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN an admin removing someone WHEN the hub agrees THEN the member is asked to be deleted`() =
         runTest {
-            // GIVEN
             var path: String? = null
             val engine =
                 MockEngine { request ->
@@ -277,17 +247,14 @@ class KtorMembersRemoteDataSourceTest {
                     respondJson("""{"message": "Member removed from the household"}""")
                 }
 
-            // WHEN
             dataSource(engine).removeMember("liam")
 
-            // THEN
             assertEquals("/api/v1/users/liam", path)
         }
 
     @Test
     fun `GIVEN the only admin left WHEN someone tries to remove them THEN it says they are the sole admin`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -296,7 +263,6 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<SoleAdminException> { dataSource(engine).removeMember("emma") }
         }
 
@@ -305,7 +271,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN a member leaving WHEN they confirm with their PIN THEN it is posted with the deletion`() =
         runTest {
-            // GIVEN
             var path: String? = null
             var sent: String? = null
             val engine =
@@ -315,10 +280,8 @@ class KtorMembersRemoteDataSourceTest {
                     respondJson("""{"message": "You have left the household"}""")
                 }
 
-            // WHEN
             dataSource(engine).leaveHousehold("111111")
 
-            // THEN
             assertEquals("/api/v1/users/me", path)
             assertSameJson("""{"pin": "111111"}""", sent)
         }
@@ -326,7 +289,6 @@ class KtorMembersRemoteDataSourceTest {
     @Test
     fun `GIVEN the wrong PIN WHEN a member tries to leave THEN it says how many attempts are left`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -335,17 +297,14 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN
             val thrown = assertFailsWith<WrongPinException> { dataSource(engine).leaveHousehold("000000") }
 
-            // THEN
             assertEquals(2, thrown.attemptsLeft)
         }
 
     @Test
     fun `GIVEN the only admin WHEN they try to leave THEN it says they are the sole admin`() =
         runTest {
-            // GIVEN
             val engine =
                 MockEngine {
                     respondJson(
@@ -354,17 +313,14 @@ class KtorMembersRemoteDataSourceTest {
                     )
                 }
 
-            // WHEN / THEN
             assertFailsWith<SoleAdminException> { dataSource(engine).leaveHousehold("111111") }
         }
 
     @Test
     fun `GIVEN the hub cannot be reached WHEN a member tries to leave THEN it is reported as offline`() =
         runTest {
-            // GIVEN
             val engine = unreachableHub()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { dataSource(engine).leaveHousehold("111111") }
         }
 }

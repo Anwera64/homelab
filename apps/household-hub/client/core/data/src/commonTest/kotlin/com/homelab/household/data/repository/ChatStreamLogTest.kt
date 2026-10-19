@@ -42,7 +42,6 @@ class ChatStreamLogTest {
     @Test
     fun `GIVEN a stream that drops mid-answer and is picked up WHEN a turn is sent THEN the drop and the resume are each logged once`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
             every { remote.openChatStream(any(), any(), any()) } returns
@@ -53,10 +52,8 @@ class ChatStreamLogTest {
                 }
             every { remote.resumeTurnStream("s-1") } returns flowOf(ChatStreamEvent.Delta("lo"), done)
 
-            // WHEN
             repository(remote, writer).streamChatTurn("s-1", "When is the dentist").toList()
 
-            // THEN
             assertEquals(
                 listOf(
                     Line(Severity.Warn, "Chat", "Chat stream dropped"),
@@ -69,55 +66,45 @@ class ChatStreamLogTest {
     @Test
     fun `GIVEN a stream that stops without saying how it ended WHEN a turn is sent THEN the drop is logged`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
             every { remote.openChatStream(any(), any(), any()) } returns
                 flowOf(ChatStreamEvent.Accepted, ChatStreamEvent.Delta("Hel"))
             every { remote.resumeTurnStream("s-1") } returns flowOf(ChatStreamEvent.Delta("lo"), done)
 
-            // WHEN
             repository(remote, writer).streamChatTurn("s-1", "When is the dentist").toList()
 
-            // THEN
             assertEquals("Chat stream dropped", writer.lines.first().message)
         }
 
     @Test
     fun `GIVEN a stream that ends on its own terms WHEN a turn is sent THEN nothing is logged`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
             every { remote.openChatStream(any(), any(), any()) } returns flowOf(ChatStreamEvent.Delta("Hello"), done)
 
-            // WHEN
             repository(remote, writer).streamChatTurn("s-1", "Say hello").toList()
 
-            // THEN
             assertTrue(writer.lines.isEmpty())
         }
 
     @Test
     fun `GIVEN a hub that cannot be reached at all WHEN a turn is sent THEN no drop is logged because no stream ever opened`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
             every { remote.openChatStream(any(), any(), any()) } returns
                 flow { throw ServerOfflineException("Cannot reach the hub") }
 
-            // WHEN
             runCatchingSafe { repository(remote, writer).streamChatTurn("s-1", "Say hello").toList() }
 
-            // THEN
             assertTrue(writer.lines.isEmpty())
         }
 
     @Test
     fun `GIVEN a dropped stream WHEN it is logged THEN the lines carry nothing of the conversation or the failure`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<SessionRemoteDataSource>(MockMode.autofill)
             every { remote.openChatStream(any(), any(), any()) } returns
@@ -127,10 +114,8 @@ class ChatStreamLogTest {
                 }
             every { remote.resumeTurnStream("s-1") } returns flowOf(ChatStreamEvent.Delta("lo"), done)
 
-            // WHEN
             repository(remote, writer).streamChatTurn("s-1", "When is the dentist").toList()
 
-            // THEN
             assertTrue(writer.lines.all { it.throwable == null })
             val logged = writer.lines.joinToString(" ") { it.message }
             listOf(

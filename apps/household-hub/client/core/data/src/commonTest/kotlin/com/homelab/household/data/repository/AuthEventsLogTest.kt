@@ -53,46 +53,37 @@ class AuthEventsLogTest {
     @Test
     fun `GIVEN a hub that accepts the PIN WHEN signing in THEN it is logged once without saying who or with what`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<AuthRemoteDataSource>()
             everySuspend { remote.login("emma", "482913") } returns signedIn()
 
-            // WHEN
             repository(remote, writer).login("emma", "482913")
 
-            // THEN
             assertEquals(listOf(Line(Severity.Info, "Auth", "Signed in")), writer.lines)
         }
 
     @Test
     fun `GIVEN a new member joining with an invite WHEN the hub accepts THEN it is logged as a sign-in`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<AuthRemoteDataSource>()
             everySuspend { remote.joinHousehold("maple-otter", "Emma", "482913", "#3C6E4E") } returns signedIn()
 
-            // WHEN
             repository(remote, writer).joinHousehold("maple-otter", "Emma", "482913", "#3C6E4E")
 
-            // THEN
             assertEquals(listOf(Line(Severity.Info, "Auth", "Signed in")), writer.lines)
         }
 
     @Test
     fun `GIVEN a signed-in phone WHEN its token is renewed THEN nothing is logged as a sign-in`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val remote = mock<AuthRemoteDataSource>()
             everySuspend { remote.renew("jwt-token-123") } returns signedIn(token = "jwt-token-456")
             val tokens = InMemorySessionStorage().apply { saveTokens("jwt-token-123") }
 
-            // WHEN
             repository(remote, writer, tokens).refreshToken()
 
-            // THEN
             assertTrue(writer.lines.isEmpty())
         }
 
@@ -100,29 +91,23 @@ class AuthEventsLogTest {
     @Test
     fun `GIVEN a signed-in phone WHEN the member signs out THEN the phone logs nothing of its own`() =
         runTest {
-            // GIVEN
             val writer = RecordingLogWriter()
             val tokens = InMemorySessionStorage().apply { saveTokens("jwt-token-123") }
             val remote = mock<AuthRemoteDataSource>()
             everySuspend { remote.signOut("jwt-token-123") } returns Unit
 
-            // WHEN
             repository(remote, writer, tokens).logout()
 
-            // THEN
             assertTrue(writer.lines.isEmpty())
         }
 
     @Test
     fun `GIVEN the hub stops accepting the token WHEN that is raised THEN it is logged as a warning apart from an ordinary sign-out`() {
-        // GIVEN
         val writer = RecordingLogWriter()
         val events = AuthEventsLocalDataSource(log = writer.logger("Auth"))
 
-        // WHEN
         events.raiseSignedOut()
 
-        // THEN
         assertEquals(listOf(Line(Severity.Warn, "Auth", "Signed out by the hub")), writer.lines)
         assertFalse(writer.lines.any { "emma" in it.message.lowercase() })
     }

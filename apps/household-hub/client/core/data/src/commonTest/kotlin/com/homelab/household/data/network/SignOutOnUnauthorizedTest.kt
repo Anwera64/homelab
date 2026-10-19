@@ -38,14 +38,11 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN a token kept on this phone WHEN a signed-in call comes back 401 THEN the token is forgotten and the sign-out is announced once`() =
         runTest {
-            // GIVEN
             val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
             var signedOut = 0
 
-            // WHEN
             client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.get("$hub/api/v1/spaces/shared")
 
-            // THEN
             assertNull(tokens.getAccessToken())
             assertEquals(1, signedOut)
         }
@@ -57,31 +54,25 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN a stored member WHEN a signed-in call comes back 401 THEN they are forgotten with the token`() =
         runTest {
-            // GIVEN
             val tokens =
                 InMemorySessionStorage().apply {
                     saveTokens("revoked-token")
                     saveUser(UserReadDto(id = "emma", full_name = "Emma", is_admin = true, is_active = true))
                 }
 
-            // WHEN
             client(HttpStatusCode.Unauthorized, tokens) {}.get("$hub/api/v1/spaces/shared")
 
-            // THEN
             assertNull(tokens.getUser())
         }
 
     @Test
     fun `GIVEN someone else is signed in on this phone WHEN sign-in refuses a PIN with 401 THEN their token is left alone`() =
         runTest {
-            // GIVEN
             val tokens = InMemorySessionStorage().apply { saveTokens("someone-elses-token") }
             var signedOut = 0
 
-            // WHEN
             client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.post("$hub/api/v1/auth/login")
 
-            // THEN
             assertEquals("someone-elses-token", tokens.getAccessToken())
             assertEquals(0, signedOut)
         }
@@ -89,14 +80,11 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN a member changing their PIN WHEN the hub refuses the current one with 403 THEN they stay signed in`() =
         runTest {
-            // GIVEN
             val tokens = InMemorySessionStorage().apply { saveTokens("good-token") }
             var signedOut = 0
 
-            // WHEN
             client(HttpStatusCode.Forbidden, tokens) { signedOut++ }.post("$hub/api/v1/users/me/pin")
 
-            // THEN
             assertEquals("good-token", tokens.getAccessToken())
             assertEquals(0, signedOut)
         }
@@ -108,14 +96,11 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN a member signing out WHEN the hub answers the sign-out with 401 THEN nothing is announced and the token is left to the caller`() =
         runTest {
-            // GIVEN
             val tokens = InMemorySessionStorage().apply { saveTokens("revoked-token") }
             var signedOut = 0
 
-            // WHEN
             client(HttpStatusCode.Unauthorized, tokens) { signedOut++ }.post("$hub/api/v1/auth/logout")
 
-            // THEN
             assertEquals("revoked-token", tokens.getAccessToken())
             assertEquals(0, signedOut)
         }
@@ -123,22 +108,18 @@ class SignOutOnUnauthorizedTest {
     @Test
     fun `GIVEN no token kept on this phone WHEN a call comes back 401 THEN nobody is signed out`() =
         runTest {
-            // GIVEN
             var signedOut = 0
 
-            // WHEN
             client(
                 HttpStatusCode.Unauthorized,
                 InMemorySessionStorage(),
             ) { signedOut++ }.get("$hub/api/v1/spaces/shared")
 
-            // THEN
             assertEquals(0, signedOut)
         }
 
     @Test
     fun `GIVEN the calls the hub answers without a token WHEN each is checked THEN only those read as public`() {
-        // GIVEN
         val public =
             listOf(
                 "/api/v1/auth/login",
@@ -152,7 +133,6 @@ class SignOutOnUnauthorizedTest {
             )
         val signedIn = listOf("/api/v1/invites", "/api/v1/users/me/pin", "/api/v1/auth/refresh", "/api/v1/auth/me")
 
-        // WHEN / THEN
         public.forEach { path -> assertEquals(true, PublicEndpoints.isPublic("$hub$path"), path) }
         signedIn.forEach { path -> assertEquals(false, PublicEndpoints.isPublic("$hub$path"), path) }
     }

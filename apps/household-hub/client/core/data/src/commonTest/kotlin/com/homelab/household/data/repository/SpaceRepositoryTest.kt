@@ -55,14 +55,11 @@ class SpaceRepositoryTest {
     @Test
     fun `GIVEN a member's own space WHEN it is asked for THEN it is mapped to a personal space`() =
         runTest {
-            // GIVEN
             val remote = mock<SpaceRemoteDataSource>()
             everySuspend { remote.getPersonalSpace() } returns personalDto
 
-            // WHEN
             val space = repository(remote).getPersonalSpace()
 
-            // THEN
             assertEquals(SpaceType.PERSONAL, space.type)
             assertEquals("sp-personal-emma", space.id)
         }
@@ -70,11 +67,9 @@ class SpaceRepositoryTest {
     @Test
     fun `GIVEN the hub cannot be reached WHEN a member's own space is asked for THEN the failure reaches the caller`() =
         runTest {
-            // GIVEN
             val remote = mock<SpaceRemoteDataSource>()
             everySuspend { remote.getPersonalSpace() } throws ServerOfflineException()
 
-            // WHEN / THEN
             assertFailsWith<ServerOfflineException> { repository(remote).getPersonalSpace() }
         }
 
@@ -83,14 +78,11 @@ class SpaceRepositoryTest {
     @Test
     fun `GIVEN the space everybody shares WHEN it is asked for THEN it is mapped to a household space`() =
         runTest {
-            // GIVEN
             val remote = mock<SpaceRemoteDataSource>()
             everySuspend { remote.getHouseholdSpace() } returns householdDto
 
-            // WHEN
             val space = repository(remote).getHouseholdSpace()
 
-            // THEN
             assertEquals(household, space)
         }
 
@@ -99,19 +91,16 @@ class SpaceRepositoryTest {
     @Test
     fun `GIVEN settings holding numbers and booleans and nulls WHEN they are saved THEN they reach the data source as strings`() =
         runTest {
-            // GIVEN
             val remote = mock<SpaceRemoteDataSource>()
             val expectedWire = mapOf("theme" to "dark", "quiet_hours" to "22", "notify" to "true", "note" to "")
             everySuspend { remote.updateSpaceSettings("sp-household", expectedWire) } returns householdDto
 
-            // WHEN
             val space =
                 repository(remote).updateSpaceSettings(
                     "sp-household",
                     mapOf("theme" to "dark", "quiet_hours" to 22, "notify" to true, "note" to null),
                 )
 
-            // THEN
             assertEquals(household, space)
             verifySuspend(VerifyMode.exactly(1)) { remote.updateSpaceSettings("sp-household", expectedWire) }
         }

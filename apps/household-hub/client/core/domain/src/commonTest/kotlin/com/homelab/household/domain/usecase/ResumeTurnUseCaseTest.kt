@@ -20,27 +20,21 @@ class ResumeTurnUseCaseTest {
 
     @Test
     fun `GIVEN no conversation WHEN a turn is resumed THEN it is refused`() {
-        // GIVEN
         val sessionId = " "
 
-        // WHEN
         val thrown = assertFailsWith<ValidationException> { resumeTurn(sessionId) }
 
-        // THEN
         assertEquals("Session ID cannot be blank", thrown.message)
     }
 
     @Test
     fun `GIVEN a turn the phone stopped hearing WHEN it is resumed THEN the rest comes from the repository`() =
         runTest {
-            // GIVEN
             val rest = listOf(ChatStreamEvent.Delta("lo"), ChatStreamEvent.StillWorking)
             every { sessionRepo.resumeTurn("s-1", "m1") } returns flowOf(*rest.toTypedArray())
 
-            // WHEN
             val events = resumeTurn("s-1", afterAssistantMessageId = "m1").toList()
 
-            // THEN
             assertEquals(rest, events)
         }
 }

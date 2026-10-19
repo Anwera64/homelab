@@ -19,7 +19,7 @@ class DefensiveSseStreamReaderTest {
     private val reader = DefensiveSseStreamReader()
 
     @Test
-    fun parse_sse_stream_decodes_deltas_and_done() =
+    fun `GIVEN a stream of two deltas then a done event WHEN it is read THEN the words and the finished answer come out in order`() =
         runTest {
             val ssePayload =
                 """
@@ -92,7 +92,7 @@ class DefensiveSseStreamReaderTest {
         }
 
     @Test
-    fun parse_sse_stream_strips_control_delimiter_tokens() =
+    fun `GIVEN a delta carrying control delimiter tokens WHEN the stream is read THEN the tokens are stripped from the content`() =
         runTest {
             val ssePayload =
                 """
@@ -115,7 +115,6 @@ class DefensiveSseStreamReaderTest {
     @Test
     fun `GIVEN a delta with a table separator WHEN it is read THEN the dashes survive`() =
         runTest {
-            // GIVEN
             val ssePayload =
                 """
                 data: {"type": "delta", "content": "|---|---|"}
@@ -124,17 +123,14 @@ class DefensiveSseStreamReaderTest {
 
                 """.trimIndent()
 
-            // WHEN
             val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
 
-            // THEN
             assertEquals("|---|---|", (events.single() as ChatStreamEvent.Delta).content)
         }
 
     @Test
     fun `GIVEN a delta with a heading and a divider WHEN it is read THEN both survive`() =
         runTest {
-            // GIVEN
             val ssePayload =
                 """
                 data: {"type": "delta", "content": "### Plan\n\n---"}
@@ -143,10 +139,8 @@ class DefensiveSseStreamReaderTest {
 
                 """.trimIndent()
 
-            // WHEN
             val events = reader.readEvents(ByteReadChannel(ssePayload.encodeToByteArray())).toList()
 
-            // THEN
             assertEquals("### Plan\n\n---", (events.single() as ChatStreamEvent.Delta).content)
         }
 
@@ -157,7 +151,7 @@ class DefensiveSseStreamReaderTest {
      * reader must skip such a line and keep streaming, or one odd event kills the whole answer.
      */
     @Test
-    fun an_unexpectedly_shaped_event_is_skipped_and_the_stream_continues() =
+    fun `GIVEN a stream with one oddly shaped event between two deltas WHEN it is read THEN the odd event is skipped and both deltas arrive`() =
         runTest {
             val ssePayload =
                 """
@@ -187,7 +181,7 @@ class DefensiveSseStreamReaderTest {
      * it at all, and a screen that waits forever for a word that is never coming.
      */
     @Test
-    fun the_two_ways_a_turn_fails_are_both_read() =
+    fun `GIVEN a stream reporting that the turn failed WHEN it is read THEN the turn is reported as failed`() =
         runTest {
             val ssePayload =
                 """
@@ -204,7 +198,7 @@ class DefensiveSseStreamReaderTest {
         }
 
     @Test
-    fun a_turn_that_never_opened_is_read_as_an_error_carrying_its_reason() =
+    fun `GIVEN a stream reporting an error for a turn that never opened WHEN it is read THEN a stream error carries the reason`() =
         runTest {
             val ssePayload =
                 """
@@ -223,7 +217,7 @@ class DefensiveSseStreamReaderTest {
 
     /** The hub has saved the question. The earliest thing it can honestly say. */
     @Test
-    fun the_hub_saying_it_has_the_question_is_read() =
+    fun `GIVEN a stream saying the hub accepted the question WHEN it is read THEN the turn is reported as accepted`() =
         runTest {
             val ssePayload =
                 """
@@ -239,7 +233,7 @@ class DefensiveSseStreamReaderTest {
         }
 
     @Test
-    fun reasoning_is_read_as_it_arrives() =
+    fun `GIVEN a stream of two reasoning pieces WHEN it is read THEN both come out in order`() =
         runTest {
             val ssePayload =
                 """
@@ -264,7 +258,7 @@ class DefensiveSseStreamReaderTest {
      * top level — so every tool arrived nameless and every failure arrived as a success.
      */
     @Test
-    fun a_tool_s_outcome_is_read_from_where_the_hub_puts_it() =
+    fun `GIVEN a failed tool result with its details inside the data WHEN the stream is read THEN the tool name and failure and error are found`() =
         runTest {
             val ssePayload =
                 """
@@ -366,7 +360,6 @@ class DefensiveSseStreamReaderTest {
     @Test
     fun `GIVEN frames with ids WHEN they are read THEN each id is reported after its event`() =
         runTest {
-            // GIVEN
             val ssePayload =
                 """
                 id: t:1
@@ -380,7 +373,6 @@ class DefensiveSseStreamReaderTest {
                 """.trimIndent()
             val reportedIds = mutableListOf<String>()
 
-            // WHEN
             val events =
                 reader
                     .readEvents(
@@ -388,7 +380,6 @@ class DefensiveSseStreamReaderTest {
                         onEventId = { reportedIds.add(it) },
                     ).toList()
 
-            // THEN
             assertEquals(listOf("t:1", "t:2"), reportedIds)
             assertEquals("Hello", (events[0] as ChatStreamEvent.Delta).content)
             assertEquals(" world", (events[1] as ChatStreamEvent.Delta).content)
@@ -397,7 +388,6 @@ class DefensiveSseStreamReaderTest {
     @Test
     fun `GIVEN a frame without an id after one with an id WHEN read THEN no id is reported for it`() =
         runTest {
-            // GIVEN
             val ssePayload =
                 """
                 id: t:1
@@ -410,7 +400,6 @@ class DefensiveSseStreamReaderTest {
                 """.trimIndent()
             val reportedIds = mutableListOf<String>()
 
-            // WHEN
             val events =
                 reader
                     .readEvents(
@@ -418,7 +407,6 @@ class DefensiveSseStreamReaderTest {
                         onEventId = { reportedIds.add(it) },
                     ).toList()
 
-            // THEN
             assertEquals(listOf("t:1"), reportedIds)
             assertEquals(2, events.size)
         }
