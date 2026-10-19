@@ -42,6 +42,8 @@ data class ChangeRow(
     val readAge: MemoryAge,
     val readTime: LocalTime,
     val status: ChangeStatus = ChangeStatus.Open(),
+    /** The time the stored memory's sentence adds, once rebuilt from its event. */
+    val storedEventTime: LocalEventTime? = null,
 )
 
 @OptIn(ExperimentalTime::class)
@@ -57,6 +59,7 @@ fun changeRowOf(
         storedAge = memoryAge(card.stored.createdAt, now, offset),
         readAge = memoryAge(card.readAt, now, offset),
         readTime = localTime(card.readAt, deviceTimeZone.offsetSecondsAt(card.readAt)),
+        storedEventTime = eventTimeOf(card.stored, deviceTimeZone),
     )
 }
 

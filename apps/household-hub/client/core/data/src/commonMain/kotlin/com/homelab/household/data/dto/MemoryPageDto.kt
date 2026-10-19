@@ -38,6 +38,9 @@ data class MemoryPageItemDto(
     @SerialName("agent_name") val agent_name: String,
     @SerialName("agent_avatar") val agent_avatar: String,
     @SerialName("can_remove") val can_remove: Boolean = false,
+    @SerialName("event_starts_at") val event_starts_at: String? = null,
+    @SerialName("time_from_event") val time_from_event: String? = null,
+    @SerialName("moved_from") val moved_from: String? = null,
 )
 
 /** Where a change's new sentence was read. [title] is only given to the chat's owner. */

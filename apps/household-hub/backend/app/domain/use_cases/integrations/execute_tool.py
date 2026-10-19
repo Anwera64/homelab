@@ -28,6 +28,7 @@ from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEve
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
+from app.domain.use_cases.memories.follow_event import FollowEventChangeUseCase
 from app.domain.use_cases.integrations.execute_search import GENERAL, ExecuteSearchUseCase
 from app.domain.use_cases.integrations.manage_documents import SaveDocumentUseCase
 from app.domain.use_cases.integrations.turn_sources import TurnSources
@@ -74,6 +75,7 @@ class ExecuteToolUseCase:
         calendar_secrets: Optional[CalendarSecretResolver] = None,
         remember: Optional[RememberUseCase] = None,
         forget: Optional[ForgetUseCase] = None,
+        follow_event: Optional[FollowEventChangeUseCase] = None,
     ):
         self.calendar_repo = calendar_repo
         self.calendar_connector = calendar_connector
@@ -92,9 +94,11 @@ class ExecuteToolUseCase:
         secrets = calendar_secrets or CalendarSecretResolver(calendar_repo, cipher, uow)
         self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, secrets)
         self.create_calendar_event_uc = CreateCalendarEventUseCase(calendar_repo, calendar_connector, secrets)
-        self.update_calendar_event_uc = UpdateCalendarEventUseCase(calendar_repo, calendar_connector, secrets)
+        self.update_calendar_event_uc = UpdateCalendarEventUseCase(
+            calendar_repo, calendar_connector, secrets, follow=follow_event
+        )
         self.delete_calendar_event_uc = DeleteCalendarEventUseCase(
-            calendar_repo, calendar_connector, secrets, allow_agent_delete=allow_calendar_delete
+            calendar_repo, calendar_connector, secrets, allow_agent_delete=allow_calendar_delete, follow=follow_event
         )
         self.search_uc = ExecuteSearchUseCase(search_connector)
         self.save_doc_uc = SaveDocumentUseCase(document_repo, uow)

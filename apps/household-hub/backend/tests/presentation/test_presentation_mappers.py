@@ -111,3 +111,33 @@ def test_memory_presentation_mapper():
     resp = MemoryPresentationMapper.to_response(mem)
     assert resp.id == "mem-1"
     assert resp.content == "Likes tea"
+
+
+def test_a_memory_row_carries_its_events_start_how_its_time_is_shown_and_where_it_moved_from():
+    """Memory spec §7: the phone adds the time in its own zone, so the hub sends instants, never a formatted time."""
+    from app.domain.entities.memory import TIMED, MemoryPageItem
+
+    start = datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc)
+    was = datetime(2026, 10, 18, 18, 0, tzinfo=timezone.utc)
+    memory = AgentMemory(
+        id="m1", user_id="emma", content="Dinner together", event_id="ev1",
+        event_starts_at=start, time_from_event=TIMED, moved_from=was,
+    )
+    row = MemoryPresentationMapper.to_page_item(MemoryPageItem(
+        memory=memory, speaker_name="Emma", is_mine=True, agent_name="Planner", agent_avatar="🗓", can_remove=True,
+    )).model_dump()
+
+    assert (row["content"], row["event_starts_at"], row["time_from_event"], row["moved_from"]) == (
+        "Dinner together", start, TIMED, was,
+    )
+
+
+def test_a_memory_in_the_models_own_words_sends_no_event_time():
+    from app.domain.entities.memory import MemoryPageItem
+
+    row = MemoryPresentationMapper.to_page_item(MemoryPageItem(
+        memory=AgentMemory(id="m1", user_id="emma", content="Robin is vegan"),
+        speaker_name="Emma", is_mine=True, agent_name="Planner", agent_avatar="🗓", can_remove=True,
+    )).model_dump()
+
+    assert (row["event_starts_at"], row["time_from_event"], row["moved_from"]) == (None, None, None)

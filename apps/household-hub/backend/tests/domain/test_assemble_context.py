@@ -455,3 +455,23 @@ async def test_GIVEN_nothing_waits_THEN_there_is_no_heading():
     use_case = AssembleAgentContextUseCase(memory_repo=FakeMemoryRepository())
 
     assert "Not True Yet" not in await _system(use_case, User(id="anton", full_name="Anton"))
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_memory_rebuilt_from_its_event_THEN_the_prompt_tells_its_time_in_the_members_zone():
+    from app.domain.entities.memory import TIMED
+
+    moved = AgentMemory(
+        user_id="u1", content="Dinner together", event_id="ev1",
+        event_starts_at=datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc), time_from_event=TIMED,
+    )
+    use_case = AssembleAgentContextUseCase(memory_repo=FakeMemoryRepository(personal=[moved]))
+
+    llm_messages = await use_case.execute(
+        user=User(id="u1", full_name="Alex Rivera"),
+        agent=AgentPersonality(id="a1", name="Assistant", system_prompt="Helpful bot"),
+        recent_messages=[ChatMessage(role="user", content="Hello")],
+        timezone_name="America/Lima",
+    )
+
+    assert "Dinner together on Monday 19 October, 12:30." in llm_messages[0].content

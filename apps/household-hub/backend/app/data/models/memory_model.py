@@ -31,6 +31,9 @@ class MemoryModel(Base):
     replaced_by_id = Column(String(36), ForeignKey("agent_memories.id", ondelete="SET NULL"), nullable=True)
     retired_at = Column(DateTime(timezone=True), nullable=True)
     moved_from = Column(DateTime(timezone=True), nullable=True)
+    # Memory spec §7: the event's start the memory was last matched to, and how its time is shown.
+    event_starts_at = Column(DateTime(timezone=True), nullable=True)
+    time_from_event = Column(String(8), nullable=True)  # 'timed', 'all_day', or None for the model's words
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 

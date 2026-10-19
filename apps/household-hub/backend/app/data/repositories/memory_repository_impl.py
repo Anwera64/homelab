@@ -3,7 +3,7 @@ from typing import List, Optional
 from app.domain.entities.memory import AgentMemory
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.data.datasources.memory_data_source import IMemoryDataSource
-from app.data.mappers.memory_data_mapper import MemoryDataMapper
+from app.data.mappers.memory_data_mapper import MemoryDataMapper, as_stored
 
 
 class MemoryRepositoryImpl(IMemoryRepository):
@@ -43,6 +43,12 @@ class MemoryRepositoryImpl(IMemoryRepository):
         models = await self.data_source.list_current(now, scope="household")
         return [self.mapper.to_domain(m) for m in models]
 
+    async def list_by_event(self, user_id: str, event_id: str) -> List[AgentMemory]:
+        return [self.mapper.to_domain(m) for m in await self.data_source.list_by_event(user_id, event_id)]
+
+    async def list_linked_current(self, now: datetime) -> List[AgentMemory]:
+        return [self.mapper.to_domain(m) for m in await self.data_source.list_linked_current(now)]
+
     async def get_by_id(self, memory_id: str) -> Optional[AgentMemory]:
         model = await self.data_source.get_by_id(memory_id)
         return self.mapper.to_domain(model) if model else None
@@ -58,7 +64,12 @@ class MemoryRepositoryImpl(IMemoryRepository):
             model.content = memory.content
             model.confidence = memory.confidence
             model.is_active = memory.is_active
-            model.retired_at = memory.retired_at
+            model.retired_at = as_stored(memory.retired_at)
+            # An event memory follows its event (memory spec §7).
+            model.expires_at = as_stored(memory.expires_at)
+            model.moved_from = as_stored(memory.moved_from)
+            model.event_starts_at = as_stored(memory.event_starts_at)
+            model.time_from_event = memory.time_from_event
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
         else:

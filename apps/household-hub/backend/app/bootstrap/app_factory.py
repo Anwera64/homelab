@@ -15,6 +15,7 @@ from app.domain.use_cases.models.sync_default_model import SyncDefaultModelUseCa
 from app.domain.use_cases.agents.purge_expired_trash_agents import PurgeExpiredTrashAgentsUseCase
 from app.domain.use_cases.auth.purge_expired_device_sessions import PurgeExpiredDeviceSessionsUseCase
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.follow_event import CheckEventMemoriesUseCase
 from app.domain.use_cases.memories.reflection_sweep import ReflectionSweepUseCase
 from app.data.datasources import sqlite_vec_extension
 from app import __version__
@@ -74,6 +75,23 @@ async def periodic_reflection_sweeper(interval_seconds: float = 60):
             logger.error("Error in the reflection sweep: %s", e, exc_info=True)
 
 
+async def periodic_event_checker(interval_seconds: float = 1800):
+    """
+    The periodic check (memory spec §7): reads the events of linked memories from each member's
+    calendar, to catch a change made in a calendar app. It needs no model, so it runs apart from the
+    reflection sweep.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            async with AsyncSessionLocal() as session:
+                await get_container(session)[CheckEventMemoriesUseCase].run_pass()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Error in the event check: %s", e, exc_info=True)
+
+
 async def fill_memory_vectors() -> None:
     """
     Gives stored memories the vectors they lack, after a change of embedding model or a spell with
@@ -92,6 +110,7 @@ async def lifespan(app: FastAPI):
     bg_task = None
     fill_task = None
     sweep_task = None
+    event_task = None
     if settings.ENVIRONMENT != "testing":
         await init_db()
         async with AsyncSessionLocal() as session:
@@ -106,18 +125,20 @@ async def lifespan(app: FastAPI):
         # In the background: a slow embedder mustn't hold the hub's start.
         fill_task = asyncio.create_task(fill_memory_vectors())
         sweep_task = asyncio.create_task(periodic_reflection_sweeper(settings.REFLECTION_SWEEP_SECONDS))
+        event_task = asyncio.create_task(periodic_event_checker(settings.EVENT_CHECK_MINUTES * 60))
 
     try:
         yield
     finally:
         if fill_task and not fill_task.done():
             fill_task.cancel()
-        if sweep_task and not sweep_task.done():
-            sweep_task.cancel()
-            try:
-                await sweep_task
-            except asyncio.CancelledError:
-                pass
+        for task in (sweep_task, event_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
         if bg_task and not bg_task.done():
             bg_task.cancel()
             try:

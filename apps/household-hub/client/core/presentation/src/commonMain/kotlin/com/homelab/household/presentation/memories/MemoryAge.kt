@@ -54,6 +54,37 @@ fun memoryAge(
     }
 }
 
+/**
+ * An event memory's time on the member's phone (memory spec §7): its weekday ([isoDay] 1 for Monday),
+ * date, and clock [time], which is null for an all-day event.
+ */
+data class LocalEventTime(
+    val isoDay: Int,
+    val day: Int,
+    val month: Int,
+    val time: LocalTime?,
+)
+
+/**
+ * [at] as the phone shows it. An all-day event starts at midnight UTC on its date, so it is read in
+ * UTC: the same date in every zone.
+ */
+@OptIn(ExperimentalTime::class)
+fun localEventTime(
+    at: Instant,
+    offsetSeconds: Int,
+    allDay: Boolean,
+): LocalEventTime {
+    val offset = if (allDay) 0 else offsetSeconds
+    val civil = civil(at, offset)
+    return LocalEventTime(
+        isoDay = civil.isoDay,
+        day = civil.day,
+        month = civil.month,
+        time = if (allDay) null else localTime(at, offset),
+    )
+}
+
 @OptIn(ExperimentalTime::class)
 fun localDay(
     at: Instant,

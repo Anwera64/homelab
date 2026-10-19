@@ -55,6 +55,9 @@ class MemoryPresentationMapper:
             agent_name=item.agent_name,
             agent_avatar=item.agent_avatar,
             can_remove=item.can_remove,
+            event_starts_at=memory.event_starts_at if memory.time_from_event else None,
+            time_from_event=memory.time_from_event,
+            moved_from=memory.moved_from,
         )
 
     @staticmethod

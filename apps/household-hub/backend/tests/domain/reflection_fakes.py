@@ -69,6 +69,9 @@ class FakeMemories:
     async def get_by_id(self, memory_id):
         return next((m for m in self.memories if m.id == memory_id), None)
 
+    async def list_by_event(self, user_id, event_id):
+        return [m for m in self.memories if m.user_id == user_id and m.event_id == event_id and m.is_active]
+
     async def create(self, memory):
         self.memories.append(memory)
         self.created.append(memory)

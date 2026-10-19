@@ -2,6 +2,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
 
+# How a memory rebuilt from its event shows the event's time (memory spec §7). Its content is then
+# only the title: every reader adds the time in its own zone, since the hub keeps times in UTC.
+TIMED = "timed"
+ALL_DAY = "all_day"
+
 
 def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -28,6 +33,11 @@ class AgentMemory:
     retired_at: datetime | None = None
     # For an event memory: the event's time before it last moved ("Moved in your calendar · was …").
     moved_from: datetime | None = None
+    # For an event memory: the event's start when the memory was last made to match it, so the
+    # periodic check can tell it moved. An all-day event starts at midnight UTC on its date.
+    event_starts_at: datetime | None = None
+    # TIMED or ALL_DAY once the hub rebuilt the sentence from the event; None for the model's own words.
+    time_from_event: str | None = None
     created_at: datetime = field(default_factory=get_utc_now)
     updated_at: datetime = field(default_factory=get_utc_now)
 

@@ -75,7 +75,7 @@ class AssembleAgentContextUseCase:
     ) -> List[LLMMessage]:
         is_secret = is_secret_session or is_turn_secret
 
-        block = await self.memory_block.execute(user.id, is_secret=is_secret)
+        block = await self.memory_block.execute(user.id, is_secret=is_secret, timezone_name=timezone_name)
         logger.info(
             "Memory block | member=%s tokens=%d/%d in=%d left_out=%d left_out_ids=%s",
             user.id, block.tokens_used, block.budget_tokens, len(block.included), len(block.left_out),

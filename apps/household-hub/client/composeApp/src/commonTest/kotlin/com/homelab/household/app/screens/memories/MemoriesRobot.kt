@@ -17,6 +17,8 @@ import com.homelab.household.app.resources.changes_title
 import com.homelab.household.app.resources.memories_band_line
 import com.homelab.household.app.resources.memories_empty_title
 import com.homelab.household.app.resources.memories_household_note
+import com.homelab.household.app.resources.memories_moved_theirs
+import com.homelab.household.app.resources.memories_moved_yours
 import com.homelab.household.app.resources.memories_offline_title
 import com.homelab.household.app.resources.memories_remove
 import com.homelab.household.app.resources.memories_remove_unreachable
@@ -82,6 +84,24 @@ class MemoriesRobot(
 
     suspend fun seesUntil(day: Int) =
         seesInList(getString(Res.string.memories_until, day, getString(Res.string.tool_card_month_oct)))
+
+    /** "Moved in your calendar · was …", or in [speaker]'s calendar on someone else's memory. */
+    suspend fun seesItMoved(speaker: String? = null) =
+        seesSubstring(
+            if (speaker == null) {
+                getString(Res.string.memories_moved_yours, "")
+            } else {
+                getString(Res.string.memories_moved_theirs, speaker, "")
+            },
+        )
+
+    suspend fun seesNothingMoved() {
+        test.waitUntilDoesNotExist(
+            hasText(getString(Res.string.memories_moved_yours, ""), substring = true),
+            timeoutMillis = WAIT_MILLIS,
+        )
+        test.waitUntilDoesNotExist(hasText("’s calendar · was", substring = true), timeoutMillis = WAIT_MILLIS)
+    }
 
     suspend fun seesYouAsked() = seesInList(getString(Res.string.memories_you_asked))
 

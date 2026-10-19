@@ -48,6 +48,12 @@ class MemoryPageItemRead(BaseModel):
     agent_name: str
     agent_avatar: str
     can_remove: bool
+    # A memory the hub rebuilt from its event (memory spec §7): its content is the event's title, and
+    # the phone adds this start in its own zone. "timed" or "all_day"; None keeps the model's words.
+    event_starts_at: Optional[datetime] = None
+    time_from_event: Optional[str] = None
+    # Where the event was before it last moved: "Moved in your calendar · was Sat 20:00".
+    moved_from: Optional[datetime] = None
 
 
 class WaitingChangeRead(BaseModel):

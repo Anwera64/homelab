@@ -132,3 +132,16 @@ async def test_GIVEN_more_than_twenty_five_small_household_memories_THEN_all_fit
     system = (await assembler.execute(user=EMMA, agent=AGENT, recent_messages=[]))[0].content
 
     assert "Memory h29" in system
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_memory_rebuilt_from_its_event_THEN_its_line_shows_the_time_in_the_members_zone():
+    from app.domain.entities.memory import TIMED
+
+    moved = AgentMemory(
+        id="dinner", user_id="emma", content="Dinner together", created_at=NOW,
+        event_id="ev1", event_starts_at=datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc), time_from_event=TIMED,
+    )
+    block = await _builder(personal=[moved]).execute("emma", is_secret=False, timezone_name="Europe/Madrid")
+
+    assert block.lines["dinner"].endswith("Dinner together on Monday 19 October, 19:30.")

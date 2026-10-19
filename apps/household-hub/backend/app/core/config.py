@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     MEMORY_MATCH_BAR: float = 0.60
     # Memory text in log lines, cut to 500 characters; off unless tuning (§9).
     MEMORY_LOG_TEXT: bool = False
+    # How often the hub reads the events of linked memories, to catch changes made in a calendar app (§7).
+    EVENT_CHECK_MINUTES: float = 30
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["https://spicy-llama.duckdns.org"]

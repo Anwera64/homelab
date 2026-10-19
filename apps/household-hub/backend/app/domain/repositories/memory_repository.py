@@ -28,6 +28,14 @@ class IMemoryRepository(Protocol):
         """Every active, unexpired household memory, newest first."""
         ...
 
+    async def list_by_event(self, user_id: str, event_id: str) -> List[AgentMemory]:
+        """The member's active memories linked to that event of their calendar (memory spec §7)."""
+        ...
+
+    async def list_linked_current(self, now: datetime) -> List[AgentMemory]:
+        """Every active, unexpired memory linked to an event: what the periodic check reads."""
+        ...
+
     async def get_by_id(self, memory_id: str) -> Optional[AgentMemory]:
         ...
 

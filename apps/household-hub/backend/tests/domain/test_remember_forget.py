@@ -453,3 +453,20 @@ async def test_a_forget_card_for_a_waiting_sentence_shows_whose_it_waits_on_and_
     assert pinned == {"proposal_id": held.id} and refusal is None
     assert shown["stored"]["content"] == held.content and shown["stored"]["mine"] is True
     assert shown["stored"]["waiting_on"] == "Liam" and shown["stored"]["said_by"] == "Emma"
+
+
+@pytest.mark.asyncio
+async def test_a_card_on_a_memory_rebuilt_from_its_event_sends_the_events_start_for_the_phone_to_show():
+    from datetime import datetime, timezone
+
+    from app.domain.entities.memory import TIMED
+
+    world = World(scores={"jury": 0.9})
+    world.jury.content, world.jury.time_from_event = "Studio Jury", TIMED
+    world.jury.event_starts_at = datetime(2026, 10, 17, 7, 0, tzinfo=timezone.utc)
+
+    shown, _, _ = await _card(world).execute(EMMA, "forget", {"memory": "the jury"})
+
+    assert shown["stored"]["content"] == "Studio Jury"
+    assert shown["stored"]["event_starts_at"] == "2026-10-17T07:00:00+00:00"
+    assert shown["stored"]["time_from_event"] == TIMED

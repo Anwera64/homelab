@@ -221,4 +221,54 @@ class MemoriesScreenTest {
             }
         }
     }
+
+    private fun withEvents() =
+        FakeMembersHub().apply {
+            remembers("p1", "Prefers dinner after 20:00 on weekdays.")
+            remembers(
+                "h1",
+                "Studio jury",
+                household = true,
+                expiresAt = "2026-10-25T00:00:00Z",
+                eventStartsAt = "2026-10-24T00:00:00Z",
+                timeFromEvent = "all_day",
+                movedFrom = "2026-10-23T00:00:00Z",
+            )
+            remembers(
+                "h2",
+                "Boiler service",
+                household = true,
+                mine = false,
+                eventStartsAt = "2026-10-31T00:00:00Z",
+                timeFromEvent = "all_day",
+                movedFrom = "2026-10-30T00:00:00Z",
+            )
+        }
+
+    @Test
+    fun `GIVEN a memory rebuilt from its moved event WHEN Household is opened THEN it shows the event's day and that it moved`() {
+        runScreenTest {
+            memoriesScreen(withEvents())
+
+            onMemories {
+                opensHousehold(count = 2)
+                seesMemory("Studio jury on Saturday 24 October.")
+                seesItMoved()
+                seesMemory("Boiler service on Saturday 31 October.")
+                seesItMoved(speaker = "Liam")
+            }
+        }
+    }
+
+    @Test
+    fun `GIVEN memories that never moved WHEN the page opens THEN no moved line shows`() {
+        runScreenTest {
+            memoriesScreen(household())
+
+            onMemories {
+                seesMemory("Prefers dinner after 20:00 on weekdays.")
+                seesNothingMoved()
+            }
+        }
+    }
 }

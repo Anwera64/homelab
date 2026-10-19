@@ -8,6 +8,7 @@ import com.homelab.household.data.dto.MemoryPageDto
 import com.homelab.household.data.dto.MemoryPageItemDto
 import com.homelab.household.domain.model.ChangeCard
 import com.homelab.household.domain.model.ChangesToCheck
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.LookedOver
 import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MemoryItem
@@ -93,7 +94,16 @@ object MemoryDataMapper {
             agentName = dto.agent_name,
             agentAvatar = dto.agent_avatar,
             canRemove = dto.can_remove,
+            eventTime = eventTimeOf(dto),
+            movedFrom = dto.moved_from?.let(::instantOf),
         )
+
+    /** Only a kind this phone knows adds a time; anything else keeps the sentence as the hub sent it. */
+    private fun eventTimeOf(dto: MemoryPageItemDto): EventTime? {
+        val start = dto.event_starts_at ?: return null
+        val allDay = EVENT_TIME_KINDS[dto.time_from_event] ?: return null
+        return EventTime(startsAt = instantOf(start), allDay = allDay)
+    }
 
     /** The hub's SQLite hands times back without a zone; every one it writes is UTC. */
     private fun instantOf(iso: String): Instant {
@@ -102,6 +112,8 @@ object MemoryDataMapper {
     }
 
     private val ZONE = Regex("""(Z|[+-]\d{2}:?\d{2})$""")
+
+    private val EVENT_TIME_KINDS = mapOf("timed" to false, "all_day" to true)
 
     private val ORIGINS =
         mapOf(

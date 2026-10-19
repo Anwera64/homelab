@@ -1110,3 +1110,50 @@ async def test_GIVEN_a_whole_day_event_WHEN_calendar_read_runs_THEN_its_day_is_n
     (event,) = result.data["events"]
     assert event["start_time"].startswith("2026-10-09T00:00:00")
     assert event["occurrence_start"].startswith("2026-10-09T00:00:00")
+
+
+class RecordingFollow:
+    """Stands in for FollowEventChangeUseCase: what the memories were told about (memory spec §7)."""
+
+    def __init__(self, fail: bool = False):
+        self.told = []
+        self.fail = fail
+
+    async def execute(self, user_id, event_id):
+        self.told.append((user_id, event_id))
+        if self.fail:
+            raise RuntimeError("memory store down")
+
+
+async def _connected():
+    repo = MockCalendarCredentialRepository()
+    await repo.save(CalendarCredential(
+        user_id="u1", provider="caldav", url="https://cal", username="u1", encrypted_secret="ENC:pass123",
+    ))
+    connector = MockCalendarConnector()
+    secrets = CalendarSecretResolver(repo, MockSecretCipher(), MockUnitOfWork())
+    now = datetime.now(timezone.utc)
+    event = await CreateCalendarEventUseCase(repo, connector, secrets).execute("u1", "Dinner", now, now)
+    return repo, connector, secrets, event
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_hub_changes_or_removes_an_event_THEN_its_memories_are_told_after_the_calendar_answers():
+    repo, connector, secrets, event = await _connected()
+    follow = RecordingFollow()
+
+    await UpdateCalendarEventUseCase(repo, connector, secrets, follow=follow).execute("u1", event.id, title="Dinner!")
+    await DeleteCalendarEventUseCase(repo, connector, secrets, follow=follow).execute("u1", event.id)
+
+    assert follow.told == [("u1", event.id), ("u1", event.id)]
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_the_memories_cant_follow_THEN_the_calendar_change_still_stands():
+    repo, connector, secrets, event = await _connected()
+    follow = RecordingFollow(fail=True)
+
+    updated = await UpdateCalendarEventUseCase(repo, connector, secrets, follow=follow).execute("u1", event.id, title="Dinner!")
+    deleted = await DeleteCalendarEventUseCase(repo, connector, secrets, follow=follow).execute("u1", event.id)
+
+    assert updated.title == "Dinner!" and deleted is True

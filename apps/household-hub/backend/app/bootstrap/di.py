@@ -183,6 +183,7 @@ from app.data.datasources.memory_proposal_data_source import SqliteMemoryProposa
 from app.data.mappers.memory_proposal_data_mapper import MemoryProposalDataMapper
 from app.data.repositories.memory_proposal_repository_impl import MemoryProposalRepositoryImpl
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.follow_event import CheckEventMemoriesUseCase, FollowEventChangeUseCase
 from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase
 from app.domain.use_cases.memories.recall_memories import RecallMemoriesUseCase
 from app.data.datasources.memory_vector_data_source import SqliteMemoryVectorDataSource
@@ -303,6 +304,10 @@ def get_container(session: AsyncSession):
     # Memory vectors and recall (memory spec §4, §5.2).
     memory_vector_repo = MemoryVectorRepositoryImpl(SqliteMemoryVectorDataSource(session))
     proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
+    # Event memories follow their event (memory spec §7), whichever hub route changed it.
+    follow_event_uc = FollowEventChangeUseCase(
+        memory_repo, proposal_repo, uow, calendar_cred_repo, _caldav_connector, calendar_secrets
+    )
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
         user_repo=user_repo,
@@ -381,6 +386,7 @@ def get_container(session: AsyncSession):
         calendar_secrets=calendar_secrets,
         remember=remember_uc,
         forget=forget_uc,
+        follow_event=follow_event_uc,
     )
 
     chat_turn_uc = ProcessChatTurnUseCase(
@@ -600,8 +606,8 @@ def get_container(session: AsyncSession):
         pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
         pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
         pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
-        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
-        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE),
+        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, follow=follow_event_uc),
+        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE, follow=follow_event_uc),
         pres_deps.get_start_google_calendar_sign_in_use_case: StartGoogleCalendarSignInUseCase(_sign_in_states, _google_oauth),
         pres_deps.get_complete_google_calendar_sign_in_use_case: CompleteGoogleCalendarSignInUseCase(
             _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow,
@@ -625,6 +631,7 @@ def get_container(session: AsyncSession):
             allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
             page_reader=_page_reader,
             calendar_secrets=calendar_secrets,
+            follow_event=follow_event_uc,
         ),
 
         # Stage 3 Chat
@@ -661,10 +668,12 @@ def get_container(session: AsyncSession):
                 neighbour_bar=settings.REFLECTION_NEIGHBOUR_BAR,
                 neighbours_max=settings.REFLECTION_NEIGHBOURS_MAX,
                 log_text=settings.MEMORY_LOG_TEXT,
+                event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
             ),
             embed_memories=embed_memories_uc,
             idle_minutes=settings.REFLECTION_IDLE_MINUTES,
         ),
+        CheckEventMemoriesUseCase: CheckEventMemoriesUseCase(memory_repo, follow_event_uc),
         PurgeExpiredTrashAgentsUseCase: PurgeExpiredTrashAgentsUseCase(agent_repo, session_repo, uow, settings.AGENT_DELETE_GRACE_DAYS),
         PurgeExpiredDeviceSessionsUseCase: PurgeExpiredDeviceSessionsUseCase(
             device_session_repo, uow, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
