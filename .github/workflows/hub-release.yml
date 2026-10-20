@@ -1,0 +1,83 @@
+name: Hub release
+
+# One backend release: the tests, then the private image ghcr.io/anwera64/household-hub:<version>
+# and the release notes. release-tags.yml calls it when a merge bumps __version__; pushing a
+# hub-v* tag by hand runs it too. Prod runs the image once Renovate's bump PR is merged.
+
+on:
+  push:
+    tags: ['hub-v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: The hub-v* tag the caller just pushed
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: hub-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/anwera64/household-hub
+
+jobs:
+  release:
+    name: Test, publish the image, write the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    defaults:
+      run:
+        working-directory: apps/household-hub/backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      # The tag names the version; the code must agree, or the image would be mislabelled.
+      - name: Check the tag matches __version__
+        run: |
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/__init__.py)"
+          if ! [ "hub-v$version" = "$TAG" ]; then
+            echo "::error::$TAG does not match __version__ ($version) in app/__init__.py"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_ENV"
+
+      # The same Python and tests as household-hub-backend.yml.
+      - name: Read the image's Python version
+        id: python
+        run: echo "version=$(sed -n 's/^FROM python:\(.*\)-slim$/\1/p' Dockerfile)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.python.outputs.version }}
+          cache: pip
+          cache-dependency-path: apps/household-hub/backend/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests -q
+
+      # The first push creates the package, private and linked to this repository.
+      - name: Build and push the image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+          docker build --platform linux/amd64 --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" --tag "$IMAGE:$version" .
+          docker push "$IMAGE:$version"
+
+      - name: Write the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"

@@ -94,6 +94,13 @@ test('Root README matches the repository', async (t) => {
     }
   });
 
+  await t.test('lists the release workflows and their tests', () => {
+    const paths = treePaths(readme);
+    for (const p of ['.github/workflows/hub-release.yml', '.github/workflows/release-tags.yml', 'tests/release-workflows.test.js']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+  });
+
   await t.test('lists the hub backend CI and says how its lock files are regenerated', () => {
     const paths = treePaths(readme);
     for (const p of ['.github/workflows/household-hub-backend.yml', 'tests/backend-workflow.test.js']) {
