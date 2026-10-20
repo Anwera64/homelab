@@ -76,6 +76,19 @@ jobs:
           docker build --platform linux/amd64 --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" --tag "$IMAGE:$version" .
           docker push "$IMAGE:$version"
 
+      # Nothing built may be public (#134), and the first push came out public all the same.
+      # An anonymous pull token is refused for a private image (401) or an unknown one (403).
+      - name: Check the image is private
+        run: |
+          status="$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/token?scope=repository:anwera64/household-hub:pull")"
+          case "$status" in
+            401|403) ;;
+            *)
+              echo "::error::Anyone can pull $IMAGE (anonymous token: HTTP $status). Make the package private in its settings."
+              exit 1
+              ;;
+          esac
+
       - name: Write the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

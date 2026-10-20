@@ -420,6 +420,33 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # The prod Hub: the household's. It runs a released image, so it changes only when
+  # Renovate's bump PR for that image is merged; revert that PR to roll back. Its data
+  # and key are its own: it shares neither with the dev Hub.
+  household-hub:
+    image: ghcr.io/anwera64/household-hub:0.5.0
+    container_name: household-hub
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - ENVIRONMENT=production
+      - SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}
+      - EMBEDDING_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=bge-m3
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-https://hub.${DOMAIN_NAME:-spicy-llama.duckdns.org}}
+    volumes:
+      - household_hub_prod_data:/data
+    ports:
+      - 3052:3050   # the Pi's Caddy (hub); from the server itself, localhost:3052/api/v1/health and /docs
+    depends_on:
+      - searxng
+      - ollama
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: *default-logging
+
   # ==============================================================================
   # 10. Logs (Loki + Alloy + Grafana)
   # A container's log dies with the container. Alloy reads every container's
@@ -522,6 +549,11 @@ services:
       - RENOVATE_REPOSITORIES=Anwera64/homelab
       # A fine-grained token for this one repo; README.md lists the permissions it needs.
       - RENOVATE_TOKEN=${RENOVATE_TOKEN:-}
+      # The prod Hub's image is private, and GitHub Packages takes classic tokens only:
+      # one with read:packages, from .env.
+      - RENOVATE_HOST_RULES=[{"matchHost":"ghcr.io","hostType":"docker","username":"Anwera64","password":"${RENOVATE_GHCR_TOKEN:-}"}]
+      # The one command its security PRs run: the hub's patch bump (renovate.json).
+      - RENOVATE_ALLOWED_COMMANDS=["^bash tools/bump-hub-patch[.]sh$$"]
       # The rules are renovate.json in the repo; without it Renovate does nothing.
       - RENOVATE_ONBOARDING=false
       - RENOVATE_REQUIRE_CONFIG=required
@@ -604,6 +636,8 @@ volumes:
     name: prometheus_data
   household_hub_data:
     name: household_hub_data
+  household_hub_prod_data:
+    name: household_hub_prod_data
   ollama_models:
     name: ollama_models
   loki_data:

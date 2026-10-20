@@ -54,6 +54,17 @@ test('Hub release workflow', async (t) => {
     assert.match(workflow, /--label "org\.opencontainers\.image\.source=https:\/\/github\.com\/\$\{\{ github\.repository \}\}"/);
   });
 
+  await t.test('fails the release when anyone could pull the image', () => {
+    // The first push came out public (#134), whatever the docs say about new packages.
+    const push = workflow.indexOf('docker push');
+    const check = workflow.indexOf('name: Check the image is private');
+    const notes = workflow.indexOf('gh release create');
+    assert.ok(check > push && check < notes, 'after the push, before the release is written');
+    assert.match(workflow, /curl -s -o \/dev\/null -w '%\{http_code\}' "https:\/\/ghcr\.io\/token\?scope=repository:anwera64\/household-hub:pull"/, 'an anonymous pull token');
+    // 401 private, 403 unknown; 200 is public. Anything unexpected fails rather than passes.
+    assert.match(workflow, /case "\$status" in\n\s+401\|403\) ;;/);
+  });
+
   await t.test('writes release notes and attaches nothing', () => {
     assert.match(workflow, /^\s*gh release create "\$TAG" --verify-tag --generate-notes --title "\$TAG"$/m);
     assert.doesNotMatch(workflow, /upload-artifact/, 'no build output leaves the runner but the private image');

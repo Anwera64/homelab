@@ -323,6 +323,15 @@ test('Server firewall', async (t) => {
     assert.doesNotMatch(script, /192\.168\.1\.20/, 'the desktop is allowed through .env, not the script');
   });
 
+  await t.test('admits the allowed sources on every published port, so a new one needs no rule', () => {
+    // The Pi's Caddy reaches the dev Hub on 3051 and the prod Hub on 3052 through this one rule.
+    const allow = script.match(/^\s*iptables -A DOCKER-USER -i "\$iface" -s "\$source"([^\n]*)$/m);
+    assert.ok(allow, 'the allowed-sources rule must exist');
+    assert.doesNotMatch(allow[1], /-p |--dport|--ctorigdstport/, 'no port limit on the allowed sources');
+    const env = read(path.join(SERVER_DIR, '.env.example'));
+    assert.match(env, /^SERVER_ALLOWED_SOURCES=[^\n]*\b192\.168\.1\.35\b/m, 'the Pi is an allowed source');
+  });
+
   await t.test('admits one port for one address, matched on the port the caller dialled', () => {
     // SERVER_PORT_SOURCES="3100=192.168.1.20": the desktop's Alloy reaches Loki and nothing else.
     assert.match(script, /SERVER_PORT_SOURCES/);

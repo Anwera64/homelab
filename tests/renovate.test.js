@@ -228,9 +228,122 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.ok(index > rules.findIndex((r) => r.groupName === 'hub dependencies'), 'it must override the hub group');
   });
 
+  await t.test('a hub release reaches prod through a PR of its own, merged by a human, as soon as it exists', () => {
+    const image = 'ghcr.io/anwera64/household-hub';
+    assert.ok(serverImages.some((i) => i.startsWith(`${image}:`)), 'prod runs the released image');
+    const index = rules.findIndex((r) => asList(r.matchPackageNames).includes(image));
+    assert.ok(index >= 0, 'a rule must match the prod image');
+    const rule = rules[index];
+    assert.deepEqual(rule.matchPackageNames, [image], 'that image alone');
+    assert.equal(rule.groupName, 'Hub prod', 'out of the container images group');
+    assert.equal(rule.automerge, false, 'putting a release on prod is a human\'s merge');
+    // A release is ours and already tested: no three-day wait for it to be pulled upstream.
+    assert.equal(rule.minimumReleaseAge, '0 days');
+    const groupIndex = rules.findIndex((r) => asList(r.matchManagers).includes('docker-compose') && r.groupName === 'container images');
+    assert.ok(index > groupIndex, 'the rule must come after the group rule, which it overrides');
+  });
+
   await t.test('every image on the server and the Pi has a version Renovate can compare', () => {
     for (const image of [...serverImages, ...piImages]) {
       assert.match(image, /:v?\d/, `${image} must carry a version tag`);
     }
+  });
+});
+
+test('A security fix for the hub releases a patch, so it can reach prod before the next slice', async (t) => {
+  const config = parse(read(CONFIG_PATH));
+  const alerts = config.vulnerabilityAlerts || {};
+  const compose = read(path.join(ROOT_DIR, 'hosts/server/docker-compose.yml'));
+  const renovate = (compose.match(/^  renovate:\n([\s\S]*?)(?=^  [a-z0-9_-]+:\n|^[a-z]|(?![\s\S]))/m) || [])[1] || '';
+  const envExample = read(path.join(ROOT_DIR, 'hosts/server/.env.example'));
+  const command = 'bash tools/bump-hub-patch.sh';
+
+  await t.test('Renovate\'s security PRs bump the hub\'s patch version, once per PR, and wait for a human', () => {
+    assert.deepEqual(asList(alerts.labels), ['security']);
+    assert.equal(alerts.automerge, false, 'a security release is a human\'s merge');
+    const tasks = alerts.postUpgradeTasks || {};
+    assert.deepEqual(tasks.commands, [command]);
+    assert.deepEqual(tasks.fileFilters, ['apps/household-hub/backend/app/__init__.py'], 'the bump commits nothing else');
+    assert.equal(tasks.executionMode, 'branch', 'one bump per PR, however many packages it fixes');
+  });
+
+  await t.test('the server\'s Renovate may run that command and nothing else', () => {
+    const allowed = renovate.match(/^      - RENOVATE_ALLOWED_COMMANDS=(.*)$/m);
+    assert.ok(allowed, 'the renovate service must set RENOVATE_ALLOWED_COMMANDS');
+    // A backslash reaches the container halved, which is no longer JSON: [.] spells the dot.
+    assert.doesNotMatch(allowed[1], /\\/, 'no backslash in the pattern');
+    // Compose reads $$ as a literal $.
+    const patterns = JSON.parse(allowed[1].replace(/\$\$/g, '$'));
+    assert.equal(patterns.length, 1);
+    const regex = new RegExp(patterns[0]);
+    assert.ok(regex.test(command));
+    for (const other of [`${command}; rm -rf /`, 'bash tools/other.sh', `${command} && curl x`]) {
+      assert.ok(!regex.test(other), `"${other}" must not be allowed`);
+    }
+  });
+
+  await t.test('Renovate reads the private prod image with a token of its own, empty until set', () => {
+    // GitHub Packages takes classic tokens only; RENOVATE_TOKEN is fine-grained.
+    assert.ok(renovate.includes('- RENOVATE_HOST_RULES=[{"matchHost":"ghcr.io","hostType":"docker","username":"Anwera64","password":"${RENOVATE_GHCR_TOKEN:-}"}]'));
+    assert.match(envExample, /^RENOVATE_GHCR_TOKEN=$/m);
+    assert.match(envExample, /read:packages/);
+  });
+});
+
+test('tools/bump-hub-patch.sh', async (t) => {
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+  const SCRIPT = path.join(ROOT_DIR, 'tools/bump-hub-patch.sh');
+  const probe = spawnSync('bash', ['-c', 'command -v git'], { encoding: 'utf8' });
+  const canRun = process.platform !== 'win32' && !probe.error && probe.status === 0;
+  const skip = !canRun && 'needs bash and git';
+
+  // A checkout with the hub's version file and a lock file, as Renovate leaves it before committing.
+  const checkout = (version) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bump-'));
+    const git = (...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, encoding: 'utf8' });
+    fs.mkdirSync(path.join(dir, 'apps/household-hub/backend/app'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'apps/household-hub/client'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/app/__init__.py'), `"""Household Hub Backend Application."""\n__version__ = "${version}"\n`);
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/requirements.txt'), 'fastapi==1.0.0\n');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/client/gradle.properties'), 'app.version=0.5.0\n');
+    git('init', '-q');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'base');
+    return dir;
+  };
+  const versionIn = (dir) => read(path.join(dir, 'apps/household-hub/backend/app/__init__.py')).match(/__version__ = "([^"]+)"/)[1];
+  const run = (dir) => spawnSync('bash', [SCRIPT], { cwd: dir, encoding: 'utf8' });
+
+  await t.test('GIVEN a fixed hub package WHEN it runs THEN the patch goes up by one', { skip }, () => {
+    const dir = checkout('0.5.0');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/requirements.txt'), 'fastapi==1.0.1\n');
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(versionIn(dir), '0.5.1');
+  });
+
+  await t.test('GIVEN a two-digit patch WHEN it runs THEN it counts on, not by text', { skip }, () => {
+    const dir = checkout('0.5.9');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/requirements.txt'), 'fastapi==1.0.1\n');
+    assert.equal(run(dir).status, 0);
+    assert.equal(versionIn(dir), '0.5.10');
+  });
+
+  await t.test('GIVEN a security fix outside the hub WHEN it runs THEN the hub version stays', { skip }, () => {
+    // Renovate's security settings apply to every alert, the client's included.
+    const dir = checkout('0.5.0');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/client/gradle.properties'), 'app.version=0.5.0\n# fixed\n');
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(versionIn(dir), '0.5.0');
+  });
+
+  await t.test('GIVEN no readable version WHEN it runs THEN it fails and changes nothing', { skip }, () => {
+    const dir = checkout('0.5.0');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/app/__init__.py'), '__version__ = "dev"\n');
+    fs.writeFileSync(path.join(dir, 'apps/household-hub/backend/requirements.txt'), 'fastapi==1.0.1\n');
+    assert.notEqual(run(dir).status, 0);
+    assert.match(read(path.join(dir, 'apps/household-hub/backend/app/__init__.py')), /"dev"/);
   });
 });

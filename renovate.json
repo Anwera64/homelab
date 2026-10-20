@@ -11,6 +11,15 @@
   "pip-compile": {
     "managerFilePatterns": ["/(^|/)requirements(-dev)?\\.txt$/"]
   },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": false,
+    "postUpgradeTasks": {
+      "commands": ["bash tools/bump-hub-patch.sh"],
+      "fileFilters": ["apps/household-hub/backend/app/__init__.py"],
+      "executionMode": "branch"
+    }
+  },
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
@@ -92,6 +101,13 @@
       "matchPackageNames": ["jellyfin/jellyfin"],
       "groupName": "Jellyfin",
       "automerge": false
+    },
+    {
+      "description": "A hub release reaches prod when a human merges its bump PR. The release is ours and already tested, so it opens at once.",
+      "matchPackageNames": ["ghcr.io/anwera64/household-hub"],
+      "groupName": "Hub prod",
+      "automerge": false,
+      "minimumReleaseAge": "0 days"
     }
   ]
 }
