@@ -147,6 +147,7 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
 │       ├── release-tags.yml         # A merged version bump: tags it and starts its release
 │       ├── hub-release.yml          # Hub release: tests, the private image to GHCR, release notes
+│       ├── app-release.yml          # App release: tests, Firebase App Distribution and TestFlight, release notes
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
 ├── renovate.json                    # Renovate: bump PRs for pinned images and the hub's and client's libraries
 ├── tools/

@@ -348,6 +348,32 @@ Three things that wiring needs, none of which produce a useful error if missing:
 
 ---
 
+## 📦 Releasing the apps
+
+1. A PR raises `app.version` in `gradle.properties`, and `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`
+   in `iosApp/project.yml` with it (`AppVariantsTest` fails otherwise). The minor number is the MVP slice.
+2. Merging it is the release: `release-tags.yml` tags `app-v<version>` and runs `app-release.yml`. That
+   runs the JVM tests, sends the signed APK to Firebase App Distribution (group `household`) and the
+   Release archive to TestFlight, then writes the release notes. Neither build is kept on GitHub.
+3. Firebase emails the testers; TestFlight offers the build once Apple has processed it. A version
+   uploads once: a broken upload is fixed by a patch release. TestFlight builds expire after 90 days.
+
+The keys live in the repository's **`release` environment**, limited to `master` and the `app-v*` and
+`hub-v*` tags, so no pull request run reaches them:
+
+| Secret | What it is |
+|---|---|
+| `HUB_KEYSTORE_BASE64` | the Android release keystore, base64 |
+| `HUB_KEYSTORE_PASSWORD`, `HUB_KEY_ALIAS`, `HUB_KEY_PASSWORD` | its password, key alias and key password |
+| `FIREBASE_WIF_PROVIDER` | the Workload Identity provider (`projects/<number>/locations/global/workloadIdentityPools/github/providers/homelab`) |
+| `FIREBASE_SERVICE_ACCOUNT_EMAIL` | the account the upload acts as, role Firebase App Distribution Admin. It has no key: Google accepts only this repository's runs in the `release` environment as it |
+| `FIREBASE_ANDROID_APP_ID` | the Android app's Firebase app ID (`1:…:android:…`) |
+| `ASC_PRIVATE_KEY`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | an App Store Connect API key (Admin role: Xcode signs with it) |
+| `APPLE_TEAM_ID` | the Apple developer team ID |
+
+Losing the Android keystore means every phone has to uninstall and reinstall the app: keep a copy
+outside GitHub.
+
 ## 🌐 Network ingress
 
 * **Two apps, two hubs (#134):** debug builds are the dev app (`com.homelab.household.dev`, "HyggeHub

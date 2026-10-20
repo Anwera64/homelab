@@ -1,0 +1,189 @@
+name: App release
+
+# One app release: the JVM tests, then the household's app to the phones. Android goes to Firebase
+# App Distribution as a signed APK, iOS to TestFlight; neither build is kept anywhere else, and the
+# release notes are written once both have it. release-tags.yml calls this when a merge bumps
+# app.version; pushing an app-v* tag by hand runs it too.
+#
+# The keys live in the "release" environment, which only master and app-v*/hub-v* tags may use, so
+# no pull request run can reach them.
+
+on:
+  push:
+    tags: ['app-v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: The app-v* tag the caller just pushed
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  check:
+    name: Check the version and run the tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      code: ${{ steps.version.outputs.code }}
+    defaults:
+      run:
+        working-directory: apps/household-hub/client
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      # The tag names the version; the code must agree. The build number is Android's version code.
+      - name: Check the tag matches app.version
+        id: version
+        working-directory: .
+        run: |
+          version="$(sed -n 's/^app\.version=//p' apps/household-hub/client/gradle.properties)"
+          if ! [ "app-v$version" = "$TAG" ]; then
+            echo "::error::$TAG does not match app.version ($version) in gradle.properties"
+            exit 1
+          fi
+          IFS=. read -r major minor patch <<< "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-client
+
+      - name: Run the JVM tests
+        run: ./gradlew jvmTest
+
+  android:
+    name: Android to Firebase App Distribution
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    # id-token: GitHub vouches for this run to Google, which is how it signs in to Firebase.
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: apps/household-hub/client
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: ./.github/actions/setup-client
+
+      # Outside the checkout, and gone with the runner.
+      - name: Write the signing key
+        env:
+          HUB_KEYSTORE_BASE64: ${{ secrets.HUB_KEYSTORE_BASE64 }}
+        run: echo "$HUB_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+      # No key is stored anywhere: Google accepts only this repository's runs in the release
+      # environment as the uploading account (Workload Identity Federation). Exports
+      # GOOGLE_APPLICATION_CREDENTIALS for the Firebase CLI.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.FIREBASE_WIF_PROVIDER }}
+          service_account: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Build the signed release
+        env:
+          HUB_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
+          HUB_KEYSTORE_PASSWORD: ${{ secrets.HUB_KEYSTORE_PASSWORD }}
+          HUB_KEY_ALIAS: ${{ secrets.HUB_KEY_ALIAS }}
+          HUB_KEY_PASSWORD: ${{ secrets.HUB_KEY_PASSWORD }}
+        run: ./gradlew :androidApp:assembleRelease
+
+      - name: Upload to Firebase App Distribution
+        run: |
+          npx --yes firebase-tools@15.34.0 appdistribution:distribute \
+            androidApp/build/outputs/apk/release/androidApp-release.apk \
+            --app "${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
+            --groups household \
+            --release-notes "$TAG"
+
+  ios:
+    name: iOS to TestFlight
+    needs: check
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: release
+    defaults:
+      run:
+        working-directory: apps/household-hub/client/iosApp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: ./.github/actions/setup-client
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      # Outside the checkout, and gone with the runner.
+      - name: Write the App Store Connect key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: echo "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+
+      # Signed automatically: the key lets Xcode fetch the distribution certificate and profile.
+      - name: Archive the Release build
+        env:
+          version: ${{ needs.check.outputs.version }}
+          code: ${{ needs.check.outputs.code }}
+        run: |
+          xcodebuild archive \
+            -project HouseholdHub.xcodeproj \
+            -scheme HouseholdHub \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/HouseholdHub.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$code"
+
+      # ExportOptions.plist: method app-store-connect, destination upload, so the export is the
+      # TestFlight upload. No .ipa is left behind to keep.
+      - name: Upload to TestFlight
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/HouseholdHub.xcarchive" \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+
+  notes:
+    name: Write the release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Write the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"

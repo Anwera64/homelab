@@ -75,6 +75,9 @@ targets:
         # needed, because the hub is HTTPS; only a move to cleartext on the LAN would want
         # NSAllowsLocalNetworking.
         NSLocalNetworkUsageDescription: Connects to your home hub on the local network.
+        # TestFlight asks about encryption for each build unless this answers it. The app only
+        # uses the HTTPS built into iOS (Ktor's Darwin engine), which Apple counts as exempt.
+        ITSAppUsesNonExemptEncryption: false
         # `canOpenURL` answers honestly only for schemes declared here; without the entry it
         # returns false even when Tailscale is installed, and IosExternalApps would always fall
         # through to the store page. The counterpart of the Android manifest's <queries> block.

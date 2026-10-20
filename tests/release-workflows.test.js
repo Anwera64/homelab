@@ -136,3 +136,108 @@ test('Merging a version bump tags and releases it', async (t) => {
     }
   });
 });
+
+test('App release workflow', async (t) => {
+  const APP_RELEASE_PATH = path.join(ROOT_DIR, '.github/workflows/app-release.yml');
+  const workflow = read(APP_RELEASE_PATH);
+  const job = (name) => jobBlock(workflow, name);
+
+  await t.test('runs on a pushed app-v* tag, or when the tagging workflow calls it', () => {
+    assert.ok(fs.existsSync(APP_RELEASE_PATH), '.github/workflows/app-release.yml must exist');
+    const on = topLevelBlock(workflow, 'on');
+    assert.match(on, /^  push:\n    tags: \['app-v\*'\]\n/m);
+    assert.match(on, /^  workflow_call:\n    inputs:\n      tag:\n/m);
+    assert.doesNotMatch(on, /pull_request/, 'no pull request reaches the signing keys');
+    assert.deepEqual(topLevelBlock(workflow, 'permissions').trim().split('\n').map((l) => l.trim()), ['contents: write']);
+  });
+
+  await t.test('refuses a tag that is not app.version, and tests before anything is built for release', () => {
+    const check = job('check');
+    assert.ok(check, 'a check job');
+    assert.match(check, /sed -n 's\/\^app\\.version=\/\/p' apps\/household-hub\/client\/gradle\.properties/);
+    assert.match(check, /\[ "app-v\$version" = "\$TAG" \]/);
+    assert.match(check, /\.\/gradlew jvmTest/);
+    for (const name of ['android', 'ios']) {
+      assert.match(job(name), /needs: check/, `${name} waits for the check`);
+    }
+  });
+
+  await t.test('only the upload jobs see the keys, through the release environment', () => {
+    assert.doesNotMatch(job('check'), /secrets\./, 'the check job needs no secret');
+    for (const name of ['android', 'ios']) {
+      assert.match(job(name), /^    environment: release$/m, `${name} runs in the release environment`);
+    }
+  });
+
+  await t.test('Android: a signed release build to Firebase App Distribution, nothing kept', () => {
+    const android = job('android');
+    assert.match(android, /\.\/gradlew :androidApp:assembleRelease/);
+    for (const name of ['HUB_KEYSTORE_PASSWORD', 'HUB_KEY_ALIAS', 'HUB_KEY_PASSWORD']) {
+      assert.ok(android.includes(`${name}: \${{ secrets.${name} }}`), `${name} comes from the release environment`);
+    }
+    assert.match(android, /base64 --decode > "\$RUNNER_TEMP\/release\.keystore"/, 'the keystore lives outside the checkout');
+    assert.match(android, /npx --yes firebase-tools@\d+\.\d+\.\d+ appdistribution:distribute /, 'a pinned Firebase CLI');
+    assert.match(android, /--app "\$\{\{ secrets\.FIREBASE_ANDROID_APP_ID \}\}"/);
+    assert.match(android, /--groups household/);
+    // No key to leak: GitHub vouches for the run, and Google lets only this repo's release runs act
+    // as the account (Workload Identity Federation). The action exports GOOGLE_APPLICATION_CREDENTIALS.
+    assert.match(android, /uses: google-github-actions\/auth@[0-9a-f]{40} # v3\.\d+\.\d+/);
+    assert.match(android, /workload_identity_provider: \$\{\{ secrets\.FIREBASE_WIF_PROVIDER \}\}/);
+    assert.match(android, /service_account: \$\{\{ secrets\.FIREBASE_SERVICE_ACCOUNT_EMAIL \}\}/);
+    assert.match(android, /^    permissions:\n      contents: read\n      id-token: write\n/m);
+    assert.doesNotMatch(workflow, /FIREBASE_SERVICE_ACCOUNT\b(?!_EMAIL)|firebase\.json/, 'no service account key');
+  });
+
+  await t.test('iOS: an archive signed with the App Store Connect key, uploaded to TestFlight', () => {
+    const ios = job('ios');
+    assert.match(ios, /runs-on: macos-26/, 'the image the client CI builds iOS on');
+    assert.match(ios, /xcodegen generate/);
+    assert.match(ios, /xcodebuild archive[\s\S]*?-configuration Release/);
+    assert.match(ios, /xcodebuild -exportArchive[\s\S]*?-exportOptionsPlist ExportOptions\.plist/);
+    for (const flag of ['-allowProvisioningUpdates', '-authenticationKeyPath', '-authenticationKeyID', '-authenticationKeyIssuerID']) {
+      assert.ok(ios.split(flag).length - 1 >= 2, `archive and export both pass ${flag}`);
+    }
+    assert.match(ios, /DEVELOPMENT_TEAM="\$\{\{ secrets\.APPLE_TEAM_ID \}\}"/);
+    assert.match(ios, /MARKETING_VERSION="\$version" CURRENT_PROJECT_VERSION="\$code"|MARKETING_VERSION/, 'built as the tagged version');
+    const options = read(path.join(ROOT_DIR, 'apps/household-hub/client/iosApp/ExportOptions.plist'));
+    assert.match(options, /<key>method<\/key>\s*<string>app-store-connect<\/string>/);
+    assert.match(options, /<key>destination<\/key>\s*<string>upload<\/string>/);
+    assert.match(options, /<key>signingStyle<\/key>\s*<string>automatic<\/string>/);
+  });
+
+  await t.test('writes release notes only once both stores have the build, and keeps no build', () => {
+    const notes = job('notes');
+    assert.match(notes, /needs: \[android, ios\]/);
+    assert.match(notes, /^\s*gh release create "\$TAG" --verify-tag --generate-notes --title "\$TAG"$/m);
+    assert.doesNotMatch(workflow, /upload-artifact|\.apk"? *\n.*gh release|gh release upload/, 'no APK or IPA leaves the runners');
+  });
+
+  await t.test('pins every action to a full commit SHA', () => {
+    for (const ref of usesRefs(workflow).filter((r) => !r.startsWith('./'))) {
+      assert.match(ref, /@[0-9a-f]{40}$/, `"${ref}" must be pinned to a 40-character commit SHA`);
+    }
+  });
+});
+
+test('Merging an app version bump releases it too', async (t) => {
+  const workflow = read(RELEASE_TAGS_PATH);
+
+  await t.test('tags app.version once, beside the hub version', () => {
+    const tag = jobBlock(workflow, 'tag');
+    assert.match(tag, /sed -n 's\/\^app\\.version=\/\/p' apps\/household-hub\/client\/gradle\.properties/);
+    assert.match(tag, /tag="app-v\$version"/);
+    assert.match(tag, /echo "app=\$tag" >> "\$GITHUB_OUTPUT"/);
+    assert.match(tag, /outputs:\n      hub: \$\{\{ steps\.hub\.outputs\.hub \}\}\n      app: \$\{\{ steps\.app\.outputs\.app \}\}/);
+  });
+
+  await t.test('calls the app release with the keys of the release environment', () => {
+    const app = jobBlock(workflow, 'app');
+    assert.match(app, /needs: tag/);
+    assert.match(app, /if: needs\.tag\.outputs\.app != ''/);
+    assert.match(app, /uses: \.\/\.github\/workflows\/app-release\.yml/);
+    assert.match(app, /tag: \$\{\{ needs\.tag\.outputs\.app \}\}/);
+    assert.match(app, /secrets: inherit/);
+    // A called workflow gets no more than its caller grants: the Firebase sign-in needs id-token.
+    assert.match(app, /permissions:\n      contents: write\n      id-token: write\n/);
+  });
+});
