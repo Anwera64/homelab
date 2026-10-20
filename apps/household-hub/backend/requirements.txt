@@ -19,7 +19,7 @@ bcrypt==5.0.0
     # via -r requirements.in
 caldav==3.5.0
     # via -r requirements.in
-certifi==2026.10.18
+certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
