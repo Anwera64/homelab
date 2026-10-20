@@ -343,6 +343,11 @@ expires when the event ends. Reflection takes the id from the chat's saved tool 
 created and removed in the same chat leaves nothing. A mentioned event with no id known is a dated
 memory with an expiry and no link.
 
+**Removed events are named.** An event the chat touched that is gone, whether removed in the chat or no
+longer in the calendar, is listed for the model as removed (`[r1] Dinner · Sun 25 Oct 2026, 20:00`),
+with its last title and start from the chat's steps, so it doesn't save the event as a plain dated
+memory. A fact the model tags with one is dropped and logged (`outcome=dropped_removed_event`).
+
 **Scope.** Personal or household, decided per event like any other memory.
 
 **Staying true.**
@@ -454,7 +459,7 @@ Behaviour the slice's tests must pin. Names are for orientation; each PR writes 
 | Recall | A related memory outside the block is attached and replayed unchanged on the next turn; an unrelated message attaches nothing |
 | Recall gives up | A slow embedder skips recall and the turn still answers |
 | Search fallback | With the extension unavailable, search returns the same order from Python |
-| Event link | An event created in a chat is remembered once with its id and expiry; created and removed in the same chat, it is not |
+| Event link | An event created in a chat is remembered once with its id and expiry; created and removed in the same chat, or gone from the calendar, it is named as removed and a fact tagged with it is not saved |
 | Event changed in the hub | Removing the event retires its memory; moving it rebuilds the sentence and records `moved_from` |
 | Event changed outside | The periodic check retires a memory whose event is gone, and changes nothing when the calendar is unreachable |
 | One store | No `/gossip` route exists; a household memory carries who said it into the prompt line |

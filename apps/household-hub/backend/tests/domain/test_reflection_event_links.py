@@ -104,6 +104,53 @@ async def test_GIVEN_an_event_the_calendar_no_longer_has_THEN_it_is_not_offered(
 
 
 @pytest.mark.asyncio
+async def test_GIVEN_an_event_the_calendar_no_longer_has_THEN_the_model_is_told_it_was_removed():
+    world = _world({"facts": []},
+                   [_step("created", "ev-dinner", title="Dinner together", start_time="2026-10-24T20:00:00")],
+                   events=[])
+
+    await world.run()
+
+    assert "[r1] Dinner together · Sat 24 Oct 2026, 20:00" in world.llm.prompt
+    assert "removed" in world.llm.calls[-1]["messages"][0].content
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_an_event_created_and_removed_in_the_chat_THEN_the_model_is_told_it_was_removed():
+    world = _world({"facts": []},
+                   [_step("created", "ev-dinner", title="Dinner together", start_time="2026-10-24T20:00:00"),
+                    _step("deleted", "ev-dinner")],
+                   events=[DINNER])
+
+    await world.run()
+
+    assert "[r1] Dinner together · Sat 24 Oct 2026, 20:00" in world.llm.prompt
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_removed_all_day_event_THEN_the_model_is_shown_only_its_date():
+    world = _world({"facts": []},
+                   [_step("created", "ev-trip", title="School trip", start_time="2026-10-23", is_all_day=True),
+                    _step("deleted", "ev-trip")])
+
+    await world.run()
+
+    assert "[r1] School trip · Fri 23 Oct 2026\n" in world.llm.prompt
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_fact_about_a_removed_event_THEN_nothing_is_saved():
+    world = _world({"facts": [_fact("Dinner together on Saturday 24 October at 20:00", event="r1")]},
+                   [_step("created", "ev-dinner", title="Dinner together", start_time="2026-10-24T20:00:00")],
+                   events=[])
+
+    result = await world.run()
+
+    assert world.memories.created == []
+    assert result.same == 1
+
+
+@pytest.mark.asyncio
 async def test_GIVEN_the_calendar_cant_be_reached_THEN_the_reflection_still_runs_without_links():
     world = _world({"facts": [_fact("Dinner together on Saturday", event="e1")]},
                    [_step("created", "ev-dinner")], events=[DINNER], fail=True)
