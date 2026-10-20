@@ -122,7 +122,7 @@ services:
 
   # Pushes Uptime Kuma's alerts to the phones. Its users are made with its CLI (README.md).
   ntfy:
-    image: binwiederhier/ntfy:v2.31.0
+    image: binwiederhier/ntfy:v2.31.1
     container_name: ntfy
     command: serve
     ports:
