@@ -145,6 +145,8 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── test.yml                 # CI: node tests + compose validation
 │       ├── household-hub-client.yml # CI: hub client (Kotlin Multiplatform)
 │       ├── household-hub-backend.yml # CI: hub backend tests (pytest), lock files and image build
+│       ├── release-tags.yml         # A merged version bump: tags it and starts its release
+│       ├── hub-release.yml          # Hub release: tests, the private image to GHCR, release notes
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
 ├── renovate.json                    # Renovate: bump PRs for pinned images and the hub's and client's libraries
 ├── .githooks/
@@ -208,6 +210,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
     ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
     ├── backend-workflow.test.js     # Hub backend CI workflow
+    ├── release-workflows.test.js    # Release tagging and the hub release
     ├── ci-workflow.test.js          # Hub client CI workflow
     ├── scripts-validation.test.js   # PowerShell scripts
     └── readme.test.js               # This README matches the repo
