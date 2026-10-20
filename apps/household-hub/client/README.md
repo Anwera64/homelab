@@ -200,15 +200,16 @@ through a bitmap context hides that, so only the file's own PNG header tells you
 checks it. And dropping `preserves-vector-representation` from `HearthLaunchTile.imageset`'s
 `Contents.json` makes Xcode silently rasterise the SVG, which nothing detects at all.
 
-Regenerating the app icon's PNG needs `tools/make_app_icon.sh`, which rasterises
-`tools/hearth_app_icon.svg` with `rsvg-convert` and refuses to leave behind a PNG carrying an alpha
+Regenerating the app icons' PNGs needs `tools/make_app_icon.sh`, which rasterises
+`tools/hearth_app_icon.svg` twice with `rsvg-convert`: `AppIcon` on Hearth's primary for the household's
+app, `AppIcon-Dev` on its tertiary for the dev app. It refuses to leave behind a PNG carrying an alpha
 channel — Apple rejects an app icon that has one outright, even a fully opaque one. That script
 needs librsvg (`brew install librsvg`), but this is a **developer-machine dependency only**:
-`AppIcon-1024.png` is committed, CI never regenerates it, and nobody cloning the repo needs librsvg
+both PNGs are committed, CI never regenerates them, and nobody cloning the repo needs librsvg
 installed to build or test anything.
 
 **Re-checking the launch screen or the icon on a simulator:** run
-`xcrun simctl uninstall booted com.homelab.household` before reinstalling. iOS caches the
+`xcrun simctl uninstall booted com.homelab.household.dev` (the Debug app) before reinstalling. iOS caches the
 launch-screen snapshot and the home-screen icon per install, so without the uninstall you're
 looking at the previous artwork and will chase a phantom.
 
@@ -324,7 +325,7 @@ whether you changed what you meant to.
 
 ```powershell
 .\gradlew.bat :androidApp:installDebug
-adb shell am start -n com.homelab.household/.MainActivity
+adb shell am start -n com.homelab.household.dev/com.homelab.household.MainActivity
 ```
 
 On iOS, generate the Xcode project first — `project.yml` is the source of truth, and both the
@@ -349,9 +350,17 @@ Three things that wiring needs, none of which produce a useful error if missing:
 
 ## 🌐 Network ingress
 
-* **Base URL:** `https://hub.spicy-llama.duckdns.org`, set once as `hub.baseUrl` in `gradle.properties`.
-  `:core:data` generates it into `BuildConfig`, exposed as `DEFAULT_BASE_URL` and injected as `HubConfig`.
-  Override it per build with `-Phub.baseUrl=...`.
+* **Two apps, two hubs (#134):** debug builds are the dev app (`com.homelab.household.dev`, "HyggeHub
+  Dev", the terracotta icon) and talk to `hub.devUrl`; release builds are the household's
+  (`com.homelab.household`, "HyggeHub") and talk to `hub.prodUrl`. Both install side by side. The
+  addresses are in `gradle.properties`, with `telemetry.devUrl` and `telemetry.prodUrl` for the logs.
+  Android puts them in `BuildConfig.HUB_URL` per build type; iOS reads `HubBaseUrl` from Info.plist,
+  which `project.yml` sets per configuration. `:core:data`'s `DEFAULT_BASE_URL` is the dev address,
+  the SDK's default for tests and tools. Override one per build with `-Phub.devUrl=...`.
+* **Version:** `app.version` in `gradle.properties`, for both apps; the build number is derived from
+  it (1.2.3 becomes 10203). `project.yml` repeats both numbers, because Xcode can't read
+  `gradle.properties`; `AppVariantsTest` fails when they differ. Once the app release workflow
+  lands (#134), merging a change to `app.version` releases it.
 * **API prefix:** `/api/v1`
 * **Local ingress:** on home Wi-Fi, local DNS resolves the domain to `192.168.1.20:3050`. Away from
   home, Tailscale MagicDNS and DuckDNS provide encrypted remote access.

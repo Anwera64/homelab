@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# make_app_icon.sh — regenerates AppIcon-1024.png, the iOS app icon, from tools/hearth_app_icon.svg.
+# make_app_icon.sh — regenerates the iOS app icons from tools/hearth_app_icon.svg: AppIcon-1024.png
+# for the household's app, and AppIcon-Dev-1024.png for the dev app (Debug builds), which is the same
+# artwork on Hearth's tertiary (#C05638) instead of its primary, the same as Android's debug icon.
 #
 # Xcode's asset catalog compiler accepts vector artwork (SVG) for ordinary image sets — that's
 # what HearthLaunchTile.imageset uses — but NOT for an AppIcon set, which must be a raster image.
@@ -32,24 +34,33 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SVG="tools/hearth_app_icon.svg"
-OUT="iosApp/HouseholdHub/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+ASSETS="iosApp/HouseholdHub/Assets.xcassets"
 
 if ! command -v rsvg-convert >/dev/null 2>&1; then
   echo "error: rsvg-convert not found on PATH (brew install librsvg)" >&2
   exit 1
 fi
 
-rsvg-convert -w 1024 -h 1024 --background-color='#3C6E4E' "$SVG" -o "$OUT"
+# $1: the background colour, $2: the PNG to write. The SVG's own background <rect> is recoloured,
+# so the glyph is the same in both icons.
+render() {
+  local background="$1" out="$2" svg
+  svg="$(mktemp)"
+  sed "s/fill=\"#3C6E4E\"/fill=\"$background\"/" "$SVG" > "$svg"
+  rsvg-convert -w 1024 -h 1024 --background-color="$background" "$svg" -o "$out"
+  rm -f "$svg"
 
-color_type=$(od -An -tu1 -j 25 -N 1 "$OUT" | tr -d ' ')
+  color_type=$(od -An -tu1 -j 25 -N 1 "$out" | tr -d ' ')
+  if [ "$color_type" != "2" ]; then
+    echo "error: $out has PNG colour type $color_type, expected 2 (truecolour, no alpha)." >&2
+    echo "       rsvg-convert emitted an alpha channel here; a flattening pass (CoreGraphics with" >&2
+    echo "       CGImageAlphaInfo.noneSkipLast + ImageIO) needs to be added before this script's" >&2
+    echo "       output can be considered done." >&2
+    rm -f "$out"
+    exit 1
+  fi
+  echo "Wrote $out (colour type 2, truecolour, no alpha)"
+}
 
-if [ "$color_type" != "2" ]; then
-  echo "error: $OUT has PNG colour type $color_type, expected 2 (truecolour, no alpha)." >&2
-  echo "       rsvg-convert emitted an alpha channel here; a flattening pass (CoreGraphics with" >&2
-  echo "       CGImageAlphaInfo.noneSkipLast + ImageIO) needs to be added before this script's" >&2
-  echo "       output can be considered done." >&2
-  rm -f "$OUT"
-  exit 1
-fi
-
-echo "Wrote $OUT (colour type 2, truecolour, no alpha)"
+render '#3C6E4E' "$ASSETS/AppIcon.appiconset/AppIcon-1024.png"
+render '#C05638' "$ASSETS/AppIcon-Dev.appiconset/AppIcon-Dev-1024.png"
