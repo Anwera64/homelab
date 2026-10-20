@@ -1399,4 +1399,38 @@ class ConversationScreenTest {
 
             assertEquals(listOf("c-1" to true), decided)
         }
+
+    // ---- a memory rebuilt from its event (slice 5 wrap-up) -----------------------------------------
+
+    /** The hub sends only the event's title and its start; the card adds the day and time, here in UTC. */
+    @Test
+    fun `GIVEN a forget of a memory moved in your calendar WHEN drawn THEN it shows the day and time of the event`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Forgetting a memory moved in your calendar"))
+
+            onConversation {
+                seesTheForgetCard()
+                seesWords("Dinner together on Monday 19 October, 17:30.")
+            }
+        }
+
+    @Test
+    fun `GIVEN a forgotten memory moved in your calendar WHEN drawn THEN its record names the day and time of the event`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Forgot a memory moved in your calendar"))
+
+            onConversation {
+                seesWords("Dinner together on Monday 19 October, 17:30.", partly = true)
+            }
+        }
+
+    @Test
+    fun `GIVEN a remember beside Liams event memory WHEN drawn THEN his memory shows the day and time of the event`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Remembering beside Liam's event memory"))
+
+            onConversation {
+                seesWhatTheySaid("Liam", "Dinner together on Monday 19 October, 17:30.", meta = "Planner · March")
+            }
+        }
 }

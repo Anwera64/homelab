@@ -50,7 +50,9 @@ sealed interface ProposalDetails {
 /**
  * A memory already kept, as a Remember or Forget card shows it: its sentence, who said it ([mine]
  * when it was the member), the agent that noted it and when. A Forget card for a sentence the
- * member asked to remember that still waits names whose answer it waits on: [waitingOn].
+ * member asked to remember that still waits names whose answer it waits on: [waitingOn]. A memory
+ * the hub rebuilt from its calendar event is only the event's title, and [eventTime] is the time the
+ * card adds to it, as the memory page does (memory spec §7).
  */
 data class StoredMemory(
     val content: String,
@@ -59,6 +61,7 @@ data class StoredMemory(
     val agentName: String? = null,
     val addedAt: Instant? = null,
     val waitingOn: String? = null,
+    val eventTime: EventTime? = null,
 )
 
 /**

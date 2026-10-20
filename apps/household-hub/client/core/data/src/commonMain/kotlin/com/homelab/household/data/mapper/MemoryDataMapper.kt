@@ -94,14 +94,21 @@ object MemoryDataMapper {
             agentName = dto.agent_name,
             agentAvatar = dto.agent_avatar,
             canRemove = dto.can_remove,
-            eventTime = eventTimeOf(dto),
+            eventTime = eventTimeOf(dto.event_starts_at, dto.time_from_event),
             movedFrom = dto.moved_from?.let(::instantOf),
         )
 
-    /** Only a kind this phone knows adds a time; anything else keeps the sentence as the hub sent it. */
-    private fun eventTimeOf(dto: MemoryPageItemDto): EventTime? {
-        val start = dto.event_starts_at ?: return null
-        val allDay = EVENT_TIME_KINDS[dto.time_from_event] ?: return null
+    /**
+     * The time a memory rebuilt from its event leaves to the phone, from the hub's `event_starts_at`
+     * and `time_from_event`. Only a kind this phone knows adds a time; anything else keeps the
+     * sentence as the hub sent it.
+     */
+    fun eventTimeOf(
+        startsAt: String?,
+        kind: String?,
+    ): EventTime? {
+        val start = startsAt ?: return null
+        val allDay = EVENT_TIME_KINDS[kind] ?: return null
         return EventTime(startsAt = instantOf(start), allDay = allDay)
     }
 

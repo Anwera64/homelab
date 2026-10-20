@@ -230,19 +230,19 @@ Items marked **⛔** break a designed flow until they're done.
 Built in slice 5 from [`STAGE_5_MEMORY.md`](STAGE_5_MEMORY.md); the section numbers below are that document's.
 
 - ~~`MemoryAuditViewModel.loadAudit()` never loads `userMilestones` — wire it to `GET /gossip/audit`.~~ Dropped: the endpoint and the milestones go.
-- [ ] ⛔ **No reflection after a turn.** A sweep reflects a chat once it has been idle, when the chat model is in memory and no turn is running, from a per-chat marker (§2.2).
-- [ ] ⛔ **Reflection saves only what the member states**, and nothing from a secret chat or secret turn, read per message (§2.2; locking spec §4.4).
-- [ ] ⛔ **`remember` and `forget`** as a write tool on the approval card, locked in secret turns, with its labels in the one label map (§2.1).
-- [ ] The chat title starts as the first message's opening words and is replaced at the first reflection (§2.3).
+- [x] ⛔ **No reflection after a turn.** A sweep reflects a chat once it has been idle, when the chat model is in memory and no turn is running, from a per-chat marker (§2.2). *Done in slice 5 (#191).*
+- [x] ⛔ **Reflection saves only what the member states**, and nothing from a secret chat or secret turn, read per message (§2.2; locking spec §4.4). *Done in slice 5 (#191).*
+- [x] ⛔ **`remember` and `forget`** as a write tool on the approval card, locked in secret turns, with its labels in the one label map (§2.1). *Done in slice 5 (#210).*
+- [x] The chat title starts as the first message's opening words and is replaced at the first reflection (§2.3). *Done in slice 5 (#191).*
 - [x] **One store.** `agent_memories` gains expiry, origin, `relevant_for`, the event link and what replaced a retired memory; `gossip_milestones` and `/gossip` are removed; the store starts empty (§3). *Done in slice 5, PR 1.*
-- [ ] ⛔ **Vectors** in `memory_vectors`, ranked with `sqlite-vec`'s distance function and with Python as the fallback (§4).
-- [ ] ⛔ **The fixed block** in the system prompt, filled to a token budget, in place of the newest 20 / 10 / 15 (§5.1).
-- [ ] **Recall** once per member message, attached to the message and saved with it (§5.2).
-- [ ] ⛔ **Comparing on write**: the model names the relation; changes and contradictions become proposals (§6).
-- [ ] **Calendar events** as linked memories, updated or retired with the event, and a periodic check for changes made outside the hub (§7).
-- [ ] ⛔ **Logging** of every sweep decision, reflection run, recall and calendar-link change (§9).
+- [x] ⛔ **Vectors** in `memory_vectors`, ranked with `sqlite-vec`'s distance function and with Python as the fallback (§4). *Done in slice 5 (#189).*
+- [x] ⛔ **The fixed block** in the system prompt, filled to a token budget, in place of the newest 20 / 10 / 15 (§5.1). *Done in slice 5 (#189).*
+- [x] **Recall** once per member message, attached to the message and saved with it (§5.2). *Done in slice 5 (#189).*
+- [x] ⛔ **Comparing on write**: the model names the relation; changes and contradictions become proposals (§6). *Done in slice 5: proposals in #191, answered in #197.*
+- [x] **Calendar events** as linked memories, updated or retired with the event, and a periodic check for changes made outside the hub (§7). *Done in slice 5 (#224).*
+- [x] ⛔ **Logging** of every sweep decision, reflection run, recall and calendar-link change (§9). *Done in slice 5 (#189, #191, #210, #224).*
 - [x] **`memory_proposals`** with who may answer, and `retired_at` / `moved_from` on memories (§3.1, §3.5). *Tables in slice 5, PR 1; used from PR 2 and PR 5.*
-- [ ] ⛔ Client: the memory page, Changes to check, the chat line and its sheet, designed in §6.22 (§8).
+- [x] ⛔ Client: the memory page, Changes to check, the chat line and its sheet, designed in §6.22 (§8). *Done in slice 5 (#188, #197).*
 
 ### 5.7 Calendar
 

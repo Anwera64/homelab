@@ -10,6 +10,7 @@ import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MessageRole
@@ -34,6 +35,7 @@ import com.homelab.household.domain.usecase.ResumeTurnUseCase
 import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.LocalTime
 import com.homelab.household.presentation.memories.MemoryAge
 import com.homelab.household.presentation.whenagentsact.WhenAgentsActViewModel
@@ -1870,6 +1872,27 @@ class ChatSessionViewModelTest {
 
         // 23:30Z on the 17th is already the 18th an hour ahead of UTC.
         assertEquals(MemoryAge.Today, viewModel.memoryAge(Instant.parse("2026-10-17T23:30:00Z")))
+    }
+
+    @Test
+    fun `GIVEN a card about a memory rebuilt from its event WHEN its time is asked THEN it is the phones own day and clock`() {
+        val viewModel = viewModelWith()
+
+        // 18:30Z reads 19:30 an hour ahead of UTC.
+        assertEquals(
+            LocalEventTime(isoDay = 1, day = 19, month = 10, time = LocalTime(19, 30)),
+            viewModel.eventTime(EventTime(startsAt = Instant.parse("2026-10-19T18:30:00Z"), allDay = false)),
+        )
+    }
+
+    @Test
+    fun `GIVEN a card about an all-day event memory WHEN its time is asked THEN it is only the date`() {
+        val viewModel = viewModelWith()
+
+        assertEquals(
+            LocalEventTime(isoDay = 5, day = 23, month = 10, time = null),
+            viewModel.eventTime(EventTime(startsAt = Instant.parse("2026-10-23T00:00:00Z"), allDay = true)),
+        )
     }
 
     private companion object {

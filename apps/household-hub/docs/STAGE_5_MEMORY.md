@@ -1,6 +1,6 @@
 # Household Hub: Memory
 
-**Status:** 📐 Specification — behaviour and screens agreed
+**Status:** ✅ Built in slice 5 (20 October 2026)
 **Target:** `backend` (`memories`, `chat`, `integrations`, `bootstrap`) + `client` (`:core:*`, `:composeApp`)
 **Date:** October 2026
 
@@ -573,14 +573,14 @@ Left open on 12 October; answered by Anton on 13 and 14 October.
 
 **How it ships.** Each PR writes its tests first and changes something that can be checked on the phone.
 
-1. **One store.** The migration (§3), proposals table and wipe; `/gossip` goes.
-2. **Memory page.** The list, tabs, ✕ with Undo, and its states.
-3. **Reading.** Vectors (§4), the fixed block and recall (§5).
-4. **Reflection.** The sweep (§2.2) and comparing on write (§6), after another wipe (§3.3).
-5. **Changes to check and the chat sheet** (§6.1, §8).
-6. **`remember` / `forget`** (§2.1).
-7. **Calendar links** (§7).
-8. **Wrap-up.**
+1. **One store.** The migration (§3), proposals table and wipe; `/gossip` goes. (#182)
+2. **Memory page.** The list, tabs, ✕ with Undo, and its states. (#188)
+3. **Reading.** Vectors (§4), the fixed block and recall (§5). (#189)
+4. **Reflection.** The sweep (§2.2) and comparing on write (§6), after another wipe (§3.3). (#191)
+5. **Changes to check and the chat sheet** (§6.1, §8). (#197)
+6. **`remember` / `forget`** (§2.1). (#210)
+7. **Calendar links** (§7). (#224)
+8. **Wrap-up.** The remember and forget cards show an event memory's day and time; the docs record what was built.
 
 ---
 

@@ -7,11 +7,13 @@ import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.HubTool
 import com.homelab.household.domain.model.LookedOverLine
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
+import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.RepeatEvery
 import com.homelab.household.domain.model.StoredMemory
 import com.homelab.household.domain.model.ToolAction
@@ -112,11 +114,57 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
     @OptIn(ExperimentalTime::class)
     private val march = Instant.parse("2026-03-04T10:00:00Z")
 
+    /** A dinner the hub rebuilt from its calendar event: the title, and the start the phone adds. */
+    @OptIn(ExperimentalTime::class)
+    private val dinner =
+        StoredMemory(
+            "Dinner together",
+            saidBy = "Emma",
+            mine = true,
+            agentName = "Planner",
+            addedAt = march,
+            eventTime = EventTime(startsAt = Instant.parse("2026-10-19T17:30:00Z"), allDay = false),
+        )
+
+    /** A Forget card for [stored], at [status]. */
+    private fun forgetting(
+        stored: StoredMemory,
+        status: ProposalStatus = ProposalStatus.Pending,
+    ) = agent.copy(
+        messages =
+            listOf(
+                said("m-1", "Forget about dinner, it's off", MessageRole.USER),
+                said(
+                    "m-2",
+                    "This is the one I have. Shall I forget it?",
+                    MessageRole.ASSISTANT,
+                    parts =
+                        listOf(
+                            AnswerPart.ToolDone(HubTool.MEMORY_LOOKUP, ToolSummary()),
+                            AnswerPart.Text("This is the one I have. Shall I forget it?"),
+                            AnswerPart.Proposal(
+                                toolCallId = "c-1",
+                                tool = HubTool.FORGET,
+                                action = ToolAction.Delete,
+                                details = ProposalDetails.Memory(
+                                    content = stored.content,
+                                    household = null,
+                                    stored = stored,
+                                ),
+                                status = status,
+                            ),
+                        ),
+                ),
+            ),
+        turnState = if (status == ProposalStatus.Pending) TurnState.AwaitingApproval else TurnState.Idle,
+    )
+
     /** A Remember card for "Sam is vegan now.", over [stored], after the hub looked it up. */
     private fun remembering(
         asked: String,
         said: String,
         stored: StoredMemory,
+        content: String = "Sam is vegan now.",
     ) = agent.copy(
         messages =
             listOf(
@@ -135,7 +183,7 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                                 action = ToolAction.Create,
                                 details =
                                     ProposalDetails.Memory(
-                                        content = "Sam is vegan now.",
+                                        content = content,
                                         household = true,
                                         stored = stored,
                                     ),
@@ -774,6 +822,16 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                             ),
                         ),
                     turnState = TurnState.AwaitingApproval,
+                ),
+            // A memory rebuilt from its moved event: the card adds the event's day and time to its title.
+            "Forgetting a memory moved in your calendar" to forgetting(dinner),
+            "Forgot a memory moved in your calendar" to forgetting(dinner, status = ProposalStatus.Approved),
+            "Remembering beside Liam's event memory" to
+                remembering(
+                    asked = "Remember that dinner is at 20:00",
+                    said = "Liam has dinner down for earlier. I can keep yours as well and ask Liam.",
+                    stored = dinner.copy(saidBy = "Liam", mine = false),
+                    content = "Dinner together is at 20:00.",
                 ),
             // Canvas: MemChatLine. The chat went quiet after the answer, was looked over, then went on.
             "Looked over" to

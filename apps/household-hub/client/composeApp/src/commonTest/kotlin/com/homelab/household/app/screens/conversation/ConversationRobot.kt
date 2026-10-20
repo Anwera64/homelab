@@ -147,9 +147,12 @@ import com.homelab.household.app.resources.tool_search_results
 import com.homelab.household.app.resources.tool_step_automatic
 import com.homelab.household.app.resources.tool_step_named
 import com.homelab.household.app.testing.StillTheme
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.MemoryAge
+import com.homelab.household.presentation.memories.localEventTime
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
@@ -1025,6 +1028,7 @@ fun ComposeUiTest.conversationScreen(
     onUndoAutomatic: () -> Unit = {},
     onLookedOver: () -> Unit = {},
     memoryAge: (Instant) -> MemoryAge? = { MemoryAge.Month(MARCH) },
+    eventTime: (EventTime) -> LocalEventTime? = { localEventTime(it.startsAt, offsetSeconds = 0, it.allDay) },
 ) {
     setContent {
         StillTheme(darkTheme = darkTheme) {
@@ -1042,6 +1046,7 @@ fun ComposeUiTest.conversationScreen(
                 onUndoAutomatic = onUndoAutomatic,
                 onLookedOver = onLookedOver,
                 memoryAge = memoryAge,
+                eventTime = eventTime,
                 onBack = {},
                 memberName = "Emma",
             )

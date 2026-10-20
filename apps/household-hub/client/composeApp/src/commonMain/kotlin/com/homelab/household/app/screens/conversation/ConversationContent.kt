@@ -71,11 +71,13 @@ import com.homelab.household.app.util.WaitPhase
 import com.homelab.household.app.util.rememberWaitPhase
 import com.homelab.household.domain.model.AnswerPart
 import com.homelab.household.domain.model.ChatMessage
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.presentation.chatsession.ChatSessionUiState
 import com.homelab.household.presentation.chatsession.TurnState
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.MemoryAge
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
@@ -122,6 +124,8 @@ fun ConversationContent(
     onLookedOver: () -> Unit = {},
     /** When a stored memory on a Remember or Forget card was noted. */
     memoryAge: (Instant) -> MemoryAge? = { null },
+    /** The day and time a card's event memory adds to its title, on this phone. */
+    eventTime: (EventTime) -> LocalEventTime? = { null },
 ) {
     val colors = HearthTheme.colors
     val type = HearthTheme.typography
@@ -354,6 +358,7 @@ fun ConversationContent(
                     onAskAgain = question?.let { { onSend(it) } },
                     onApproveAutomatically = onApproveAutomatically,
                     memoryAge = memoryAge,
+                    eventTime = eventTime,
                 )
             } else {
                 MessageBubble(
@@ -405,6 +410,7 @@ fun ConversationContent(
                         onConnectCalendar = onConnectCalendar,
                         onApproveAutomatically = onApproveAutomatically,
                         memoryAge = memoryAge,
+                        eventTime = eventTime,
                     ) {
                         val tool = state.activeTool
                         when {
@@ -472,6 +478,7 @@ private fun Answer(
     onConnectCalendar: () -> Unit,
     onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
     memoryAge: (Instant) -> MemoryAge?,
+    eventTime: (EventTime) -> LocalEventTime?,
     onAskAgain: (() -> Unit)? = null,
     status: (@Composable () -> Unit)? = null,
 ) {
@@ -492,6 +499,7 @@ private fun Answer(
                             onDecide = onDecide,
                             onApproveAutomatically = onApproveAutomatically,
                             memoryAge = memoryAge,
+                            eventTime = eventTime,
                         )
                     }
 

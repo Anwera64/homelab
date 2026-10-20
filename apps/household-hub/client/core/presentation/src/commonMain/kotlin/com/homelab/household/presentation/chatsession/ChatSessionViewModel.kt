@@ -10,6 +10,7 @@ import com.homelab.household.domain.model.ChatMessage
 import com.homelab.household.domain.model.ChatStreamEvent
 import com.homelab.household.domain.model.ConversationSession
 import com.homelab.household.domain.model.DeviceTimeZone
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.MessageRole
 import com.homelab.household.domain.model.MessageStatus
 import com.homelab.household.domain.model.ProposalDetails
@@ -30,8 +31,10 @@ import com.homelab.household.domain.usecase.SetToolApprovalUseCase
 import com.homelab.household.domain.usecase.StreamChatTurnUseCase
 import com.homelab.household.domain.usecase.ToggleSecretModeUseCase
 import com.homelab.household.domain.util.runCatchingSafe
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.LocalTime
 import com.homelab.household.presentation.memories.MemoryAge
+import com.homelab.household.presentation.memories.localEventTime
 import com.homelab.household.presentation.memories.localTime
 import com.homelab.household.presentation.memories.memoryAge
 import kotlinx.coroutines.Job
@@ -242,6 +245,11 @@ class ChatSessionViewModel(
         val now = clock.now()
         return memoryAge(at, now, deviceTimeZone.offsetSecondsAt(now))
     }
+
+    /** The time a card's event memory adds to its title, on the phone's own clock (memory spec §7). */
+    @OptIn(ExperimentalTime::class)
+    fun eventTime(event: EventTime): LocalEventTime =
+        localEventTime(event.startsAt, deviceTimeZone.offsetSecondsAt(event.startsAt), event.allDay)
 
     @OptIn(ExperimentalTime::class)
     private fun lookedOverAt(session: ConversationSession): LocalTime? =

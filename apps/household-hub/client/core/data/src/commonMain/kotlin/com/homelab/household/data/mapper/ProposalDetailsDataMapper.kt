@@ -85,6 +85,7 @@ object ProposalDetailsDataMapper {
             agentName = stored.text(AGENT)?.ifBlank { null },
             addedAt = stored.text(CREATED_AT)?.let(Instant::parseOrNull),
             waitingOn = stored.text(WAITING_ON)?.ifBlank { null },
+            eventTime = MemoryDataMapper.eventTimeOf(stored.text(EVENT_STARTS_AT), stored.text(TIME_FROM_EVENT)),
         )
     }
 
@@ -253,6 +254,8 @@ object ProposalDetailsDataMapper {
     private const val AGENT = "agent"
     private const val CREATED_AT = "created_at"
     private const val WAITING_ON = "waiting_on"
+    private const val EVENT_STARTS_AT = "event_starts_at"
+    private const val TIME_FROM_EVENT = "time_from_event"
     private val WEEKDAYS = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     private const val MONTHS = 12
     private const val MAX_DAY = 31
