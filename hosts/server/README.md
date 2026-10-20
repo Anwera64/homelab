@@ -355,17 +355,48 @@ The setup is meant to outlive the laptop:
 3. In [`bootstrap.sh`](bootstrap.sh), the section between `# >>> laptop` and `# <<< laptop` is the hardware-specific part: the NVIDIA driver, the lid and the battery. Replace it for the new machine.
 4. In [`docker-compose.yml`](docker-compose.yml), the `deploy` blocks of Jellyfin and Ollama are the only GPU settings. On an Intel machine Jellyfin's becomes a `/dev/dri` device for Quick Sync, and Ollama's goes: the embedder then runs on the CPU.
 
-## The Hub's key
+## The Hubs and their keys
 
-The Hub runs here as `household-hub-dev`: the dev hub, built from the checkout, so each merge reaches it at 04:00. It answers at `https://hub-dev.spicy-llama.duckdns.org`, and on `hub.` too until the prod hub ships (#134). From the server itself it is `http://localhost:3051`.
+Two Hubs run here, and they share neither data nor key:
 
-`HUB_DEV_SECRET_KEY` in `.env` signs every login token and encrypts the calendar credentials stored in its database. The Hub refuses to start without it, or on a key shorter than 32 characters. Make one with `openssl rand -hex 32` and never commit it.
+| | Dev | Prod |
+|---|---|---|
+| Container | `household-hub-dev`, built from the checkout | `household-hub`, the released image `ghcr.io/anwera64/household-hub` |
+| Changes | every merge, at 04:00 | when the `Hub prod` bump PR is merged, then at 04:00 |
+| Data | volume `household_hub_data` | volume `household_hub_prod_data` |
+| Key | `HUB_DEV_SECRET_KEY` | `HUB_SECRET_KEY` |
+| Address | `https://hub-dev.spicy-llama.duckdns.org` | `https://hub.spicy-llama.duckdns.org`, once the prod app ships (#134) |
+| From the server itself | `http://localhost:3051` | `http://localhost:3052` |
 
-Changing the key later has two costs:
+Until the prod app ships, `hub.` still leads to the dev Hub, so the installed app keeps its data.
+
+Each key signs that Hub's login tokens and encrypts the calendar credentials stored in its database. A Hub refuses to start without its key, or on one shorter than 32 characters. Make each with `openssl rand -hex 32`, never copy the dev one's into prod, and never commit either.
+
+Changing a key later has two costs:
 
 - It signs every phone out; each member signs in again once.
 - The stored calendar credentials can no longer be read. Re-encrypt them with the new key while the Hub is stopped, or reconnect each calendar in the app afterwards.
 
+## Releasing the Hub
+
+Prod only runs a released image:
+
+1. A PR raises `__version__` in `apps/household-hub/backend/app/__init__.py`. The minor number is the MVP slice (`0.5.0`) and a fix within it is a patch (`0.5.1`).
+2. Merging it is the release. [`release-tags.yml`](../../.github/workflows/release-tags.yml) tags `hub-v<version>`, and `hub-release.yml` runs the tests, pushes the private image and writes the release notes. It fails if the image can be pulled without signing in.
+3. Renovate opens a `Hub prod` PR that moves the `household-hub` image to the new version, at its next hourly run. It never merges it by itself.
+4. Merging that PR puts the version on prod at 04:00. To apply it at once: `sudo hosts/server/system/server-stack-up.sh`.
+
+**Rolling back:** revert the `Hub prod` PR on GitHub, then run `server-stack-up.sh` or wait for 04:00. The database stays as the newer version left it, so a release whose migration changed it needs that migration undone first.
+
+**Security fixes:** Renovate opens a PR, labelled `security`, when GitHub reports a vulnerable package in the hub's requirements. That PR also raises the patch version ([`tools/bump-hub-patch.sh`](../../tools/bump-hub-patch.sh)), so merging it releases the fix and the `Hub prod` PR follows. Routine package bumps reach dev only, and prod gets them with the next release. This needs Dependabot alerts on in the repository's settings.
+
+**The private image** needs a **classic** GitHub token with `read:packages` only; GitHub Packages takes no fine-grained token. It is used twice:
+
+- By the server's Docker, which pulls the image as root: `sudo docker login ghcr.io -u Anwera64`, with the token as the password. Docker keeps it in `/root/.docker/config.json`.
+- By Renovate, to see new versions: `RENOVATE_GHCR_TOKEN` in `.env`.
+
+When the token expires, prod keeps running the image it has, but a new version cannot be pulled and Renovate stops opening `Hub prod` PRs.
+
 ## Backups
 
-`hosts/server/.env` is not in git. `config/` on the SSD holds every app's settings and databases; the Hub's database is in the `household_hub_data` volume.
+`hosts/server/.env` is not in git. `config/` on the SSD holds every app's settings and databases; the Hubs' databases are in the `household_hub_prod_data` (prod) and `household_hub_data` (dev) volumes.

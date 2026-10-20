@@ -149,6 +149,8 @@ The server has a firewall, so its service ports answer lemonpi only.
 │       ├── hub-release.yml          # Hub release: tests, the private image to GHCR, release notes
 │       └── caddy-image.yml          # Builds the Pi's Caddy + DuckDNS image (arm64/amd64) to GHCR
 ├── renovate.json                    # Renovate: bump PRs for pinned images and the hub's and client's libraries
+├── tools/
+│   └── bump-hub-patch.sh            # Renovate's security PRs: raises the hub's patch version
 ├── .githooks/
 │   └── pre-commit                   # Tests, compose validation, architecture checks before every commit
 ├── AGENTS.md                        # Development rules (plan first, TDD, Clean Architecture, environment)

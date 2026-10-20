@@ -96,7 +96,7 @@ test('Root README matches the repository', async (t) => {
 
   await t.test('lists the release workflows and their tests', () => {
     const paths = treePaths(readme);
-    for (const p of ['.github/workflows/hub-release.yml', '.github/workflows/release-tags.yml', 'tests/release-workflows.test.js']) {
+    for (const p of ['.github/workflows/hub-release.yml', '.github/workflows/release-tags.yml', 'tests/release-workflows.test.js', 'tools/bump-hub-patch.sh']) {
       assert.ok(paths.includes(p), `the tree must list ${p}`);
     }
   });
