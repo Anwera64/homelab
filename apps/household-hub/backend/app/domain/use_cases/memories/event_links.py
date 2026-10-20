@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from app.domain.entities.calendar_event import CalendarEvent
+from app.domain.entities.memory import AgentMemory
 from app.domain.entities.session import ChatMessage
 
 CALENDAR_WRITE = "calendar_write"
@@ -70,6 +71,22 @@ def removed_events(messages: List[ChatMessage], gone_ids: List[str]) -> List[Rem
             removed.append(event_id)
     removed += [event_id for event_id in gone_ids if event_id not in removed]
     return [named[event_id] for event_id in removed if event_id in named]
+
+
+def carry_event(new: AgentMemory, stored: AgentMemory, link: bool) -> None:
+    """
+    What [new] keeps from the event-linked [stored] it replaces or sits beside: the expiry when it has
+    none of its own, and with [link] the event itself, so a later move or removal still reaches it.
+    The words are the member's own and carry their own time, so nothing about a rebuilt sentence is
+    copied (memory spec §7).
+    """
+    if stored.event_id is None:
+        return
+    if new.expires_at is None:
+        new.expires_at = stored.expires_at
+    if link:
+        new.event_id = stored.event_id
+        new.event_starts_at = stored.event_starts_at
 
 
 def event_expiry(event: CalendarEvent) -> Optional[datetime]:

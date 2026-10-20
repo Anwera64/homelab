@@ -348,6 +348,11 @@ longer in the calendar, is listed for the model as removed (`[r1] Dinner · Sun 
 with its last title and start from the chat's steps, so it doesn't save the event as a plain dated
 memory. A fact the model tags with one is dropped and logged (`outcome=dropped_removed_event`).
 
+**Replacing an event memory.** A memory that takes an event-linked memory's place (`remember` over the
+member's own, or Use new) keeps the event link, the event's start and its expiry, in the member's own
+words; the next move or removal of the event rebuilds or retires it. Keep both gives the new sentence
+only the expiry: one memory per event.
+
 **Scope.** Personal or household, decided per event like any other memory.
 
 **Staying true.**

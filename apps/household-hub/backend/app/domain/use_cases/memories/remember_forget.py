@@ -14,6 +14,7 @@ from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.event_links import carry_event
 from app.domain.use_cases.memories.list_memory_page import UNKNOWN_AGENT_NAME, MemoryItems
 from app.domain.use_cases.memories.match_memory import HeldMatch, MatchMemoryUseCase, MemoryMatch
 from app.domain.use_cases.memories.retire_memory import RetireMemoryUseCase
@@ -135,6 +136,9 @@ class RememberUseCase:
             created_at=self.clock(),
             updated_at=self.clock(),
         )
+        if stored is not None:
+            # It takes the place of the stored one, so a later move or removal of its event still reaches it.
+            carry_event(new, stored, link=True)
         done = Remembered(memory=new)
         async with self.uow:
             await self.memory_repo.create(new)

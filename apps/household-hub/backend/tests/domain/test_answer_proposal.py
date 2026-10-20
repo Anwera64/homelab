@@ -1,6 +1,7 @@
 """Answering a change to check, and undoing the answer (memory spec §6.1, §10 Replacement, Only the speaker answers)."""
 
 import logging
+from datetime import datetime, timezone
 
 import pytest
 
@@ -110,6 +111,50 @@ async def test_GIVEN_a_change_WHEN_use_new_THEN_it_replaces_the_stored_one():
     assert new is not None and new.is_active
     assert not world.stored.is_active
     assert world.stored.replaced_by_id == new.id and world.stored.retired_at == NOW
+
+
+_SERVICE_STARTS = datetime(2026, 10, 28, 8, 0, tzinfo=timezone.utc)
+_SERVICE_ENDS = datetime(2026, 10, 28, 10, 0, tzinfo=timezone.utc)
+
+
+def _linked_world():
+    world = World()
+    world.stored.event_id = "ev-boiler"
+    world.stored.event_starts_at = _SERVICE_STARTS
+    world.stored.expires_at = _SERVICE_ENDS
+    return world
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_change_to_a_memory_linked_to_an_event_WHEN_use_new_THEN_the_new_one_keeps_the_event():
+    world = _linked_world()
+
+    await world.answer.execute("prop", USE_NEW, LIAM)
+
+    new = world.new_memory
+    assert (new.event_id, new.event_starts_at, new.expires_at) == ("ev-boiler", _SERVICE_STARTS, _SERVICE_ENDS)
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_change_to_a_memory_linked_to_an_event_WHEN_keep_both_THEN_the_new_one_only_takes_its_expiry():
+    world = _linked_world()
+
+    await world.answer.execute("prop", KEEP_BOTH, LIAM)
+
+    new = world.new_memory
+    assert (new.event_id, new.event_starts_at, new.expires_at) == (None, None, _SERVICE_ENDS)
+    assert world.stored.event_id == "ev-boiler"
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_use_new_on_a_linked_memory_WHEN_undone_THEN_the_stored_one_is_linked_as_before():
+    world = _linked_world()
+    await world.answer.execute("prop", USE_NEW, LIAM)
+
+    await world.undo.execute("prop", LIAM)
+
+    assert [m.id for m in world.memories.memories] == ["boiler"]
+    assert (world.stored.is_active, world.stored.event_id, world.stored.expires_at) == (True, "ev-boiler", _SERVICE_ENDS)
 
 
 @pytest.mark.asyncio
