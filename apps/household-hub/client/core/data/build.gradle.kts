@@ -10,14 +10,14 @@ plugins {
 val generateBuildConfig =
     tasks.register("generateBuildConfig") {
         val baseUrl =
-            providers.gradleProperty("hub.baseUrl").orNull
+            providers.gradleProperty("hub.devUrl").orNull
                 ?: throw GradleException(
-                    "hub.baseUrl is not set; add it to gradle.properties or pass -Phub.baseUrl=...",
+                    "hub.devUrl is not set; add it to gradle.properties or pass -Phub.devUrl=...",
                 )
         val telemetryUrl =
-            providers.gradleProperty("telemetry.baseUrl").orNull
+            providers.gradleProperty("telemetry.devUrl").orNull
                 ?: throw GradleException(
-                    "telemetry.baseUrl is not set; add it to gradle.properties or pass -Ptelemetry.baseUrl=... " +
+                    "telemetry.devUrl is not set; add it to gradle.properties or pass -Ptelemetry.devUrl=... " +
                         "(an empty value turns telemetry off)",
                 )
         val outputDir = layout.buildDirectory.dir("generated/source/buildConfig/commonMain/kotlin")

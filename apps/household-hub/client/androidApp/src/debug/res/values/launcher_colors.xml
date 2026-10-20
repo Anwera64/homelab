@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The dev app (debug builds) sits beside the household's on the same phone: Hearth's
+         tertiary tells the two apart where the name is cut short. -->
+    <color name="launcher_background">#C05638</color>
+</resources>

@@ -36,12 +36,16 @@ final class AppIconTests: XCTestCase {
         _ = try appIconImage()
     }
 
-    func testAppIconCornerIsOpaqueHearthPrimaryGreen() throws {
+    /// The tests run hosted in a Debug build, which is the dev app (#134): its icon,
+    /// `AppIcon-Dev`, is the same artwork on Hearth's tertiary, so it cannot be mistaken for the
+    /// household's green one on the same phone. Release builds use `AppIcon`, which nothing here
+    /// can host; `AppVariantsTest` pins which set each configuration names.
+    func testDevAppIconCornerIsOpaqueHearthTertiary() throws {
         let image = try appIconImage()
         let corner = CGPoint(x: iconCanvasSize * 0.1, y: iconCanvasSize * 0.1)
         let pixel = try rasterizedPixel(of: image, at: corner, canvasSize: iconCanvasSize)
 
-        assertPixel(pixel, hex: (0x3C, 0x6E, 0x4E))
+        assertPixel(pixel, hex: (0xC0, 0x56, 0x38))
         XCTAssertEqual(
             pixel.a, 255,
             "Corner pixel alpha was \(pixel.a), not fully opaque — an app icon must not carry any "
