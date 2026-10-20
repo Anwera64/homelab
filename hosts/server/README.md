@@ -357,7 +357,9 @@ The setup is meant to outlive the laptop:
 
 ## The Hub's key
 
-`HUB_SECRET_KEY` in `.env` signs every login token and encrypts the calendar credentials stored in the Hub's database. The Hub refuses to start without it, or on a key shorter than 32 characters. Make one with `openssl rand -hex 32` and never commit it.
+The Hub runs here as `household-hub-dev`: the dev hub, built from the checkout, so each merge reaches it at 04:00. It answers at `https://hub-dev.spicy-llama.duckdns.org`, and on `hub.` too until the prod hub ships (#134). From the server itself it is `http://localhost:3051`.
+
+`HUB_DEV_SECRET_KEY` in `.env` signs every login token and encrypts the calendar credentials stored in its database. The Hub refuses to start without it, or on a key shorter than 32 characters. Make one with `openssl rand -hex 32` and never commit it.
 
 Changing the key later has two costs:
 

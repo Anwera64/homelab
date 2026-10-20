@@ -174,7 +174,7 @@ test('Root README matches the repository', async (t) => {
 
     assert.match(readme, /^\| \*\*Grafana\*\* \| Server \| `https:\/\/grafana\.spicy-llama\.duckdns\.org` \| Log search/m);
     assert.match(readme, /^\| \*\*Loki\*\* \| Server \| — \| [^|]*port 3100, the desktop's Alloy only/m);
-    assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org` \| Family assistant backend/m);
+    assert.match(readme, /^\| \*\*Household Hub\*\* \| Server \| `https:\/\/hub\.spicy-llama\.duckdns\.org`[^|]* \| Family assistant backend/m);
     assert.match(readme, /^\| \*\*Ollama\*\* \| Desktop \| — \| [^|]*port 11434, the server only/m);
 
     const paths = treePaths(readme);
@@ -217,7 +217,7 @@ test('Root README matches the repository', async (t) => {
     assert.match(serverRow, /image renderer \(on demand\)/, 'the Server row must list the renderer as on demand');
   });
   await t.test('says how to search the logs, what is kept and which ports the desktop opens', () => {
-    assert.ok(readme.includes('{container="household-hub"}'), 'README must show a LogQL query by container');
+    assert.ok(readme.includes('{container="household-hub-dev"}'), 'README must show a LogQL query by container');
     assert.ok(readme.includes('{host="desktop", container="ollama"}'), 'README must show how to find the desktop\'s lines');
     assert.match(readme, /30 days/);
     assert.ok(readme.includes('logs=off'), 'README must name the opt-out label');
@@ -226,10 +226,19 @@ test('Root README matches the repository', async (t) => {
     assert.match(readme, /New-NetFirewallRule[^\n]*-LocalPort 11434[^\n]*-RemoteAddress 192\.168\.1\.30/);
   });
   await t.test('the telemetry route is in the endpoints and the graph', () => {
-    assert.match(readme, /^\| \*\*Alloy\*\* \| Server \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org` \| Ships/m);
     const graph = readme.match(/```mermaid\n([\s\S]*?)```/)[1];
     assert.match(graph, /CADDY -->\|telemetry, token checked by the hub\| ALLOY/);
     assert.ok(readme.includes('{service_name="household-hub-app"}'), 'README must show how to find the app\'s lines');
+    assert.ok(readme.includes('hub_env="dev"'), 'README must show how to tell the dev app\'s lines from the prod app\'s');
+    assert.match(readme, /^\| \*\*Alloy\*\* \| Server \| `https:\/\/telemetry\.spicy-llama\.duckdns\.org`, `https:\/\/telemetry-dev\.spicy-llama\.duckdns\.org` \| /m);
+  });
+
+  await t.test('the dev hub is in the endpoints, reached from the server on its one port', () => {
+    const row = readme.match(/^\| \*\*Household Hub\*\* \|.*$/m);
+    assert.ok(row, 'README must list the Household Hub');
+    assert.ok(row[0].includes('`https://hub-dev.spicy-llama.duckdns.org`'));
+    assert.ok(row[0].includes('`http://localhost:3051`'), '/docs on the server is on the published port');
+    assert.doesNotMatch(readme, /127\.0\.0\.1:3050/, 'the loopback-only port is gone');
   });
   await t.test('the desktop opens one port, for the server: the media rule is gone', () => {
     // The media ports left with the media services. Only Ollama answers, and only the server.

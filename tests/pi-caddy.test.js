@@ -96,24 +96,42 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     assert.doesNotMatch(caddyfile, /:8191\b/);
   });
   await t.test('telemetry goes to Alloy only after the hub accepts the sender\'s token', () => {
-    const block = caddyfile.match(/@telemetry host telemetry\.spicy-llama\.duckdns\.org\s*\n\s*handle @telemetry \{\n([\s\S]*?)\n    \}/);
-    assert.ok(block, 'the Caddyfile must route telemetry.spicy-llama.duckdns.org');
-    const body = block[1];
+    const snippet = caddyfile.match(/^\(app_telemetry\) \{\n([\s\S]*?)\n\}$/m);
+    assert.ok(snippet, 'the telemetry route is one snippet, so the dev and prod names cannot drift apart');
+    const body = snippet[1];
     // Only log batches: nothing stores traces or metrics, and nothing else of Alloy is exposed.
     assert.match(body, /@logs \{\s*\n\s*method POST\s*\n\s*path \/v1\/logs\s*\n\s*\}/);
     // `route` keeps the written order. Without it Caddy runs request_header after forward_auth
     // and removes the member the hub just named.
-    const guarded = body.match(/handle @logs \{\n(?:\s*#[^\n]*\n)?\s*route \{\n([\s\S]*?)\n            \}\n        \}/);
+    const guarded = body.match(/handle @logs \{\n(?:\s*#[^\n]*\n)*\s*route \{\n([\s\S]*?)\n        \}\n    \}/);
     assert.ok(guarded, 'log batches must be handled by an ordered route');
     const steps = guarded[1];
-    // A sender cannot name the member itself: the header is removed, then set from the hub's answer.
+    // A sender names neither the member nor the hub: both are removed, then set by Caddy.
     const strip = steps.indexOf('request_header -X-Member-Id');
-    // Both the Hub and Alloy are on the server now.
-    const auth = steps.search(/forward_auth 192\.168\.1\.30:3051 \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
+    const env = steps.indexOf('request_header X-Hub-Env {args[1]}');
+    // The hub behind this name answers for its own tokens.
+    const auth = steps.search(/forward_auth 192\.168\.1\.30:\{args\[0\]\} \{\s*\n\s*uri \/api\/v1\/auth\/verify\s*\n\s*copy_headers X-Member-Id\s*\n\s*\}/);
     const proxy = steps.indexOf('reverse_proxy 192.168.1.30:4318');
-    assert.ok(strip >= 0 && auth >= 0 && proxy >= 0, 'strip, forward_auth and reverse_proxy must all be present');
-    assert.ok(strip < auth && auth < proxy, 'strip the header, then ask the hub, then pass to Alloy');
+    assert.ok(strip >= 0 && env >= 0 && auth >= 0 && proxy >= 0, 'strip, the env, forward_auth and reverse_proxy must all be present');
+    assert.ok(strip < auth && env < auth && auth < proxy, 'strip and set the headers, then ask the hub, then pass to Alloy');
     assert.match(body, /handle \{\s*\n\s*respond 404\s*\n\s*\}/, 'anything else on this name is refused');
+  });
+
+  await t.test('each telemetry name asks its own hub, and says which one', () => {
+    const route = (name, matcher) =>
+      caddyfile.match(new RegExp(`@${matcher} host ${name}\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @${matcher} \\{\\s*\\n\\s*import app_telemetry (\\d+) (\\w+)\\s*\\n\\s*\\}`));
+    const dev = route('telemetry-dev', 'telemetry_dev');
+    assert.ok(dev, 'telemetry-dev must import the snippet');
+    assert.deepEqual(dev.slice(1), ['3051', 'dev']);
+    // Until the prod app exists (#134), the old name still serves today's data: the dev hub.
+    const prod = route('telemetry', 'telemetry');
+    assert.ok(prod, 'telemetry must import the snippet');
+    assert.deepEqual(prod.slice(1), ['3051', 'dev']);
+  });
+
+  await t.test('the dev hub has a name of its own, beside the one the installed app uses', () => {
+    assert.match(caddyfile, new RegExp(`@hub_dev host hub-dev\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub_dev \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051\\s*\\n`));
+    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051\\s*\\n`));
   });
 
   await t.test('plain HTTP on the Pi\'s own names redirects to the dashboard\'s HTTPS name', () => {

@@ -18,6 +18,32 @@
     }
 }
 
+# The app's logs, to Alloy on the server. The hub behind the name is asked whose token it
+# is first; it never sees the logs themselves. {args[0]}: that hub's port on the server,
+# {args[1]}: dev or prod, which Alloy keeps as the hub_env label.
+(app_telemetry) {
+    @logs {
+        method POST
+        path /v1/logs
+    }
+    handle @logs {
+        # route keeps this order; Caddy's own would strip the header after the hub set it.
+        # A sender names neither the member nor the hub: Caddy sets both.
+        route {
+            request_header -X-Member-Id
+            request_header X-Hub-Env {args[1]}
+            forward_auth 192.168.1.30:{args[0]} {
+                uri /api/v1/auth/verify
+                copy_headers X-Member-Id
+            }
+            reverse_proxy 192.168.1.30:4318
+        }
+    }
+    handle {
+        respond 404
+    }
+}
+
 *.spicy-llama.duckdns.org, spicy-llama.duckdns.org {
     import security_headers
 
@@ -108,32 +134,25 @@
         reverse_proxy 192.168.1.30:3002
     }
 
-    # The app's logs, to Alloy on the server. The hub is asked whose token it is first;
-    # it never sees the logs themselves.
+    # The app's logs (the app_telemetry snippet above), and the hubs. Until the prod app
+    # exists (#134), the names the installed app uses still lead to today's data: the dev hub.
     @telemetry host telemetry.spicy-llama.duckdns.org
     handle @telemetry {
-        @logs {
-            method POST
-            path /v1/logs
-        }
-        handle @logs {
-            # route keeps this order; Caddy's own would strip the header after the hub set it.
-            route {
-                request_header -X-Member-Id
-                forward_auth 192.168.1.30:3051 {
-                    uri /api/v1/auth/verify
-                    copy_headers X-Member-Id
-                }
-                reverse_proxy 192.168.1.30:4318
-            }
-        }
-        handle {
-            respond 404
-        }
+        import app_telemetry 3051 dev
+    }
+
+    @telemetry_dev host telemetry-dev.spicy-llama.duckdns.org
+    handle @telemetry_dev {
+        import app_telemetry 3051 dev
     }
 
     @hub host hub.spicy-llama.duckdns.org
     handle @hub {
+        reverse_proxy 192.168.1.30:3051
+    }
+
+    @hub_dev host hub-dev.spicy-llama.duckdns.org
+    handle @hub_dev {
         reverse_proxy 192.168.1.30:3051
     }
 

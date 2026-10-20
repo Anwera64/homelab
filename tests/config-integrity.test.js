@@ -220,7 +220,9 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.doesNotMatch(receiver[1], /\b(traces|metrics)\s*=/);
     assert.doesNotMatch(receiver[1], /grpc\s*\{/, 'only OTLP over HTTP is published');
     assert.match(alloy, /key\s*=\s*"member\.id"\s*\n\s*action\s*=\s*"upsert"\s*\n\s*from_context\s*=\s*"metadata\.x-member-id"/);
-    assert.match(alloy, /key\s*=\s*"loki\.attribute\.labels"[\s\S]*?value\s*=\s*"member\.id"/);
+    // Which hub vouched for the sender, dev or prod: set by Caddy per name, like the member.
+    assert.match(alloy, /key\s*=\s*"hub\.env"\s*\n\s*action\s*=\s*"upsert"\s*\n\s*from_context\s*=\s*"metadata\.x-hub-env"/);
+    assert.match(alloy, /key\s*=\s*"loki\.attribute\.labels"[\s\S]*?value\s*=\s*"member\.id, hub\.env"/);
     assert.match(alloy, /key\s*=\s*"loki\.resource\.labels"[\s\S]*?value\s*=\s*"service\.name"/);
     assert.match(alloy, /otelcol\.exporter\.loki "[a-z_]+" \{\s*\n\s*forward_to\s*=\s*\[loki\.write\.loki\.receiver\]/);
   });
@@ -236,7 +238,16 @@ test('Cross-Configuration & Infrastructure Integrity Suite', async (t) => {
     assert.ok(selector, 'the drop must be a stage.match with a selector');
     assert.match(process[1], /action\s*=\s*"drop"/);
     const logql = JSON.parse('"' + selector[1] + '"');
-    assert.match(logql, /^\{container="household-hub"\} \|~ /, 'only the hub is filtered');
+    // Both hubs, and nothing else: Loki anchors the regex at both ends.
+    const containers = logql.match(/^\{container=~"([^"]+)"\} \|~ /);
+    assert.ok(containers, 'only the hubs are filtered, by a container regex');
+    const hubs = new RegExp(`^(?:${containers[1]})$`);
+    for (const name of ['household-hub', 'household-hub-dev']) {
+      assert.ok(hubs.test(name), `${name} is filtered`);
+    }
+    for (const name of ['grafana', 'household-hub-app', 'searxng']) {
+      assert.ok(!hubs.test(name), `${name} is not filtered`);
+    }
     const filter = new RegExp(JSON.parse(logql.replace(/^\{[^}]*\} \|~ /, '')));
     const line = (request, status) => `INFO:     127.0.0.1:41642 - "${request} HTTP/1.1" ${status}`;
     assert.ok(filter.test(line('GET /api/v1/health', '200 OK')), 'an answered health check is dropped');

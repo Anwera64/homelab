@@ -388,16 +388,19 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  household-hub:
+  # The dev Hub: built from the checkout, so every merge reaches it at 04:00. It keeps
+  # the data and key the Hub had before there were two.
+  household-hub-dev:
     build:
       context: ../../apps/household-hub/backend
-    container_name: household-hub
+    container_name: household-hub-dev
     environment:
       - TZ=${TZ:-Europe/Madrid}
       # Signs every login and encrypts the stored calendar credentials. In production mode
       # the Hub refuses to start on the default from the repo, or on a key under 32 characters.
+      # Dev keeps that mode: it is reachable from the internet too.
       - ENVIRONMENT=production
-      - SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}
+      - SECRET_KEY=${HUB_DEV_SECRET_KEY:?set HUB_DEV_SECRET_KEY in hosts/server/.env}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}
       # What a turn reads is embedded here. If this Ollama is down, the turn ranks by keywords.
       - EMBEDDING_BASE_URL=http://ollama:11434
@@ -405,12 +408,11 @@ services:
       # Google Calendar sign-in (#54); empty ID leaves Google unavailable in the app.
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
       - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET:-}
-      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-https://hub.${DOMAIN_NAME:-spicy-llama.duckdns.org}}
+      - HUB_PUBLIC_URL=${HUB_DEV_PUBLIC_URL:-https://hub-dev.${DOMAIN_NAME:-spicy-llama.duckdns.org}}
     volumes:
       - household_hub_data:/data
     ports:
-      - 127.0.0.1:3050:3050   # /docs and /api/v1/health from the server itself
-      - 3051:3050             # LAN, for the Pi's Caddy (hub.spicy-llama.duckdns.org)
+      - 3051:3050   # the Pi's Caddy (hub-dev); from the server itself, localhost:3051/api/v1/health and /docs
     depends_on:
       - searxng
       - ollama
