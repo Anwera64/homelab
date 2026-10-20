@@ -1,8 +1,9 @@
 name: Release tags
 
-# Merging a version bump is the release: when master's __version__ has no hub-v* tag yet, this
-# tags the merge and runs hub-release.yml. A tag pushed with GITHUB_TOKEN starts no workflow
-# of its own, so the release is called from here. A version that is already tagged does nothing.
+# Merging a version bump is the release: when master's __version__ has no hub-v* tag yet, or
+# app.version no app-v* tag, this tags the merge and runs hub-release.yml or app-release.yml.
+# A tag pushed with GITHUB_TOKEN starts no workflow of its own, so the release is called from
+# here. A version that is already tagged does nothing.
 
 on:
   push:
@@ -28,6 +29,7 @@ jobs:
       contents: write
     outputs:
       hub: ${{ steps.hub.outputs.hub }}
+      app: ${{ steps.app.outputs.app }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -44,6 +46,19 @@ jobs:
           git push origin "refs/tags/$tag"
           echo "hub=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Tag the app version
+        id: app
+        run: |
+          version="$(sed -n 's/^app\.version=//p' apps/household-hub/client/gradle.properties)"
+          tag="app-v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag is already released"
+            exit 0
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          echo "app=$tag" >> "$GITHUB_OUTPUT"
+
   hub:
     name: Hub release
     needs: tag
@@ -54,3 +69,15 @@ jobs:
     uses: ./.github/workflows/hub-release.yml
     with:
       tag: ${{ needs.tag.outputs.hub }}
+
+  # The keys are in the release environment, which the called jobs name themselves.
+  app:
+    name: App release
+    needs: tag
+    if: needs.tag.outputs.app != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/app-release.yml
+    with:
+      tag: ${{ needs.tag.outputs.app }}
+    secrets: inherit

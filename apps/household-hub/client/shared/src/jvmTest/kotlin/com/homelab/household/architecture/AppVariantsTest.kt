@@ -172,6 +172,12 @@ class AppVariantsTest {
     }
 
     @Test
+    fun `GIVEN a TestFlight upload WHEN App Store Connect asks about encryption THEN the plist answers no`() {
+        // Only the HTTPS built into iOS (Ktor's Darwin engine), which Apple counts as exempt.
+        assertTrue(iosProject.contains("ITSAppUsesNonExemptEncryption: false"))
+    }
+
+    @Test
     fun `GIVEN the iOS project WHEN it names a version THEN it is app version and its build number`() {
         val version = properties["app.version"].orEmpty()
         val (major, minor, patch) = version.split(".").map { it.toInt() }
