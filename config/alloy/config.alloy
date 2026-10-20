@@ -23,7 +23,7 @@ discovery.relabel "containers" {
     action        = "drop"
   }
 
-  // Docker names a container "/household-hub"; search by "household-hub".
+  // Docker names a container "/household-hub-dev"; search by "household-hub-dev".
   rule {
     source_labels = ["__meta_docker_container_name"]
     regex         = "/(.*)"
@@ -51,7 +51,7 @@ loki.process "containers" {
   // Docker's health check and Caddy's sign-in check before each telemetry batch: the
   // answered ones say nothing and would drown the rest. Failures are kept.
   stage.match {
-    selector            = "{container=\"household-hub\"} |~ \"\\\"GET /api/v1/(health|auth/verify)[^\\\"]*\\\" 20[04]\""
+    selector            = "{container=~\"household-hub(-dev)?\"} |~ \"\\\"GET /api/v1/(health|auth/verify)[^\\\"]*\\\" 20[04]\""
     action              = "drop"
     drop_counter_reason = "hub_probe_answered"
   }
@@ -76,11 +76,18 @@ otelcol.processor.attributes "app" {
     from_context = "metadata.x-member-id"
   }
 
-  // Loki labels: {service_name="household-hub-app", member_id="..."}.
+  // Which hub vouched for the sender: Caddy sets dev or prod by the name the batch came to.
+  action {
+    key          = "hub.env"
+    action       = "upsert"
+    from_context = "metadata.x-hub-env"
+  }
+
+  // Loki labels: {service_name="household-hub-app", member_id="...", hub_env="dev"}.
   action {
     key    = "loki.attribute.labels"
     action = "insert"
-    value  = "member.id"
+    value  = "member.id, hub.env"
   }
 
   action {

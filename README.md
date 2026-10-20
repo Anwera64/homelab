@@ -119,14 +119,14 @@ graph TD
 | **Maintainerr** | Server | `https://maintainerr.spicy-llama.duckdns.org` | Media lifecycle & cleanup |
 | **Cleanuparr** | Server | `https://cleanuparr.spicy-llama.duckdns.org` | Download queue cleanup: fakes, failed imports, seeding limits |
 | **FlareSolverr** | Server | — | Cloudflare challenge solver. No login, so no name and no port: only Prowlarr reaches it |
-| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org` | Family assistant backend (`/docs` at `http://127.0.0.1:3050` on the server itself) |
+| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org`, `https://hub-dev.spicy-llama.duckdns.org` | Family assistant backend: the dev hub, built from master; both names lead to it until the prod hub ships (#134). `/docs` at `http://localhost:3051` on the server itself |
 | **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | Log search (sign-in required) |
 | **Gluetun API** | Server | — | VPN status for Homepage (port 8000, API key) |
 | **SearXNG** | Server | — | Private search for the hub (internal `http://searxng:8080`) |
 | **Ollama** | Desktop | — | The chat model, local LLM inference (port 11434, the server only) |
 | **Ollama (embedder)** | Server | — | `bge-m3`, ranks what a chat turn reads (internal `http://ollama:11434`) |
 | **Loki** | Server | — | Log store, 30 days (port 3100, the desktop's Alloy only) |
-| **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
+| **Alloy** | Server | `https://telemetry.spicy-llama.duckdns.org`, `https://telemetry-dev.spicy-llama.duckdns.org` | Ships the server's container output to Loki; receives the app's logs (OTLP), after the hub has checked the sender's token |
 | **Alloy** | Desktop | — | Ships the desktop's container output to the server's Loki |
 | **Recyclarr** | Server | — | TRaSH Guides sync, daily 3 AM |
 | **Renovate** | Server | — | Version bump PRs for every host's images, the hub and its client, opened when a release is three days old; runs every hour |
@@ -259,11 +259,11 @@ Remove-NetFirewallRule -DisplayName "Homelab Stack (LAN)"
 **Server**
 * **Update:** `cd ~/homelab && git pull && sudo hosts/server/bootstrap.sh`
 * **Logs:** every container's output is kept for 30 days in Loki and survives a rebuild. This covers the server's containers and the desktop's.
-* **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org`. Try `{container="household-hub"}`, or `{container="household-hub"} |= "tool"` to filter by text. The desktop's lines carry `host="desktop"`: `{host="desktop", container="ollama"}`.
+* **Searching logs:** open Grafana (Explore) at `https://grafana.spicy-llama.duckdns.org`. Try `{container="household-hub-dev"}`, or `{container="household-hub-dev"} |= "tool"` to filter by text. The desktop's lines carry `host="desktop"`: `{host="desktop", container="ollama"}`.
 * **Grafana sign-in:** admin / admin on first start (Grafana asks for a new password), or `GRAFANA_ADMIN_PASSWORD` in `hosts/server/.env`.
 * **Leave a container out:** label it `logs=off`.
 * **Dashboards as images:** Grafana can draw a dashboard or a panel as a PNG, which is how a dashboard change gets checked without a browser. The renderer is a headless browser and does not run by itself. On the server, in `~/homelab/hosts/server`, start it with `docker compose --profile render up -d grafana-renderer` and stop it with `docker compose --profile render stop grafana-renderer`.
-* **The app's logs:** `{service_name="household-hub-app"}`, or add `member_id="..."` for one member. The app posts them to `https://telemetry.spicy-llama.duckdns.org/v1/logs` with its sign-in token; Caddy asks the hub whose token it is before passing them to Alloy.
+* **The app's logs:** `{service_name="household-hub-app"}`, or add `member_id="..."` for one member and `hub_env="dev"` or `hub_env="prod"` for one hub. Caddy sets `hub_env` by the name the logs came to: `telemetry-dev` is the dev hub's. The app posts them to `https://telemetry.spicy-llama.duckdns.org/v1/logs` with its sign-in token; Caddy asks the hub whose token it is before passing them to Alloy.
 * **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki's port is open to the desktop's Alloy only.
 
 **lemonpi**

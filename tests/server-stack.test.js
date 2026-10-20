@@ -41,7 +41,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 
   await t.test('runs every desktop service, with an Ollama of its own for the embedder only', () => {
     const expected = [
-      'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub',
+      'alloy', 'bazarr', 'cleanuparr', 'flaresolverr', 'gluetun', 'grafana', 'grafana-renderer', 'household-hub-dev',
       'jellyfin', 'jellystat', 'jellystat-db', 'loki', 'maintainerr', 'node-exporter', 'nvidia-gpu-exporter', 'ollama',
       'prometheus', 'prowlarr', 'qbittorrent', 'radarr', 'recyclarr', 'renovate', 'searxng', 'seerr', 'smartctl-exporter',
       'sonarr',
@@ -59,7 +59,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
       jellyfin: ['8096:8096'], seerr: ['5055:5055'], jellystat: ['3005:3000'], maintainerr: ['6246:6246'],
       sonarr: ['8989:8989'], radarr: ['7878:7878'], prowlarr: ['9696:9696'], bazarr: ['6767:6767'],
       gluetun: ['8080:8080', '8000:8000'], cleanuparr: ['11011:11011'],
-      grafana: ['3002:3000'], 'household-hub': ['3051:3050'], alloy: ['4318:4318'],
+      grafana: ['3002:3000'], 'household-hub-dev': ['3051:3050'], alloy: ['4318:4318'],
     };
     // FlareSolverr has no login: Prowlarr reaches it inside the stack, and nothing else does.
     assert.doesNotMatch(block('flaresolverr'), /^    ports:/m, 'FlareSolverr must publish no port');
@@ -181,8 +181,8 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.match(ollama, /^    mem_limit:\s*2g\s*$/m);
   });
 
-  await t.test('the Hub is always on, built from the repo, and asks the desktop for the chat model only', () => {
-    const hub = block('household-hub');
+  await t.test('the dev Hub is always on, built from the repo, and asks the desktop for the chat model only', () => {
+    const hub = block('household-hub-dev');
     assert.doesNotMatch(hub, /profiles:/, 'the hub is not optional on the server');
     assert.match(hub, /context:\s*\.\.\/\.\.\/apps\/household-hub\/backend\s*$/m);
     assert.ok(hub.includes('- OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.1.20:11434}'));
@@ -190,9 +190,11 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(hub.includes('- EMBEDDING_BASE_URL=http://ollama:11434'));
     assert.ok(hub.includes('- EMBEDDING_MODEL=bge-m3'));
     assert.ok(hub.includes('- household_hub_data:/data'));
-    assert.ok(hub.includes('- 127.0.0.1:3050:3050'));
+    // One port, on every address: the server itself reaches it as localhost:3051.
+    assert.equal(portsOf(hub).trim().split('\n').length, 1, 'the dev Hub publishes one port');
+    assert.doesNotMatch(hub, /127\.0\.0\.1:3050/);
     // The comment on that port names the health check where it really is.
-    assert.match(hub, /127\.0\.0\.1:3050:3050\s+#[^\n]*\/api\/v1\/health/);
+    assert.match(hub, /- 3051:3050\s+#[^\n]*localhost:3051\/api\/v1\/health/);
     // Start order only: without the embedder the Hub still answers, by keywords.
     assert.deepEqual(dependsOn(hub), ['searxng', 'ollama']);
     assert.doesNotMatch(hub, /condition:/);
@@ -200,12 +202,16 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
     assert.ok(block('searxng').includes('- SEARXNG_SECRET=${SEARXNG_SECRET}'));
   });
 
-  await t.test('the Hub cannot start on the default signing key from the public repo', () => {
-    const hub = block('household-hub');
+  await t.test('the dev Hub cannot start on the default signing key from the public repo', () => {
+    const hub = block('household-hub-dev');
     // In production mode the Hub refuses the built-in default and any key under 32 characters (#102).
+    // The dev Hub keeps that mode: it is reachable from the internet like the other.
     assert.ok(hub.includes('- ENVIRONMENT=production'));
-    assert.ok(hub.includes('- SECRET_KEY=${HUB_SECRET_KEY:?set HUB_SECRET_KEY in hosts/server/.env}'), 'the key is required and has no default');
-    assert.match(envExample, /^HUB_SECRET_KEY=$/m, 'the key must be present and empty in .env.example');
+    assert.ok(hub.includes('- SECRET_KEY=${HUB_DEV_SECRET_KEY:?set HUB_DEV_SECRET_KEY in hosts/server/.env}'), 'the key is required and has no default');
+    assert.match(envExample, /^HUB_DEV_SECRET_KEY=$/m, 'the key must be present and empty in .env.example');
+    assert.doesNotMatch(envExample, /^HUB_SECRET_KEY=/m, 'the prod key arrives with the prod Hub');
+    // Google sign-in returns to the address the Hub names.
+    assert.ok(hub.includes('- HUB_PUBLIC_URL=${HUB_DEV_PUBLIC_URL:-https://hub-dev.${DOMAIN_NAME:-spicy-llama.duckdns.org}}'));
     assert.match(envExample, /openssl rand -hex 32/);
   });
 
@@ -395,7 +401,7 @@ test('Server stack: the desktop services, on the always-on host', async (t) => {
 
 test('The server compose file is validated wherever the others are', async (t) => {
   // The required secrets get a stand-in value, or the compose file would refuse to resolve.
-  const validate = 'HUB_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q';
+  const validate = 'HUB_DEV_SECRET_KEY=validate docker compose -f hosts/server/docker-compose.yml --env-file hosts/server/.env.example config -q';
 
   await t.test('in CI', () => {
     assert.ok(read(path.join(ROOT_DIR, '.github/workflows/test.yml')).includes(validate));
@@ -473,7 +479,10 @@ test('Server README', async (t) => {
   });
 
   await t.test('explains the Hub\'s key and what changing it costs', () => {
-    assert.ok(readme.includes('HUB_SECRET_KEY'));
+    assert.ok(readme.includes('HUB_DEV_SECRET_KEY'));
+    assert.doesNotMatch(readme, /\bHUB_SECRET_KEY\b/, 'no prod key until the prod Hub exists');
+    assert.match(readme, /household-hub-dev/);
+    assert.match(readme, /hub-dev\.spicy-llama\.duckdns\.org/);
     assert.match(readme, /signs every phone out/);
     assert.match(readme, /calendar/i);
   });
