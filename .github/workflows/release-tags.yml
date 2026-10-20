@@ -75,8 +75,10 @@ jobs:
     name: App release
     needs: tag
     if: needs.tag.outputs.app != ''
+    # A called workflow gets no more than this: id-token is the Firebase sign-in.
     permissions:
       contents: write
+      id-token: write
     uses: ./.github/workflows/app-release.yml
     with:
       tag: ${{ needs.tag.outputs.app }}

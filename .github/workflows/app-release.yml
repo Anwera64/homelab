@@ -69,6 +69,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
+    # id-token: GitHub vouches for this run to Google, which is how it signs in to Firebase.
+    permissions:
+      contents: read
+      id-token: write
     defaults:
       run:
         working-directory: apps/household-hub/client
@@ -80,13 +84,18 @@ jobs:
       - uses: ./.github/actions/setup-client
 
       # Outside the checkout, and gone with the runner.
-      - name: Write the signing key and the Firebase account
+      - name: Write the signing key
         env:
           HUB_KEYSTORE_BASE64: ${{ secrets.HUB_KEYSTORE_BASE64 }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          echo "$HUB_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase.json"
+        run: echo "$HUB_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+      # No key is stored anywhere: Google accepts only this repository's runs in the release
+      # environment as the uploading account (Workload Identity Federation). Exports
+      # GOOGLE_APPLICATION_CREDENTIALS for the Firebase CLI.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.FIREBASE_WIF_PROVIDER }}
+          service_account: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Build the signed release
         env:
@@ -97,8 +106,6 @@ jobs:
         run: ./gradlew :androidApp:assembleRelease
 
       - name: Upload to Firebase App Distribution
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase.json
         run: |
           npx --yes firebase-tools@15.34.0 appdistribution:distribute \
             androidApp/build/outputs/apk/release/androidApp-release.apk \

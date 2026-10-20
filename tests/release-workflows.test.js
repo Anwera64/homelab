@@ -179,7 +179,13 @@ test('App release workflow', async (t) => {
     assert.match(android, /npx --yes firebase-tools@\d+\.\d+\.\d+ appdistribution:distribute /, 'a pinned Firebase CLI');
     assert.match(android, /--app "\$\{\{ secrets\.FIREBASE_ANDROID_APP_ID \}\}"/);
     assert.match(android, /--groups household/);
-    assert.match(android, /GOOGLE_APPLICATION_CREDENTIALS: \$\{\{ runner\.temp \}\}\/firebase\.json/);
+    // No key to leak: GitHub vouches for the run, and Google lets only this repo's release runs act
+    // as the account (Workload Identity Federation). The action exports GOOGLE_APPLICATION_CREDENTIALS.
+    assert.match(android, /uses: google-github-actions\/auth@[0-9a-f]{40} # v3\.\d+\.\d+/);
+    assert.match(android, /workload_identity_provider: \$\{\{ secrets\.FIREBASE_WIF_PROVIDER \}\}/);
+    assert.match(android, /service_account: \$\{\{ secrets\.FIREBASE_SERVICE_ACCOUNT_EMAIL \}\}/);
+    assert.match(android, /^    permissions:\n      contents: read\n      id-token: write\n/m);
+    assert.doesNotMatch(workflow, /FIREBASE_SERVICE_ACCOUNT\b(?!_EMAIL)|firebase\.json/, 'no service account key');
   });
 
   await t.test('iOS: an archive signed with the App Store Connect key, uploaded to TestFlight', () => {
@@ -231,6 +237,7 @@ test('Merging an app version bump releases it too', async (t) => {
     assert.match(app, /uses: \.\/\.github\/workflows\/app-release\.yml/);
     assert.match(app, /tag: \$\{\{ needs\.tag\.outputs\.app \}\}/);
     assert.match(app, /secrets: inherit/);
-    assert.match(app, /permissions:\n      contents: write\n/);
+    // A called workflow gets no more than its caller grants: the Firebase sign-in needs id-token.
+    assert.match(app, /permissions:\n      contents: write\n      id-token: write\n/);
   });
 });
