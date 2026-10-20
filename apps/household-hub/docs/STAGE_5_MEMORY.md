@@ -1,6 +1,6 @@
 # Household Hub: Memory
 
-**Status:** 📐 Specification — behaviour and screens agreed
+**Status:** ✅ Built in slice 5 (20 October 2026)
 **Target:** `backend` (`memories`, `chat`, `integrations`, `bootstrap`) + `client` (`:core:*`, `:composeApp`)
 **Date:** October 2026
 
@@ -343,6 +343,16 @@ expires when the event ends. Reflection takes the id from the chat's saved tool 
 created and removed in the same chat leaves nothing. A mentioned event with no id known is a dated
 memory with an expiry and no link.
 
+**Removed events are named.** An event the chat touched that is gone, whether removed in the chat or no
+longer in the calendar, is listed for the model as removed (`[r1] Dinner · Sun 25 Oct 2026, 20:00`),
+with its last title and start from the chat's steps, so it doesn't save the event as a plain dated
+memory. A fact the model tags with one is dropped and logged (`outcome=dropped_removed_event`).
+
+**Replacing an event memory.** A memory that takes an event-linked memory's place (`remember` over the
+member's own, or Use new) keeps the event link, the event's start and its expiry, in the member's own
+words; the next move or removal of the event rebuilds or retires it. Keep both gives the new sentence
+only the expiry: one memory per event.
+
 **Scope.** Personal or household, decided per event like any other memory.
 
 **Staying true.**
@@ -454,7 +464,7 @@ Behaviour the slice's tests must pin. Names are for orientation; each PR writes 
 | Recall | A related memory outside the block is attached and replayed unchanged on the next turn; an unrelated message attaches nothing |
 | Recall gives up | A slow embedder skips recall and the turn still answers |
 | Search fallback | With the extension unavailable, search returns the same order from Python |
-| Event link | An event created in a chat is remembered once with its id and expiry; created and removed in the same chat, it is not |
+| Event link | An event created in a chat is remembered once with its id and expiry; created and removed in the same chat, or gone from the calendar, it is named as removed and a fact tagged with it is not saved |
 | Event changed in the hub | Removing the event retires its memory; moving it rebuilds the sentence and records `moved_from` |
 | Event changed outside | The periodic check retires a memory whose event is gone, and changes nothing when the calendar is unreachable |
 | One store | No `/gossip` route exists; a household memory carries who said it into the prompt line |
@@ -573,14 +583,14 @@ Left open on 12 October; answered by Anton on 13 and 14 October.
 
 **How it ships.** Each PR writes its tests first and changes something that can be checked on the phone.
 
-1. **One store.** The migration (§3), proposals table and wipe; `/gossip` goes.
-2. **Memory page.** The list, tabs, ✕ with Undo, and its states.
-3. **Reading.** Vectors (§4), the fixed block and recall (§5).
-4. **Reflection.** The sweep (§2.2) and comparing on write (§6), after another wipe (§3.3).
-5. **Changes to check and the chat sheet** (§6.1, §8).
-6. **`remember` / `forget`** (§2.1).
-7. **Calendar links** (§7).
-8. **Wrap-up.**
+1. **One store.** The migration (§3), proposals table and wipe; `/gossip` goes. (#182)
+2. **Memory page.** The list, tabs, ✕ with Undo, and its states. (#188)
+3. **Reading.** Vectors (§4), the fixed block and recall (§5). (#189)
+4. **Reflection.** The sweep (§2.2) and comparing on write (§6), after another wipe (§3.3). (#191)
+5. **Changes to check and the chat sheet** (§6.1, §8). (#197)
+6. **`remember` / `forget`** (§2.1). (#210)
+7. **Calendar links** (§7). (#224)
+8. **Wrap-up.** The remember and forget cards show an event memory's day and time; the docs record what was built.
 
 ---
 

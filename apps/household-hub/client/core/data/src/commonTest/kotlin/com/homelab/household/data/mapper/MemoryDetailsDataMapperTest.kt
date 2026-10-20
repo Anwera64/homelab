@@ -1,11 +1,13 @@
 package com.homelab.household.data.mapper
 
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.StoredMemory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
@@ -121,5 +123,57 @@ class MemoryDetailsDataMapperTest {
             )
 
         assertEquals("Liam", (details as ProposalDetails.Memory).stored?.waitingOn)
+    }
+
+    private fun storedEventTime(stored: String): EventTime? {
+        val details =
+            ProposalDetailsDataMapper.fromJson(
+                "forget",
+                json("""{"memory": "dinner", "memory_id": "dinner", "stored": $stored}"""),
+            )
+        return (details as ProposalDetails.Memory).stored?.eventTime
+    }
+
+    @Test
+    fun `GIVEN a forget of a memory rebuilt from its event WHEN read THEN it keeps the event start to show`() {
+        val eventTime =
+            storedEventTime(
+                """{"content": "Dinner together", "said_by": "Emma", "mine": true,
+                "event_starts_at": "2026-10-19T17:30:00+00:00", "time_from_event": "timed"}""",
+            )
+
+        assertEquals(EventTime(startsAt = Instant.parse("2026-10-19T17:30:00Z"), allDay = false), eventTime)
+    }
+
+    @Test
+    fun `GIVEN a forget of a memory rebuilt from an all-day event WHEN read THEN it is a date`() {
+        val eventTime =
+            storedEventTime(
+                """{"content": "School trip", "said_by": "Emma", "mine": true,
+                "event_starts_at": "2026-10-23T00:00:00+00:00", "time_from_event": "all_day"}""",
+            )
+
+        assertEquals(EventTime(startsAt = Instant.parse("2026-10-23T00:00:00Z"), allDay = true), eventTime)
+    }
+
+    @Test
+    fun `GIVEN a stored event time of a kind this phone does not know WHEN read THEN the sentence stays as sent`() {
+        val eventTime =
+            storedEventTime(
+                """{"content": "Dinner together", "said_by": "Emma", "mine": true,
+                "event_starts_at": "2026-10-19T17:30:00+00:00", "time_from_event": "weekly"}""",
+            )
+
+        assertNull(eventTime)
+    }
+
+    @Test
+    fun `GIVEN a stored memory with no event start WHEN read THEN it has no event time`() {
+        val eventTime =
+            storedEventTime(
+                """{"content": "Dinner together", "said_by": "Emma", "mine": true, "time_from_event": "timed"}""",
+            )
+
+        assertNull(eventTime)
     }
 }

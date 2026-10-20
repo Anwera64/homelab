@@ -1,6 +1,7 @@
 """The `remember` and `forget` tools once they run (memory spec §2.1, §10 `remember`, `remember` on another's memory)."""
 
 import logging
+from datetime import datetime, timezone
 
 import pytest
 
@@ -122,6 +123,34 @@ async def test_GIVEN_the_memory_a_card_showed_THEN_that_one_is_replaced_whatever
     done = await world.remember.execute(EMMA, "The jury moved to Monday.", replaces="something else", memory_id="jury")
 
     assert done.replaced is world.jury
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_it_replaces_a_memory_linked_to_an_event_THEN_the_new_one_keeps_the_event_and_its_expiry():
+    world = World()
+    world.jury.event_id = "ev-jury"
+    world.jury.event_starts_at = datetime(2026, 10, 17, 7, 0, tzinfo=timezone.utc)
+    world.jury.expires_at = datetime(2026, 10, 17, 9, 0, tzinfo=timezone.utc)
+
+    done = await world.remember.execute(EMMA, "The jury is at 10:00.", memory_id="jury")
+
+    saved = world.new(done.memory.id)
+    assert (saved.event_id, saved.event_starts_at, saved.expires_at) == (
+        "ev-jury", world.jury.event_starts_at, world.jury.expires_at
+    )
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_it_replaces_a_linked_memory_with_its_own_expiry_THEN_its_own_expiry_stays():
+    world = World()
+    world.jury.event_id = "ev-jury"
+    world.jury.expires_at = datetime(2026, 10, 17, 9, 0, tzinfo=timezone.utc)
+
+    done = await world.remember.execute(
+        EMMA, "The jury is at 10:00.", memory_id="jury", expires_at="2026-10-18T00:00:00Z"
+    )
+
+    assert world.new(done.memory.id).expires_at == datetime(2026, 10, 18, tzinfo=timezone.utc)
 
 
 @pytest.mark.asyncio

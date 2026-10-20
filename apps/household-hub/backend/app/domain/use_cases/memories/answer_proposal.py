@@ -26,6 +26,7 @@ from app.domain.repositories.session_repository import ISessionRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
+from app.domain.use_cases.memories.event_links import carry_event
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,10 @@ class AnswerProposalUseCase:
         new: Optional[AgentMemory] = None
         async with self.uow:
             if answer != KEEP_STORED:
-                new = await self.memory_repo.create(await memory_from_proposal(proposal, stored, self.session_repo))
+                new = await memory_from_proposal(proposal, stored, self.session_repo)
+                # Use new takes the stored one's place, event and all; beside it, only the expiry follows.
+                carry_event(new, stored, link=answer == USE_NEW)
+                new = await self.memory_repo.create(new)
                 proposal.new_memory_id = new.id
             if answer == USE_NEW:
                 stored.is_active = False

@@ -146,6 +146,7 @@ import com.homelab.household.app.resources.tool_card_weekday_wed
 import com.homelab.household.app.resources.tool_card_when
 import com.homelab.household.app.resources.tool_card_when_all_day
 import com.homelab.household.app.screens.memories.ageWords
+import com.homelab.household.app.screens.memories.memorySentence
 import com.homelab.household.app.theme.HearthShapes
 import com.homelab.household.app.theme.HearthTheme
 import com.homelab.household.domain.model.AnswerPart
@@ -155,6 +156,7 @@ import com.homelab.household.domain.model.EventDate
 import com.homelab.household.domain.model.EventMoment
 import com.homelab.household.domain.model.EventRepeat
 import com.homelab.household.domain.model.EventScope
+import com.homelab.household.domain.model.EventTime
 import com.homelab.household.domain.model.ProposalDetails
 import com.homelab.household.domain.model.ProposalStatus
 import com.homelab.household.domain.model.RepeatEnd
@@ -166,6 +168,7 @@ import com.homelab.household.domain.model.editableFields
 import com.homelab.household.domain.model.offersNoRepeat
 import com.homelab.household.domain.model.proposedValues
 import com.homelab.household.domain.model.repeatSummary
+import com.homelab.household.presentation.memories.LocalEventTime
 import com.homelab.household.presentation.memories.MemoryAge
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -202,10 +205,20 @@ fun ToolApprovalCard(
     ) -> Unit = { id, edited -> onDecide(id, true, edited) },
     /** When a stored memory on a Remember or Forget card was noted; null leaves its age out. */
     memoryAge: (Instant) -> MemoryAge? = { null },
+    /** The day and time a stored event memory adds to its title; null leaves its words as they are. */
+    eventTime: (EventTime) -> LocalEventTime? = { null },
 ) {
     val label = toolLabel(card.tool, card.action)
     val details = approvalCardDetails(card)
-    val name = details.title ?: stringResource(Res.string.tool_card_untitled)
+    // A memory rebuilt from its event is only the event's title: its sentence adds the day and time.
+    val stored = (card.details as? ProposalDetails.Memory)?.stored
+    val storedSentence = stored?.let { memorySentence(it.content, it.eventTime?.let(eventTime)) }
+    val name =
+        if (storedSentence != null && cardAsk(card.action, card.tool) == CardAsk.Forget) {
+            storedSentence
+        } else {
+            details.title ?: stringResource(Res.string.tool_card_untitled)
+        }
 
     when (card.status) {
         ProposalStatus.Approved -> {
@@ -226,7 +239,17 @@ fun ToolApprovalCard(
         }
 
         ProposalStatus.Pending -> {
-            PendingCard(card, label, name, details, onDecide, onApproveAutomatically, memoryAge, modifier)
+            PendingCard(
+                card,
+                label,
+                name,
+                storedSentence,
+                details,
+                onDecide,
+                onApproveAutomatically,
+                memoryAge,
+                modifier,
+            )
         }
     }
 }
@@ -236,6 +259,7 @@ private fun PendingCard(
     card: AnswerPart.Proposal,
     label: ToolLabel,
     name: String,
+    storedSentence: String?,
     details: ApprovalCardDetails,
     onDecide: (toolCallId: String, approved: Boolean, edited: ProposalDetails?) -> Unit,
     onApproveAutomatically: (toolCallId: String, edited: ProposalDetails?) -> Unit,
@@ -280,7 +304,13 @@ private fun PendingCard(
         } else {
             val memory = card.details as? ProposalDetails.Memory
             if (memory != null) {
-                MemoryDetails(memory = memory, name = name, forget = ask == CardAsk.Forget, memoryAge = memoryAge)
+                MemoryDetails(
+                    memory = memory,
+                    name = name,
+                    storedSentence = storedSentence,
+                    forget = ask == CardAsk.Forget,
+                    memoryAge = memoryAge,
+                )
             } else {
                 // Under the title's words rather than its icon, as the canvas lines them up.
                 Column(
@@ -368,6 +398,7 @@ private fun PendingCard(
 private fun MemoryDetails(
     memory: ProposalDetails.Memory,
     name: String,
+    storedSentence: String?,
     forget: Boolean,
     memoryAge: (Instant) -> MemoryAge?,
     modifier: Modifier = Modifier,
@@ -422,7 +453,7 @@ private fun MemoryDetails(
                         stringResource(Res.string.tool_card_memory_said, stored.saidBy)
                     }
                 Text(text = overline.uppercase(), style = type.overline, color = colors.textMuted)
-                Text(text = stored.content, style = type.body, color = colors.textMuted)
+                Text(text = storedSentence ?: stored.content, style = type.body, color = colors.textMuted)
                 val you = stringResource(Res.string.memories_you)
                 storedMeta(stored, memoryAge, yours = you.takeIf { stored.mine })?.let { meta ->
                     Text(text = meta, style = type.monoSm, color = colors.textMuted)

@@ -1,19 +1,25 @@
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from app.domain.entities.calendar_event import CalendarEvent
+from app.domain.entities.memory import AgentMemory
 from app.domain.entities.session import ChatMessage
 
 CALENDAR_WRITE = "calendar_write"
 
 
-def touched_event_ids(messages: List[ChatMessage]) -> List[str]:
-    """
-    The events a chat created or changed, from the calendar steps saved on its answers, in the order
-    first touched (memory spec §7). One removed later in the same chat is left out, unless only one
-    date of it went: the series is still there. Failed steps and cards still waiting changed nothing.
-    """
-    touched: List[str] = []
+@dataclass(frozen=True)
+class RemovedEvent:
+    """An event a chat named that is gone: its title and start as the agent wrote them, in the member's time."""
+
+    title: str
+    start: str
+    all_day: bool = False
+
+
+def _calendar_steps(messages: List[ChatMessage]) -> Iterator[Tuple[str, str, dict]]:
+    """Each calendar step that ran, in order, as (event id, action, arguments). Failed steps and cards still waiting changed nothing."""
     for message in messages:
         if message.role != "assistant":
             continue
@@ -21,15 +27,66 @@ def touched_event_ids(messages: List[ChatMessage]) -> List[str]:
             if not isinstance(step, dict) or step.get("tool") != CALENDAR_WRITE or not step.get("success"):
                 continue
             data = step.get("data") if isinstance(step.get("data"), dict) else {}
-            event_id, action = data.get("event_id"), data.get("action")
-            if not event_id:
-                continue
-            if action == "deleted":
-                if not (step.get("arguments") or {}).get("occurrence_start") and event_id in touched:
-                    touched.remove(event_id)
-            elif action in ("created", "updated") and event_id not in touched:
-                touched.append(event_id)
+            if data.get("event_id"):
+                yield data["event_id"], data.get("action"), step.get("arguments") or {}
+
+
+def _removes_whole_event(action: Optional[str], arguments: dict) -> bool:
+    """A delete without a date takes the whole event; with one, the series is still there."""
+    return action == "deleted" and not arguments.get("occurrence_start")
+
+
+def touched_event_ids(messages: List[ChatMessage]) -> List[str]:
+    """
+    The events a chat created or changed, from the calendar steps saved on its answers, in the order
+    first touched (memory spec §7). One removed later in the same chat is left out, unless only one
+    date of it went: the series is still there.
+    """
+    touched: List[str] = []
+    for event_id, action, arguments in _calendar_steps(messages):
+        if _removes_whole_event(action, arguments):
+            if event_id in touched:
+                touched.remove(event_id)
+        elif action in ("created", "updated") and event_id not in touched:
+            touched.append(event_id)
     return touched
+
+
+def removed_events(messages: List[ChatMessage], gone_ids: List[str]) -> List[RemovedEvent]:
+    """
+    The events a chat named that no longer happen: removed in the chat itself, or [gone_ids], which
+    the calendar no longer has. Each is named by its latest title and start in the chat; one the chat
+    never gave a title is left out, as there is nothing to call it (memory spec §7).
+    """
+    named: Dict[str, RemovedEvent] = {}
+    removed: List[str] = []
+    for event_id, action, arguments in _calendar_steps(messages):
+        if action in ("created", "updated") and arguments.get("title") and arguments.get("start_time"):
+            named[event_id] = RemovedEvent(
+                title=str(arguments["title"]),
+                start=str(arguments["start_time"]),
+                all_day=bool(arguments.get("is_all_day")),
+            )
+        elif _removes_whole_event(action, arguments) and event_id not in removed:
+            removed.append(event_id)
+    removed += [event_id for event_id in gone_ids if event_id not in removed]
+    return [named[event_id] for event_id in removed if event_id in named]
+
+
+def carry_event(new: AgentMemory, stored: AgentMemory, link: bool) -> None:
+    """
+    What [new] keeps from the event-linked [stored] it replaces or sits beside: the expiry when it has
+    none of its own, and with [link] the event itself, so a later move or removal still reaches it.
+    The words are the member's own and carry their own time, so nothing about a rebuilt sentence is
+    copied (memory spec §7).
+    """
+    if stored.event_id is None:
+        return
+    if new.expires_at is None:
+        new.expires_at = stored.expires_at
+    if link:
+        new.event_id = stored.event_id
+        new.event_starts_at = stored.event_starts_at
 
 
 def event_expiry(event: CalendarEvent) -> Optional[datetime]:
