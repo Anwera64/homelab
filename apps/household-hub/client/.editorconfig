@@ -30,7 +30,7 @@ ktlint_standard_package-name = disabled
 # The design system's locals are the scale itself, reaching a screen through `HearthTheme`
 # precisely so a later size class can provide a different one — the opposite of the implicit
 # dependency this rule exists to catch. See DesignSystemTokenTest.
-compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps
+compose_allowed_composition_locals = LocalHearthColors, LocalHearthFonts, LocalHearthTypography, LocalHearthSpacing, LocalHearthSizes, LocalHearthMotion, LocalExternalApps, LocalDragHidesKeyboard
 
 # `modifier = Modifier` reads as one thought, with the chain's calls one per line beneath it. This
 # rule would move `Modifier` down a line of its own after the `=`. ModifierChainTest guards the shape.

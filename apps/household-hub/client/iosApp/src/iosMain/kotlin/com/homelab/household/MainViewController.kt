@@ -69,6 +69,6 @@ fun startHouseholdHub() {
 fun MainViewController(): UIViewController {
     startHouseholdHub()
     return ComposeUIViewController {
-        App(externalApps = IosExternalApps())
+        App(externalApps = IosExternalApps(), dragHidesKeyboard = true)
     }
 }

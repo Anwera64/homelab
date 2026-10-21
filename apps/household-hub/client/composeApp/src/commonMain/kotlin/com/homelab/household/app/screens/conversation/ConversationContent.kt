@@ -1,6 +1,5 @@
 package com.homelab.household.app.screens.conversation
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -132,18 +130,15 @@ fun ConversationContent(
     val transcript = rememberLazyListState()
 
     // iOS has no back button to hide the keyboard, and the composer's return key sends, so the
-    // conversation itself lets it go, as Messages does: a tap on it (below, on the greeting and the
-    // transcript) or a drag of the transcript. Only a finger drags; following an answer as it
-    // arrives scrolls without one, so it never takes the keyboard away from someone typing.
+    // conversation lets it go as Messages does: a tap (HearthScaffold's, for every screen) or a
+    // drag of the transcript. Only a finger drags; following an answer as it arrives scrolls
+    // without one, so it never takes the keyboard away from someone typing.
     val focusManager = LocalFocusManager.current
     LaunchedEffect(transcript, focusManager) {
         transcript.interactionSource.interactions
             .filterIsInstance<DragInteraction.Start>()
             .collect { focusManager.clearFocus() }
     }
-    // A tap on a real control (folded steps, retry, the agent avatar) is consumed by that control
-    // first and never reaches this.
-    val tapClearsFocus = Modifier.pointerInput(focusManager) { detectTapGestures { focusManager.clearFocus() } }
 
     // A live turn with nothing saying it is still going: no word back yet, the model thinking, or
     // a tool done and the next words not here. It obeys the same four beats as every other wait
@@ -294,7 +289,6 @@ fun ConversationContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(tapClearsFocus)
                     .padding(padding)
                     .padding(HearthTheme.spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -381,7 +375,6 @@ fun ConversationContent(
             state = transcript,
             modifier = Modifier
                 .fillMaxSize()
-                .then(tapClearsFocus)
                 .padding(padding)
                 .testTag(CONVERSATION_TRANSCRIPT_TAG),
             contentPadding = PaddingValues(HearthTheme.spacing.xl),
