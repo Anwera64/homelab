@@ -171,6 +171,19 @@ class CalendarEventNotFoundException(CalendarIntegrationException):
         )
 
 
+class CalendarChoiceException(CalendarIntegrationException):
+    """
+    A calendar step names no calendar where one is needed, or one it can't use. The message is for
+    the model: it lists the member's calendars and says whether to ask the member or read first.
+    """
+    pass
+
+
+class CalendarNotPickedException(CalendarIntegrationException):
+    """The member turned off the calendar an event is on, or it left their account: it isn't read."""
+    pass
+
+
 class CalendarUnreachableException(CalendarIntegrationException):
     """The calendar server could not be reached, or did not answer like a CalDAV server."""
     pass

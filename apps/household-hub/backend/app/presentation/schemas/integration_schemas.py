@@ -51,6 +51,8 @@ class CalendarEventCreate(BaseModel):
     description: Optional[str] = Field("", max_length=65536)
     location: Optional[str] = Field("", max_length=512)
     is_all_day: Optional[bool] = False
+    # The key of the member's calendar to add it to; needed when more than one can be written to.
+    calendar: Optional[str] = Field(None, max_length=16)
 
 
 class CalendarEventUpdate(BaseModel):
@@ -71,8 +73,26 @@ class CalendarEventRead(BaseModel):
     location: str
     is_all_day: bool
     calendar_name: str
+    # The key of the member's calendar it is on, and whether it can be changed there.
+    calendar: str = ""
+    read_only: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CalendarSourceRead(BaseModel):
+    """One calendar of the member's account, and whether the hub reads it."""
+
+    key: str
+    name: str
+    writable: bool
+    picked: bool
+
+
+class CalendarSourcesPick(BaseModel):
+    """The keys of the calendars the member wants read; every other one is turned off."""
+
+    picked: List[str] = Field(..., max_length=100)
 
 
 class SearchQueryRequest(BaseModel):

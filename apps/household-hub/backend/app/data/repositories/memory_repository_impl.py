@@ -70,6 +70,7 @@ class MemoryRepositoryImpl(IMemoryRepository):
             model.moved_from = as_stored(memory.moved_from)
             model.event_starts_at = as_stored(memory.event_starts_at)
             model.time_from_event = memory.time_from_event
+            model.event_calendar = memory.event_calendar
             updated = await self.data_source.update(model)
             return self.mapper.to_domain(updated)
         else:

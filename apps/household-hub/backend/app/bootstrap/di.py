@@ -24,6 +24,7 @@ from app.data.datasources.memory_data_source import SqliteMemoryDataSource
 from app.data.datasources.system_setting_data_source import SqliteSystemSettingDataSource
 from app.data.datasources.llm_model_data_source import SqliteLLMModelDataSource
 from app.data.datasources.calendar_credential_data_source import SqliteCalendarCredentialDataSource
+from app.data.datasources.calendar_source_data_source import SqliteCalendarSourceDataSource
 from app.data.datasources.tool_approval_data_source import SqliteToolApprovalDataSource
 from app.data.datasources.document_data_source import SqliteDocumentDataSource
 from app.data.datasources.invite_data_source import SqliteInviteDataSource
@@ -39,6 +40,7 @@ from app.data.mappers.memory_data_mapper import MemoryDataMapper
 from app.data.mappers.system_setting_data_mapper import SystemSettingDataMapper
 from app.data.mappers.llm_model_data_mapper import LLMModelDataMapper
 from app.data.mappers.calendar_credential_data_mapper import CalendarCredentialDataMapper
+from app.data.mappers.calendar_source_data_mapper import CalendarSourceDataMapper
 from app.data.mappers.tool_approval_data_mapper import ToolApprovalDataMapper
 from app.data.mappers.document_data_mapper import DocumentDataMapper
 from app.data.mappers.invite_data_mapper import InviteDataMapper
@@ -54,6 +56,7 @@ from app.data.repositories.memory_repository_impl import MemoryRepositoryImpl
 from app.data.repositories.system_setting_repository_impl import SystemSettingRepositoryImpl
 from app.data.repositories.llm_model_repository_impl import LLMModelRepositoryImpl
 from app.data.repositories.calendar_credential_repository_impl import CalendarCredentialRepositoryImpl
+from app.data.repositories.calendar_source_repository_impl import CalendarSourceRepositoryImpl
 from app.data.repositories.tool_approval_repository_impl import ToolApprovalRepositoryImpl
 from app.data.repositories.document_repository_impl import DocumentRepositoryImpl
 from app.data.repositories.invite_repository_impl import InviteRepositoryImpl
@@ -151,6 +154,11 @@ from app.domain.use_cases.integrations.mark_calendar_steps_fixed import MarkCale
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.calendar_sources import (
+    MemberCalendarsUseCase,
+    PickCalendarsUseCase,
+    SyncCalendarSourcesUseCase,
+)
 from app.domain.use_cases.integrations.google_calendar_sign_in import (
     CompleteGoogleCalendarSignInUseCase,
     StartGoogleCalendarSignInUseCase,
@@ -214,6 +222,7 @@ _memory_proposal_mapper = MemoryProposalDataMapper()
 _system_setting_mapper = SystemSettingDataMapper()
 _llm_model_mapper = LLMModelDataMapper()
 _calendar_cred_mapper = CalendarCredentialDataMapper()
+_calendar_source_mapper = CalendarSourceDataMapper()
 _tool_approval_mapper = ToolApprovalDataMapper()
 _document_mapper = DocumentDataMapper()
 _invite_mapper = InviteDataMapper()
@@ -297,6 +306,9 @@ def get_container(session: AsyncSession):
     uow = SqliteUnitOfWork(session)
     drop_proposals_uc = DropPendingProposalsUseCase(session_repo, uow)
     calendar_secrets = CalendarSecretResolver(calendar_cred_repo, _secret_cipher, uow, _google_oauth)
+    # Every calendar of the member's account they picked (#252), kept per connection.
+    calendar_source_repo = CalendarSourceRepositoryImpl(SqliteCalendarSourceDataSource(session), _calendar_source_mapper)
+    calendar_sync = SyncCalendarSourcesUseCase(calendar_source_repo, _caldav_connector, uow)
 
     guard_code_guesses_uc = GuardCodeGuessesUseCase(system_setting_repo, uow, _code_guess_lock)
     create_member_uc = CreateMemberUseCase(user_repo, space_repo, _password_hasher, uow)
@@ -306,7 +318,7 @@ def get_container(session: AsyncSession):
     proposal_repo = MemoryProposalRepositoryImpl(SqliteMemoryProposalDataSource(session), _memory_proposal_mapper)
     # Event memories follow their event (memory spec §7), whichever hub route changed it.
     follow_event_uc = FollowEventChangeUseCase(
-        memory_repo, proposal_repo, uow, calendar_cred_repo, _caldav_connector, calendar_secrets
+        memory_repo, proposal_repo, uow, calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync
     )
     context_assembler = AssembleAgentContextUseCase(
         memory_repo=memory_repo,
@@ -384,6 +396,7 @@ def get_container(session: AsyncSession):
         allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
         page_reader=_page_reader,
         calendar_secrets=calendar_secrets,
+        calendar_sources=calendar_source_repo,
         remember=remember_uc,
         forget=forget_uc,
         follow_event=follow_event_uc,
@@ -403,7 +416,7 @@ def get_container(session: AsyncSession):
         context_window_tokens=settings.LLM_CONTEXT_TOKENS,
         answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
         approval_repo=tool_approval_repo,
-        event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+        event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync),
         recall=recall_uc,
         memory_card=MemoryOnCardUseCase(
             match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo, session_repo=session_repo
@@ -604,10 +617,13 @@ def get_container(session: AsyncSession):
         ),
         pres_deps.get_user_calendar_use_case: GetUserCalendarUseCase(calendar_cred_repo),
         pres_deps.get_delete_calendar_use_case: DeleteCalendarUseCase(calendar_cred_repo, uow),
-        pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
-        pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
-        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, follow=follow_event_uc),
-        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE, follow=follow_event_uc),
+        pres_deps.get_calendar_events_use_case: GetCalendarEventsUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync),
+        pres_deps.get_member_calendars_use_case: MemberCalendarsUseCase(
+            calendar_cred_repo, calendar_secrets, calendar_sync, PickCalendarsUseCase(calendar_sync, calendar_source_repo, uow)
+        ),
+        pres_deps.get_create_calendar_event_use_case: CreateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync),
+        pres_deps.get_update_calendar_event_use_case: UpdateCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, follow=follow_event_uc, sync=calendar_sync),
+        pres_deps.get_delete_calendar_event_use_case: DeleteCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, allow_agent_delete=settings.CALENDAR_ALLOW_AGENT_DELETE, follow=follow_event_uc, sync=calendar_sync),
         pres_deps.get_start_google_calendar_sign_in_use_case: StartGoogleCalendarSignInUseCase(_sign_in_states, _google_oauth),
         pres_deps.get_complete_google_calendar_sign_in_use_case: CompleteGoogleCalendarSignInUseCase(
             _sign_in_states, _google_oauth, _caldav_connector, _secret_cipher, calendar_cred_repo, uow,
@@ -631,6 +647,7 @@ def get_container(session: AsyncSession):
             allow_calendar_delete=settings.CALENDAR_ALLOW_AGENT_DELETE,
             page_reader=_page_reader,
             calendar_secrets=calendar_secrets,
+            calendar_sources=calendar_source_repo,
             follow_event=follow_event_uc,
         ),
 
@@ -668,7 +685,7 @@ def get_container(session: AsyncSession):
                 neighbour_bar=settings.REFLECTION_NEIGHBOUR_BAR,
                 neighbours_max=settings.REFLECTION_NEIGHBOURS_MAX,
                 log_text=settings.MEMORY_LOG_TEXT,
-                event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets),
+                event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync),
             ),
             embed_memories=embed_memories_uc,
             idle_minutes=settings.REFLECTION_IDLE_MINUTES,
@@ -755,6 +772,7 @@ def setup_dependency_injection(app: FastAPI):
         pres_deps.get_user_calendar_use_case,
         pres_deps.get_delete_calendar_use_case,
         pres_deps.get_calendar_events_use_case,
+        pres_deps.get_member_calendars_use_case,
         pres_deps.get_create_calendar_event_use_case,
         pres_deps.get_update_calendar_event_use_case,
         pres_deps.get_delete_calendar_event_use_case,

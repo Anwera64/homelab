@@ -1190,7 +1190,10 @@ class ProcessChatTurnUseCase:
                     tc.arguments.get("occurrence_start"), "occurrence_start", calendar_arguments.zone_of(timezone_name)
                 )
             event = await self.event_lookup.execute(
-                user_id=user_id, event_id=event_id, occurrence_start=occurrence_start
+                user_id=user_id,
+                event_id=event_id,
+                occurrence_start=occurrence_start,
+                calendar=tc.arguments.get("calendar"),
             )
         except Exception:
             logger.warning("Could not look up event %s for its card", event_id, exc_info=True)

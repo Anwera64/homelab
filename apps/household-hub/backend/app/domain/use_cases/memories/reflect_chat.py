@@ -30,7 +30,13 @@ from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.repositories.user_repository import IUserRepository
 from app.domain.use_cases.chat.current_date_line import current_date_line, sent_at_stamp
 from app.domain.use_cases.memories.embed_memories import EmbedMemoriesUseCase
-from app.domain.use_cases.memories.event_links import RemovedEvent, event_expiry, removed_events, touched_event_ids
+from app.domain.use_cases.memories.event_links import (
+    RemovedEvent,
+    event_calendars,
+    event_expiry,
+    removed_events,
+    touched_event_ids,
+)
 from app.domain.use_cases.memories.memory_block import BuildMemoryBlockUseCase, _aware, sanitize_prompt_snippet
 
 logger = logging.getLogger(__name__)
@@ -335,6 +341,7 @@ class ReflectChatUseCase:
                 )
                 if event is not None:
                     memory.event_id = event.id
+                    memory.event_calendar = event.calendar_key or None
                     memory.event_starts_at = event.start_time
                     memory.expires_at = event_expiry(event)
                     linked.add(event.id)
@@ -403,9 +410,10 @@ class ReflectChatUseCase:
             return {}, []
         found: List[CalendarEvent] = []
         gone: List[str] = []
+        calendars = event_calendars(kept)
         for event_id in ids:
             try:
-                event = await self.event_lookup.execute(session.user_id, event_id)
+                event = await self.event_lookup.execute(session.user_id, event_id, calendar=calendars.get(event_id))
             except Exception as exc:
                 logger.warning(
                     "Reflection events | member=%s session=%s event=%s could not be read, not linked: %s",

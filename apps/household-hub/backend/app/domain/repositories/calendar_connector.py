@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, Protocol
 from app.domain.entities.calendar_event import CalendarEvent, Repeat
+from app.domain.entities.calendar_source import DiscoveredCalendar
 from app.domain.entities.integration_credential import CalendarCredential
 
 
@@ -12,6 +13,10 @@ class ICalendarConnector(Protocol):
         """
         ...
 
+    async def list_calendars(self, credential: CalendarCredential, secret: str) -> List[DiscoveredCalendar]:
+        """The account's calendars that hold events, and whether the member can write to each."""
+        ...
+
     async def fetch_events(
         self,
         credential: CalendarCredential,
@@ -20,6 +25,7 @@ class ICalendarConnector(Protocol):
         end_time: datetime,
         limit: int = 50,
         timeout: float = 10.0,
+        calendar_url: str | None = None,
     ) -> List[CalendarEvent]:
         ...
 
@@ -35,6 +41,7 @@ class ICalendarConnector(Protocol):
         is_all_day: bool = False,
         timeout: float = 10.0,
         repeat: Optional[Repeat] = None,
+        calendar_url: str | None = None,
     ) -> CalendarEvent:
         ...
 
@@ -53,6 +60,7 @@ class ICalendarConnector(Protocol):
         repeat: Optional[Repeat] = None,
         occurrence_start: datetime | None = None,
         scope: str | None = None,
+        calendar_url: str | None = None,
     ) -> CalendarEvent:
         """
         On a repeating event, [occurrence_start] names the date meant and [scope] whether the change
@@ -67,6 +75,7 @@ class ICalendarConnector(Protocol):
         event_id: str,
         occurrence_start: datetime | None = None,
         timeout: float = 10.0,
+        calendar_url: str | None = None,
     ) -> Optional[CalendarEvent]:
         """
         The event with that ID, or None when the calendar has none. For a repeating event,
@@ -82,6 +91,7 @@ class ICalendarConnector(Protocol):
         timeout: float = 10.0,
         occurrence_start: datetime | None = None,
         scope: str | None = None,
+        calendar_url: str | None = None,
     ) -> bool:
         """On a repeating event, removes the date [occurrence_start] only, or it and every later one."""
         ...

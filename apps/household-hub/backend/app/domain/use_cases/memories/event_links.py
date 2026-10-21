@@ -31,6 +31,22 @@ def _calendar_steps(messages: List[ChatMessage]) -> Iterator[Tuple[str, str, dic
                 yield data["event_id"], data.get("action"), step.get("arguments") or {}
 
 
+def event_calendars(messages: List[ChatMessage]) -> Dict[str, str]:
+    """The calendar key of each event a chat's calendar steps named one for, the latest winning."""
+    calendars: Dict[str, str] = {}
+    for message in messages:
+        if message.role != "assistant":
+            continue
+        for step in (message.metadata_json or {}).get("tools_executed") or []:
+            if not isinstance(step, dict) or step.get("tool") != CALENDAR_WRITE or not step.get("success"):
+                continue
+            data = step.get("data") if isinstance(step.get("data"), dict) else {}
+            calendar = data.get("calendar") or (step.get("arguments") or {}).get("calendar")
+            if data.get("event_id") and calendar:
+                calendars[data["event_id"]] = str(calendar)
+    return calendars
+
+
 def _removes_whole_event(action: Optional[str], arguments: dict) -> bool:
     """A delete without a date takes the whole event; with one, the series is still there."""
     return action == "deleted" and not arguments.get("occurrence_start")
@@ -86,6 +102,7 @@ def carry_event(new: AgentMemory, stored: AgentMemory, link: bool) -> None:
         new.expires_at = stored.expires_at
     if link:
         new.event_id = stored.event_id
+        new.event_calendar = stored.event_calendar
         new.event_starts_at = stored.event_starts_at
 
 

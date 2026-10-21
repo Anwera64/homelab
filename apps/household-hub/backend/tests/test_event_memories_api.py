@@ -9,12 +9,21 @@ from sqlalchemy import select
 
 from app.data.models.memory_model import MemoryModel
 from app.domain.entities.calendar_event import CalendarEvent
+from app.domain.entities.calendar_source import DiscoveredCalendar
 from tests.test_memories import setup_environment
 
 CONNECTOR = "app.data.connectors.caldav_calendar_connector.CalDavCalendarConnector"
 # Far ahead, so the memory never expires before the test reads the page.
 SAT = datetime(2099, 10, 17, 18, 0, tzinfo=timezone.utc)
 SUN = datetime(2099, 10, 18, 17, 30, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def one_calendar_account():
+    """The account has one calendar, so the phone's changes need not name it."""
+    home = DiscoveredCalendar(url="https://caldav.icloud.com/home/", name="Home", writable=True)
+    with patch(f"{CONNECTOR}.list_calendars", new=AsyncMock(return_value=[home])):
+        yield
 
 
 def _event(start):

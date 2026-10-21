@@ -31,7 +31,7 @@ class FakeEventLookup:
         self.fail = fail
         self.asked = []
 
-    async def execute(self, user_id, event_id, occurrence_start=None, timeout=5.0):
+    async def execute(self, user_id, event_id, occurrence_start=None, timeout=5.0, calendar=None):
         self.asked.append((user_id, event_id))
         if self.fail:
             raise CalendarUnreachableException("down")

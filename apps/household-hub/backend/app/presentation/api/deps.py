@@ -68,6 +68,7 @@ from app.domain.use_cases.integrations.configure_calendar import ConfigureCalend
 from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarUseCase
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
+from app.domain.use_cases.integrations.calendar_sources import MemberCalendarsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
 from app.domain.use_cases.integrations.delete_calendar_event import DeleteCalendarEventUseCase
@@ -283,6 +284,9 @@ def get_delete_calendar_use_case() -> DeleteCalendarUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_calendar_events_use_case() -> GetCalendarEventsUseCase:
+    raise NotImplementedError("Wired by bootstrap coordinator")
+
+def get_member_calendars_use_case() -> MemberCalendarsUseCase:
     raise NotImplementedError("Wired by bootstrap coordinator")
 
 def get_create_calendar_event_use_case() -> CreateCalendarEventUseCase:

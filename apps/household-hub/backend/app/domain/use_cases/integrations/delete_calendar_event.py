@@ -6,6 +6,7 @@ from app.domain.exceptions import CalendarNotConnectedException, ToolPermissionD
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.calendar_sources import CHANGE, CREATE, LOOK, SyncCalendarSourcesUseCase, on
 from app.domain.use_cases.memories.follow_event import FollowEventChangeUseCase
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,13 @@ class DeleteCalendarEventUseCase:
         secrets: CalendarSecretResolver,
         allow_agent_delete: bool = True,
         follow: Optional[FollowEventChangeUseCase] = None,
+        sync: Optional[SyncCalendarSourcesUseCase] = None,
     ):
         self.credential_repo = credential_repo
         self.connector = connector
         self.secrets = secrets
+        # Without it, the connection's one calendar is used, as before calendars could be picked.
+        self.sync = sync
         self.allow_agent_delete = allow_agent_delete
         # Keeps the member's memories of the event true once the calendar has answered (memory spec §7).
         self.follow = follow
@@ -34,6 +38,7 @@ class DeleteCalendarEventUseCase:
         timeout: float = 10.0,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar: Optional[str] = None,
     ) -> bool:
         if not self.allow_agent_delete:
             raise ToolPermissionDeniedException(
@@ -45,6 +50,7 @@ class DeleteCalendarEventUseCase:
             raise CalendarNotConnectedException("No calendar configured for user.")
 
         secret = await self.secrets.resolve(credential)
+        source = None if self.sync is None else await self.sync.choose(credential, secret, calendar, CHANGE)
         deleted = await self.connector.delete_event(
             credential=credential,
             secret=secret,
@@ -52,15 +58,16 @@ class DeleteCalendarEventUseCase:
             timeout=timeout,
             occurrence_start=occurrence_start,
             scope=scope,
+            calendar_url=source.url if source else None,
         )
-        await self._follow(user_id, event_id)
+        await self._follow(user_id, event_id, source.key if source else None)
         return deleted
 
-    async def _follow(self, user_id: str, event_id: str) -> None:
+    async def _follow(self, user_id: str, event_id: str, calendar: Optional[str]) -> None:
         if self.follow is None:
             return
         try:
-            await self.follow.execute(user_id, event_id)
+            await self.follow.execute(user_id, event_id, calendar=calendar)
         except Exception as exc:
             # The calendar change stands; the periodic check brings the memories in line later.
             logger.warning("Calendar link | member=%s event=%s memories could not follow: %s", user_id, event_id, exc)
