@@ -78,7 +78,7 @@ services:
   # ==============================================================================
   qbittorrent:
     profiles: ["media"]
-    image: lscr.io/linuxserver/qbittorrent:5.2.4_v2.0.15-ls481
+    image: lscr.io/linuxserver/qbittorrent:5.3.0_v2.1.2-ls484
     container_name: qbittorrent
     network_mode: "service:gluetun"
     environment:
@@ -117,7 +117,7 @@ services:
   # 3. Arr Automation Suite (Unified /data Volume for Instant 0-byte Hardlinks)
   # ==============================================================================
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls164
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls165
     container_name: prowlarr
     ports:
       - 9696:9696
@@ -134,7 +134,7 @@ services:
 
   radarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls322
+    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls323
     container_name: radarr
     ports:
       - 7878:7878
@@ -170,7 +170,7 @@ services:
 
   bazarr:
     profiles: ["media"]
-    image: lscr.io/linuxserver/bazarr:v1.6.2-ls368
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls369
     container_name: bazarr
     ports:
       - 6767:6767
@@ -369,7 +369,7 @@ services:
   # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
   # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
   ollama:
-    image: ollama/ollama:0.40.6
+    image: ollama/ollama:0.40.7
     container_name: ollama
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -455,7 +455,7 @@ services:
   # The desktop runs an Alloy of its own that ships its logs to this Loki.
   # ==============================================================================
   loki:
-    image: grafana/loki:3.7.8
+    image: grafana/loki:3.7.9
     container_name: loki
     command: -config.file=/etc/loki/loki-config.yaml
     # For the desktop's Alloy. Loki has no login of its own: the firewall admits only the
@@ -541,7 +541,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.172.0
+    image: renovate/renovate:44.173.1
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
