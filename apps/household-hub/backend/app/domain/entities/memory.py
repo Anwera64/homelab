@@ -28,6 +28,9 @@ class AgentMemory:
     origin: str = "reflection"  # "reflection", "tool" or "manual"
     relevant_for: list[str] | None = None
     event_id: str | None = None
+    # The key of the member's calendar the event is on. None for a link made before calendars could
+    # be picked: the first check finds its calendar and fills it in.
+    event_calendar: str | None = None
     # Set when the memory is retired, in favour of another or by the member, so it can be undone.
     replaced_by_id: str | None = None
     retired_at: datetime | None = None

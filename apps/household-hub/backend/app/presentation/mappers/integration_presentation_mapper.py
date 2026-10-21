@@ -1,6 +1,7 @@
 from typing import List
 from app.domain.entities.integration_credential import CalendarCredential
 from app.domain.entities.calendar_event import CalendarEvent
+from app.domain.entities.calendar_source import CalendarSource
 from app.domain.entities.search_result import SearchResult
 from app.domain.entities.document import ParsedDocument, StoredDocument
 from app.domain.entities.tool_definition import ToolDefinition, ToolExecutionResult
@@ -8,6 +9,7 @@ from app.domain.entities.tool_definition import ToolDefinition, ToolExecutionRes
 from app.presentation.schemas.integration_schemas import (
     CalendarCredentialRead,
     CalendarEventRead,
+    CalendarSourceRead,
     SearchResultResponse,
     SearchResultItemResponse,
     DocumentParseResponse,
@@ -46,7 +48,13 @@ class IntegrationPresentationMapper:
             location=entity.location,
             is_all_day=entity.is_all_day,
             calendar_name=entity.calendar_name,
+            calendar=entity.calendar_key,
+            read_only=entity.read_only,
         )
+
+    @staticmethod
+    def to_calendar_source_read(entity: CalendarSource) -> CalendarSourceRead:
+        return CalendarSourceRead(key=entity.key, name=entity.name, writable=entity.writable, picked=entity.picked)
 
     @staticmethod
     def to_search_result_response(entity: SearchResult) -> SearchResultResponse:

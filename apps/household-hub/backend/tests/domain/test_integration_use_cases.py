@@ -1124,7 +1124,7 @@ class RecordingFollow:
         self.told = []
         self.fail = fail
 
-    async def execute(self, user_id, event_id):
+    async def execute(self, user_id, event_id, calendar=None):
         self.told.append((user_id, event_id))
         if self.fail:
             raise RuntimeError("memory store down")

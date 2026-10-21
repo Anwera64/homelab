@@ -111,3 +111,64 @@ async def test_a_renamed_calendar_keeps_its_key_and_shows_its_new_name():
     renamed = DiscoveredCalendar(url=HOME.url, name="Family", writable=True)
     synced = await _sync(stored, [renamed])
     assert (synced[0].key, synced[0].name, synced[0].picked) == ("c1", "Family", False)
+
+
+class CountingUnitOfWork:
+    def __init__(self):
+        self.commits = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        pass
+
+    async def commit(self):
+        self.commits += 1
+
+
+@pytest.mark.asyncio
+async def test_the_calendars_are_saved_for_good_when_the_account_changed():
+    uow = CountingUnitOfWork()
+    repo = FakeSourceRepository()
+
+    await SyncCalendarSourcesUseCase(repo, FakeConnector([HOME]), uow=uow).execute(_credential(), "secret")
+
+    assert uow.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_written_when_the_account_is_as_kept():
+    uow = CountingUnitOfWork()
+    repo = FakeSourceRepository([CalendarSource(key="c1", url=HOME.url, name="Home", writable=True, picked=True)])
+
+    await SyncCalendarSourcesUseCase(repo, FakeConnector([HOME]), uow=uow).execute(_credential(), "secret")
+
+    assert uow.commits == 0
+
+
+@pytest.mark.asyncio
+async def test_the_member_picks_which_calendars_are_read():
+    from app.domain.use_cases.integrations.calendar_sources import PickCalendarsUseCase
+
+    uow = CountingUnitOfWork()
+    repo = FakeSourceRepository()
+    sync = SyncCalendarSourcesUseCase(repo, FakeConnector([HOME, WORK, HOLIDAYS]), uow=uow)
+
+    picked = await PickCalendarsUseCase(sync, repo, uow).execute(_credential(), "secret", ["c2", "c3"])
+
+    assert {s.name: s.picked for s in picked} == {"Home": False, "Work": True, "Holidays": True}
+    assert await repo.list_for("cred-1") == picked
+    assert uow.commits == 2
+
+
+@pytest.mark.asyncio
+async def test_picking_a_calendar_the_account_does_not_have_is_refused():
+    from app.domain.exceptions import CalendarChoiceException
+    from app.domain.use_cases.integrations.calendar_sources import PickCalendarsUseCase
+
+    repo = FakeSourceRepository()
+    sync = SyncCalendarSourcesUseCase(repo, FakeConnector([HOME]))
+
+    with pytest.raises(CalendarChoiceException):
+        await PickCalendarsUseCase(sync, repo, CountingUnitOfWork()).execute(_credential(), "secret", ["c7"])

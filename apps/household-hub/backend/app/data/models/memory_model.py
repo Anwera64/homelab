@@ -28,6 +28,8 @@ class MemoryModel(Base):
     origin = Column(String(16), default="reflection", server_default="reflection", nullable=False)  # 'reflection', 'tool', 'manual'
     relevant_for = Column(JSON, nullable=True)
     event_id = Column(String(255), nullable=True, index=True)
+    # The key of the member's calendar the event is on (calendar_sources.key); None for older links.
+    event_calendar = Column(String(16), nullable=True)
     replaced_by_id = Column(String(36), ForeignKey("agent_memories.id", ondelete="SET NULL"), nullable=True)
     retired_at = Column(DateTime(timezone=True), nullable=True)
     moved_from = Column(DateTime(timezone=True), nullable=True)

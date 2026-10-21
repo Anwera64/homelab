@@ -37,6 +37,7 @@ import app.data.models.memory_proposal_model
 import app.data.models.memory_vector_model
 import app.data.models.system_setting_model
 import app.data.models.calendar_credential_model
+import app.data.models.calendar_source_model
 import app.data.models.document_model
 import app.data.models.invite_model
 import app.data.models.pin_reset_model

@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.domain.entities.user import User
 from app.domain.exceptions import (
     CalendarAuthException,
+    CalendarNotConnectedException,
     CalendarSignInDeniedException,
     CalendarSignInExpiredException,
     CalendarUnreachableException,
@@ -21,6 +22,8 @@ from app.presentation.schemas.integration_schemas import (
     CalendarEventCreate,
     CalendarEventUpdate,
     CalendarEventRead,
+    CalendarSourceRead,
+    CalendarSourcesPick,
     SearchQueryRequest,
     SearchResultResponse,
     DocumentParseResponse,
@@ -101,6 +104,33 @@ async def get_my_calendar(
     if not cred:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No calendar configured.")
     return IntegrationPresentationMapper.to_calendar_credential_read(cred)
+
+
+@router.get("/calendars/me/sources", response_model=List[CalendarSourceRead])
+async def list_my_calendars(
+    current_user: User = Depends(pres_deps.get_current_user),
+    calendars_uc=Depends(pres_deps.get_member_calendars_use_case),
+):
+    """Every calendar of the member's account, and which of them the hub reads."""
+    try:
+        sources = await calendars_uc.list(current_user.id)
+    except CalendarNotConnectedException:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No calendar configured.")
+    return [IntegrationPresentationMapper.to_calendar_source_read(s) for s in sources]
+
+
+@router.put("/calendars/me/sources", response_model=List[CalendarSourceRead])
+async def pick_my_calendars(
+    payload: CalendarSourcesPick,
+    current_user: User = Depends(pres_deps.get_current_user),
+    calendars_uc=Depends(pres_deps.get_member_calendars_use_case),
+):
+    """The member picks which calendars the hub reads; every other one is turned off."""
+    try:
+        sources = await calendars_uc.pick(current_user.id, payload.picked)
+    except CalendarNotConnectedException:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No calendar configured.")
+    return [IntegrationPresentationMapper.to_calendar_source_read(s) for s in sources]
 
 
 @router.post("/calendars", response_model=CalendarCredentialRead, status_code=status.HTTP_201_CREATED)
@@ -187,7 +217,7 @@ async def get_calendar_events(
     current_user: User = Depends(pres_deps.get_current_user),
     get_events_uc=Depends(pres_deps.get_calendar_events_use_case),
 ):
-    """Fetches events from the user's primary CalDAV calendar within the given window."""
+    """Fetches events from every calendar the member picked within the given window."""
     events = await get_events_uc.execute(
         user_id=current_user.id,
         start_time=start_time,
@@ -203,7 +233,7 @@ async def create_calendar_event(
     current_user: User = Depends(pres_deps.get_current_user),
     create_event_uc=Depends(pres_deps.get_create_calendar_event_use_case),
 ):
-    """Creates a new event on the user's primary CalDAV calendar."""
+    """Creates a new event on the member's calendar the payload names, or their only writable one."""
     event = await create_event_uc.execute(
         user_id=current_user.id,
         title=payload.title,
@@ -212,6 +242,7 @@ async def create_calendar_event(
         description=payload.description or "",
         location=payload.location or "",
         is_all_day=bool(payload.is_all_day),
+        calendar=payload.calendar,
     )
     return IntegrationPresentationMapper.to_calendar_event_read(event)
 
@@ -220,10 +251,11 @@ async def create_calendar_event(
 async def update_calendar_event(
     event_id: str,
     payload: CalendarEventUpdate,
+    calendar: Optional[str] = Query(None, max_length=16),
     current_user: User = Depends(pres_deps.get_current_user),
     update_event_uc=Depends(pres_deps.get_update_calendar_event_use_case),
 ):
-    """Updates an existing event on the user's primary CalDAV calendar."""
+    """Updates an existing event on the member's calendar it is on."""
     event = await update_event_uc.execute(
         user_id=current_user.id,
         event_id=event_id,
@@ -233,6 +265,7 @@ async def update_calendar_event(
         description=payload.description,
         location=payload.location,
         is_all_day=payload.is_all_day,
+        calendar=calendar,
     )
     return IntegrationPresentationMapper.to_calendar_event_read(event)
 
@@ -240,11 +273,12 @@ async def update_calendar_event(
 @router.delete("/calendars/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_calendar_event(
     event_id: str,
+    calendar: Optional[str] = Query(None, max_length=16),
     current_user: User = Depends(pres_deps.get_current_user),
     del_event_uc=Depends(pres_deps.get_delete_calendar_event_use_case),
 ):
-    """Deletes an event from the user's primary CalDAV calendar."""
-    await del_event_uc.execute(user_id=current_user.id, event_id=event_id)
+    """Deletes an event from the member's calendar it is on."""
+    await del_event_uc.execute(user_id=current_user.id, event_id=event_id, calendar=calendar)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

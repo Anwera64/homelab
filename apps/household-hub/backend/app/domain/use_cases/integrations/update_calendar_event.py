@@ -69,14 +69,14 @@ class UpdateCalendarEventUseCase:
         )
         if source:
             updated = on(updated, source)
-        await self._follow(user_id, event_id)
+        await self._follow(user_id, event_id, source.key if source else None)
         return updated
 
-    async def _follow(self, user_id: str, event_id: str) -> None:
+    async def _follow(self, user_id: str, event_id: str, calendar: Optional[str]) -> None:
         if self.follow is None:
             return
         try:
-            await self.follow.execute(user_id, event_id)
+            await self.follow.execute(user_id, event_id, calendar=calendar)
         except Exception as exc:
             # The calendar change stands; the periodic check brings the memories in line later.
             logger.warning("Calendar link | member=%s event=%s memories could not follow: %s", user_id, event_id, exc)

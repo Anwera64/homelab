@@ -179,6 +179,11 @@ class CalendarChoiceException(CalendarIntegrationException):
     pass
 
 
+class CalendarNotPickedException(CalendarIntegrationException):
+    """The member turned off the calendar an event is on, or it left their account: it isn't read."""
+    pass
+
+
 class CalendarUnreachableException(CalendarIntegrationException):
     """The calendar server could not be reached, or did not answer like a CalDAV server."""
     pass

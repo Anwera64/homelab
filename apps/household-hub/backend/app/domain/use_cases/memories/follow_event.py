@@ -2,18 +2,23 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import groupby
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from app.domain.entities.calendar_event import CalendarEvent
 from app.domain.entities.memory import ALL_DAY, TIMED, AgentMemory
 from app.domain.entities.memory_proposal import FROM_REFLECTION
-from app.domain.exceptions import CalendarIntegrationException, CalendarNotConnectedException
+from app.domain.exceptions import (
+    CalendarIntegrationException,
+    CalendarNotConnectedException,
+    CalendarNotPickedException,
+)
 from app.domain.repositories.calendar_connector import ICalendarConnector
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.memory_proposal_repository import IMemoryProposalRepository
 from app.domain.repositories.memory_repository import IMemoryRepository
 from app.domain.repositories.unit_of_work import IUnitOfWork
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.calendar_sources import SyncCalendarSourcesUseCase, on
 from app.domain.use_cases.memories.event_links import event_expiry
 
 logger = logging.getLogger(__name__)
@@ -88,6 +93,7 @@ class FollowEventChangeUseCase:
         connector: ICalendarConnector,
         secrets: CalendarSecretResolver,
         clock: Callable[[], datetime] = _utc_now,
+        sync: Optional[SyncCalendarSourcesUseCase] = None,
     ):
         self.memory_repo = memory_repo
         self.proposal_repo = proposal_repo
@@ -96,13 +102,19 @@ class FollowEventChangeUseCase:
         self.connector = connector
         self.secrets = secrets
         self.clock = clock
+        # Without it, the connection's one calendar is read, as before calendars could be picked.
+        self.sync = sync
 
-    async def execute(self, user_id: str, event_id: str) -> None:
+    async def execute(self, user_id: str, event_id: str, calendar: Optional[str] = None) -> None:
         memories = await self.memory_repo.list_by_event(user_id, event_id)
         if not memories:
             return
+        calendar = calendar or next((m.event_calendar for m in memories if m.event_calendar), None)
         try:
-            event = await self.read_event(user_id, event_id)
+            event = await self.read_event(user_id, event_id, calendar)
+        except CalendarNotPickedException:
+            logger.info("Calendar link | member=%s event=%s is on a calendar not read, left alone", user_id, event_id)
+            return
         except CalendarIntegrationException as exc:
             logger.warning("Calendar link | member=%s event=%s could not be read, left for the check: %s", user_id, event_id, exc)
             return
@@ -110,32 +122,58 @@ class FollowEventChangeUseCase:
         for memory_id, outcome in outcomes.items():
             logger.info("Calendar link | member=%s memory=%s event=%s outcome=%s", user_id, memory_id, event_id, outcome)
 
-    async def read_event(self, user_id: str, event_id: str, timeout: float = 10.0) -> Optional[CalendarEvent]:
-        """The event as the member's calendar has it, or None when it has none. Raises when it can't say."""
+    async def read_event(
+        self, user_id: str, event_id: str, calendar: Optional[str] = None, timeout: float = 10.0
+    ) -> Optional[CalendarEvent]:
+        """
+        The event as the member's calendar has it, or None when it has none. Raises when it can't say,
+        and when [calendar] is one the member doesn't read: an event there isn't gone. A link made
+        before calendars could be picked names none, so each picked calendar is looked through.
+        """
         credential = await self.credential_repo.get_by_user_id(user_id)
         if not credential or not credential.is_active:
             # No calendar is not the same as no event: nothing is retired for it.
             raise CalendarNotConnectedException("No calendar configured for user.")
         secret = await self.secrets.resolve(credential)
-        return await self.connector.get_event(credential=credential, secret=secret, event_id=event_id, timeout=timeout)
+        if self.sync is None:
+            return await self.connector.get_event(
+                credential=credential, secret=secret, event_id=event_id, timeout=timeout
+            )
+        picked = [s for s in await self.sync.execute(credential, secret) if s.picked]
+        if calendar:
+            picked = [s for s in picked if s.key == calendar]
+            if not picked:
+                raise CalendarNotPickedException(f"Calendar '{calendar}' is not read.")
+        for source in picked:
+            event = await self.connector.get_event(
+                credential=credential, secret=secret, event_id=event_id, timeout=timeout, calendar_url=source.url
+            )
+            if event is not None:
+                return on(event, source)
+        return None
 
     async def save(self, memories: List[AgentMemory], event: Optional[CalendarEvent]) -> Dict[str, str]:
         """Matches each memory to [event] and saves those that changed, in one commit."""
         now = self.clock()
         outcomes: Dict[str, str] = {}
+        # Links that named no calendar now name the one the event was found on.
+        filled = set()
         for memory in memories:
+            if event is not None and event.calendar_key and memory.event_calendar != event.calendar_key:
+                memory.event_calendar = event.calendar_key
+                filled.add(memory.id)
             outcome = match_event(memory, event, now)
             if outcome:
                 outcomes[memory.id] = outcome
-        if not outcomes:
+        if not outcomes and not filled:
             return outcomes
         async with self.uow:
             for memory in memories:
-                if memory.id not in outcomes:
+                if memory.id not in outcomes and memory.id not in filled:
                     continue
                 memory.updated_at = now
                 await self.memory_repo.update(memory)
-                if outcomes[memory.id] == RETIRED:
+                if outcomes.get(memory.id) == RETIRED:
                     # Reflection's changes to it have nothing left to change. A member's own
                     # `remember` is left for them to answer.
                     for dropped in await self.proposal_repo.drop_pending_for(memory.id, origin=FROM_REFLECTION):
@@ -184,21 +222,25 @@ class CheckEventMemoriesUseCase:
         return result
 
     async def _check_member(self, user_id: str, memories: List[AgentMemory], result: EventCheckResult) -> None:
-        by_event: Dict[str, List[AgentMemory]] = {}
+        by_event: Dict[Tuple[str, Optional[str]], List[AgentMemory]] = {}
         for memory in memories:
-            by_event.setdefault(memory.event_id, []).append(memory)
-        events: Dict[str, Optional[CalendarEvent]] = {}
+            by_event.setdefault((memory.event_id, memory.event_calendar), []).append(memory)
+        events: Dict[Tuple[str, Optional[str]], Optional[CalendarEvent]] = {}
         try:
-            for event_id in by_event:
-                events[event_id] = await self.follow.read_event(user_id, event_id)
+            for event_id, calendar in list(by_event):
+                try:
+                    events[(event_id, calendar)] = await self.follow.read_event(user_id, event_id, calendar)
+                except CalendarNotPickedException:
+                    # A calendar the member turned off: its events aren't gone, and wait unread.
+                    del by_event[(event_id, calendar)]
         except CalendarIntegrationException as exc:
             # One answer missing would retire memories whose events are fine: the whole member waits.
             result.unreachable.append(user_id)
             logger.warning("Event check | member=%s calendar could not be read, nothing changed: %s", user_id, exc)
             return
-        for event_id, linked in by_event.items():
+        for (event_id, calendar), linked in by_event.items():
             result.checked += len(linked)
-            outcomes = await self.follow.save(linked, events[event_id])
+            outcomes = await self.follow.save(linked, events[(event_id, calendar)])
             for memory_id, outcome in outcomes.items():
                 if outcome == RETIRED:
                     result.retired += 1
