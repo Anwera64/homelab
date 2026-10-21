@@ -92,9 +92,11 @@ targets:
         PRODUCT_NAME: HouseholdHub
         # app.version in gradle.properties, which Xcode cannot read; AppVariantsTest keeps them
         # equal. The build number is the Android version code: 1.2.3 -> 10203.
-        MARKETING_VERSION: "0.5.0"
-        CURRENT_PROJECT_VERSION: 500
-        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "0.5.1"
+        CURRENT_PROJECT_VERSION: 501
+        # iPhone only. An iPad app must allow all four orientations for multitasking, or App Store
+        # Connect refuses the upload (error 90474); an iPad still runs this in the iPhone window.
+        TARGETED_DEVICE_FAMILY: "1"
         # `embedAndSignAppleFrameworkForXcode` stages the framework it just linked under
         # build/xcode-frameworks/<CONFIGURATION>/<SDK_NAME>, so the search path has to be spelled
         # with those two build settings rather than a fixed path — Debug/Release and
