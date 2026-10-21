@@ -172,6 +172,14 @@ class AppVariantsTest {
     }
 
     @Test
+    fun `GIVEN the iOS app WHEN it is built THEN it is an iPhone app`() {
+        // An iPad app must allow all four orientations for multitasking, or App Store Connect
+        // refuses the upload (error 90474). The household's app is for phones; an iPad still runs it
+        // in the iPhone-sized window.
+        assertTrue(iosProject.contains("""TARGETED_DEVICE_FAMILY: "1""""), "the app targets iPhone only")
+    }
+
+    @Test
     fun `GIVEN a TestFlight upload WHEN App Store Connect asks about encryption THEN the plist answers no`() {
         // Only the HTTPS built into iOS (Ktor's Darwin engine), which Apple counts as exempt.
         assertTrue(iosProject.contains("ITSAppUsesNonExemptEncryption: false"))
