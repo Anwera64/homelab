@@ -9,7 +9,10 @@ class ListAvailableToolsUseCase:
         return [
             ToolDefinition(
                 name="calendar_read",
-                description="Fetch calendar events for the user within a specified time range.",
+                description=(
+                    "Fetch the member's calendar events within a time range, from every calendar they picked. "
+                    "Each event says which calendar it is on; one marked read_only can't be changed or removed."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -38,7 +41,7 @@ class ListAvailableToolsUseCase:
             ),
             ToolDefinition(
                 name="calendar_write",
-                description="Schedule, update, or cancel a calendar event on the user's primary CalDAV calendar.",
+                description="Schedule, update, or cancel an event on one of the member's calendars.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -78,6 +81,14 @@ class ListAvailableToolsUseCase:
                             "type": "boolean",
                             "description": "Whether the event is an all-day event",
                             "default": False,
+                        },
+                        "calendar": {
+                            "type": "string",
+                            "description": (
+                                "The calendar's key, such as 'c2'. On update or delete: the calendar "
+                                "calendar_read gave for the event. On create: the calendar the member chose; "
+                                "when they have more than one and didn't say, ask them which before creating."
+                            ),
                         },
                         "event_id": {
                             "type": "string",

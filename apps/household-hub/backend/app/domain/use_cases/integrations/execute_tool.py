@@ -14,6 +14,7 @@ from app.domain.exceptions import (
 )
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
+from app.domain.repositories.calendar_source_repository import ICalendarSourceRepository
 from app.domain.repositories.search_connector import ISearchConnector
 from app.domain.repositories.document_repository import IDocumentRepository
 from app.domain.repositories.document_reader import IDocumentReader
@@ -24,6 +25,7 @@ from app.domain.repositories.page_reader import IPageReader
 from app.domain.use_cases.integrations import calendar_arguments
 from app.domain.use_cases.integrations.calendar_arguments import CalendarArgumentError
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.calendar_sources import SyncCalendarSourcesUseCase
 from app.domain.use_cases.integrations.get_calendar_events import GetCalendarEventsUseCase
 from app.domain.use_cases.integrations.create_calendar_event import CreateCalendarEventUseCase
 from app.domain.use_cases.integrations.update_calendar_event import UpdateCalendarEventUseCase
@@ -76,6 +78,7 @@ class ExecuteToolUseCase:
         remember: Optional[RememberUseCase] = None,
         forget: Optional[ForgetUseCase] = None,
         follow_event: Optional[FollowEventChangeUseCase] = None,
+        calendar_sources: Optional[ICalendarSourceRepository] = None,
     ):
         self.calendar_repo = calendar_repo
         self.calendar_connector = calendar_connector
@@ -92,13 +95,20 @@ class ExecuteToolUseCase:
         # Initialize sub-use-cases
         # Without a Google client, password calendars still work; a Google one is refused once its token runs out.
         secrets = calendar_secrets or CalendarSecretResolver(calendar_repo, cipher, uow)
-        self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, secrets)
-        self.create_calendar_event_uc = CreateCalendarEventUseCase(calendar_repo, calendar_connector, secrets)
+        # Without kept calendars, the connection's one calendar is used, as before calendars could be picked.
+        sync = None if calendar_sources is None else SyncCalendarSourcesUseCase(calendar_sources, calendar_connector)
+        self.get_calendar_events_uc = GetCalendarEventsUseCase(calendar_repo, calendar_connector, secrets, sync=sync)
+        self.create_calendar_event_uc = CreateCalendarEventUseCase(calendar_repo, calendar_connector, secrets, sync=sync)
         self.update_calendar_event_uc = UpdateCalendarEventUseCase(
-            calendar_repo, calendar_connector, secrets, follow=follow_event
+            calendar_repo, calendar_connector, secrets, follow=follow_event, sync=sync
         )
         self.delete_calendar_event_uc = DeleteCalendarEventUseCase(
-            calendar_repo, calendar_connector, secrets, allow_agent_delete=allow_calendar_delete, follow=follow_event
+            calendar_repo,
+            calendar_connector,
+            secrets,
+            allow_agent_delete=allow_calendar_delete,
+            follow=follow_event,
+            sync=sync,
         )
         self.search_uc = ExecuteSearchUseCase(search_connector)
         self.save_doc_uc = SaveDocumentUseCase(document_repo, uow)
@@ -217,32 +227,33 @@ class ExecuteToolUseCase:
                 end_time = calendar_arguments.moment(end_str, "end_time", zone)
                 limit = int(arguments.get("limit", 50))
 
-                events = await self.get_calendar_events_uc.execute(
+                reading = await self.get_calendar_events_uc.read(
                     user_id=user_id,
                     start_time=start_time,
                     end_time=end_time,
                     limit=limit,
                 )
-                return ToolExecutionResult(
-                    tool_name=tool_name,
-                    success=True,
-                    data={
-                        "events": [
-                            {
-                                "id": e.id,
-                                "title": e.title,
-                                # A whole day has no clock time to move into a zone: it stays its date.
-                                "start_time": _told(e.start_time, None if e.is_all_day else zone),
-                                "end_time": _told(e.end_time, None if e.is_all_day else zone),
-                                "description": e.description,
-                                "location": e.location,
-                                "is_all_day": e.is_all_day,
-                                **_series_fields(e, None if e.is_all_day else zone),
-                            }
-                            for e in events
-                        ]
-                    },
-                )
+                read_data: Dict[str, Any] = {
+                    "events": [
+                        {
+                            "id": e.id,
+                            "title": e.title,
+                            # A whole day has no clock time to move into a zone: it stays its date.
+                            "start_time": _told(e.start_time, None if e.is_all_day else zone),
+                            "end_time": _told(e.end_time, None if e.is_all_day else zone),
+                            "description": e.description,
+                            "location": e.location,
+                            "is_all_day": e.is_all_day,
+                            **_series_fields(e, None if e.is_all_day else zone),
+                            **_calendar_fields(e),
+                        }
+                        for e in reading.events
+                    ]
+                }
+                if reading.unreadable:
+                    # Said, so the model doesn't tell the member a day is free when part of it went unread.
+                    read_data["unreadable"] = reading.unreadable
+                return ToolExecutionResult(tool_name=tool_name, success=True, data=read_data)
 
             elif tool_name == "calendar_write":
                 action = arguments.get("action", "create")
@@ -267,6 +278,7 @@ class ExecuteToolUseCase:
                         location=arguments.get("location", ""),
                         is_all_day=bool(arguments.get("is_all_day", False)),
                         repeat=calendar_arguments.repeat(arguments.get("repeat")),
+                        calendar=arguments.get("calendar"),
                     )
                     return ToolExecutionResult(
                         tool_name=tool_name,
@@ -277,6 +289,7 @@ class ExecuteToolUseCase:
                             "title": created.title,
                             "start_time": _told(created.start_time, zone),
                             "end_time": _told(created.end_time, zone),
+                            **_calendar_fields(created),
                         },
                     )
 
@@ -305,11 +318,17 @@ class ExecuteToolUseCase:
                             arguments.get("occurrence_start"), "occurrence_start", zone
                         ),
                         scope=calendar_arguments.scope(arguments.get("scope")),
+                        calendar=arguments.get("calendar"),
                     )
                     return ToolExecutionResult(
                         tool_name=tool_name,
                         success=True,
-                        data={"action": "updated", "event_id": updated.id, "title": updated.title},
+                        data={
+                            "action": "updated",
+                            "event_id": updated.id,
+                            "title": updated.title,
+                            **_calendar_fields(updated),
+                        },
                     )
 
                 elif action == "delete":
@@ -327,12 +346,12 @@ class ExecuteToolUseCase:
                             arguments.get("occurrence_start"), "occurrence_start", zone
                         ),
                         scope=calendar_arguments.scope(arguments.get("scope")),
+                        calendar=arguments.get("calendar"),
                     )
-                    return ToolExecutionResult(
-                        tool_name=tool_name,
-                        success=True,
-                        data={"action": "deleted", "event_id": event_id, "deleted": deleted},
-                    )
+                    deleted_data: Dict[str, Any] = {"action": "deleted", "event_id": event_id, "deleted": deleted}
+                    if arguments.get("calendar"):
+                        deleted_data["calendar"] = arguments["calendar"]
+                    return ToolExecutionResult(tool_name=tool_name, success=True, data=deleted_data)
                 else:
                     return ToolExecutionResult(
                         tool_name=tool_name,
@@ -470,6 +489,16 @@ def _told(when: datetime, zone) -> str:
     if zone is None or when.tzinfo is None:
         return when.isoformat()
     return when.astimezone(zone).isoformat()
+
+
+def _calendar_fields(event) -> Dict[str, Any]:
+    """Which calendar an event is on, for the model to name it back by; read_only only when it is."""
+    if not event.calendar_key:
+        return {}
+    fields: Dict[str, Any] = {"calendar": event.calendar_key, "calendar_name": event.calendar_name}
+    if event.read_only:
+        fields["read_only"] = True
+    return fields
 
 
 def _series_fields(event, zone=None) -> Dict[str, Any]:

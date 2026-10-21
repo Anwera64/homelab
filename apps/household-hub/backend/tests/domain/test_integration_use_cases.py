@@ -108,6 +108,7 @@ class MockCalendarConnector:
         end_time: datetime,
         limit: int = 50,
         timeout: float = 10.0,
+        calendar_url: Optional[str] = None,
     ) -> List[CalendarEvent]:
         return self.events
 
@@ -123,6 +124,7 @@ class MockCalendarConnector:
         is_all_day: bool = False,
         timeout: float = 10.0,
         repeat=None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         event = CalendarEvent(
             id=f"evt-{len(self.events) + 1}",
@@ -153,6 +155,7 @@ class MockCalendarConnector:
         repeat=None,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         self.series_calls.append({"occurrence_start": occurrence_start, "scope": scope, "repeat": repeat})
         for evt in self.events:
@@ -179,6 +182,7 @@ class MockCalendarConnector:
         event_id: str,
         occurrence_start: Optional[datetime] = None,
         timeout: float = 10.0,
+        calendar_url: Optional[str] = None,
     ) -> Optional[CalendarEvent]:
         self.looked_up_occurrence = occurrence_start
         return next((evt for evt in self.events if evt.id == event_id), None)
@@ -191,6 +195,7 @@ class MockCalendarConnector:
         timeout: float = 10.0,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> bool:
         self.series_calls.append({"occurrence_start": occurrence_start, "scope": scope})
         for i, evt in enumerate(self.events):

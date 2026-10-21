@@ -6,6 +6,7 @@ from app.domain.exceptions import CalendarNotConnectedException
 from app.domain.repositories.calendar_credential_repository import ICalendarCredentialRepository
 from app.domain.repositories.calendar_connector import ICalendarConnector
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
+from app.domain.use_cases.integrations.calendar_sources import CHANGE, CREATE, LOOK, SyncCalendarSourcesUseCase, on
 from app.domain.use_cases.memories.follow_event import FollowEventChangeUseCase
 
 logger = logging.getLogger(__name__)
@@ -18,10 +19,13 @@ class UpdateCalendarEventUseCase:
         connector: ICalendarConnector,
         secrets: CalendarSecretResolver,
         follow: Optional[FollowEventChangeUseCase] = None,
+        sync: Optional[SyncCalendarSourcesUseCase] = None,
     ):
         self.credential_repo = credential_repo
         self.connector = connector
         self.secrets = secrets
+        # Without it, the connection's one calendar is used, as before calendars could be picked.
+        self.sync = sync
         # Keeps the member's memories of the event true once the calendar has answered (memory spec §7).
         self.follow = follow
 
@@ -39,12 +43,14 @@ class UpdateCalendarEventUseCase:
         repeat: Optional[Repeat] = None,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar: Optional[str] = None,
     ) -> CalendarEvent:
         credential = await self.credential_repo.get_by_user_id(user_id)
         if not credential or not credential.is_active:
             raise CalendarNotConnectedException("No calendar configured for user.")
 
         secret = await self.secrets.resolve(credential)
+        source = None if self.sync is None else await self.sync.choose(credential, secret, calendar, CHANGE)
         updated = await self.connector.update_event(
             credential=credential,
             secret=secret,
@@ -59,7 +65,10 @@ class UpdateCalendarEventUseCase:
             repeat=repeat,
             occurrence_start=occurrence_start,
             scope=scope,
+            calendar_url=source.url if source else None,
         )
+        if source:
+            updated = on(updated, source)
         await self._follow(user_id, event_id)
         return updated
 

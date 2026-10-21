@@ -123,7 +123,7 @@ class FakeConnector:
         self.fail = fail
         self.asked = []
 
-    async def get_event(self, credential, secret, event_id, occurrence_start=None, timeout=10.0):
+    async def get_event(self, credential, secret, event_id, occurrence_start=None, timeout=10.0, calendar_url=None):
         self.asked.append((credential.user_id, event_id, occurrence_start))
         if self.fail:
             raise CalendarUnreachableException("down")

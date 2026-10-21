@@ -52,3 +52,14 @@ class CalendarEvent:
     # A date that was moved on its own starts at [start_time] but is still named by [occurrence_start].
     repeat: Optional[Repeat] = None
     occurrence_start: Optional[datetime] = None
+    # Which of the member's calendars it is on, by the key the model names it with.
+    calendar_key: str = ""
+    read_only: bool = False
+
+
+@dataclass
+class CalendarReading:
+    """The events of every calendar the member picked, and the names of those that couldn't be read."""
+
+    events: List[CalendarEvent]
+    unreadable: List[str] = field(default_factory=list)

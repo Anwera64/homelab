@@ -384,10 +384,12 @@ class FakeEventLookup:
         self.fails = fails
         self.asked = []
         self.dates = []
+        self.calendars = []
 
-    async def execute(self, user_id, event_id, occurrence_start=None, timeout=5.0):
+    async def execute(self, user_id, event_id, occurrence_start=None, timeout=5.0, calendar=None):
         self.asked.append((user_id, event_id))
         self.dates.append(occurrence_start)
+        self.calendars.append(calendar)
         if self.fails:
             raise CalendarUnreachableException("calendar.example.com did not answer")
         return self.events.get(event_id)
@@ -434,6 +436,19 @@ async def test_GIVEN_a_remove_with_only_an_id_WHEN_its_card_is_shown_THEN_it_nam
     assert card["arguments"] == proposal["arguments"]
     # The model's own call is left as it made it.
     assert REMOVE.arguments == {"action": "delete", "event_id": "e9f57d50"}
+
+
+@pytest.mark.asyncio
+async def test_GIVEN_a_removal_on_a_second_calendar_WHEN_its_card_is_shown_THEN_the_event_is_looked_up_on_that_calendar():
+    on_work = LLMToolCall(
+        id="d2", name="calendar_write", arguments={"action": "delete", "event_id": "e9f57d50", "calendar": "c2"}
+    )
+    lookup = FakeEventLookup([_test_event()])
+    use_case, _, _, _ = _setup([[LLMResponseChunk(tool_calls=[on_work])]], event_lookup=lookup)
+
+    await _ask_from(use_case, "Europe/Madrid")
+
+    assert lookup.calendars == ["c2"]
 
 
 @pytest.mark.asyncio
