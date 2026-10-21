@@ -3,7 +3,9 @@ package com.homelab.household.app.components
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
 import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
 import androidx.compose.ui.test.getBoundsInRoot
@@ -12,8 +14,12 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import androidx.compose.ui.unit.Dp
 import kotlin.test.assertEquals
@@ -70,6 +76,42 @@ class HearthScaffoldRobot(
             .onNodeWithTag(contentTag)
             .assertTopPositionInRootIsEqualTo(top)
             .assertLeftPositionInRootIsEqualTo(left)
+    }
+
+    fun focusesTheField(fieldTag: String) {
+        test.waitUntilExactlyOneExists(hasTestTag(fieldTag), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(fieldTag).performClick().assertIsFocused()
+    }
+
+    /** A tap on a spot that holds no control, as a finger beside the field would land. */
+    fun tapsEmptySpace(emptyTag: String) {
+        test.waitUntilExactlyOneExists(hasTestTag(emptyTag), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(emptyTag).performClick()
+    }
+
+    fun tapsTheButton(label: String) {
+        test.waitUntilExactlyOneExists(hasText(label), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithText(label).performClick()
+    }
+
+    /** A finger scrolls the form, as it would to reach a field further down. */
+    fun dragsUp(formTag: String) {
+        test.waitUntilExactlyOneExists(hasTestTag(formTag), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(formTag).performTouchInput { swipeUp() }
+    }
+
+    /** A finger moves along the field's line, as it does to reach the end of a long title. */
+    fun dragsAlong(fieldTag: String) {
+        test.waitUntilExactlyOneExists(hasTestTag(fieldTag), timeoutMillis = WAIT_MILLIS)
+        test.onNodeWithTag(fieldTag).performTouchInput { swipeLeft() }
+    }
+
+    fun seesTheFieldFocused(fieldTag: String) {
+        test.onNodeWithTag(fieldTag).assertIsFocused()
+    }
+
+    fun seesTheFieldNotFocused(fieldTag: String) {
+        test.onNodeWithTag(fieldTag).assertIsNotFocused()
     }
 
     private companion object {
