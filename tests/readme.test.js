@@ -246,6 +246,9 @@ test('Root README matches the repository', async (t) => {
     assert.ok(row[0].includes('`https://hub-dev.spicy-llama.duckdns.org`'));
     assert.ok(row[0].includes('`http://localhost:3051`'), '/docs on the server is on the published port');
     assert.doesNotMatch(readme, /127\.0\.0\.1:3050/, 'the loopback-only port is gone');
+    // After the cutover (#134): hub. is the household's prod hub.
+    assert.ok(row[0].includes('`http://localhost:3052`'), 'the prod hub\'s port is named too');
+    assert.doesNotMatch(row[0], /until the prod hub ships/, 'the prod hub has shipped');
   });
   await t.test('the desktop opens one port, for the server: the media rule is gone', () => {
     // The media ports left with the media services. Only Ollama answers, and only the server.

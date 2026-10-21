@@ -5,7 +5,7 @@ description: Rebase a PR and prepare it for manual testing on the server's hub a
 Given a PR number (none given: the PR of the current branch):
 1. Fetch latest master and rebase or merge it into the PR branch. Resolve conflicts and explain each resolution. Push the result: the server builds from GitHub, not from this PC.
 2. Run the full hub test suite and the client build. Stop and report if anything fails.
-3. Deploy the PR's hub. PRs are tested on the dev hub, `household-hub-dev` on the server (`ssh anwera97@server.lan`, checkout `~/homelab`, compose in `hosts/server`), not on this PC. Until the prod hub ships (#134) it is also the hub the household uses:
+3. Deploy the PR's hub. PRs are tested on the dev hub, `household-hub-dev` on the server (`ssh anwera97@server.lan`, checkout `~/homelab`, compose in `hosts/server`), not on this PC. The household uses the prod hub, which only changes on a release, so testing here is safe:
    - Only when the PR changes the hub (`apps/household-hub/backend`). A client-only PR skips this.
    - Say so before switching, then `git fetch` and `git switch` to the PR branch in `~/homelab`.
    - `docker compose build household-hub-dev` with the output in a file, and check its exit code. Only then `docker compose up -d household-hub-dev`, and wait for it to be healthy.

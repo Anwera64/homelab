@@ -134,11 +134,12 @@
         reverse_proxy 192.168.1.30:3002
     }
 
-    # The app's logs (the app_telemetry snippet above), and the hubs. Until the prod app
-    # exists (#134), the names the installed app uses still lead to today's data: the dev hub.
+    # The app's logs (the app_telemetry snippet above), and the hubs. hub and telemetry are the
+    # household's: the prod hub, which runs released images. The -dev names are the dev hub,
+    # built from master, for the dev app (#134).
     @telemetry host telemetry.spicy-llama.duckdns.org
     handle @telemetry {
-        import app_telemetry 3051 dev
+        import app_telemetry 3052 prod
     }
 
     @telemetry_dev host telemetry-dev.spicy-llama.duckdns.org
@@ -148,7 +149,7 @@
 
     @hub host hub.spicy-llama.duckdns.org
     handle @hub {
-        reverse_proxy 192.168.1.30:3051
+        reverse_proxy 192.168.1.30:3052
     }
 
     @hub_dev host hub-dev.spicy-llama.duckdns.org

@@ -119,7 +119,7 @@ graph TD
 | **Maintainerr** | Server | `https://maintainerr.spicy-llama.duckdns.org` | Media lifecycle & cleanup |
 | **Cleanuparr** | Server | `https://cleanuparr.spicy-llama.duckdns.org` | Download queue cleanup: fakes, failed imports, seeding limits |
 | **FlareSolverr** | Server | — | Cloudflare challenge solver. No login, so no name and no port: only Prowlarr reaches it |
-| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org`, `https://hub-dev.spicy-llama.duckdns.org` | Family assistant backend: the dev hub, built from master; both names lead to it until the prod hub ships (#134). `/docs` at `http://localhost:3051` on the server itself |
+| **Household Hub** | Server | `https://hub.spicy-llama.duckdns.org`, `https://hub-dev.spicy-llama.duckdns.org` | Family assistant backend. `hub.` is the household's prod hub, on released images; `hub-dev.` is the dev hub, built from master (#134). `/docs` at `http://localhost:3052` (prod) and `http://localhost:3051` (dev) on the server itself |
 | **Grafana** | Server | `https://grafana.spicy-llama.duckdns.org` | Log search (sign-in required) |
 | **Gluetun API** | Server | — | VPN status for Homepage (port 8000, API key) |
 | **SearXNG** | Server | — | Private search for the hub (internal `http://searxng:8080`) |

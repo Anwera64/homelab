@@ -515,6 +515,8 @@ test('Server README', async (t) => {
     for (const text of ['HUB_DEV_SECRET_KEY', 'HUB_SECRET_KEY', 'household-hub-dev', 'hub-dev.spicy-llama.duckdns.org', 'localhost:3051', 'localhost:3052']) {
       assert.ok(readme.includes(text), `README must name ${text}`);
     }
+    // After the cutover (#134), hub. is the prod Hub's address.
+    assert.doesNotMatch(readme, /once the prod app ships|Until the prod app ships/, 'the prod app has shipped');
     assert.match(readme, /signs every phone out/);
     assert.match(readme, /calendar/i);
     assert.match(readme, /never the dev one's|never copy/i, 'the prod key is its own');
