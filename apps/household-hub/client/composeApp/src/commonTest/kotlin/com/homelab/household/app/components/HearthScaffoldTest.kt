@@ -154,6 +154,19 @@ class HearthScaffoldTest {
         }
 
     @Test
+    fun `GIVEN a focused field on a screen that cannot scroll WHEN empty space is dragged THEN the field keeps focus`() =
+        runComposeUiTest {
+            setContent { StillTheme { FieldAndButton() } }
+
+            onHearthScaffold {
+                focusesTheField(FIELD)
+                dragsUp(EMPTY)
+
+                seesTheFieldFocused(FIELD)
+            }
+        }
+
+    @Test
     fun `GIVEN a scaffold with a focused field WHEN a button is tapped THEN the button runs`() =
         runComposeUiTest {
             setContent { StillTheme { FieldAndButton() } }

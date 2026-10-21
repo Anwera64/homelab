@@ -1,6 +1,8 @@
 package com.homelab.household.app.components
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -15,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -32,7 +35,8 @@ import com.homelab.household.app.theme.HearthTheme
  *
  * A tap anywhere a control doesn't take hides the keyboard. iOS has no back button to do it, and
  * its numeric keypad has no return key, so without this a field keeps the keyboard until the
- * screen is left. A field, button or chip consumes its own tap first and never reaches this.
+ * screen is left. A field, button or chip consumes its own tap first and never reaches this, and
+ * a drag is not a tap: where no list takes it, the finger has still moved.
  * Where [LocalDragHidesKeyboard] says so (iOS), a finger scrolling the screen hides it too.
  */
 @Composable
@@ -49,7 +53,7 @@ fun HearthScaffold(
     val scrollHidesKeyboard = remember(focusManager) { ScrollHidesKeyboard(focusManager) }
     Scaffold(
         modifier = modifier
-            .pointerInput(focusManager) { detectTapGestures { focusManager.clearFocus() } }
+            .pointerInput(focusManager) { detectStillTaps { focusManager.clearFocus() } }
             .then(if (dragHidesKeyboard) Modifier.nestedScroll(scrollHidesKeyboard) else Modifier),
         topBar = header,
         bottomBar = bottomBar,
@@ -84,3 +88,15 @@ private class ScrollHidesKeyboard(
         return Offset.Zero
     }
 }
+
+/**
+ * A tap that no child consumed, and that ended within the touch slop of where it began.
+ * `detectTapGestures` would also count a drag that nothing took, such as one across a screen that
+ * cannot scroll.
+ */
+private suspend fun PointerInputScope.detectStillTaps(onTap: () -> Unit) =
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+        if ((up.position - down.position).getDistance() <= viewConfiguration.touchSlop) onTap()
+    }
