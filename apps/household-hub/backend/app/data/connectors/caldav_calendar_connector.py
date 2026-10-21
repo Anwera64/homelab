@@ -1,13 +1,18 @@
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+from urllib.parse import urljoin
 import caldav
 from caldav.lib.error import AuthorizationError, NotFoundError
 from icalendar import Calendar as ICalendar, Event as IEvent
+from lxml import etree
 import uuid
 
 from app.data.connectors import ical_series
+from app.data.connectors.google_calendar_list import GoogleCalendarList
 from app.domain.entities.calendar_event import ALL, THIS_AND_FOLLOWING, CalendarEvent, Repeat
+from app.domain.entities.calendar_source import DiscoveredCalendar
 from app.domain.entities.integration_credential import OAUTH, CalendarCredential
 from app.domain.exceptions import (
     CalendarAuthException,
@@ -176,6 +181,43 @@ def _dates(calendar: ICalendar, start: datetime) -> List[datetime]:
 # How many of a series' dates are compared after a write: enough to show a skip, a move or an end.
 CONFIRMED_DATES = 5
 
+logger = logging.getLogger(__name__)
+
+DAV = "DAV:"
+CALDAV = "urn:ietf:params:xml:ns:caldav"
+_NS = {"d": DAV, "c": CALDAV}
+# One request for every calendar of the account, with what the hub needs to know of each.
+_LIST_CALENDARS = f"""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="{DAV}" xmlns:c="{CALDAV}">
+  <d:prop>
+    <d:displayname/>
+    <d:resourcetype/>
+    <d:current-user-privilege-set/>
+    <c:supported-calendar-component-set/>
+  </d:prop>
+</d:propfind>"""
+_WRITE_PRIVILEGES = {"write", "write-content", "all"}
+
+
+def _discovered(response, home_set: str) -> Optional[DiscoveredCalendar]:
+    """
+    One entry of the account's calendar list, or None when it holds no events: the home set itself,
+    or a reminders list. A server that says nothing of privileges is taken at its word that it can
+    be written, as before.
+    """
+    if response.find(".//d:resourcetype/c:calendar", _NS) is None:
+        return None
+    components = [c.get("name") for c in response.iterfind(".//c:supported-calendar-component-set/c:comp", _NS)]
+    if components and "VEVENT" not in components:
+        return None
+    href = response.findtext("d:href", namespaces=_NS)
+    privilege_set = response.find(".//d:current-user-privilege-set", _NS)
+    writable = privilege_set is None or any(
+        etree.QName(p).localname in _WRITE_PRIVILEGES for p in privilege_set.iterfind("d:privilege/*", _NS)
+    )
+    name = response.findtext(".//d:displayname", namespaces=_NS) or href
+    return DiscoveredCalendar(url=urljoin(home_set, href), name=name, writable=writable)
+
 
 class CalDavCalendarConnector(ICalendarConnector):
     """
@@ -183,6 +225,9 @@ class CalDavCalendarConnector(ICalendarConnector):
     CalDAV servers using standard RFC 4791 / 5545 iCalendar format.
     All synchronous socket calls are dispatched to asyncio.to_thread.
     """
+
+    def __init__(self, google_calendars: Optional[GoogleCalendarList] = None):
+        self.google_calendars = google_calendars or GoogleCalendarList()
 
     def _sync_get_client(self, credential: CalendarCredential, secret: str) -> caldav.DAVClient:
         if credential.auth_kind == OAUTH:
@@ -210,7 +255,25 @@ class CalDavCalendarConnector(ICalendarConnector):
         except Exception as e:
             raise CalendarUnreachableException(f"CalDAV server at {credential.url} could not be reached: {e}")
 
-    def _sync_get_target_calendar(self, client: caldav.DAVClient, credential: CalendarCredential):
+    def _sync_list_calendars(self, credential: CalendarCredential, secret: str) -> List[DiscoveredCalendar]:
+        client = self._sync_get_client(credential, secret)
+        try:
+            home_set = str(client.principal().calendar_home_set.url)
+            response = client.propfind(home_set, _LIST_CALENDARS, depth=1)
+            raw = response._raw if isinstance(response._raw, bytes) else str(response._raw).encode()
+            tree = etree.fromstring(raw)
+        except AuthorizationError as e:
+            raise CalendarAuthException(f"CalDAV server at {credential.url} refused the credentials: {e}")
+        except Exception as e:
+            raise CalendarUnreachableException(f"CalDAV server at {credential.url} could not list its calendars: {e}")
+        found = (_discovered(r, home_set) for r in tree.iterfind("d:response", _NS))
+        return [c for c in found if c is not None]
+
+    def _sync_get_target_calendar(
+        self, client: caldav.DAVClient, credential: CalendarCredential, calendar_url: Optional[str] = None
+    ):
+        if calendar_url:
+            return client.calendar(url=calendar_url)
         # A Google sign-in's address is the calendar itself; Google's CalDAV has no discovery to lean on.
         if credential.auth_kind == OAUTH:
             return client.calendar(url=credential.url)
@@ -236,10 +299,11 @@ class CalDavCalendarConnector(ICalendarConnector):
         start_time: datetime,
         end_time: datetime,
         limit: int,
+        calendar_url: Optional[str] = None,
     ) -> List[CalendarEvent]:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential)
+            target_cal = self._sync_get_target_calendar(client, credential, calendar_url)
             raw_events = target_cal.date_search(start=start_time, end=end_time, expand=True)
             rules = self._sync_series_rules(target_cal, start_time, end_time)
 
@@ -280,7 +344,9 @@ class CalDavCalendarConnector(ICalendarConnector):
                                 occurrence_start=ical_series.occurrence_of(component) if of_series else None,
                             )
                         )
-                except Exception:
+                except Exception as e:
+                    # Told apart in the logs from an event the calendar doesn't have.
+                    logger.warning("Calendar read | skipped an event that could not be read: %s (%s)", item.url, e)
                     continue
 
             return sorted(events, key=lambda e: e.start_time)
@@ -323,10 +389,11 @@ class CalDavCalendarConnector(ICalendarConnector):
         location: str,
         is_all_day: bool,
         repeat: Optional[Repeat] = None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential)
+            target_cal = self._sync_get_target_calendar(client, credential, calendar_url)
             cal = ICalendar()
             cal.add("prodid", "-//Household Hub//CalDAV Connector//EN")
             cal.add("version", "2.0")
@@ -382,10 +449,11 @@ class CalDavCalendarConnector(ICalendarConnector):
         repeat: Optional[Repeat] = None,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential)
+            target_cal = self._sync_get_target_calendar(client, credential, calendar_url)
             event = _find_event(target_cal, event_id, credential)
 
             cal_obj = ICalendar.from_ical(event.data)
@@ -544,6 +612,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         secret: str,
         event_id: str,
         occurrence_start: Optional[datetime] = None,
+        calendar_url: Optional[str] = None,
     ) -> Optional[CalendarEvent]:
         """
         The event as a member sees it. For a repeating one, [occurrence_start] picks the date meant:
@@ -552,7 +621,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         """
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential)
+            target_cal = self._sync_get_target_calendar(client, credential, calendar_url)
             try:
                 item = target_cal.event_by_uid(event_id)
             except NotFoundError:
@@ -597,10 +666,11 @@ class CalDavCalendarConnector(ICalendarConnector):
         event_id: str,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> bool:
         client = self._sync_get_client(credential, secret)
         try:
-            target_cal = self._sync_get_target_calendar(client, credential)
+            target_cal = self._sync_get_target_calendar(client, credential, calendar_url)
             event = _find_event(target_cal, event_id, credential)
             cal_obj = ICalendar.from_ical(event.data)
             if scope == ALL or not ical_series.repeats(cal_obj):
@@ -634,6 +704,20 @@ class CalDavCalendarConnector(ICalendarConnector):
         except asyncio.TimeoutError:
             raise CalendarUnreachableException(f"CalDAV server at {credential.url} did not answer within {timeout:.0f}s.")
 
+    async def list_calendars(
+        self, credential: CalendarCredential, secret: str, timeout: float = 15.0
+    ) -> List[DiscoveredCalendar]:
+        """The account's event calendars. Google's CalDAV can't list them, so Google's own list is asked."""
+        if credential.auth_kind == OAUTH:
+            return await self.google_calendars.list(secret)
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._sync_list_calendars, credential, secret),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise CalendarUnreachableException(f"CalDAV server at {credential.url} did not answer within {timeout:.0f}s.")
+
     async def fetch_events(
         self,
         credential: CalendarCredential,
@@ -642,6 +726,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         end_time: datetime,
         limit: int = 50,
         timeout: float = 10.0,
+        calendar_url: Optional[str] = None,
     ) -> List[CalendarEvent]:
         try:
             return await asyncio.wait_for(
@@ -652,6 +737,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                     start_time,
                     end_time,
                     limit,
+                    calendar_url,
                 ),
                 timeout=timeout,
             )
@@ -670,6 +756,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         is_all_day: bool = False,
         timeout: float = 10.0,
         repeat: Optional[Repeat] = None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         try:
             return await asyncio.wait_for(
@@ -684,6 +771,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                     location,
                     is_all_day,
                     repeat,
+                    calendar_url,
                 ),
                 timeout=timeout,
             )
@@ -705,6 +793,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         repeat: Optional[Repeat] = None,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> CalendarEvent:
         try:
             return await asyncio.wait_for(
@@ -722,6 +811,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                     repeat,
                     occurrence_start,
                     scope,
+                    calendar_url,
                 ),
                 timeout=timeout,
             )
@@ -735,10 +825,11 @@ class CalDavCalendarConnector(ICalendarConnector):
         event_id: str,
         occurrence_start: Optional[datetime] = None,
         timeout: float = 10.0,
+        calendar_url: Optional[str] = None,
     ) -> Optional[CalendarEvent]:
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(self._sync_get_event, credential, secret, event_id, occurrence_start),
+                asyncio.to_thread(self._sync_get_event, credential, secret, event_id, occurrence_start, calendar_url),
                 timeout=timeout,
             )
         except asyncio.TimeoutError:
@@ -752,6 +843,7 @@ class CalDavCalendarConnector(ICalendarConnector):
         timeout: float = 10.0,
         occurrence_start: Optional[datetime] = None,
         scope: Optional[str] = None,
+        calendar_url: Optional[str] = None,
     ) -> bool:
         try:
             return await asyncio.wait_for(
@@ -762,6 +854,7 @@ class CalDavCalendarConnector(ICalendarConnector):
                     event_id,
                     occurrence_start,
                     scope,
+                    calendar_url,
                 ),
                 timeout=timeout,
             )
