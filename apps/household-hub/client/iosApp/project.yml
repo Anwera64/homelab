@@ -49,6 +49,10 @@ targets:
       properties:
         # Per configuration (settings below): Debug is the dev app, Release the household's.
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        # XcodeGen otherwise writes the literals "1.0" and "1": the settings below never reach the
+        # plist on their own, and App Store Connect refuses a second upload of build 1.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # The hub and log collector this app talks to, read by MainViewController.kt.
         HubBaseUrl: $(HUB_BASE_URL)
         TelemetryBaseUrl: $(TELEMETRY_BASE_URL)
@@ -92,8 +96,8 @@ targets:
         PRODUCT_NAME: HouseholdHub
         # app.version in gradle.properties, which Xcode cannot read; AppVariantsTest keeps them
         # equal. The build number is the Android version code: 1.2.3 -> 10203.
-        MARKETING_VERSION: "0.5.2"
-        CURRENT_PROJECT_VERSION: 502
+        MARKETING_VERSION: "0.5.3"
+        CURRENT_PROJECT_VERSION: 503
         # iPhone only. An iPad app must allow all four orientations for multitasking, or App Store
         # Connect refuses the upload (error 90474); an iPad still runs this in the iPhone window.
         TARGETED_DEVICE_FAMILY: "1"

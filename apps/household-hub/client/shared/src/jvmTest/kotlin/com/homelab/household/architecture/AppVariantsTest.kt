@@ -194,6 +194,16 @@ class AppVariantsTest {
             iosProject.contains("CURRENT_PROJECT_VERSION: ${major * 10000 + minor * 100 + patch}"),
             "the build number is the Android version code",
         )
+        // XcodeGen writes "1.0" and "1" into the generated Info.plist unless told otherwise, and
+        // the build settings alone never reach it: 0.5.1 went to TestFlight as 1.0 (1).
+        assertTrue(
+            iosProject.contains("CFBundleShortVersionString: $(MARKETING_VERSION)"),
+            "the plist reads the version",
+        )
+        assertTrue(
+            iosProject.contains("CFBundleVersion: $(CURRENT_PROJECT_VERSION)"),
+            "the plist reads the build number",
+        )
     }
 
     @Test

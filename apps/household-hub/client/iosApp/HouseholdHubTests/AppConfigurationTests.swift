@@ -19,6 +19,15 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertEqual(telemetry, "https://telemetry-dev.spicy-llama.duckdns.org")
     }
 
+    /// XcodeGen's own defaults are "1.0" and "1"; the app must carry app.version and its build number.
+    func testAppCarriesItsReleaseVersionAndBuildNumber() throws {
+        let version = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+        let build = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
+        XCTAssertNotNil(version.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression), "version \(version)")
+        XCTAssertNotEqual(version, "1.0")
+        XCTAssertNotEqual(build, "1")
+    }
+
     func testDevAppIsNamedAndIdentifiedApartFromTheHouseholdsApp() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "HyggeHub Dev")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.homelab.household.dev")
