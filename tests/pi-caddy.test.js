@@ -88,7 +88,7 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     }
     // The media services left the desktop: a name still sent there answers 502.
     assert.doesNotMatch(caddyfile, /192\.168\.1\.20/, 'nothing is proxied to the desktop any more');
-    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051`));
+    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3052`));
   });
 
   await t.test('FlareSolverr, which has no login and no page to use, has no name', () => {
@@ -123,15 +123,15 @@ test('Pi Caddy terminates the DuckDNS HTTPS ingress', async (t) => {
     const dev = route('telemetry-dev', 'telemetry_dev');
     assert.ok(dev, 'telemetry-dev must import the snippet');
     assert.deepEqual(dev.slice(1), ['3051', 'dev']);
-    // Until the prod app exists (#134), the old name still serves today's data: the dev hub.
+    // The household's app sends to telemetry: the prod hub vouches for it (#134).
     const prod = route('telemetry', 'telemetry');
     assert.ok(prod, 'telemetry must import the snippet');
-    assert.deepEqual(prod.slice(1), ['3051', 'dev']);
+    assert.deepEqual(prod.slice(1), ['3052', 'prod']);
   });
 
-  await t.test('the dev hub has a name of its own, beside the one the installed app uses', () => {
+  await t.test('the household\'s name leads to the prod hub, and the dev hub keeps its own', () => {
+    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3052\\s*\\n`));
     assert.match(caddyfile, new RegExp(`@hub_dev host hub-dev\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub_dev \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051\\s*\\n`));
-    assert.match(caddyfile, new RegExp(`@hub host hub\\.spicy-llama\\.duckdns\\.org\\s*\\n\\s*handle @hub \\{\\s*\\n\\s*reverse_proxy ${SERVER}:3051\\s*\\n`));
   });
 
   await t.test('plain HTTP on the Pi\'s own names redirects to the dashboard\'s HTTPS name', () => {

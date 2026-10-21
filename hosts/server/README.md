@@ -365,10 +365,10 @@ Two Hubs run here, and they share neither data nor key:
 | Changes | every merge, at 04:00 | when the `Hub prod` bump PR is merged, then at 04:00 |
 | Data | volume `household_hub_data` | volume `household_hub_prod_data` |
 | Key | `HUB_DEV_SECRET_KEY` | `HUB_SECRET_KEY` |
-| Address | `https://hub-dev.spicy-llama.duckdns.org` | `https://hub.spicy-llama.duckdns.org`, once the prod app ships (#134) |
+| Address | `https://hub-dev.spicy-llama.duckdns.org` | `https://hub.spicy-llama.duckdns.org` |
 | From the server itself | `http://localhost:3051` | `http://localhost:3052` |
 
-Until the prod app ships, `hub.` still leads to the dev Hub, so the installed app keeps its data.
+The household's apps (release builds) talk to prod; the dev app (debug builds) talks to dev.
 
 Each key signs that Hub's login tokens and encrypts the calendar credentials stored in its database. A Hub refuses to start without its key, or on one shorter than 32 characters. Make each with `openssl rand -hex 32`, never copy the dev one's into prod, and never commit either.
 
