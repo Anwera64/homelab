@@ -166,6 +166,19 @@ test('Renovate: pinned images and client dependencies, bumped in PRs', async (t)
     assert.doesNotMatch('latest', scheme);
   });
 
+  await t.test('offers Unbound\'s tags without the v: each release comes as both, the same image', () => {
+    const [rule] = ruleFor((r) => asList(r.matchPackageNames).includes('klutchell/unbound') && r.allowedVersions);
+    assert.ok(rule && /^\/.*\/$/.test(rule.allowedVersions), 'a rule must keep Unbound\'s tags without the v');
+    const allowed = new RegExp(rule.allowedVersions.slice(1, -1));
+    const tag = piImages.find((image) => image.startsWith('klutchell/unbound:')).split(':')[1];
+    for (const ok of ['1.26.2', tag]) {
+      assert.match(ok, allowed);
+    }
+    for (const never of ['v1.26.2', 'latest', 'main', 'build-5f7c473b5a6459fff01f3e9cf33dd9b46ed12e6e']) {
+      assert.doesNotMatch(never, allowed, `${never} must never be offered`);
+    }
+  });
+
   await t.test('groups the client\'s minor and patch bumps into a PR of their own, merged once CI is green', () => {
     const [group] = ruleFor((r) => r.groupName === 'client dependencies');
     assert.ok(group, 'a client dependencies group must exist');
