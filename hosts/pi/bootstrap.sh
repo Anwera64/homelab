@@ -127,5 +127,22 @@ if [ ! -f "$PI_DIR/.env" ]; then
 fi
 docker compose --project-directory "$PI_DIR" up -d --remove-orphans
 
+step "Nightly update (system/pi-update.timer, 04:30)"
+# Writes a unit from system/ with this checkout's path filled in. Succeeds when it changed.
+place_unit() {
+  local unit=/etc/systemd/system/$1
+  sed "s|@PI_DIR@|$PI_DIR|g" "$PI_DIR/system/$1" | cmp -s - "$unit" && return 1
+  sed "s|@PI_DIR@|$PI_DIR|g" "$PI_DIR/system/$1" > "$unit"
+}
+# The timer starts the service; the service itself is never enabled.
+place_unit pi-update.service || true
+systemctl daemon-reload
+if place_unit pi-update.timer; then
+  systemctl daemon-reload
+  # A timer keeps its old schedule until it is restarted.
+  systemctl restart pi-update.timer
+fi
+systemctl enable --now pi-update.timer
+
 step "Done."
 finish

@@ -54,11 +54,33 @@ Rollback, which also works if the Pi is dead: activate DHCP on the Livebox again
 
 ## Updating
 
+Image versions are pinned in `docker-compose.yml`, and Renovate opens the bump PRs. `pi-update.timer` applies what was merged at 04:30, after the server's 04:00 update. It fast-forwards the checkout and, if anything changed, starts the stack, waits for the health checks and removes the old images. Caddy and Unbound read one mounted file each, which a merge replaces, so when the Caddyfile or `unbound.conf` changed that container is recreated too.
+
+When the stack does not start, the checkout is rolled back to the last commit that started (kept as the ref `refs/pi-update/applied`), that commit is started again and an alert is sent. The next night tries the same change again. It changes nothing when the checkout has local edits or commits of its own. To see what it did:
+
 ```sh
-cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh
+journalctl -u pi-update
 ```
 
-The script is safe to rerun. Image versions are pinned in `docker-compose.yml`; bump them in a PR.
+Host setup (packages, the units in `system/`) is left to a human: when a merge changes it, the update says so in an alert. Then run:
+
+```sh
+sudo hosts/pi/bootstrap.sh
+```
+
+The script is safe to rerun. It also installs the timer, so run it once after this lands.
+
+### Alerts
+
+The update reports through the Pi's own ntfy, as a user of its own that may only post to `homelab`. Make it once, and put the token it prints in `NTFY_UPDATE_TOKEN` in `hosts/pi/.env`:
+
+```sh
+docker exec -it ntfy ntfy user add pi-update
+docker exec -it ntfy ntfy access pi-update homelab write-only
+docker exec -it ntfy ntfy token add pi-update
+```
+
+Without the token the update still runs and sends nothing. An alert goes out when a run fails (local edits, a failed fetch, a start rolled back) and when the host setup changed. When ntfy itself is down, nothing is sent, but the rollback starts ntfy again before the alert goes out. To try it: `sudo systemctl start pi-update`.
 
 ## Uptime and alerts
 
@@ -108,7 +130,7 @@ Add them by hand in the Uptime Kuma page. From here Kuma reaches the server's se
 
 ### Restarts that are not outages
 
-The server's nightly update restarts its stack at 04:00 when a bump was merged, and a reboot for security updates can follow at 05:00. Two settings keep these from the phones:
+The server's nightly update restarts its stack at 04:00 when a bump was merged (lemonpi's at 04:30), and a reboot for security updates can follow at 05:00. Two settings keep these from the phones:
 
 - Under Maintenance, add a recurring maintenance window every day from 04:00 to 05:15, for all monitors. No alert is sent during it, so a real outage in that time alerts only once the window ends.
 - On each monitor, set Retries to 3. A service that is back within three checks is then never reported, at any hour.

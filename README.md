@@ -131,6 +131,7 @@ graph TD
 | **Recyclarr** | Server | — | TRaSH Guides sync, daily 3 AM |
 | **Renovate** | Server | — | Version bump PRs for every host's images, the hub and its client, opened when a release is three days old; runs every hour |
 | **Nightly update** | Server | — | Applies merged bumps and restarts the stack, daily 4 AM |
+| **Nightly update** | lemonpi | — | Applies merged bumps and config, restarts the stack and rolls back if it does not start, daily 4:30 AM |
 
 The server has a firewall, so its service ports answer lemonpi only.
 
@@ -162,6 +163,10 @@ The server has a firewall, so its service ports answer lemonpi only.
 │   │   ├── bootstrap.sh             # Idempotent setup: OS, log2ram, Docker, Tailscale, stack
 │   │   ├── docker-compose.yml       # Pi-hole, Unbound, Caddy, Homepage, Uptime Kuma, ntfy
 │   │   ├── .env.example             # Pi secrets template (password, DuckDNS token, leases, API keys)
+│   │   ├── system/
+│   │   │   ├── pi-update.sh         # Nightly update: fast-forward, restart, roll back on a failed start
+│   │   │   ├── pi-update.service
+│   │   │   └── pi-update.timer      # 04:30, after the server's
 │   │   ├── caddy/
 │   │   │   ├── Caddyfile            # HTTPS routes for *.spicy-llama.duckdns.org
 │   │   │   └── Dockerfile           # Caddy + DuckDNS DNS plugin (built by CI)
@@ -209,6 +214,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── config-integrity.test.js     # Compose files, Homepage and env cross-checks
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
+    ├── pi-update.test.js            # The Pi's nightly update: fast-forward, rollback, alerts
     ├── server-stack.test.js         # Server compose, env template, CI gates and server README
     ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
     ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes
@@ -273,7 +279,7 @@ Remove-NetFirewallRule -DisplayName "Homelab Stack (LAN)"
 * **Privacy:** the hub's lines carry calendar titles and note text (secret chats are left out). They are kept for 30 days behind Grafana's sign-in, and Loki's port is open to the desktop's Alloy only.
 
 **lemonpi**
-* **Update:** `cd ~/homelab && git pull && sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; Renovate opens the bump PRs.
+* **Update:** `pi-update.timer` applies what was merged at 04:30, and alerts through ntfy when it can't. Host setup changes still need `sudo hosts/pi/bootstrap.sh`. Image versions are pinned in `hosts/pi/docker-compose.yml`; Renovate opens the bump PRs.
 * **Caddy image:** CI builds it monthly and on changes to `hosts/pi/caddy/Dockerfile`. Bump the pinned tag to roll it out.
 * **Checks, backups and rollback:** see [`hosts/pi/README.md`](hosts/pi/README.md).
 
