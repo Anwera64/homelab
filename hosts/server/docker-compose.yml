@@ -470,7 +470,7 @@ services:
     logging: *default-logging
 
   alloy:
-    image: grafana/alloy:v1.20.1
+    image: grafana/alloy:v1.21.0
     container_name: alloy
     ports:
       - 4318:4318   # OTLP over HTTP: the app's logs, through the Pi's Caddy (telemetry.spicy-llama.duckdns.org)
@@ -541,7 +541,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.176.3
+    image: renovate/renovate:44.176.4
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
