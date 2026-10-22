@@ -2,8 +2,8 @@
 # Prometheus - asks each exporter for its numbers and keeps a year of them
 # (the retention is a flag in hosts/server/docker-compose.yml).
 #
-# Every exporter's numbers carry host=server, so another machine can be added
-# later without the two mixing.
+# Every exporter's numbers carry the name of the host they describe (server,
+# lemonpi), so the machines never mix.
 # =============================================================================
 
 global:
@@ -31,6 +31,14 @@ scrape_configs:
       - targets: [nvidia-gpu-exporter:9835]
         labels:
           host: server
+
+  # lemonpi's node exporter, over the LAN: the Pi's own numbers and its nightly
+  # update's (the lemonpi dashboard). It answers on the Pi's LAN address only.
+  - job_name: lemonpi
+    static_configs:
+      - targets: [192.168.1.35:9100]
+        labels:
+          host: lemonpi
 
   - job_name: prometheus
     static_configs:

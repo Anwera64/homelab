@@ -215,6 +215,7 @@ The server has a firewall, so its service ports answer lemonpi only.
     ├── pi-dns.test.js               # Pi compose, Unbound, DHCP and bootstrap.sh
     ├── pi-caddy.test.js             # Pi Caddy routes and the image workflow
     ├── pi-update.test.js            # The Pi's nightly update: fast-forward, rollback, alerts
+    ├── pi-metrics.test.js           # The Pi's node exporter, its Prometheus job and the lemonpi dashboard
     ├── server-stack.test.js         # Server compose, env template, CI gates and server README
     ├── server-bootstrap.test.js     # Server bootstrap.sh, firewall, disk guard, battery and nightly update
     ├── renovate.test.js             # Renovate's groups, auto-merge rules and tag schemes

@@ -117,6 +117,8 @@ if [ "$(git -C "$REPO_DIR" config --get core.sparseCheckout || true)" = "true" ]
 fi
 
 step "Pi-hole + Unbound + Homepage"
+# The node exporter reads this folder; pi-update.sh writes there.
+install -d -m 0755 /var/lib/node_exporter/textfile
 if [ ! -f "$PI_DIR/.env" ]; then
   cp "$PI_DIR/.env.example" "$PI_DIR/.env"
   chown "$TARGET_USER:" "$PI_DIR/.env"

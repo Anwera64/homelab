@@ -114,9 +114,17 @@ exit 0
   const env = ['PIHOLE_PASSWORD=secret', 'NTFY_UPDATE_TOKEN=' + token, ''].join('\n');
   fs.writeFileSync(path.join(checkout, 'hosts/pi/.env'), env);
 
+  const textfile = path.join(root, 'textfile');
   const run = () => spawnSync(path.join(checkout, 'hosts/pi/system/pi-update.sh'), [], {
-    encoding: 'utf8', env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, PI_NTFY_URL: 'http://ntfy.test/homelab' },
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, PI_NTFY_URL: 'http://ntfy.test/homelab', PI_TEXTFILE_DIR: textfile },
   });
+  // What the run left for the node exporter, as { metric: value }.
+  const prom = () => {
+    const file = path.join(textfile, 'pi_update.prom');
+    const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
+    return Object.fromEntries(lines.filter((l) => l && !l.startsWith('#')).map((l) => l.split(' ')).map(([k, v]) => [k, Number(v)]));
+  };
   // docker calls without the project directory, which is the throwaway checkout's.
   const calls = () => (fs.existsSync(dockerLog) ? fs.readFileSync(dockerLog, 'utf8') : '')
     .split('\n').filter(Boolean).map((l) => l.replace(` --project-directory ${path.join(checkout, 'hosts/pi')}`, ''));
@@ -135,7 +143,7 @@ exit 0
   const failStarts = (n) => fs.writeFileSync(failUps, `${n}\n`);
   const breakCurl = () => fs.writeFileSync(failCurl, '');
   const cleanup = () => fs.rmSync(root, { recursive: true, force: true });
-  return { seed, checkout, run, calls, alerts, alertText, clearCalls, upstream, failStarts, breakCurl, cleanup };
+  return { seed, checkout, textfile, prom, run, calls, alerts, alertText, clearCalls, upstream, failStarts, breakCurl, cleanup };
 }
 
 const START = 'docker compose up -d --remove-orphans --wait';
@@ -378,6 +386,58 @@ test('Pi nightly update: host setup, which only bootstrap applies', async (t) =>
     const result = h.run();
     assert.equal(result.status, 0, result.stderr);
     assert.match(h.alertText(h.alerts()[0]), /sudo hosts\/pi\/bootstrap\.sh/);
+    h.cleanup();
+  });
+});
+
+test('Pi nightly update: the numbers it leaves for the node exporter', async (t) => {
+  await t.test('writes them where the exporter reads them, whole and readable by it', () => {
+    const script = read(path.join(SYSTEM_DIR, 'pi-update.sh'));
+    assert.match(script, /^TEXTFILE_DIR="\$\{PI_TEXTFILE_DIR:-\/var\/lib\/node_exporter\/textfile\}"$/m);
+    // The exporter does not run as root, and must never read a half-written file.
+    assert.match(script, /chmod 644/);
+    assert.match(script, /mv "\$tmp" "\$PROM"/);
+  });
+
+  await t.test('a quiet night records that it ran, and no update', { skip }, () => {
+    const h = setup();
+    const started = Math.floor(Date.now() / 1000);
+    assert.equal(h.run().status, 0);
+    assert.ok(h.prom().pi_update_last_run_timestamp_seconds >= started);
+    assert.equal(h.prom().pi_update_last_run_success, 1);
+    assert.equal(h.prom().pi_update_last_applied_timestamp_seconds, undefined, 'nothing was applied yet');
+    h.cleanup();
+  });
+
+  await t.test('an applied bump records when, and later quiet nights keep that time', { skip }, () => {
+    const h = setup();
+    const started = Math.floor(Date.now() / 1000);
+    h.upstream('hosts/pi/docker-compose.yml', 'image: pihole:1.0.1\n');
+    assert.equal(h.run().status, 0);
+    const applied = h.prom().pi_update_last_applied_timestamp_seconds;
+    assert.ok(applied >= started);
+    assert.equal(h.run().status, 0);
+    assert.equal(h.prom().pi_update_last_applied_timestamp_seconds, applied);
+    assert.deepEqual(fs.readdirSync(h.textfile), ['pi_update.prom']);
+    assert.equal(fs.statSync(path.join(h.textfile, 'pi_update.prom')).mode & 0o777, 0o644);
+    h.cleanup();
+  });
+
+  await t.test('a refused run is recorded as failed', { skip }, () => {
+    const h = setup();
+    fs.writeFileSync(path.join(h.checkout, 'hosts/pi/bootstrap.sh'), '#!/bin/sh\necho edited by hand\n');
+    assert.equal(h.run().status, 1);
+    assert.equal(h.prom().pi_update_last_run_success, 0);
+    h.cleanup();
+  });
+
+  await t.test('a rolled-back night is recorded as failed, and applies nothing', { skip }, () => {
+    const h = setup();
+    h.upstream('hosts/pi/docker-compose.yml', 'image: pihole:1.0.1\n');
+    h.failStarts(1);
+    assert.equal(h.run().status, 1);
+    assert.equal(h.prom().pi_update_last_run_success, 0);
+    assert.equal(h.prom().pi_update_last_applied_timestamp_seconds, undefined);
     h.cleanup();
   });
 });

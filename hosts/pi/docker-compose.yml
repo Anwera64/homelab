@@ -3,6 +3,7 @@
 #   Pi-hole  -> blocks ads/trackers, answers every device on the LAN and tailnet
 #   Unbound  -> Pi-hole's only upstream; resolves from the root servers with DNSSEC
 #   Uptime Kuma + ntfy -> check the server's services and push an alert to the phones
+#   node exporter -> the Pi's numbers for the server's Prometheus (the lemonpi dashboard)
 # The first two use host networking: Pi-hole owns :53, Unbound 127.0.0.1:5335.
 # Run through bootstrap.sh; see README.md.
 # ==============================================================================
@@ -139,4 +140,22 @@ services:
     volumes:
       - ./data/ntfy:/var/lib/ntfy
     mem_limit: 128m
+    restart: unless-stopped
+
+  # The Pi's own numbers (CPU, memory, temperature, the SD card, the nightly update's
+  # result) for the server's Prometheus, which shows them on the lemonpi dashboard.
+  # Only on the LAN address: the server reads it, the tailnet does not.
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: node-exporter
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=192.168.1.35:9100
+      # Numbers system/pi-update.sh leaves.
+      - --collector.textfile.directory=/host/var/lib/node_exporter/textfile
+    volumes:
+      - /:/host:ro,rslave
+    mem_limit: 64m
     restart: unless-stopped

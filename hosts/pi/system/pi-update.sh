@@ -15,6 +15,10 @@
 #
 # Host setup (packages, units) is bootstrap.sh's job: when a merge touches it,
 # this says so and leaves it to a human. Runs from pi-update.timer.
+#
+# Every run leaves three numbers for the node exporter (the Updates section of
+# the lemonpi dashboard): when it ran, whether it ended well, and when a run last
+# applied something.
 # ==============================================================================
 set -euo pipefail
 
@@ -22,7 +26,10 @@ PI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_DIR="$(cd "$PI_DIR/../.." && pwd)"
 # git refuses a root-run command in a checkout someone else owns.
 OWNER="$(stat -c %U "$REPO_DIR")"
+TEXTFILE_DIR="${PI_TEXTFILE_DIR:-/var/lib/node_exporter/textfile}"
+PROM="$TEXTFILE_DIR/pi_update.prom"
 APPLIED_REF=refs/pi-update/applied
+APPLIED=0
 # Only the tests point it elsewhere. ntfy publishes on the Pi's loopback.
 NTFY_URL="${PI_NTFY_URL:-http://127.0.0.1:2586/homelab}"
 # Why the run failed, for the alert. Set before each exit that is not a success.
@@ -43,9 +50,30 @@ notify() {
     -d "$2 See: journalctl -u pi-update" "$NTFY_URL" \
     || log "could not send the alert to ntfy"
 }
-# A failed run says why, through ntfy, and still ends with its own status.
+# $1: the run's exit status. The time of the last applied update is carried over
+# from the previous file on a night that applied nothing.
+record() {
+  local success=0 applied tmp
+  [ "$1" -eq 0 ] && success=1
+  applied="$(sed -n 's/^pi_update_last_applied_timestamp_seconds //p' "$PROM" 2>/dev/null || true)"
+  [ "$APPLIED" -eq 1 ] && applied="$(date +%s)"
+  mkdir -p "$TEXTFILE_DIR"
+  # Written beside the file and moved over it, so the exporter never reads half of one.
+  # 644: the exporter does not run as root.
+  tmp="$(mktemp "$PROM.XXXXXX")"
+  {
+    echo "pi_update_last_run_timestamp_seconds $(date +%s)"
+    echo "pi_update_last_run_success $success"
+    [ -z "$applied" ] || echo "pi_update_last_applied_timestamp_seconds $applied"
+  } > "$tmp"
+  chmod 644 "$tmp"
+  mv "$tmp" "$PROM"
+}
+# A failed run says why, through ntfy. Every run leaves its numbers, and still ends
+# with its own status.
 on_exit() {
   local status=$?
+  record "$status" || true
   if [ "$status" -ne 0 ]; then
     log "$FAILURE"
     notify "failed" "$FAILURE." || true
@@ -106,6 +134,7 @@ fi
 FAILURE="${after:0:7} started, but the run failed after that"
 docker image prune -f
 repo update-ref "$APPLIED_REF" "$after"
+APPLIED=1
 
 if [ -n "$(repo diff --name-only "$before" "$after" -- hosts/pi/bootstrap.sh hosts/pi/system)" ]; then
   log "the host setup changed too: run sudo hosts/pi/bootstrap.sh"
