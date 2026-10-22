@@ -39,10 +39,15 @@ test('Prometheus scrapes the server\'s exporters', async (t) => {
     assert.match(job('prometheus'), /targets: \[localhost:9090\]/);
   });
 
-  await t.test('names only services the compose file runs', () => {
+  await t.test('reads lemonpi\'s node exporter on its LAN address, with its own name', () => {
+    assert.match(job('lemonpi'), /targets: \[192\.168\.1\.35:9100\]/);
+    assert.match(job('lemonpi'), /labels:\s*\n\s+host: lemonpi\b/);
+  });
+
+  await t.test('names only services the compose file runs, and lemonpi', () => {
     const targets = [...config.matchAll(/targets: \[([a-z0-9.-]+):\d+\]/g)].map((m) => m[1]);
-    assert.equal(targets.length, 4);
-    for (const host of targets.filter((h) => !['localhost', 'host.docker.internal'].includes(h))) {
+    assert.equal(targets.length, 5);
+    for (const host of targets.filter((h) => !['localhost', 'host.docker.internal', '192.168.1.35'].includes(h))) {
       assert.match(compose, new RegExp(`^  ${host}:\\s*$`, 'm'), `${host} must be a service on the server`);
     }
   });

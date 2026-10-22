@@ -12,6 +12,7 @@ A Raspberry Pi 5 (1 GB RAM) on Raspberry Pi OS Lite 64-bit (Debian 13 trixie), w
 | Homepage (Docker) | The homelab dashboard at https://home.spicy-llama.duckdns.org. Plain http://192.168.1.35 redirects there; http://192.168.1.35:3000 is the container's own port, for when HTTPS is down. The server's services are checked over HTTP on 192.168.1.30; its config is `config/homepage` in this repo. |
 | Uptime Kuma (Docker) | Asks each of the server's services whether it answers, every minute, keeps the history and sends an alert when one stops. It runs here so that the server's own outage is reported. https://uptime.spicy-llama.duckdns.org |
 | ntfy (Docker) | Pushes Uptime Kuma's alerts to the phones. Nobody publishes or subscribes without a login. https://ntfy.spicy-llama.duckdns.org |
+| Node exporter (Docker) | The Pi's own numbers (CPU, memory, temperature, the SD card, the nightly update's result) for the server's Prometheus, on `192.168.1.35:9100`: the LAN address only, not the tailnet. No login, so anything on the LAN can read them. See Metrics. |
 | Tailscale (native) | Subnet router for `192.168.1.0/24`, so remote devices reach the LAN, and ad blocking away from home. |
 | log2ram | Keeps `/var/log` in RAM and syncs it to the card daily. |
 | unattended-upgrades | Installs Debian security updates by itself. |
@@ -143,13 +144,31 @@ Away from home the phone reaches ntfy over Tailscale only, so an alert arrives w
 
 The Pi ships no logs to Loki, so their output is read on the Pi with `docker logs uptime-kuma` and `docker logs ntfy`.
 
+## Metrics
+
+The server's Prometheus reads the node exporter here every 15 seconds (the `lemonpi` job in `config/prometheus/prometheus.yml`, labelled `host="lemonpi"`) and keeps a year of it. In Grafana the dashboard is named "lemonpi" and opens on the last 7 days:
+
+| Section | What it shows |
+| --- | --- |
+| Health | Uptime, CPU temperature (amber at 75 °C, red at 85 °C, where the Pi 5 slows itself down), CPU and memory use, free space on the SD card. |
+| Activity | Network traffic on `eth0`, SD card writes over time and over the last 24 hours, which is the card's wear. |
+| Updates | When the nightly update last ran, whether it ended well, and when it last applied something. `pi-update.sh` leaves these in `/var/lib/node_exporter/textfile`, which bootstrap creates. |
+
+The temperature is `node_thermal_zone_temp`, the SoC's thermal zone. The dashboard is the file `config/grafana/dashboards/lemonpi.json`, and follows the same rule as the server's: a change worth keeping goes back into the file.
+
+When a panel is empty, check that the server reaches the exporter, then Prometheus' own target list (`hosts/server/README.md`):
+
+```sh
+curl -s 192.168.1.35:9100/metrics | head     # from the server
+```
+
 ## Checks
 
 ```sh
 dig @127.0.0.1 -p 5335 example.com      # Unbound answers
 dig @192.168.1.35 doubleclick.net       # 0.0.0.0 (blocked)
 dig @192.168.1.35 dnssec-failed.org     # SERVFAIL (DNSSEC works)
-docker compose --project-directory ~/homelab/hosts/pi ps   # all six up, Pi-hole and Unbound healthy
+docker compose --project-directory ~/homelab/hosts/pi ps   # all seven up, Pi-hole and Unbound healthy
 ```
 
 ## Backups

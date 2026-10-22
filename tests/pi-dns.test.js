@@ -243,12 +243,12 @@ test('Pi README: the uptime checks and their alerts', async (t) => {
     assert.match(readme, /125 MB/);
   });
 
-  await t.test('names both data folders under Backups, and counts six containers in the checks', () => {
+  await t.test('names both data folders under Backups, and counts seven containers in the checks', () => {
     const backups = readme.match(/## Backups\n([\s\S]*)$/)[1];
     for (const folder of ['hosts/pi/data/uptime-kuma', 'hosts/pi/data/ntfy']) {
       assert.ok(backups.includes(folder), `Backups must name ${folder}`);
     }
-    assert.match(readme, /all six up/);
+    assert.match(readme, /all seven up/);
   });
 });
 
