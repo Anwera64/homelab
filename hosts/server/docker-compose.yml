@@ -190,7 +190,7 @@ services:
   # 4. Request UI & Discovery (Seerr)
   # ==============================================================================
   seerr:
-    image: ghcr.io/seerr-team/seerr:v3.5.0
+    image: ghcr.io/seerr-team/seerr:v3.5.1
     container_name: seerr
     ports:
       - 5055:5055
@@ -283,7 +283,7 @@ services:
   # ==============================================================================
   maintainerr:
     profiles: ["media"]
-    image: ghcr.io/maintainerr/maintainerr:3.30.2
+    image: ghcr.io/maintainerr/maintainerr:3.31.0
     container_name: maintainerr
     ports:
       - 6246:6246
@@ -369,7 +369,7 @@ services:
   # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
   # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
   ollama:
-    image: ollama/ollama:0.40.7
+    image: ollama/ollama:0.40.8
     container_name: ollama
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -541,7 +541,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.175.0
+    image: renovate/renovate:44.176.2
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
