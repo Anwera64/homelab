@@ -11,7 +11,8 @@ class ListAvailableToolsUseCase:
                 name="calendar_read",
                 description=(
                     "Fetch the member's calendar events within a time range, from every calendar they picked. "
-                    "Each event says which calendar it is on; one marked read_only can't be changed or removed."
+                    "Each event says which calendar it is on; one marked read_only can't be changed or removed. "
+                    "'calendars' lists every calendar read, with or without events."
                 ),
                 parameters_schema={
                     "type": "object",

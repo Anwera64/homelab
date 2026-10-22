@@ -131,3 +131,20 @@ def test_calendar_write_offers_a_calendar_argument_and_no_longer_speaks_of_one_p
 
     assert "calendar" in write.parameters_schema["properties"]
     assert "primary" not in write.description.lower()
+
+
+@pytest.mark.asyncio
+async def test_calendar_read_lists_every_calendar_it_read_even_one_with_nothing_that_day():
+    sources = FakeSources([
+        CalendarSource(key="c1", url=HOME.url, name="Home", writable=True, picked=True),
+        CalendarSource(key="c2", url=WORK.url, name="Work", writable=True, picked=False),
+        CalendarSource(key="c3", url=HOLIDAYS.url, name="Holidays", writable=False, picked=True),
+    ])
+    tool = _tool(Account({HOME: [], WORK: [_event("Dentist", 2)], HOLIDAYS: []}), sources)
+
+    read = await _run(tool, "calendar_read", READ_DAY)
+
+    assert read.data["calendars"] == [
+        {"calendar": "c1", "name": "Home"},
+        {"calendar": "c3", "name": "Holidays", "read_only": True},
+    ]

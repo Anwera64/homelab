@@ -172,3 +172,31 @@ async def test_picking_a_calendar_the_account_does_not_have_is_refused():
 
     with pytest.raises(CalendarChoiceException):
         await PickCalendarsUseCase(sync, repo, CountingUnitOfWork()).execute(_credential(), "secret", ["c7"])
+
+
+class OneMemberCredentials:
+    async def get_by_user_id(self, user_id):
+        return _credential() if user_id == "member-1" else None
+
+
+class PlainSecrets:
+    async def resolve(self, credential):
+        return "secret"
+
+
+@pytest.mark.asyncio
+async def test_a_new_events_card_names_the_only_calendar_it_can_go_to():
+    from app.domain.use_cases.integrations.calendar_sources import CalendarForCardUseCase
+
+    sync = SyncCalendarSourcesUseCase(FakeSourceRepository(), FakeConnector([HOME, HOLIDAYS]))
+
+    assert await CalendarForCardUseCase(OneMemberCredentials(), PlainSecrets(), sync).execute("member-1", None) == "Home"
+
+
+@pytest.mark.asyncio
+async def test_a_member_without_a_calendar_gets_no_calendar_on_the_card():
+    from app.domain.use_cases.integrations.calendar_sources import CalendarForCardUseCase
+
+    sync = SyncCalendarSourcesUseCase(FakeSourceRepository(), FakeConnector([HOME]))
+
+    assert await CalendarForCardUseCase(OneMemberCredentials(), PlainSecrets(), sync).execute("someone-else", None) is None

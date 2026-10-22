@@ -100,6 +100,9 @@ def event_on_card(
     if action not in ("delete", "update"):
         return {}
     actual: Dict[str, Any] = {"title": event.title}
+    if event.calendar_key:
+        # Which of the member's calendars it is on, said after the time (#252).
+        actual["calendar_name"] = event.calendar_name
     names_a_date = bool(arguments.get("occurrence_start")) and arguments.get("scope") != ALL
     if not (event.repeat and names_a_date and event.occurrence_start is None):
         zone = zone_of(timezone_name)
@@ -111,7 +114,7 @@ def event_on_card(
     if action == "delete":
         return actual
 
-    shown: Dict[str, Any] = {}
+    shown: Dict[str, Any] = {key: actual[key] for key in ("calendar_name",) if key in actual}
     if not arguments.get("title"):
         shown["title"] = actual["title"]
     if not any(key in arguments for key in TIME_DETAILS):

@@ -83,4 +83,4 @@ class GetCalendarEventsUseCase:
         events = sorted(
             (e for r in results if not isinstance(r, BaseException) for e in r), key=lambda e: e.start_time
         )
-        return CalendarReading(events=events[:limit], unreadable=[s.name for s, _ in failures])
+        return CalendarReading(events=events[:limit], unreadable=[s.name for s, _ in failures], calendars=picked)

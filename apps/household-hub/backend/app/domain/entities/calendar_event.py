@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from app.domain.entities.calendar_source import CalendarSource
 
 
 FREQUENCIES = ("daily", "weekly", "monthly", "yearly")
@@ -63,3 +66,5 @@ class CalendarReading:
 
     events: List[CalendarEvent]
     unreadable: List[str] = field(default_factory=list)
+    # Every calendar read, events or not, so the model can say which calendars it sees.
+    calendars: List["CalendarSource"] = field(default_factory=list)

@@ -250,6 +250,8 @@ class ExecuteToolUseCase:
                         for e in reading.events
                     ]
                 }
+                if reading.calendars:
+                    read_data["calendars"] = [_calendar_listed(s) for s in reading.calendars]
                 if reading.unreadable:
                     # Said, so the model doesn't tell the member a day is free when part of it went unread.
                     read_data["unreadable"] = reading.unreadable
@@ -489,6 +491,14 @@ def _told(when: datetime, zone) -> str:
     if zone is None or when.tzinfo is None:
         return when.isoformat()
     return when.astimezone(zone).isoformat()
+
+
+def _calendar_listed(source) -> Dict[str, Any]:
+    """One of the calendars calendar_read read, by the key the model names it with."""
+    listed: Dict[str, Any] = {"calendar": source.key, "name": source.name}
+    if not source.writable:
+        listed["read_only"] = True
+    return listed
 
 
 def _calendar_fields(event) -> Dict[str, Any]:
