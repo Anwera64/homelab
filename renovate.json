@@ -91,6 +91,12 @@
       "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)-[0-9a-f]+$"
     },
     {
+      "description": "Unbound publishes each release as 1.26.2 and v1.26.2, the same image: keep the tags without the v.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["klutchell/unbound"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
       "description": "A Postgres major needs a dump and restore by hand.",
       "matchPackageNames": ["postgres"],
       "matchUpdateTypes": ["major"],
