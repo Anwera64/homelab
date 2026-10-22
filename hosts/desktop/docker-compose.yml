@@ -50,7 +50,7 @@ services:
   # ships it to the server's Loki. Pinned to the server's Alloy version.
   # ==============================================================================
   alloy:
-    image: grafana/alloy:v1.20.1
+    image: grafana/alloy:v1.21.0
     container_name: alloy
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     environment:
