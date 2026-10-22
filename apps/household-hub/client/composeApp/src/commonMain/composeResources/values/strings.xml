@@ -140,7 +140,24 @@
     <string name="profile_calendar_connect">Connect a calendar</string>
     <string name="profile_calendar_connect_caption">So agents can see when you’re free</string>
     <string name="profile_calendar_options">Calendar options</string>
-    <string name="calendar_sheet_change">Change calendar</string>
+    <string name="calendar_sheet_choose">Choose calendars</string>
+    <string name="calendar_sheet_choose_caption">Pick which ones agents read</string>
+    <string name="calendar_sheet_change">Change calendar account</string>
+    <string name="calendar_choose_back">Back</string>
+    <string name="calendar_choose_title">Your calendars</string>
+    <string name="calendar_choose_intro">Agents read the calendars that are on. New calendars you can edit are turned on for you.</string>
+    <string name="calendar_choose_loading">Asking your account which calendars you have…</string>
+    <string name="calendar_choose_editable">Calendars you can edit</string>
+    <string name="calendar_choose_read_only">Read only</string>
+    <string name="calendar_choose_read_only_note">Agents can read these, never change them.</string>
+    <string name="calendar_choose_row_read_only">Read only</string>
+    <string name="calendar_choose_count">%1$d of %2$d calendars on</string>
+    <string name="calendar_choose_done">Done</string>
+    <string name="calendar_choose_saving">Saving your calendars</string>
+    <string name="calendar_choose_save_failed">Couldn’t save. Your switches are kept — try Done again.</string>
+    <string name="calendar_choose_failed">Couldn’t reach your calendar account</string>
+    <string name="calendar_choose_failed_detail">Your calendars are as you left them. Agents keep reading the ones that were on.</string>
+    <string name="calendar_choose_try_again">Try again</string>
     <string name="calendar_sheet_change_caption">Replaces this one</string>
     <string name="calendar_sheet_disconnect">Disconnect calendar</string>
     <string name="calendar_sheet_disconnect_caption">Agents lose access to it</string>
@@ -232,8 +249,6 @@
     <string name="calendar_server">Server</string>
     <string name="calendar_server_preset">preset</string>
     <string name="calendar_server_placeholder">https://cloud.example.com/remote.php/dav</string>
-    <string name="calendar_name">Calendar</string>
-    <string name="calendar_name_placeholder">The first calendar on the account</string>
 
     <string name="calendar_account_missing">Type the account you sign in with.</string>
     <string name="calendar_password_missing">Paste the password.</string>
@@ -676,6 +691,7 @@
     <string name="tool_card_when">%1$s %2$d %3$s, %4$s</string>
     <string name="tool_card_day">%1$s %2$d %3$s</string>
     <string name="tool_card_when_all_day">%1$s %2$d %3$s · all day</string>
+    <string name="tool_card_on_calendar">%1$s · %2$s</string>
     <string name="tool_card_day_mon">Mon</string>
     <string name="tool_card_day_tue">Tue</string>
     <string name="tool_card_day_wed">Wed</string>

@@ -155,6 +155,7 @@ from app.domain.use_cases.integrations.get_user_calendar import GetUserCalendarU
 from app.domain.use_cases.integrations.delete_calendar import DeleteCalendarUseCase
 from app.domain.use_cases.integrations.calendar_secret_resolver import CalendarSecretResolver
 from app.domain.use_cases.integrations.calendar_sources import (
+    CalendarForCardUseCase,
     MemberCalendarsUseCase,
     PickCalendarsUseCase,
     SyncCalendarSourcesUseCase,
@@ -417,6 +418,7 @@ def get_container(session: AsyncSession):
         answer_reserve_tokens=settings.ANSWER_RESERVE_TOKENS,
         approval_repo=tool_approval_repo,
         event_lookup=GetCalendarEventUseCase(calendar_cred_repo, _caldav_connector, calendar_secrets, sync=calendar_sync),
+        calendar_for_card=CalendarForCardUseCase(calendar_cred_repo, calendar_secrets, calendar_sync),
         recall=recall_uc,
         memory_card=MemoryOnCardUseCase(
             match=memory_match, forget=forget_uc, user_repo=user_repo, agent_repo=agent_repo, session_repo=session_repo

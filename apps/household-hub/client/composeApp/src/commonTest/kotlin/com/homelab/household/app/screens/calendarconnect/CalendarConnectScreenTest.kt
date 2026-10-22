@@ -98,7 +98,6 @@ class CalendarConnectScreenTest {
                             onAccountChange = {},
                             onPasswordChange = {},
                             onServerChange = {},
-                            onCalendarNameChange = {},
                             onConnect = {},
                             onOpenInstructions = {},
                             onBack = {},

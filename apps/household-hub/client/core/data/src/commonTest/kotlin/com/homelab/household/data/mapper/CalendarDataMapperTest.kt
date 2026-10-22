@@ -1,6 +1,8 @@
 package com.homelab.household.data.mapper
 
 import com.homelab.household.data.dto.CalendarCredentialReadDto
+import com.homelab.household.data.dto.CalendarSourceDto
+import com.homelab.household.domain.model.CalendarSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -37,5 +39,15 @@ class CalendarDataMapperTest {
     @Test
     fun `GIVEN no time WHEN read THEN there is none`() {
         assertNull(CalendarDataMapper.toDomain(dto(null)).connectedAt)
+    }
+
+    @Test
+    fun `GIVEN a read only calendar the member picked WHEN read THEN it is a picked source that cannot be written`() {
+        val source =
+            CalendarDataMapper.toDomain(
+                CalendarSourceDto(key = "c2", name = "Birthdays", writable = false, picked = true),
+            )
+
+        assertEquals(CalendarSource(key = "c2", name = "Birthdays", writable = false, picked = true), source)
     }
 }

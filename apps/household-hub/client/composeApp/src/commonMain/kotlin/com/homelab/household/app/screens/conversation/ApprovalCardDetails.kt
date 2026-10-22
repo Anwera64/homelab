@@ -12,8 +12,8 @@ import com.homelab.household.domain.model.ToolAction
  * What an approval card shows about the write it asks for (canvas: ToolApproveRemove), from its
  * details: the event or note by its [title], [whenAt] for an event, and the first words of a note's
  * [preview], how an event [repeat]s, and, for one date of a repeating event, which dates the agent
- * took the change to be for: the [scope] the card's switch starts on. Anything the model left out is
- * simply not shown.
+ * took the change to be for: the [scope] the card's switch starts on, and the [calendar] it is on or
+ * goes to (canvas: CalLabelA). Anything the model left out is simply not shown.
  */
 data class ApprovalCardDetails(
     val title: String?,
@@ -21,6 +21,7 @@ data class ApprovalCardDetails(
     val preview: String? = null,
     val repeat: EventRepeat? = null,
     val scope: EventScope? = null,
+    val calendar: String? = null,
 )
 
 /**
@@ -67,6 +68,7 @@ fun approvalCardDetails(card: AnswerPart.Proposal): ApprovalCardDetails =
                 whenAt = details.start?.let { cardWhen(it, details.allDay) },
                 repeat = details.repeat,
                 scope = details.scope,
+                calendar = details.calendarName,
             )
         }
 

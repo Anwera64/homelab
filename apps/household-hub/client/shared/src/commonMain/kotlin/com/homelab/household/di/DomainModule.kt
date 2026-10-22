@@ -15,6 +15,7 @@ import com.homelab.household.domain.usecase.DeleteAgentUseCase
 import com.homelab.household.domain.usecase.DeleteSessionUseCase
 import com.homelab.household.domain.usecase.FirstRunOnboardUseCase
 import com.homelab.household.domain.usecase.GetAgentUseCase
+import com.homelab.household.domain.usecase.GetCalendarSourcesUseCase
 import com.homelab.household.domain.usecase.GetCalendarUseCase
 import com.homelab.household.domain.usecase.GetChangesToCheckUseCase
 import com.homelab.household.domain.usecase.GetCurrentUserUseCase
@@ -39,6 +40,7 @@ import com.homelab.household.domain.usecase.LookUpInviteUseCase
 import com.homelab.household.domain.usecase.ObserveMessagesUseCase
 import com.homelab.household.domain.usecase.ObserveServerStatusUseCase
 import com.homelab.household.domain.usecase.ObserveSignedOutUseCase
+import com.homelab.household.domain.usecase.PickCalendarsUseCase
 import com.homelab.household.domain.usecase.RedeemPinResetUseCase
 import com.homelab.household.domain.usecase.RegenerateAnswerUseCase
 import com.homelab.household.domain.usecase.RemoveCalendarUseCase
@@ -74,6 +76,7 @@ import com.homelab.household.domain.usecase.impl.DeleteAgentUseCaseImpl
 import com.homelab.household.domain.usecase.impl.DeleteSessionUseCaseImpl
 import com.homelab.household.domain.usecase.impl.FirstRunOnboardUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetAgentUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetCalendarSourcesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetChangesToCheckUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCurrentUserUseCaseImpl
@@ -98,6 +101,7 @@ import com.homelab.household.domain.usecase.impl.LookUpInviteUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveMessagesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveServerStatusUseCaseImpl
 import com.homelab.household.domain.usecase.impl.ObserveSignedOutUseCaseImpl
+import com.homelab.household.domain.usecase.impl.PickCalendarsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RedeemPinResetUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RegenerateAnswerUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveCalendarUseCaseImpl
@@ -193,6 +197,8 @@ val domainModule =
         factory<GetCalendarUseCase> { GetCalendarUseCaseImpl(get()) }
         factory<ConnectCalendarUseCase> { ConnectCalendarUseCaseImpl(get()) }
         factory<RemoveCalendarUseCase> { RemoveCalendarUseCaseImpl(get()) }
+        factory<GetCalendarSourcesUseCase> { GetCalendarSourcesUseCaseImpl(get()) }
+        factory<PickCalendarsUseCase> { PickCalendarsUseCaseImpl(get()) }
         factory<StartGoogleCalendarSignInUseCase> { StartGoogleCalendarSignInUseCaseImpl(get()) }
 
         // Which writes agents do without asking

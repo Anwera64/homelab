@@ -101,6 +101,7 @@ fun ProfileContent(
     onCalendar: () -> Unit,
     modifier: Modifier = Modifier,
     onDisconnectCalendar: () -> Unit = {},
+    onChooseCalendars: () -> Unit = {},
     onCalendarSignInAgain: () -> Unit = {},
     onWhenAgentsAct: () -> Unit = {},
     onMemories: () -> Unit = {},
@@ -117,6 +118,10 @@ fun ProfileContent(
                 row = calendar,
                 step = step,
                 disconnect = state.calendarDisconnect,
+                onChoose = {
+                    sheet = null
+                    onChooseCalendars()
+                },
                 onChange = {
                     sheet = null
                     onCalendar()

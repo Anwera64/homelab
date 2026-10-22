@@ -11,7 +11,6 @@ data class CalendarConnectUiState(
     val account: String = "",
     val password: String = "",
     val server: String = "",
-    val calendarName: String = "",
     val accountMissing: Boolean = false,
     val passwordMissing: Boolean = false,
     val serverMissing: Boolean = false,

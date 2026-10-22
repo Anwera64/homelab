@@ -912,6 +912,18 @@ class ConversationScreenTest {
             assertEquals(emptyList(), automatic)
         }
 
+    /** Canvas: CalLabelA. With several calendars the card says which one, after the time. */
+    @Test
+    fun `GIVEN a removal from the work calendar WHEN drawn THEN the card names Work after the time`() =
+        runComposeUiTest {
+            conversationScreen(stateNamed("Approving a removal from Work"))
+
+            onConversation {
+                seesTheRemovalCard()
+                seesWords("Fri 11 Sep, 18:00 · Work")
+            }
+        }
+
     @Test
     fun `GIVEN a removal waiting on the member WHEN drawn THEN it never offers to make removing automatic`() =
         runComposeUiTest {

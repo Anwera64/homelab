@@ -95,6 +95,33 @@ class ProposalDetailsDataMapperTest {
     }
 
     @Test
+    fun `GIVEN an event the hub says goes on Family WHEN read THEN the card knows its calendar`() {
+        val details =
+            ProposalDetailsDataMapper.fromJson(
+                "calendar_write",
+                json("""{"action": "create", "title": "Dinner", "calendar": "c3", "calendar_name": "Family"}"""),
+            ) as ProposalDetails.CalendarEvent
+
+        assertEquals("Family", details.calendarName)
+    }
+
+    @Test
+    fun `GIVEN an event on Family changed on its card WHEN written back THEN the calendar's name is not sent`() {
+        val arguments =
+            ProposalDetailsDataMapper.toArguments(
+                ProposalDetails.CalendarEvent(
+                    title = "Dinner",
+                    start = null,
+                    end = null,
+                    allDay = false,
+                    calendarName = "Family",
+                ),
+            )
+
+        assertEquals(json("""{"title": "Dinner", "is_all_day": false}"""), arguments)
+    }
+
+    @Test
     fun `GIVEN an event changed on its card WHEN written back THEN it uses the hub's names and keeps the zone it had`() {
         val arguments =
             ProposalDetailsDataMapper.toArguments(

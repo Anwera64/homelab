@@ -3,6 +3,8 @@ package com.homelab.household.data.datasource.remote
 import com.homelab.household.data.datasource.remote.`interface`.CalendarRemoteDataSource
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
 import com.homelab.household.data.dto.CalendarCredentialReadDto
+import com.homelab.household.data.dto.CalendarSourceDto
+import com.homelab.household.data.dto.CalendarSourcesPickDto
 import com.homelab.household.data.dto.GoogleSignInStartDto
 import com.homelab.household.data.network.ensureJsonSuccess
 import com.homelab.household.data.network.pinRefusal
@@ -15,6 +17,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -56,6 +59,21 @@ class KtorCalendarRemoteDataSource(
             client.delete("$baseUrl/api/v1/integrations/calendars").ensureJsonSuccess()
         }
 
+    override suspend fun getCalendarSources(): List<CalendarSourceDto> =
+        reachingHub {
+            client.get("$baseUrl$SOURCES_PATH").ensureJsonSuccess().body()
+        }
+
+    override suspend fun putCalendarSources(pick: CalendarSourcesPickDto): List<CalendarSourceDto> =
+        reachingHub {
+            client
+                .put("$baseUrl$SOURCES_PATH") {
+                    contentType(ContentType.Application.Json)
+                    setBody(pick)
+                }.ensureJsonSuccess()
+                .body()
+        }
+
     override suspend fun startGoogleSignIn(): String =
         reachingHub {
             val response = client.post("$baseUrl/api/v1/integrations/calendars/google/start")
@@ -69,6 +87,7 @@ class KtorCalendarRemoteDataSource(
         }
 
     private companion object {
+        const val SOURCES_PATH = "/api/v1/integrations/calendars/me/sources"
         const val REJECTED = "calendar_rejected"
         const val UNREACHABLE = "calendar_unreachable"
         const val GOOGLE_NOT_CONFIGURED = "google_not_configured"

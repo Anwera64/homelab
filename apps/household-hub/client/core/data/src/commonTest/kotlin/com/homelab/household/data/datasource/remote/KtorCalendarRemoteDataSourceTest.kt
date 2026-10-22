@@ -2,9 +2,12 @@ package com.homelab.household.data.datasource.remote
 
 import com.homelab.household.data.di.DEFAULT_BASE_URL
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
+import com.homelab.household.data.dto.CalendarSourceDto
+import com.homelab.household.data.dto.CalendarSourcesPickDto
 import com.homelab.household.domain.exception.CalendarRejectedException
 import com.homelab.household.domain.exception.CalendarUnreachableException
 import com.homelab.household.domain.exception.GoogleSignInUnavailableException
+import com.homelab.household.domain.exception.NotFoundException
 import com.homelab.household.domain.exception.ServerOfflineException
 import com.homelab.household.domain.exception.UpstreamGatewayException
 import io.ktor.client.HttpClient
@@ -106,7 +109,7 @@ class KtorCalendarRemoteDataSourceTest {
     // ---- configureCalendar --------------------------------------------------
 
     @Test
-    fun `GIVEN details that work WHEN the calendar is connected THEN they are posted and the saved calendar comes back`() =
+    fun `GIVEN details that work WHEN the calendar is connected THEN they are posted with no calendar name and the saved calendar comes back`() =
         runTest {
             var method: HttpMethod? = null
             var path: String? = null
@@ -123,7 +126,7 @@ class KtorCalendarRemoteDataSourceTest {
 
             assertEquals(HttpMethod.Post, method)
             assertEquals("/api/v1/integrations/calendars", path)
-            // No calendar named: the field is left out and the hub picks the account's first one.
+            // No calendar is named: the member picks them after connecting.
             assertSameJson(
                 """{"provider":"apple_icloud","url":"https://caldav.icloud.com","username":"emma@icloud.com",
                     "password":"abcd-efgh-ijkl-mnop"}""",
@@ -263,5 +266,76 @@ class KtorCalendarRemoteDataSourceTest {
             val failure = assertFailsWith<ServerOfflineException> { dataSource(engine).startGoogleSignIn() }
 
             assertTrue(failure.message.orEmpty().contains("503"), "was ${failure.message}")
+        }
+
+    // ---- calendar sources ---------------------------------------------------
+
+    private val sourcesJson =
+        """[{"key":"c1","name":"Home","writable":true,"picked":true},
+            {"key":"c2","name":"Birthdays","writable":false,"picked":false}]"""
+
+    @Test
+    fun `GIVEN a connected account WHEN its calendars are asked for THEN the sources address answers with each one`() =
+        runTest {
+            var method: HttpMethod? = null
+            var path: String? = null
+            val engine =
+                MockEngine { request ->
+                    method = request.method
+                    path = request.url.encodedPath
+                    respondJson(sourcesJson)
+                }
+
+            val sources = dataSource(engine).getCalendarSources()
+
+            assertEquals(HttpMethod.Get, method)
+            assertEquals("/api/v1/integrations/calendars/me/sources", path)
+            assertEquals(
+                listOf(
+                    CalendarSourceDto(key = "c1", name = "Home", writable = true, picked = true),
+                    CalendarSourceDto(key = "c2", name = "Birthdays", writable = false, picked = false),
+                ),
+                sources,
+            )
+        }
+
+    @Test
+    fun `GIVEN no calendar connected WHEN its calendars are asked for THEN the hub 404 says not found`() =
+        runTest {
+            val engine = MockEngine { respondJson("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound) }
+
+            assertFailsWith<NotFoundException> { dataSource(engine).getCalendarSources() }
+        }
+
+    @Test
+    fun `GIVEN two calendars ticked WHEN they are saved THEN the keys are put and the whole list comes back`() =
+        runTest {
+            var method: HttpMethod? = null
+            var path: String? = null
+            var body: String? = null
+            val engine =
+                MockEngine { request ->
+                    method = request.method
+                    path = request.url.encodedPath
+                    body = (request.body as TextContent).text
+                    respondJson(sourcesJson)
+                }
+
+            val sources = dataSource(engine).putCalendarSources(CalendarSourcesPickDto(picked = listOf("c1", "c3")))
+
+            assertEquals(HttpMethod.Put, method)
+            assertEquals("/api/v1/integrations/calendars/me/sources", path)
+            assertSameJson("""{"picked":["c1","c3"]}""", body)
+            assertEquals(2, sources.size)
+        }
+
+    @Test
+    fun `GIVEN a key that is not the account WHEN calendars are saved THEN it is the hub answering badly`() =
+        runTest {
+            val engine = MockEngine { respondJson("""{"detail":"Unknown calendar"}""", HttpStatusCode.BadRequest) }
+
+            assertFailsWith<UpstreamGatewayException> {
+                dataSource(engine).putCalendarSources(CalendarSourcesPickDto(picked = listOf("nope")))
+            }
         }
 }

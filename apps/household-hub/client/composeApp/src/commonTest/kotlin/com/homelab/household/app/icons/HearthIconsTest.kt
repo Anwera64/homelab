@@ -68,6 +68,10 @@ class HearthIconsTest {
             "repeat",
             // A sentence waiting on another member's answer: the Memory page's MemWaitingB board
             "waiting",
+            // The calendar options sheet: the Calendar & offline page's CalSheetIcons board (#252)
+            "calendarChoose",
+            "calendarSwap",
+            "calendarDisconnect",
         )
 
     private val solidShapeCounts =

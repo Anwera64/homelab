@@ -38,6 +38,8 @@ import com.homelab.household.app.resources.calendar_disconnect_title
 import com.homelab.household.app.resources.calendar_disconnect_unreachable
 import com.homelab.household.app.resources.calendar_sheet_change
 import com.homelab.household.app.resources.calendar_sheet_change_caption
+import com.homelab.household.app.resources.calendar_sheet_choose
+import com.homelab.household.app.resources.calendar_sheet_choose_caption
 import com.homelab.household.app.resources.calendar_sheet_disconnect
 import com.homelab.household.app.resources.calendar_sheet_disconnect_caption
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderMark
@@ -64,6 +66,7 @@ fun CalendarOptionsSheet(
     row: CalendarRow.Connected,
     step: CalendarSheetStep,
     disconnect: CalendarDisconnect,
+    onChoose: () -> Unit,
     onChange: () -> Unit,
     onAskToDisconnect: () -> Unit,
     onDisconnect: () -> Unit,
@@ -81,7 +84,7 @@ fun CalendarOptionsSheet(
     ) {
         when (step) {
             CalendarSheetStep.Options -> {
-                OptionsStep(row = row, onChange = onChange, onAskToDisconnect = onAskToDisconnect)
+                OptionsStep(row = row, onChoose = onChoose, onChange = onChange, onAskToDisconnect = onAskToDisconnect)
             }
 
             CalendarSheetStep.ConfirmDisconnect -> {
@@ -94,6 +97,7 @@ fun CalendarOptionsSheet(
 @Composable
 private fun OptionsStep(
     row: CalendarRow.Connected,
+    onChoose: () -> Unit,
     onChange: () -> Unit,
     onAskToDisconnect: () -> Unit,
 ) {
@@ -121,7 +125,16 @@ private fun OptionsStep(
             }
         }
         SheetAction(
-            icon = HearthIcon.AgentSwap,
+            icon = HearthIcon.CalendarChoose,
+            label = stringResource(Res.string.calendar_sheet_choose),
+            caption = stringResource(Res.string.calendar_sheet_choose_caption),
+            tint = colors.primary,
+            labelColor = colors.textPrimary,
+            onClick = onChoose,
+        )
+        HorizontalDivider(color = colors.outlineSoft)
+        SheetAction(
+            icon = HearthIcon.CalendarSwap,
             label = stringResource(Res.string.calendar_sheet_change),
             caption = stringResource(Res.string.calendar_sheet_change_caption),
             tint = colors.primary,
@@ -130,7 +143,7 @@ private fun OptionsStep(
         )
         HorizontalDivider(color = colors.outlineSoft)
         SheetAction(
-            icon = HearthIcon.Revoke,
+            icon = HearthIcon.CalendarDisconnect,
             label = stringResource(Res.string.calendar_sheet_disconnect),
             caption = stringResource(Res.string.calendar_sheet_disconnect_caption),
             tint = colors.error,
@@ -235,7 +248,7 @@ private val previewRow =
 private fun OptionsStepPreview() {
     HearthTheme {
         Surface(color = HearthTheme.colors.surface) {
-            OptionsStep(row = previewRow, onChange = {}, onAskToDisconnect = {})
+            OptionsStep(row = previewRow, onChoose = {}, onChange = {}, onAskToDisconnect = {})
         }
     }
 }

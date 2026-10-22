@@ -144,6 +144,30 @@ class MemberCalendarsUseCase:
         return credential, await self.secrets.resolve(credential)
 
 
+class CalendarForCardUseCase:
+    """
+    The name of the calendar a new event goes to, for its card: the one named, or the only one the
+    member can write to. None without a kept calendar to say; refuses as the write would.
+    """
+
+    def __init__(
+        self,
+        credential_repo: ICalendarCredentialRepository,
+        secrets: CalendarSecretResolver,
+        sync: SyncCalendarSourcesUseCase,
+    ):
+        self.credential_repo = credential_repo
+        self.secrets = secrets
+        self.sync = sync
+
+    async def execute(self, user_id: str, key: Optional[str]) -> Optional[str]:
+        credential = await self.credential_repo.get_by_user_id(user_id)
+        if not credential or not credential.is_active:
+            return None
+        secret = await self.secrets.resolve(credential)
+        return (await self.sync.choose(credential, secret, key, CREATE)).name
+
+
 def _named(sources: List[CalendarSource]) -> str:
     return ", ".join(f"{s.name} ({s.key})" for s in sources) or "none"
 

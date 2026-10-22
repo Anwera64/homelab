@@ -64,6 +64,8 @@ class AppNavHostRobot(
 
     fun seesTheGoogleSignIn() = seesText(StubScreens.GOOGLE_SIGN_IN)
 
+    fun seesTheCalendarChoose() = seesText(StubScreens.CALENDAR_CHOOSE)
+
     fun seesTheConversation(sessionId: String) = seesText(StubScreens.conversationOf(sessionId))
 
     fun seesTheJoinFor(preview: InvitePreview) = seesText(StubScreens.joinOf(preview))
@@ -145,6 +147,10 @@ class AppNavHostRobot(
     fun tapsPickGoogle() = tapsText(StubScreens.PICK_GOOGLE)
 
     fun tapsCalendarConnected() = tapsText(StubScreens.CALENDAR_CONNECTED)
+
+    fun tapsCalendarsChosen() = tapsText(StubScreens.CALENDARS_CHOSEN)
+
+    fun tapsChooseCalendars() = tapsText(StubScreens.GO_TO_CHOOSE_CALENDARS)
 
     fun tapsSignInToGoogleAgain() = tapsText(StubScreens.SIGN_IN_TO_GOOGLE_AGAIN)
 

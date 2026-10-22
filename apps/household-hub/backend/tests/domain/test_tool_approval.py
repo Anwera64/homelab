@@ -83,7 +83,7 @@ def _agent(**overrides):
     return AgentPersonality(**fields)
 
 
-def _setup(rounds, agent=None, is_secret=False, approvals=None, event_lookup=None):
+def _setup(rounds, agent=None, is_secret=False, approvals=None, event_lookup=None, calendar_for_card=None):
     agent = agent or _agent()
     session_repo = SavingSessionRepository(
         sessions=[ConversationSession(id="s1", user_id="u1", agent_id="a1", is_secret=is_secret)]
@@ -101,6 +101,7 @@ def _setup(rounds, agent=None, is_secret=False, approvals=None, event_lookup=Non
         uow=FakeUnitOfWork(),
         approval_repo=approvals,
         event_lookup=event_lookup,
+        calendar_for_card=calendar_for_card,
     )
     return use_case, session_repo, llm_client, tool_executor
 

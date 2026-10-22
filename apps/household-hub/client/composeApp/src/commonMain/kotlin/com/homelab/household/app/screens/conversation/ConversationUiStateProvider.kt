@@ -453,6 +453,37 @@ class ConversationUiStateProvider : PreviewParameterProvider<ChatSessionUiState>
                         ),
                     turnState = TurnState.AwaitingApproval,
                 ),
+            // Canvas: CalLabelA. With several calendars, the card names the one the event is on.
+            "Approving a removal from Work" to
+                agent.copy(
+                    messages =
+                        listOf(
+                            said("m-1", "Cancel the print shop pickup, we'll do it Monday", MessageRole.USER),
+                            said(
+                                "m-2",
+                                "I'll take it off your work calendar.",
+                                MessageRole.ASSISTANT,
+                                parts =
+                                    listOf(
+                                        AnswerPart.Text("I'll take it off your work calendar."),
+                                        AnswerPart.Proposal(
+                                            toolCallId = "c-1",
+                                            tool = "calendar_write",
+                                            action = ToolAction.Delete,
+                                            details =
+                                                ProposalDetails.CalendarEvent(
+                                                    title = "Print shop",
+                                                    start = EventMoment(2026, 9, 11, hour = 18, minute = 0),
+                                                    end = null,
+                                                    allDay = false,
+                                                    calendarName = "Work",
+                                                ),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    turnState = TurnState.AwaitingApproval,
+                ),
             // Canvas: RepeatAdd. A repeating event says how often under its first date.
             "Approving a repeating event" to
                 agent.copy(

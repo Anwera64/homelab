@@ -47,8 +47,6 @@ import com.homelab.household.app.resources.calendar_back
 import com.homelab.household.app.resources.calendar_checking
 import com.homelab.household.app.resources.calendar_connect
 import com.homelab.household.app.resources.calendar_hub_unreachable
-import com.homelab.household.app.resources.calendar_name
-import com.homelab.household.app.resources.calendar_name_placeholder
 import com.homelab.household.app.resources.calendar_nothing_saved
 import com.homelab.household.app.resources.calendar_other_account
 import com.homelab.household.app.resources.calendar_other_password
@@ -91,7 +89,6 @@ fun CalendarConnectContent(
     onAccountChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onServerChange: (String) -> Unit,
-    onCalendarNameChange: (String) -> Unit,
     onConnect: () -> Unit,
     onOpenInstructions: () -> Unit,
     onBack: () -> Unit,
@@ -224,7 +221,12 @@ fun CalendarConnectContent(
                         rejected -> stringResource(Res.string.calendar_password_rejected)
                         else -> null
                     },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        // The password is the last field when the server is preset.
+                        imeAction = if (state.presetServer == null) ImeAction.Next else ImeAction.Done,
+                    ),
                 visualTransformation = PasswordVisualTransformation(),
             )
 
@@ -250,20 +252,11 @@ fun CalendarConnectContent(
                         } else {
                             unreachable
                         },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                 )
             } else {
                 PresetServer(address = preset, error = unreachable)
             }
-
-            HearthTextField(
-                value = state.calendarName,
-                onValueChange = onCalendarNameChange,
-                label = stringResource(Res.string.calendar_name),
-                contentDescription = stringResource(Res.string.calendar_name),
-                placeholder = stringResource(Res.string.calendar_name_placeholder),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            )
 
             failure(state.status)?.let { failure ->
                 Text(failure, style = type.caption, color = colors.error)
@@ -394,7 +387,6 @@ private fun CalendarConnectContentPreview(
             onAccountChange = {},
             onPasswordChange = {},
             onServerChange = {},
-            onCalendarNameChange = {},
             onConnect = {},
             onOpenInstructions = {},
             onBack = {},

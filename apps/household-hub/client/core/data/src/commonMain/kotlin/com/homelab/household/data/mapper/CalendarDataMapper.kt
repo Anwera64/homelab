@@ -1,8 +1,10 @@
 package com.homelab.household.data.mapper
 
 import com.homelab.household.data.dto.CalendarCredentialReadDto
+import com.homelab.household.data.dto.CalendarSourceDto
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
+import com.homelab.household.domain.model.CalendarSource
 
 /** The hub names providers `apple_icloud`, `google_caldav` and `caldav`. */
 object CalendarDataMapper {
@@ -31,6 +33,9 @@ object CalendarDataMapper {
             connectedAt = dto.updatedAt?.let(::zoned),
             needsReconnect = dto.needsReconnect,
         )
+
+    fun toDomain(dto: CalendarSourceDto): CalendarSource =
+        CalendarSource(key = dto.key, name = dto.name, writable = dto.writable, picked = dto.picked)
 
     /** The hub writes its times in UTC, and not always with the zone on the end. */
     private fun zoned(stamp: String): String {

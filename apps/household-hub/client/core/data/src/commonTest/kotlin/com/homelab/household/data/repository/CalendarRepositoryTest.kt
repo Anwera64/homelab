@@ -3,9 +3,12 @@ package com.homelab.household.data.repository
 import com.homelab.household.data.datasource.remote.`interface`.CalendarRemoteDataSource
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
 import com.homelab.household.data.dto.CalendarCredentialReadDto
+import com.homelab.household.data.dto.CalendarSourceDto
+import com.homelab.household.data.dto.CalendarSourcesPickDto
 import com.homelab.household.domain.exception.CalendarUnreachableException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
+import com.homelab.household.domain.model.CalendarSource
 import dev.mokkery.answering.returns
 import dev.mokkery.answering.throws
 import dev.mokkery.everySuspend
@@ -69,7 +72,6 @@ class CalendarRepositoryTest {
                     url = "https://caldav.icloud.com",
                     username = "emma@icloud.com",
                     password = "abcd-efgh-ijkl-mnop",
-                    calendarName = null,
                 )
             everySuspend { remote.configureCalendar(expected) } returns
                 googleDto.copy(provider = "apple_icloud", url = "https://caldav.icloud.com")
@@ -80,7 +82,6 @@ class CalendarRepositoryTest {
                     server = "https://caldav.icloud.com",
                     account = "emma@icloud.com",
                     password = "abcd-efgh-ijkl-mnop",
-                    calendarName = null,
                 )
 
             assertEquals(CalendarProvider.APPLE, saved.provider)
@@ -108,7 +109,6 @@ class CalendarRepositoryTest {
                     server = "https://cloud.example.com",
                     account = "emma",
                     password = "secret",
-                    calendarName = null,
                 )
             }
         }
@@ -144,5 +144,36 @@ class CalendarRepositoryTest {
             val page = repository(remote).startGoogleSignIn()
 
             assertEquals("https://accounts.google.com/o/oauth2/v2/auth?state=s", page)
+        }
+
+    @Test
+    fun `GIVEN an account with calendars WHEN they are listed THEN each comes back as a source`() =
+        runTest {
+            val remote = mock<CalendarRemoteDataSource>()
+            everySuspend { remote.getCalendarSources() } returns
+                listOf(
+                    CalendarSourceDto(key = "c1", name = "Home", writable = true, picked = true),
+                    CalendarSourceDto(key = "c2", name = "Birthdays", writable = false, picked = false),
+                )
+
+            assertEquals(
+                listOf(
+                    CalendarSource(key = "c1", name = "Home", writable = true, picked = true),
+                    CalendarSource(key = "c2", name = "Birthdays", writable = false, picked = false),
+                ),
+                repository(remote).listCalendars(),
+            )
+        }
+
+    @Test
+    fun `GIVEN two calendars ticked WHEN they are picked THEN their keys are sent and the saved list comes back`() =
+        runTest {
+            val remote = mock<CalendarRemoteDataSource>()
+            everySuspend { remote.putCalendarSources(CalendarSourcesPickDto(picked = listOf("c1", "c3"))) } returns
+                listOf(CalendarSourceDto(key = "c1", name = "Home", writable = true, picked = true))
+
+            val saved = repository(remote).pickCalendars(listOf("c1", "c3"))
+
+            assertEquals(listOf(CalendarSource(key = "c1", name = "Home", writable = true, picked = true)), saved)
         }
 }

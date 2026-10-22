@@ -39,10 +39,6 @@ class CalendarConnectViewModel(
         _uiState.update { it.copy(server = server, serverMissing = false) }
     }
 
-    fun onCalendarNameChange(name: String) {
-        _uiState.update { it.copy(calendarName = name) }
-    }
-
     /**
      * The primary button. It is never disabled, so tapping it early says what is missing. A
      * failure keeps everything typed: the fix is usually one field, not all of them.
@@ -73,7 +69,6 @@ class CalendarConnectViewModel(
                     account = state.account,
                     password = state.password,
                     server = state.server,
-                    calendarName = state.calendarName,
                 )
             }.fold(
                 onSuccess = {

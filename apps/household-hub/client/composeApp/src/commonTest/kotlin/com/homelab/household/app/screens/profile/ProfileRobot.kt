@@ -22,6 +22,7 @@ import com.homelab.household.app.resources.calendar_disconnect_submit
 import com.homelab.household.app.resources.calendar_disconnect_title
 import com.homelab.household.app.resources.calendar_disconnect_unreachable
 import com.homelab.household.app.resources.calendar_sheet_change
+import com.homelab.household.app.resources.calendar_sheet_choose
 import com.homelab.household.app.resources.calendar_sheet_disconnect
 import com.homelab.household.app.resources.profile_agents
 import com.homelab.household.app.resources.profile_calendar_connect
@@ -97,6 +98,8 @@ class ProfileRobot(
     }
 
     suspend fun tapsChangeCalendar() = tapsText(getString(Res.string.calendar_sheet_change))
+
+    suspend fun tapsChooseCalendars() = tapsText(getString(Res.string.calendar_sheet_choose))
 
     suspend fun tapsDisconnectCalendar() = tapsText(getString(Res.string.calendar_sheet_disconnect))
 
@@ -202,6 +205,7 @@ fun ComposeUiTest.profileScreen(
     onMembers: () -> Unit = {},
     onSignedOut: () -> Unit = {},
     onCalendar: () -> Unit = {},
+    onChooseCalendars: () -> Unit = {},
     onCalendarSignInAgain: () -> Unit = {},
     onWhenAgentsAct: () -> Unit = {},
     onMemories: () -> Unit = {},
@@ -215,6 +219,7 @@ fun ComposeUiTest.profileScreen(
                 onLeave = {},
                 onSignedOut = onSignedOut,
                 onCalendar = onCalendar,
+                onChooseCalendars = onChooseCalendars,
                 onCalendarSignInAgain = onCalendarSignInAgain,
                 onWhenAgentsAct = onWhenAgentsAct,
                 onMemories = onMemories,

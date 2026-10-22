@@ -103,6 +103,7 @@ private val fixedSegments =
         "sessions",
         "settings",
         "shared",
+        "sources",
         "spaces",
         "start",
         "status",

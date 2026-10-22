@@ -35,7 +35,6 @@ fun CalendarConnectScreen(
         onAccountChange = viewModel::onAccountChange,
         onPasswordChange = viewModel::onPasswordChange,
         onServerChange = viewModel::onServerChange,
-        onCalendarNameChange = viewModel::onCalendarNameChange,
         onConnect = viewModel::connect,
         onOpenInstructions = { instructionsFor(provider)?.let(uriHandler::openUri) },
         onBack = onBack,

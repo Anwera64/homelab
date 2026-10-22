@@ -105,4 +105,12 @@ sealed interface Destination : NavKey {
 
     /** Google takes no password: its calendar is connected, or connected again, by signing in with Google. */
     data object GoogleCalendarSignIn : Destination
+
+    /**
+     * Which of the account's calendars agents read (#252). [afterConnect]: shown right after
+     * connecting, so leaving it, by Done or Back, ends the whole connect flow.
+     */
+    data class CalendarChoose(
+        val afterConnect: Boolean,
+    ) : Destination
 }

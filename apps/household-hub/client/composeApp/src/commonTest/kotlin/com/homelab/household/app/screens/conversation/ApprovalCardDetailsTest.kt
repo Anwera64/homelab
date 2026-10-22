@@ -42,6 +42,25 @@ class ApprovalCardDetailsTest {
     }
 
     @Test
+    fun `GIVEN an event on the family calendar WHEN read THEN the card knows its calendar`() {
+        val details =
+            approvalCardDetails(
+                card(
+                    ToolAction.Create,
+                    ProposalDetails.CalendarEvent(
+                        title = "Dinner",
+                        start = null,
+                        end = null,
+                        allDay = false,
+                        calendarName = "Family",
+                    ),
+                ),
+            )
+
+        assertEquals("Family", details.calendar)
+    }
+
+    @Test
     fun `GIVEN an all-day event WHEN read THEN it has no time`() {
         val details =
             approvalCardDetails(

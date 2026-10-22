@@ -96,8 +96,8 @@ targets:
         PRODUCT_NAME: HouseholdHub
         # app.version in gradle.properties, which Xcode cannot read; AppVariantsTest keeps them
         # equal. The build number is the Android version code: 1.2.3 -> 10203.
-        MARKETING_VERSION: "0.5.3"
-        CURRENT_PROJECT_VERSION: 503
+        MARKETING_VERSION: "0.5.4"
+        CURRENT_PROJECT_VERSION: 504
         # iPhone only. An iPad app must allow all four orientations for multitasking, or App Store
         # Connect refuses the upload (error 90474); an iPad still runs this in the iPhone window.
         TARGETED_DEVICE_FAMILY: "1"

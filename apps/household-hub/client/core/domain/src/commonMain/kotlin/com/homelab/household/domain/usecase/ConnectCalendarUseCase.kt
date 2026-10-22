@@ -13,6 +13,5 @@ interface ConnectCalendarUseCase {
         account: String,
         password: String,
         server: String = "",
-        calendarName: String = "",
     ): CalendarConnection
 }

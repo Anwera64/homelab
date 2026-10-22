@@ -49,6 +49,7 @@ from app.domain.use_cases.integrations.turn_sources import TurnSources
 from app.domain.use_cases.chat.token_estimate import estimate_tokens
 from app.domain.use_cases.models.resolve_agent_model import ResolveAgentModelUseCase
 from app.domain.exceptions import (
+    CalendarChoiceException,
     READ_THE_CALENDAR_FIRST,
     CalendarEventNotFoundException,
     ToolFailureReason,
@@ -274,6 +275,7 @@ class ProcessChatTurnUseCase:
         answer_reserve_tokens: int = 4096,
         approval_repo: Optional[IToolApprovalRepository] = None,
         event_lookup: Optional[GetCalendarEventUseCase] = None,
+        calendar_for_card: Optional[Any] = None,
         recall: Optional[RecallMemoriesUseCase] = None,
         memory_card: Optional[MemoryOnCardUseCase] = None,
     ):
@@ -297,6 +299,8 @@ class ProcessChatTurnUseCase:
         self.approval_repo = approval_repo
         # Finds the event a remove or change card is about, so the card can name it. None: it can't.
         self.event_lookup = event_lookup
+        # Names the calendar a new event goes to on its card (#252).
+        self.calendar_for_card = calendar_for_card
         # Attaches memories the fixed block left out to a new message. None: no recall.
         self.recall = recall
         # Finds the stored memory a remember or forget card is about. None: those cards show only the call.
@@ -1176,6 +1180,8 @@ class ProcessChatTurnUseCase:
         """
         event_id = (tc.arguments or {}).get("event_id")
         action = write_action(tc.name, tc.arguments)
+        if tc.name == "calendar_write" and action == "create":
+            return await self._calendar_on_card(tc, user_id)
         if tc.name != "calendar_write" or action not in ("delete", "update"):
             return {}, None
         if not isinstance(event_id, str) or not event_id:
@@ -1201,6 +1207,22 @@ class ProcessChatTurnUseCase:
         if event is None:
             return {}, CalendarEventNotFoundException(event_id).message
         return event_on_card(action, tc.arguments, event, timezone_name), None
+
+    async def _calendar_on_card(self, tc: LLMToolCall, user_id: str) -> Tuple[Dict[str, Any], Optional[str]]:
+        """
+        The calendar a new event goes to, for its card. With more than one to write to and none named,
+        there is no card: the model is told to ask the member which, as the write itself would.
+        """
+        if self.calendar_for_card is None:
+            return {}, None
+        try:
+            name = await self.calendar_for_card.execute(user_id, (tc.arguments or {}).get("calendar"))
+        except CalendarChoiceException as e:
+            return {}, e.message
+        except Exception:
+            logger.warning("Could not name the calendar for a new event's card", exc_info=True)
+            return {}, None
+        return ({"calendar_name": name} if name else {}), None
 
     async def _finish(self, turn: "_Turn"):
         """Saves the answer, and says it is done or waiting on the member."""

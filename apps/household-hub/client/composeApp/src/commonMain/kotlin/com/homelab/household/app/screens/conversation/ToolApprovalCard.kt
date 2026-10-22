@@ -105,6 +105,7 @@ import com.homelab.household.app.resources.tool_card_month_may
 import com.homelab.household.app.resources.tool_card_month_nov
 import com.homelab.household.app.resources.tool_card_month_oct
 import com.homelab.household.app.resources.tool_card_month_sep
+import com.homelab.household.app.resources.tool_card_on_calendar
 import com.homelab.household.app.resources.tool_card_remove
 import com.homelab.household.app.resources.tool_card_repeat_and
 import com.homelab.household.app.resources.tool_card_repeat_daily
@@ -318,7 +319,7 @@ private fun PendingCard(
                     verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
                 ) {
                     Text(text = name, style = HearthTheme.typography.bodyStrong, color = colors.textPrimary)
-                    val caption = details.whenAt?.let { whenText(it) } ?: details.preview
+                    val caption = onCalendar(details.whenAt?.let { whenText(it) } ?: details.preview, details.calendar)
                     if (caption != null) {
                         Text(text = caption, style = HearthTheme.typography.caption, color = colors.textMuted)
                     }
@@ -1048,6 +1049,18 @@ private fun ScopeSwitch(
         label = stringResource(Res.string.tool_card_scope),
     )
 }
+
+/** "Fri 11 Sep, 18:00 · Work": the calendar's name after the time, or on its own when there is no time. */
+@Composable
+private fun onCalendar(
+    caption: String?,
+    calendar: String?,
+): String? =
+    when {
+        calendar == null -> caption
+        caption == null -> calendar
+        else -> stringResource(Res.string.tool_card_on_calendar, caption, calendar)
+    }
 
 @Composable
 private fun whenText(moment: CardWhen): String {
