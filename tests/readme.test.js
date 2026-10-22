@@ -284,4 +284,26 @@ test('Root README matches the repository', async (t) => {
     const stray = rest.match(/192\.168\.1\.\d+(?!\/\d)/g) || [];
     assert.deepEqual(stray, [], 'use lemonpi.lan / server.lan / desktop-kujo8mp.lan outside the Hosts table');
   });
+
+  await t.test('lemonpi applies its merged bumps every night too, and says how', () => {
+    assert.match(readme, /^\| \*\*Nightly update\*\* \| lemonpi \| — \| [^|]*4:30 AM[^|]*\|$/m);
+    assert.match(readme, /^\* \*\*Update:\*\* [^\n]*`pi-update\.timer`[^\n]*04:30/m);
+    const paths = treePaths(readme);
+    for (const p of ['hosts/pi/system', 'hosts/pi/system/pi-update.sh', 'tests/pi-update.test.js']) {
+      assert.ok(paths.includes(p), `the tree must list ${p}`);
+    }
+
+    const pi = read('hosts/pi/README.md');
+    const updating = pi.match(/^## Updating\n([\s\S]*?)(?=^## )/m);
+    assert.ok(updating, 'the Pi README must have an Updating section');
+    for (const needle of [
+      'pi-update.timer', '04:30', 'refs/pi-update/applied', 'rolled back', 'Caddyfile', 'journalctl -u pi-update',
+      'sudo hosts/pi/bootstrap.sh', 'NTFY_UPDATE_TOKEN', 'ntfy user add pi-update', 'ntfy access pi-update homelab write-only', 'ntfy token add pi-update',
+    ]) {
+      assert.ok(updating[1].includes(needle), `Updating must mention ${needle}`);
+    }
+    // The Pi's own restart is inside the maintenance window that keeps restarts from the phones.
+    assert.match(pi, /The server's nightly update restarts its stack at 04:00[^\n]*lemonpi's at 04:30/);
+    assert.match(read('hosts/pi/.env.example'), /^NTFY_UPDATE_TOKEN=$/m);
+  });
 });

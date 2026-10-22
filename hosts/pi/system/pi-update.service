@@ -1,0 +1,8 @@
+[Unit]
+Description=Nightly update: merged image bumps and config reach the Pi's stack
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@PI_DIR@/system/pi-update.sh
