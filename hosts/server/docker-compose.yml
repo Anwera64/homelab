@@ -424,7 +424,7 @@ services:
   # Renovate's bump PR for that image is merged; revert that PR to roll back. Its data
   # and key are its own: it shares neither with the dev Hub.
   household-hub:
-    image: ghcr.io/anwera64/household-hub:0.5.1
+    image: ghcr.io/anwera64/household-hub:0.5.2
     container_name: household-hub
     environment:
       - TZ=${TZ:-Europe/Madrid}
