@@ -160,6 +160,7 @@ fun AppNavHost(
                         onLeave = { backStack.add(Destination.LeaveHousehold) },
                         onSignedOut = { backStack.startOver(Destination.SignIn) },
                         onCalendar = { backStack.add(Destination.CalendarPicker) },
+                        onChooseCalendars = { backStack.add(Destination.CalendarChoose(afterConnect = false)) },
                         onCalendarSignInAgain = { backStack.add(Destination.GoogleCalendarSignIn) },
                         onWhenAgentsAct = { backStack.add(Destination.WhenAgentsAct) },
                         onMemories = { backStack.add(Destination.Memories) },
@@ -226,27 +227,33 @@ fun AppNavHost(
                     )
                 }
                 entry<Destination.CalendarConnect> { destination ->
-                    val results = LocalResultEventBus.current
                     screens.CalendarConnect(
                         provider = destination.provider,
                         onBack = { backStack.removeLastOrNull() },
-                        // Connected: back past the picker, to wherever the calendar was asked for,
-                        // telling it so a chat's fix cards can show the fix.
-                        onConnect = {
-                            results.sendResult(result = CalendarConnected)
-                            backStack.backPastCalendarScreens()
-                        },
+                        // Connected: which of the account's calendars agents read comes next (#252).
+                        onConnect = { backStack.chooseCalendarsAfterConnecting() },
                     )
                 }
                 entry<Destination.GoogleCalendarSignIn> {
-                    val results = LocalResultEventBus.current
                     screens.GoogleCalendarSignIn(
                         onBack = { backStack.removeLastOrNull() },
-                        onConnect = {
+                        onConnect = { backStack.chooseCalendarsAfterConnecting() },
+                    )
+                }
+                entry<Destination.CalendarChoose> { destination ->
+                    val results = LocalResultEventBus.current
+                    // After connecting, leaving the list either way ends the flow: back past the picker,
+                    // to wherever the calendar was asked for, telling it so a chat's fix cards can show
+                    // the fix. From the profile it is just one screen.
+                    val leave = {
+                        if (destination.afterConnect) {
                             results.sendResult(result = CalendarConnected)
                             backStack.backPastCalendarScreens()
-                        },
-                    )
+                        } else {
+                            backStack.removeLastOrNull()
+                        }
+                    }
+                    screens.CalendarChoose(onBack = { leave() }, onDone = { leave() })
                 }
             },
     )
@@ -296,6 +303,12 @@ private fun SnapshotStateList<NavKey>.Tabs(selected: NavTab) {
     )
 }
 
+/** The connect screens make way for the list of calendars; Back on it no longer reopens them. */
+private fun MutableList<NavKey>.chooseCalendarsAfterConnecting() {
+    backPastCalendarScreens()
+    add(Destination.CalendarChoose(afterConnect = true))
+}
+
 /**
  * A calendar connected: back past the picker to where it was asked for, the profile with the new
  * row in it, or the conversation whose step needed it.
@@ -304,6 +317,7 @@ private fun MutableList<NavKey>.backPastCalendarScreens() {
     removeAll {
         it == Destination.CalendarPicker ||
             it is Destination.CalendarConnect ||
-            it == Destination.GoogleCalendarSignIn
+            it == Destination.GoogleCalendarSignIn ||
+            it is Destination.CalendarChoose
     }
 }

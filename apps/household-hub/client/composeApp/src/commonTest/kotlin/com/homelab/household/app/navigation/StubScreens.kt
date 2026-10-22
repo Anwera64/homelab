@@ -230,12 +230,14 @@ class StubScreens : AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onChooseCalendars: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
         onWhenAgentsAct: () -> Unit,
         onMemories: () -> Unit,
     ) {
         Column {
             Text(PROFILE)
+            Text(GO_TO_CHOOSE_CALENDARS, modifier = Modifier.clickable { onChooseCalendars() })
             Text(GO_TO_WHEN_AGENTS_ACT, modifier = Modifier.clickable { onWhenAgentsAct() })
             Text(GO_TO_MEMORIES, modifier = Modifier.clickable { onMemories() })
             Text(GO_TO_CALENDAR, modifier = Modifier.clickable { onCalendar() })
@@ -375,6 +377,18 @@ class StubScreens : AppScreens {
     }
 
     @Composable
+    override fun CalendarChoose(
+        onBack: () -> Unit,
+        onDone: () -> Unit,
+    ) {
+        Column {
+            Text(CALENDAR_CHOOSE)
+            Text(CALENDARS_CHOSEN, modifier = Modifier.clickable { onDone() })
+            Text(BACK, modifier = Modifier.clickable { onBack() })
+        }
+    }
+
+    @Composable
     override fun GoogleCalendarSignIn(
         onBack: () -> Unit,
         onConnect: () -> Unit,
@@ -421,6 +435,9 @@ class StubScreens : AppScreens {
         const val GOOGLE_SIGN_IN = "google sign in screen"
         const val SIGN_IN_TO_GOOGLE_AGAIN = "sign in to google again"
         const val CALENDAR_CONNECTED = "calendar connected"
+        const val CALENDAR_CHOOSE = "calendar choose screen"
+        const val CALENDARS_CHOSEN = "calendars chosen"
+        const val GO_TO_CHOOSE_CALENDARS = "go to choose calendars"
         const val RECONNECT_CALENDAR = "reconnect calendar"
 
         fun calendarConnectOf(provider: CalendarProvider) = "calendar connect screen for $provider"

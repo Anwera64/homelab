@@ -108,6 +108,24 @@ class ProfileScreenTest {
     }
 
     @Test
+    fun `GIVEN the calendar options WHEN Choose calendars is tapped THEN the list of calendars opens`() {
+        val hub = FakeMembersHub().apply { hasACalendar() }
+        var choose = 0
+
+        runScreenTest {
+            profileScreen(hub, onChooseCalendars = { choose++ })
+
+            onProfile {
+                opensTheOptionsOfCalendar(calendarAccount)
+
+                tapsChooseCalendars()
+            }
+
+            waitUntil(timeoutMillis = wait) { choose == 1 }
+        }
+    }
+
+    @Test
     fun `GIVEN the calendar options WHEN Change calendar is chosen THEN the picker opens`() {
         val hub = FakeMembersHub().apply { hasACalendar() }
         var picker = 0

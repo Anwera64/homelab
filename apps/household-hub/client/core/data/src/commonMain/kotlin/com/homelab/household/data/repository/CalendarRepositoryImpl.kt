@@ -2,9 +2,11 @@ package com.homelab.household.data.repository
 
 import com.homelab.household.data.datasource.remote.`interface`.CalendarRemoteDataSource
 import com.homelab.household.data.dto.CalendarCredentialCreateDto
+import com.homelab.household.data.dto.CalendarSourcesPickDto
 import com.homelab.household.data.mapper.CalendarDataMapper
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
+import com.homelab.household.domain.model.CalendarSource
 import com.homelab.household.domain.repository.CalendarRepository
 
 /** Orchestration and mapping for the member's calendar connection. [remote] speaks DTOs and wire names. */
@@ -18,7 +20,6 @@ class CalendarRepositoryImpl(
         server: String,
         account: String,
         password: String,
-        calendarName: String?,
     ): CalendarConnection =
         CalendarDataMapper.toDomain(
             remote.configureCalendar(
@@ -27,12 +28,17 @@ class CalendarRepositoryImpl(
                     url = server,
                     username = account,
                     password = password,
-                    calendarName = calendarName,
                 ),
             ),
         )
 
     override suspend fun removeCalendar() = remote.deleteCalendar()
+
+    override suspend fun listCalendars(): List<CalendarSource> =
+        remote.getCalendarSources().map(CalendarDataMapper::toDomain)
+
+    override suspend fun pickCalendars(keys: List<String>): List<CalendarSource> =
+        remote.putCalendarSources(CalendarSourcesPickDto(picked = keys)).map(CalendarDataMapper::toDomain)
 
     override suspend fun startGoogleSignIn(): String = remote.startGoogleSignIn()
 }

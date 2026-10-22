@@ -1,5 +1,6 @@
 package com.homelab.household.presentation.di
 
+import com.homelab.household.presentation.calendarchoose.CalendarChooseViewModel
 import com.homelab.household.presentation.calendarconnect.CalendarConnectViewModel
 import com.homelab.household.presentation.changepin.ChangePinViewModel
 import com.homelab.household.presentation.chats.ChatsViewModel
@@ -66,6 +67,7 @@ val presentationModule =
         factory { ChangePinViewModel(get()) }
         factory { params -> CalendarConnectViewModel(provider = params.get(), connectCalendar = get()) }
         factory { GoogleCalendarSignInViewModel(startSignIn = get()) }
+        factory { CalendarChooseViewModel(getCalendars = get(), pickCalendars = get()) }
         factory { params -> RemoveMemberViewModel(member = params.get(), removeMember = get()) }
         factory { LeaveHouseholdViewModel(get()) }
         factory { params ->

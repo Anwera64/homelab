@@ -40,6 +40,7 @@ object ProposalDetailsDataMapper {
                     allDay = allDay,
                     repeat = (arguments[REPEAT] as? JsonObject)?.let(::repeatOf),
                     scope = scopeOf(arguments),
+                    calendarName = arguments.text(CALENDAR_NAME)?.trim()?.ifBlank { null },
                 )
             }
 
@@ -227,6 +228,9 @@ object ProposalDetailsDataMapper {
     private const val END_TIME = "end_time"
     private const val IS_ALL_DAY = "is_all_day"
     private const val REPEAT = "repeat"
+
+    // Put on the card by the hub to be shown; never sent back, since the write names its calendar by key.
+    private const val CALENDAR_NAME = "calendar_name"
     private const val OCCURRENCE_START = "occurrence_start"
     private const val SCOPE = "scope"
     private const val FOLLOWING = "following"

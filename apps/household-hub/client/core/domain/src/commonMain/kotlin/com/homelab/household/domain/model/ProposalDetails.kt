@@ -13,7 +13,8 @@ sealed interface ProposalDetails {
      * An event on the member's calendar. [start] and [end] have no time when it is [allDay]. [repeat]
      * is how it repeats, when it does. [scope] is which of its dates a change or removal is for, when
      * it is about one date of a repeating event, and null otherwise. [repeatChange] is only ever set
-     * on details edited on a card: how the member changed the rule, if they did.
+     * on details edited on a card: how the member changed the rule, if they did. [calendarName] is
+     * which of the member's calendars it is on or goes to, when the hub says; it is only shown.
      */
     data class CalendarEvent(
         val title: String?,
@@ -23,6 +24,7 @@ sealed interface ProposalDetails {
         val repeat: EventRepeat? = null,
         val scope: EventScope? = null,
         val repeatChange: RepeatChange? = null,
+        val calendarName: String? = null,
     ) : ProposalDetails
 
     /** A note: its [title], and the [content] it is given or gains. */

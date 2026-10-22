@@ -114,6 +114,39 @@ enum class HearthIcon(
             "M14.6 17.8l2 2 3.8-4",
         ),
     ),
+
+    // The calendar sheet's rows (Calendar & offline page: CalSheetIcons, #252). Choosing which calendars
+    // are read is a ticked list; changing the account and disconnecting share the calendar body above.
+    CalendarChoose(
+        "calendarChoose",
+        strokes(
+            "M4.2 6.8l1.6 1.6 2.8-3",
+            "M11.6 6.6h8.2",
+            "M4.2 12.8l1.6 1.6 2.8-3",
+            "M11.6 12.6h8.2",
+            "M11.6 18.6h8.2",
+            rect(4.4, 16.8, 3.6, 3.6, 1.0),
+        ),
+    ),
+    CalendarSwap(
+        "calendarSwap",
+        strokes(
+            "M19.4 11.6V8.6a2.8 2.8 0 0 0-2.8-2.8H5.8A2.8 2.8 0 0 0 3 8.6v9.2a2.8 2.8 0 0 0 2.8 2.8h6",
+            "M8.2 3.4v4.4M15 3.4v4.4M3 11.4h16.4",
+            "M14.2 15h6",
+            "M18.4 13.2l1.8 1.8-1.8 1.8",
+            "M20.2 19.4h-6",
+            "M16 17.6l-1.8 1.8 1.8 1.8",
+        ),
+    ),
+    CalendarDisconnect(
+        "calendarDisconnect",
+        strokes(
+            "M19.4 11.6V8.6a2.8 2.8 0 0 0-2.8-2.8H5.8A2.8 2.8 0 0 0 3 8.6v9.2a2.8 2.8 0 0 0 2.8 2.8h6",
+            "M8.2 3.4v4.4M15 3.4v4.4M3 11.4h16.4",
+            "M15.2 15.2l4.6 4.6M19.8 15.2l-4.6 4.6",
+        ),
+    ),
     Search("search", strokes(circle(10.8, 10.8, 6.4), "M15.6 15.6l4.8 4.8")),
     Document(
         "document",

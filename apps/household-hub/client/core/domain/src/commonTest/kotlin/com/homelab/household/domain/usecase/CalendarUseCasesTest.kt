@@ -4,9 +4,12 @@ import com.homelab.household.domain.exception.CalendarRejectedException
 import com.homelab.household.domain.exception.ValidationException
 import com.homelab.household.domain.model.CalendarConnection
 import com.homelab.household.domain.model.CalendarProvider
+import com.homelab.household.domain.model.CalendarSource
 import com.homelab.household.domain.repository.CalendarRepository
 import com.homelab.household.domain.usecase.impl.ConnectCalendarUseCaseImpl
+import com.homelab.household.domain.usecase.impl.GetCalendarSourcesUseCaseImpl
 import com.homelab.household.domain.usecase.impl.GetCalendarUseCaseImpl
+import com.homelab.household.domain.usecase.impl.PickCalendarsUseCaseImpl
 import com.homelab.household.domain.usecase.impl.RemoveCalendarUseCaseImpl
 import com.homelab.household.domain.usecase.impl.StartGoogleCalendarSignInUseCaseImpl
 import dev.mokkery.answering.returns
@@ -44,7 +47,6 @@ class CalendarUseCasesTest {
                     "https://caldav.icloud.com",
                     "emma@icloud.com",
                     "abcd-efgh-ijkl-mnop",
-                    null,
                 )
             } returns icloud
 
@@ -61,7 +63,7 @@ class CalendarUseCasesTest {
                 connect(CalendarProvider.GOOGLE, "emma.larsson@gmail.com", "abcd efgh ijkl mnop")
             }
 
-            verifySuspend(VerifyMode.not) { repository.connectCalendar(any(), any(), any(), any(), any()) }
+            verifySuspend(VerifyMode.not) { repository.connectCalendar(any(), any(), any(), any()) }
         }
 
     @Test
@@ -76,7 +78,7 @@ class CalendarUseCasesTest {
         }
 
     @Test
-    fun `GIVEN another CalDAV server WHEN it is connected THEN the typed address and calendar are sent`() =
+    fun `GIVEN another CalDAV server WHEN it is connected THEN the typed address is sent`() =
         runTest {
             val other = icloud.copy(provider = CalendarProvider.OTHER)
             everySuspend {
@@ -85,7 +87,6 @@ class CalendarUseCasesTest {
                     "https://cloud.example.com/remote.php/dav",
                     "emma",
                     "secret",
-                    "Family",
                 )
             } returns other
 
@@ -95,7 +96,6 @@ class CalendarUseCasesTest {
                     "emma",
                     "secret",
                     server = " https://cloud.example.com/remote.php/dav ",
-                    calendarName = " Family ",
                 )
 
             assertEquals(other, connection)
@@ -122,7 +122,6 @@ class CalendarUseCasesTest {
                     "https://caldav.icloud.com",
                     "emma@icloud.com",
                     "my-apple-id-password",
-                    null,
                 )
             } throws CalendarRejectedException()
 
@@ -147,5 +146,27 @@ class CalendarUseCasesTest {
             RemoveCalendarUseCaseImpl(repository)()
 
             verifySuspend(VerifyMode.exactly(1)) { repository.removeCalendar() }
+        }
+
+    @Test
+    fun `GIVEN an account with two calendars WHEN the member asks for them THEN both come back with what is picked`() =
+        runTest {
+            val calendars =
+                listOf(
+                    CalendarSource(key = "c1", name = "Home", writable = true, picked = true),
+                    CalendarSource(key = "c2", name = "Birthdays", writable = false, picked = false),
+                )
+            everySuspend { repository.listCalendars() } returns calendars
+
+            assertEquals(calendars, GetCalendarSourcesUseCaseImpl(repository)())
+        }
+
+    @Test
+    fun `GIVEN the member ticks one calendar WHEN they save THEN the repository is told which and the saved list comes back`() =
+        runTest {
+            val saved = listOf(CalendarSource(key = "c1", name = "Home", writable = true, picked = true))
+            everySuspend { repository.pickCalendars(listOf("c1")) } returns saved
+
+            assertEquals(saved, PickCalendarsUseCaseImpl(repository)(listOf("c1")))
         }
 }

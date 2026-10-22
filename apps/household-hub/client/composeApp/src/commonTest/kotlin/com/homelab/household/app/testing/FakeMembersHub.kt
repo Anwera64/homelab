@@ -34,6 +34,21 @@ class FakeMembersHub {
         )
     private var calendar: String? = null
 
+    /** One calendar of Emma's account as the hub lists it, and whether agents read it. */
+    data class FakeCalendarSource(
+        val key: String,
+        val name: String,
+        val writable: Boolean = true,
+        val picked: Boolean = true,
+    )
+
+    /** The calendars of Emma's account, as the hub keeps them. */
+    var calendars: List<FakeCalendarSource> = emptyList()
+        private set
+
+    private var listsCalendars = true
+    private var savesCalendars = true
+
     /** How many times the phone asked the hub to forget the calendar. */
     var calendarsRemoved = 0
         private set
@@ -105,6 +120,25 @@ class FakeMembersHub {
                 path == "/api/v1/integrations/calendars/me" -> {
                     calendar?.let { json(it) }
                         ?: json("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound)
+                }
+
+                path == "/api/v1/integrations/calendars/me/sources" && request.method == HttpMethod.Get -> {
+                    if (!listsCalendars) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    if (calendar == null) {
+                        json("""{"detail":"No calendar configured."}""", HttpStatusCode.NotFound)
+                    } else {
+                        json(calendarsJson())
+                    }
+                }
+
+                path == "/api/v1/integrations/calendars/me/sources" && request.method == HttpMethod.Put -> {
+                    if (!savesCalendars) return@MockEngine respond("", HttpStatusCode.ServiceUnavailable)
+                    val body = (request.body as TextContent).text
+                    val picked = Regex("\"([^\"]+)\"").findAll(body.substringAfter("[").substringBefore("]"))
+                        .map { it.groupValues[1] }
+                        .toSet()
+                    calendars = calendars.map { it.copy(picked = it.key in picked) }
+                    json(calendarsJson())
                 }
 
                 path == "/api/v1/users/me/tool-approvals" && request.method == HttpMethod.Get -> {
@@ -192,6 +226,30 @@ class FakeMembersHub {
             "username":"emma@icloud.com","calendar_name":"Default","is_active":true,
             "created_at":"$checkedAt","updated_at":"$checkedAt"}"""
     }
+
+    /** The calendars of Emma's account, which the hub lists once she has one connected. */
+    fun hasCalendars(vararg sources: FakeCalendarSource) {
+        calendars = sources.toList()
+    }
+
+    /** The calendar account doesn't answer when the phone asks for its calendars. */
+    fun cannotListCalendars() {
+        listsCalendars = false
+    }
+
+    fun canListCalendarsAgain() {
+        listsCalendars = true
+    }
+
+    /** The hub can't keep the member's pick of calendars. */
+    fun cannotSaveCalendars() {
+        savesCalendars = false
+    }
+
+    private fun calendarsJson() =
+        calendars.joinToString(prefix = "[", postfix = "]") {
+            """{"key":"${it.key}","name":"${it.name}","writable":${it.writable},"picked":${it.picked}}"""
+        }
 
     /** Emma's Google calendar, whose sign-in Google no longer accepts. */
     fun hasAGoogleCalendarNeedingSignInAgain() {

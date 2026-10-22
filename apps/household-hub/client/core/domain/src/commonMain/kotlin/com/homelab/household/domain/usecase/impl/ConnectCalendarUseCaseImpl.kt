@@ -14,7 +14,6 @@ class ConnectCalendarUseCaseImpl(
         account: String,
         password: String,
         server: String,
-        calendarName: String,
     ): CalendarConnection {
         if (provider.signsIn) throw ValidationException("Google calendars are connected by signing in with Google")
 
@@ -31,7 +30,6 @@ class ConnectCalendarUseCaseImpl(
             server = address,
             account = trimmedAccount,
             password = cleanPassword,
-            calendarName = calendarName.trim().ifEmpty { null },
         )
     }
 }

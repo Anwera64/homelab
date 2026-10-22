@@ -55,7 +55,7 @@ class CalendarConnectViewModelTest {
     @Test
     fun `GIVEN details the hub can use WHEN connecting THEN the calendar is connected and the screen says so`() =
         runTest(testDispatcher) {
-            everySuspend { connectCalendar(any(), any(), any(), any(), any()) } returns icloud
+            everySuspend { connectCalendar(any(), any(), any(), any()) } returns icloud
             val viewModel = filledIn()
 
             viewModel.events.test {
@@ -65,14 +65,14 @@ class CalendarConnectViewModelTest {
                 assertEquals(CalendarConnectEvent.Connected, awaitItem())
             }
             verifySuspend(VerifyMode.exactly(1)) {
-                connectCalendar(CalendarProvider.APPLE, "emma@icloud.com", "abcd-efgh-ijkl-mnop", "", "")
+                connectCalendar(CalendarProvider.APPLE, "emma@icloud.com", "abcd-efgh-ijkl-mnop", "")
             }
         }
 
     @Test
     fun `GIVEN the calendar refuses the password WHEN connecting THEN the status says rejected and the typed password is kept`() =
         runTest(testDispatcher) {
-            everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws CalendarRejectedException()
+            everySuspend { connectCalendar(any(), any(), any(), any()) } throws CalendarRejectedException()
             val viewModel = filledIn()
 
             viewModel.connect()
@@ -85,7 +85,7 @@ class CalendarConnectViewModelTest {
     @Test
     fun `GIVEN a calendar server the hub cannot reach WHEN connecting THEN the status says so rather than blaming the password`() =
         runTest(testDispatcher) {
-            everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws CalendarUnreachableException()
+            everySuspend { connectCalendar(any(), any(), any(), any()) } throws CalendarUnreachableException()
             val viewModel = filledIn()
 
             viewModel.connect()
@@ -97,7 +97,7 @@ class CalendarConnectViewModelTest {
     @Test
     fun `GIVEN a hub that does not answer WHEN connecting THEN the status is its own hub unreachable failure`() =
         runTest(testDispatcher) {
-            everySuspend { connectCalendar(any(), any(), any(), any(), any()) } throws ServerOfflineException()
+            everySuspend { connectCalendar(any(), any(), any(), any()) } throws ServerOfflineException()
             val viewModel = filledIn()
 
             viewModel.connect()
@@ -118,6 +118,6 @@ class CalendarConnectViewModelTest {
             assertEquals(true, state.accountMissing)
             assertEquals(true, state.passwordMissing)
             assertEquals(true, state.serverMissing)
-            verifySuspend(VerifyMode.not) { connectCalendar(any(), any(), any(), any(), any()) }
+            verifySuspend(VerifyMode.not) { connectCalendar(any(), any(), any(), any()) }
         }
 }

@@ -1,6 +1,7 @@
 package com.homelab.household.app.navigation
 
 import androidx.compose.runtime.Composable
+import com.homelab.household.app.screens.calendarchoose.CalendarChooseScreen
 import com.homelab.household.app.screens.calendarconnect.CalendarConnectScreen
 import com.homelab.household.app.screens.calendarconnect.GoogleCalendarSignInScreen
 import com.homelab.household.app.screens.calendarprovider.CalendarProviderScreen
@@ -124,6 +125,7 @@ interface AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onChooseCalendars: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
         onWhenAgentsAct: () -> Unit,
         onMemories: () -> Unit,
@@ -182,6 +184,11 @@ interface AppScreens {
     @Composable fun GoogleCalendarSignIn(
         onBack: () -> Unit,
         onConnect: () -> Unit,
+    )
+
+    @Composable fun CalendarChoose(
+        onBack: () -> Unit,
+        onDone: () -> Unit,
     )
 }
 
@@ -321,6 +328,7 @@ object RealAppScreens : AppScreens {
         onLeave: () -> Unit,
         onSignedOut: () -> Unit,
         onCalendar: () -> Unit,
+        onChooseCalendars: () -> Unit,
         onCalendarSignInAgain: () -> Unit,
         onWhenAgentsAct: () -> Unit,
         onMemories: () -> Unit,
@@ -332,6 +340,7 @@ object RealAppScreens : AppScreens {
             onLeave = onLeave,
             onSignedOut = onSignedOut,
             onCalendar = onCalendar,
+            onChooseCalendars = onChooseCalendars,
             onCalendarSignInAgain = onCalendarSignInAgain,
             onWhenAgentsAct = onWhenAgentsAct,
             onMemories = onMemories,
@@ -427,5 +436,13 @@ object RealAppScreens : AppScreens {
         onConnect: () -> Unit,
     ) {
         GoogleCalendarSignInScreen(onBack = onBack, onConnect = onConnect)
+    }
+
+    @Composable
+    override fun CalendarChoose(
+        onBack: () -> Unit,
+        onDone: () -> Unit,
+    ) {
+        CalendarChooseScreen(onBack = onBack, onDone = onDone)
     }
 }

@@ -162,10 +162,53 @@ class AppNavHostTest {
                 tapsReconnectCalendar()
                 tapsPickApple()
                 tapsCalendarConnected()
+                seesTheCalendarChoose()
+                tapsCalendarsChosen()
                 waitForIdle()
 
                 seesTheConversation("s-1")
                 assertEquals(1, screens.calendarsConnected)
+            }
+        }
+
+    @Test
+    fun `GIVEN a calendar just connected from a conversation WHEN its calendar list is left with Back THEN the conversation still hears it once`() =
+        runComposeUiTest {
+            onAppNavHost {
+                val screens = StubScreens()
+                backStack[0] = Destination.Conversation("s-1")
+                appNavHost(screens, backStack, session)
+
+                tapsReconnectCalendar()
+                tapsPickApple()
+                tapsCalendarConnected()
+                seesTheCalendarChoose()
+                tapsBack()
+                waitForIdle()
+
+                seesTheConversation("s-1")
+                assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
+                assertEquals(1, screens.calendarsConnected)
+            }
+        }
+
+    @Test
+    fun `GIVEN the profile WHEN Choose calendars is picked and done THEN the profile is back`() =
+        runComposeUiTest {
+            onAppNavHost {
+                backStack[0] = Destination.Profile
+                appNavHost(StubScreens(), backStack, session)
+
+                tapsChooseCalendars()
+                seesTheCalendarChoose()
+                assertEquals(
+                    listOf(Destination.Profile, Destination.CalendarChoose(afterConnect = false)),
+                    backStack.toList(),
+                )
+                tapsCalendarsChosen()
+
+                seesProfile()
+                assertEquals(listOf(Destination.Profile), backStack.toList())
             }
         }
 
@@ -455,6 +498,8 @@ class AppNavHostTest {
                 tapsPickApple()
                 seesTheCalendarConnectFor(CalendarProvider.APPLE)
                 tapsCalendarConnected()
+                seesTheCalendarChoose()
+                tapsCalendarsChosen()
 
                 seesProfile()
                 assertEquals(listOf(Destination.Profile), backStack.toList())
@@ -472,6 +517,8 @@ class AppNavHostTest {
                 tapsPickGoogle()
                 seesTheGoogleSignIn()
                 tapsCalendarConnected()
+                seesTheCalendarChoose()
+                tapsCalendarsChosen()
 
                 seesProfile()
                 assertEquals(listOf(Destination.Profile), backStack.toList())
@@ -503,6 +550,8 @@ class AppNavHostTest {
                 seesTheCalendarPicker()
                 tapsPickApple()
                 tapsCalendarConnected()
+                seesTheCalendarChoose()
+                tapsCalendarsChosen()
 
                 seesTheConversation("s-1")
                 assertEquals(listOf(Destination.Conversation("s-1")), backStack.toList())
