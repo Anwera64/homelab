@@ -209,7 +209,7 @@ services:
   # ==============================================================================
   jellyfin:
     profiles: ["media"]
-    image: jellyfin/jellyfin:12.2
+    image: jellyfin/jellyfin:12.3
     container_name: jellyfin
     # The image starts as root unless told otherwise. This is the user the other media apps run
     # as (their PUID); the GPU needs no extra group.
