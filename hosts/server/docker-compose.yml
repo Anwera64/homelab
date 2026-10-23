@@ -369,7 +369,7 @@ services:
   # The embedder only (bge-m3, pulled by bootstrap.sh), on the laptop's GPU beside Jellyfin.
   # Pinned to the desktop's version. Nothing is published: the Hub reaches it inside the stack.
   ollama:
-    image: ollama/ollama:0.40.9
+    image: ollama/ollama:0.40.10
     container_name: ollama
     environment:
       - TZ=${TZ:-Europe/Madrid}
@@ -541,7 +541,7 @@ services:
   # ==============================================================================
   renovate:
     profiles: ["renovate"]
-    image: renovate/renovate:44.179.1
+    image: renovate/renovate:44.181.0
     container_name: renovate
     environment:
       - TZ=${TZ:-Europe/Madrid}
