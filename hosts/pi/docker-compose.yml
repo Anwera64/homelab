@@ -78,7 +78,7 @@ services:
   # Dashboard for the whole homelab. Config lives in the repo (config/homepage, added to
   # the sparse checkout by bootstrap.sh); the server's services are reached on 192.168.1.30.
   homepage:
-    image: ghcr.io/gethomepage/homepage:v2.6.0
+    image: ghcr.io/gethomepage/homepage:v2.7.0
     container_name: homepage
     ports:
       - 3000:3000
