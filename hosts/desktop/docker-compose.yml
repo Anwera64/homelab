@@ -19,7 +19,7 @@ services:
   # bumps both in one PR.
   # ==============================================================================
   ollama:
-    image: ollama/ollama:0.40.8
+    image: ollama/ollama:0.40.9
     container_name: ollama
     environment:
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-15m}
