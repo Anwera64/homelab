@@ -355,7 +355,7 @@ services:
   # on the desktop's RTX 5080, reached over the LAN.
   # ==============================================================================
   searxng:
-    image: searxng/searxng:2026.10.23-68647d080
+    image: searxng/searxng:2026.10.24-ef0ec03da
     container_name: searxng
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080
