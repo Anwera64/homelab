@@ -79,6 +79,10 @@ fastapi==0.156.8
     # via
     #   -c requirements.txt
     #   -r requirements.in
+flatbuffers==25.12.19
+    # via
+    #   -c requirements.txt
+    #   onnxruntime
 greenlet==3.5.6
     # via
     #   -c requirements.txt
@@ -152,20 +156,44 @@ markupsafe==3.0.4
     # via
     #   -c requirements.txt
     #   mako
+networkx==3.7
+    # via
+    #   -c requirements.txt
+    #   pymupdf
 niquests==3.21.2
     # via
     #   -c requirements.txt
     #   caldav
+numpy==2.5.4
+    # via
+    #   -c requirements.txt
+    #   onnxruntime
+    #   pymupdf
+onnxruntime==1.31.0
+    # via
+    #   -c requirements.txt
+    #   pymupdf
 opentelemetry-api==1.45.1
     # via
     #   -c requirements.txt
     #   fastapi
 packaging==26.3
-    # via pytest
+    # via
+    #   -c requirements.txt
+    #   onnxruntime
+    #   pytest
 pluggy==1.7.0
     # via
     #   pytest
     #   pytest-cov
+protobuf==7.36.2
+    # via
+    #   -c requirements.txt
+    #   onnxruntime
+psutil==7.2.2
+    # via
+    #   -c requirements.txt
+    #   pymupdf
 pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via
     #   -c requirements.txt
@@ -190,10 +218,18 @@ pyjwt==2.15.1
     # via
     #   -c requirements.txt
     #   -r requirements.in
-pymupdf==1.28.2
+pymupdf==2.0
     # via
     #   -c requirements.txt
     #   -r requirements.in
+pymupdf-layout==2.0
+    # via
+    #   -c requirements.txt
+    #   pymupdf
+pymupdf4llm==2.0
+    # via
+    #   -c requirements.txt
+    #   pymupdf
 pytest==9.1.1
     # via
     #   -r requirements-dev.in
@@ -229,6 +265,7 @@ pyyaml==6.0.3
     # via
     #   -c requirements.txt
     #   caldav
+    #   pymupdf
     #   uvicorn
 qh3==2.0.4 ; (platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'armv7l' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'i686' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'ppc64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'ppc64le' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'riscv64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'riscv64gc' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 's390x' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'x86' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'armv7l' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'i686' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'ppc64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'ppc64le' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'riscv64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'riscv64gc' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 's390x' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'x86' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'armv7l' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'i686' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'ppc64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'ppc64le' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'riscv64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'riscv64gc' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 's390x' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'x86' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'win32')
     # via
@@ -260,6 +297,10 @@ starlette==1.9.0
     # via
     #   -c requirements.txt
     #   fastapi
+tabulate==0.10.0
+    # via
+    #   -c requirements.txt
+    #   pymupdf
 tld==0.13.2
     # via
     #   -c requirements.txt
