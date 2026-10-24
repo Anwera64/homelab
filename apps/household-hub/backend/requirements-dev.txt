@@ -75,7 +75,7 @@ dnspython==2.9.0
     # via
     #   -c requirements.txt
     #   caldav
-fastapi==0.156.4
+fastapi==0.156.8
     # via
     #   -c requirements.txt
     #   -r requirements.in
